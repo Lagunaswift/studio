@@ -1,19 +1,39 @@
 "use client";
 
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, BarChart3, TrendingUp } from 'lucide-react';
+import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, Target, Edit } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
-import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useForm, SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { useToast } from '@/hooks/use-toast';
+import type { MacroTargets } from '@/types';
+import { Progress } from '@/components/ui/progress';
+
+const macroTargetSchema = z.object({
+  calories: z.coerce.number().min(0, "Calories must be positive"),
+  protein: z.coerce.number().min(0, "Protein must be positive"),
+  carbs: z.coerce.number().min(0, "Carbs must be positive"),
+  fat: z.coerce.number().min(0, "Fat must be positive"),
+});
+
+type MacroTargetFormValues = z.infer<typeof macroTargetSchema>;
 
 export default function HomePage() {
-  const { getDailyMacros } = useAppContext();
+  const { getDailyMacros, macroTargets, setMacroTargets } = useAppContext();
+  const { toast } = useToast();
   const today = format(new Date(), 'yyyy-MM-dd');
   const todayMacros = getDailyMacros(today);
+  const [showSetTargetsDialog, setShowSetTargetsDialog] = useState(false);
 
   const features = [
     {
@@ -50,6 +70,32 @@ export default function HomePage() {
     },
   ];
 
+  const macroTargetForm = useForm<MacroTargetFormValues>({
+    resolver: zodResolver(macroTargetSchema),
+    defaultValues: macroTargets || { calories: 2000, protein: 150, carbs: 200, fat: 60 },
+  });
+
+  useEffect(() => {
+    if (macroTargets) {
+      macroTargetForm.reset(macroTargets);
+    } else {
+      macroTargetForm.reset({ calories: 2000, protein: 150, carbs: 200, fat: 60 });
+    }
+  }, [macroTargets, macroTargetForm, showSetTargetsDialog]);
+
+
+  const handleSetTargets: SubmitHandler<MacroTargetFormValues> = (data) => {
+    setMacroTargets(data);
+    toast({
+      title: "Targets Updated",
+      description: "Your macro targets have been saved.",
+    });
+    setShowSetTargetsDialog(false);
+  };
+
+  const macroKeys: (keyof MacroTargets)[] = ['calories', 'protein', 'carbs', 'fat'];
+
+
   return (
     <PageWrapper>
       <section className="text-center mb-12 py-8 bg-gradient-to-br from-primary/20 to-accent/10 rounded-lg shadow-lg">
@@ -62,13 +108,50 @@ export default function HomePage() {
       </section>
 
       <section className="mb-12">
-        <h2 className="text-2xl font-bold font-headline text-primary mb-4">Today's Macros ({format(parseISO(today), "MMMM dd, yyyy")})</h2>
-        {todayMacros.calories > 0 || todayMacros.protein > 0 || todayMacros.carbs > 0 || todayMacros.fat > 0 ? (
-          <MacroDisplay macros={todayMacros} title="Today's Totals" highlightTotal />
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold font-headline text-primary">Today's Macros ({format(parseISO(today), "MMMM dd, yyyy")})</h2>
+          <Button variant="outline" onClick={() => setShowSetTargetsDialog(true)}>
+            {macroTargets ? <Edit className="mr-2 h-4 w-4" /> : <Target className="mr-2 h-4 w-4" />}
+            {macroTargets ? "Update Targets" : "Set Targets"}
+          </Button>
+        </div>
+
+        {macroTargets ? (
+          <Card className="shadow-md">
+            <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+              {macroKeys.map(key => {
+                const consumed = todayMacros[key as keyof typeof todayMacros] ?? 0;
+                const target = macroTargets[key] ?? 0;
+                const progress = target > 0 ? Math.min((consumed / target) * 100, 100) : 0;
+                const unit = key === 'calories' ? 'kcal' : 'g';
+                const macroName = key.charAt(0).toUpperCase() + key.slice(1);
+
+                return (
+                  <div key={key}>
+                    <div className="flex justify-between items-baseline mb-1">
+                      <Label htmlFor={`progress-${key}`} className="text-base font-medium text-foreground/90">{macroName}</Label>
+                      <span className="text-sm text-muted-foreground">
+                        {consumed.toFixed(0)} / {target.toFixed(0)} {unit}
+                      </span>
+                    </div>
+                    <Progress id={`progress-${key}`} value={progress} className="w-full h-3" aria-label={`${macroName} progress: ${progress.toFixed(0)}%`} />
+                     {consumed > target && target > 0 && (
+                        <p className="text-xs text-destructive mt-1">
+                          Over by {(consumed - target).toFixed(0)} {unit}
+                        </p>
+                      )}
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
         ) : (
           <Card className="shadow-md">
-            <CardContent className="pt-6">
-              <p className="text-foreground/70">No meals planned for today yet. <Link href="/meal-plan" className="text-primary hover:underline">Plan your meals now!</Link></p>
+            <CardContent className="pt-6 text-center">
+              <p className="text-foreground/70 mb-4">Set your daily macro targets to track your progress!</p>
+              <Button onClick={() => setShowSetTargetsDialog(true)} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                <Target className="mr-2 h-4 w-4" /> Set Targets Now
+              </Button>
             </CardContent>
           </Card>
         )}
@@ -95,6 +178,41 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      <Dialog open={showSetTargetsDialog} onOpenChange={setShowSetTargetsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-headline text-primary">Set Your Daily Macro Targets</DialogTitle>
+            <DialogDescription>Enter your desired daily intake for calories and macronutrients.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={macroTargetForm.handleSubmit(handleSetTargets)} className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="calories">Calories (kcal)</Label>
+              <Input id="calories" type="number" min="0" {...macroTargetForm.register("calories")} />
+              {macroTargetForm.formState.errors.calories && <p className="text-sm text-destructive mt-1">{macroTargetForm.formState.errors.calories.message}</p>}
+            </div>
+            <div>
+              <Label htmlFor="protein">Protein (g)</Label>
+              <Input id="protein" type="number" min="0" {...macroTargetForm.register("protein")} />
+              {macroTargetForm.formState.errors.protein && <p className="text-sm text-destructive mt-1">{macroTargetForm.formState.errors.protein.message}</p>}
+            </div>
+            <div>
+              <Label htmlFor="carbs">Carbohydrates (g)</Label>
+              <Input id="carbs" type="number" min="0" {...macroTargetForm.register("carbs")} />
+              {macroTargetForm.formState.errors.carbs && <p className="text-sm text-destructive mt-1">{macroTargetForm.formState.errors.carbs.message}</p>}
+            </div>
+            <div>
+              <Label htmlFor="fat">Fat (g)</Label>
+              <Input id="fat" type="number" min="0" {...macroTargetForm.register("fat")} />
+              {macroTargetForm.formState.errors.fat && <p className="text-sm text-destructive mt-1">{macroTargetForm.formState.errors.fat.message}</p>}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowSetTargetsDialog(false)}>Cancel</Button>
+              <Button type="submit" className="bg-accent hover:bg-accent/90 text-accent-foreground">Save Targets</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </PageWrapper>
   );
 }

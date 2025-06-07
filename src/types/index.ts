@@ -50,3 +50,10 @@ export interface ShoppingListItem {
 export interface DailyMacros extends Macros {
   date: string;
 }
+
+export interface MacroTargets {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
