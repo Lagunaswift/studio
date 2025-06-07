@@ -1,6 +1,7 @@
 import type { Macros } from '@/types';
 import { Flame, Beef, Wheat, Droplets } from 'lucide-react'; // Using more generic icons for macros
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 interface MacroDisplayProps {
   macros: Macros;
