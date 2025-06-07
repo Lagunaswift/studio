@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -9,14 +10,14 @@ import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, Target, Edit } fr
 import { useAppContext } from '@/context/AppContext';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import type { MacroTargets } from '@/types';
+import type { MacroTargets, Macros } from '@/types';
 import { Progress } from '@/components/ui/progress';
 
 const macroTargetSchema = z.object({
@@ -29,11 +30,24 @@ const macroTargetSchema = z.object({
 type MacroTargetFormValues = z.infer<typeof macroTargetSchema>;
 
 export default function HomePage() {
-  const { getDailyMacros, macroTargets, setMacroTargets } = useAppContext();
+  const { getDailyMacros, macroTargets, setMacroTargets, mealPlan } = useAppContext(); // Added mealPlan for useEffect dependency
   const { toast } = useToast();
-  const today = format(new Date(), 'yyyy-MM-dd');
-  const todayMacros = getDailyMacros(today);
+  
+  const [clientTodayDate, setClientTodayDate] = useState<string>('');
+  const [clientTodayMacros, setClientTodayMacros] = useState<Macros>({ calories: 0, protein: 0, carbs: 0, fat: 0 });
   const [showSetTargetsDialog, setShowSetTargetsDialog] = useState(false);
+
+  useEffect(() => {
+    // Set date on client-side to avoid hydration mismatch
+    setClientTodayDate(format(new Date(), 'yyyy-MM-dd'));
+  }, []);
+
+  useEffect(() => {
+    // Calculate today's macros once clientTodayDate is set and getDailyMacros is available
+    if (clientTodayDate && getDailyMacros) {
+      setClientTodayMacros(getDailyMacros(clientTodayDate));
+    }
+  }, [clientTodayDate, getDailyMacros, mealPlan]); // mealPlan changes trigger getDailyMacros re-creation
 
   const features = [
     {
@@ -76,13 +90,14 @@ export default function HomePage() {
   });
 
   useEffect(() => {
+    // This effect updates the form if macroTargets change (e.g., after saving new ones)
+    // or ensures the form is correctly populated when the dialog opens.
     if (macroTargets) {
       macroTargetForm.reset(macroTargets);
     } else {
       macroTargetForm.reset({ calories: 2000, protein: 150, carbs: 200, fat: 60 });
     }
-  }, [macroTargets, macroTargetForm, showSetTargetsDialog]);
-
+  }, [macroTargets, showSetTargetsDialog, macroTargetForm.reset]); // macroTargetForm.reset is a stable function
 
   const handleSetTargets: SubmitHandler<MacroTargetFormValues> = (data) => {
     setMacroTargets(data);
@@ -94,7 +109,6 @@ export default function HomePage() {
   };
 
   const macroKeys: (keyof MacroTargets)[] = ['calories', 'protein', 'carbs', 'fat'];
-
 
   return (
     <PageWrapper>
@@ -109,7 +123,9 @@ export default function HomePage() {
 
       <section className="mb-12">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold font-headline text-primary">Today's Macros ({format(parseISO(today), "MMMM dd, yyyy")})</h2>
+          <h2 className="text-2xl font-bold font-headline text-primary">
+            Today's Macros ({clientTodayDate ? format(parseISO(clientTodayDate), "MMMM dd, yyyy") : 'Loading...'})
+          </h2>
           <Button variant="outline" onClick={() => setShowSetTargetsDialog(true)}>
             {macroTargets ? <Edit className="mr-2 h-4 w-4" /> : <Target className="mr-2 h-4 w-4" />}
             {macroTargets ? "Update Targets" : "Set Targets"}
@@ -120,7 +136,7 @@ export default function HomePage() {
           <Card className="shadow-md">
             <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
               {macroKeys.map(key => {
-                const consumed = todayMacros[key as keyof typeof todayMacros] ?? 0;
+                const consumed = clientTodayMacros[key as keyof typeof clientTodayMacros] ?? 0;
                 const target = macroTargets[key] ?? 0;
                 const progress = target > 0 ? Math.min((consumed / target) * 100, 100) : 0;
                 const unit = key === 'calories' ? 'kcal' : 'g';
