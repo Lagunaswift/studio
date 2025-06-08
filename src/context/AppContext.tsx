@@ -3,18 +3,18 @@
 
 import type React from 'react';
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import type { PlannedMeal, ShoppingListItem, Recipe, MealType, Macros, MacroTargets } from '@/types';
+import type { PlannedMeal, ShoppingListItem, Recipe, MealType, Macros, MacroTargets, UserProfileSettings } from '@/types';
 import { loadState, saveState } from '@/lib/localStorage';
 import { getRecipeById, calculateTotalMacros, generateShoppingList as generateShoppingListUtil } from '@/lib/data';
 
 const MEAL_PLAN_KEY = 'macroTealMealPlan';
 const SHOPPING_LIST_KEY = 'macroTealShoppingList';
-const MACRO_TARGETS_KEY = 'macroTealMacroTargets';
+const USER_PROFILE_KEY = 'macroTealUserProfile'; // Changed from MACRO_TARGETS_KEY
 
 interface AppContextType {
   mealPlan: PlannedMeal[];
   shoppingList: ShoppingListItem[];
-  macroTargets: MacroTargets | null;
+  userProfile: UserProfileSettings | null; // Changed from macroTargets
   addMealToPlan: (recipe: Recipe, date: string, mealType: MealType, servings: number) => void;
   removeMealFromPlan: (plannedMealId: string) => void;
   updatePlannedMealServings: (plannedMealId: string, newServings: number) => void;
@@ -24,6 +24,8 @@ interface AppContextType {
   clearAllData: () => void;
   getMealsForDate: (date: string) => PlannedMeal[];
   setMacroTargets: (targets: MacroTargets) => void;
+  setDietaryPreferences: (preferences: string[]) => void; // Added
+  setAllergens: (allergens: string[]) => void; // Added
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -31,22 +33,25 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [mealPlan, setMealPlan] = useState<PlannedMeal[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
-  const [macroTargets, setMacroTargetsState] = useState<MacroTargets | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null); // Changed state
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     const loadedMealPlan = loadState<PlannedMeal[]>(MEAL_PLAN_KEY) || [];
     const loadedShoppingList = loadState<ShoppingListItem[]>(SHOPPING_LIST_KEY) || [];
-    const loadedMacroTargets = loadState<MacroTargets>(MACRO_TARGETS_KEY) || null;
+    const loadedUserProfile = loadState<UserProfileSettings>(USER_PROFILE_KEY) || {
+      macroTargets: null,
+      dietaryPreferences: [],
+      allergens: [],
+    }; // Load userProfile
 
-    // Ensure recipeDetails are populated, especially if loaded from localStorage
     const populatedMealPlan = loadedMealPlan.map(pm => {
       const recipeDetails = getRecipeById(pm.recipeId);
-      return {...pm, recipeDetails: recipeDetails || undefined }; // Ensure recipeDetails can be undefined if not found
+      return {...pm, recipeDetails: recipeDetails || undefined };
     });
     setMealPlan(populatedMealPlan);
     
-    setMacroTargetsState(loadedMacroTargets);
+    setUserProfile(loadedUserProfile); // Set userProfile state
 
     if (loadedShoppingList.length === 0 && populatedMealPlan.length > 0) {
       setShoppingList(generateShoppingListUtil(populatedMealPlan));
@@ -58,7 +63,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     if (isInitialized) {
-      // Strip recipeDetails before saving to avoid circular references or large objects in localStorage
       saveState(MEAL_PLAN_KEY, mealPlan.map(({recipeDetails, ...pm}) => pm));
     }
   }, [mealPlan, isInitialized]);
@@ -71,9 +75,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     if (isInitialized) {
-      saveState(MACRO_TARGETS_KEY, macroTargets);
+      saveState(USER_PROFILE_KEY, userProfile); // Save userProfile state
     }
-  }, [macroTargets, isInitialized]);
+  }, [userProfile, isInitialized]);
   
   const regenerateShoppingList = useCallback((currentMealPlan: PlannedMeal[]) => {
     const newShoppingList = generateShoppingListUtil(currentMealPlan);
@@ -82,7 +86,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addMealToPlan = useCallback((recipe: Recipe, date: string, mealType: MealType, servings: number) => {
     const newPlannedMeal: PlannedMeal = {
-      id: `${recipe.id}-${date}-${mealType}-${Date.now()}`, // recipe.id is now number, JS will cast to string here
+      id: `${recipe.id}-${date}-${mealType}-${Date.now()}`,
       recipeId: recipe.id,
       date,
       mealType,
@@ -145,17 +149,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const clearAllData = useCallback(() => {
     setMealPlan([]);
     setShoppingList([]);
-    setMacroTargetsState(null);
+    setUserProfile({ macroTargets: null, dietaryPreferences: [], allergens: [] }); // Clear userProfile
+  }, []);
+
+  const updateUserProfileState = useCallback((updates: Partial<UserProfileSettings>) => {
+    setUserProfile(prev => ({
+      ...(prev || { macroTargets: null, dietaryPreferences: [], allergens: [] }),
+      ...updates,
+    }));
   }, []);
 
   const setMacroTargets = useCallback((targets: MacroTargets) => {
-    setMacroTargetsState(targets);
-  }, []);
+    updateUserProfileState({ macroTargets: targets });
+  }, [updateUserProfileState]);
+
+  const setDietaryPreferences = useCallback((preferences: string[]) => {
+    updateUserProfileState({ dietaryPreferences: preferences });
+  }, [updateUserProfileState]);
+
+  const setAllergens = useCallback((allergens: string[]) => {
+    updateUserProfileState({ allergens });
+  }, [updateUserProfileState]);
 
   const contextValue = useMemo(() => ({
     mealPlan,
     shoppingList,
-    macroTargets,
+    userProfile, // Changed
     addMealToPlan,
     removeMealFromPlan,
     updatePlannedMealServings,
@@ -165,7 +184,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     clearAllData,
     getMealsForDate,
     setMacroTargets,
-  }), [mealPlan, shoppingList, macroTargets, addMealToPlan, removeMealFromPlan, updatePlannedMealServings, getDailyMacros, toggleShoppingListItem, clearMealPlanForDate, clearAllData, getMealsForDate, setMacroTargets]);
+    setDietaryPreferences, // Added
+    setAllergens, // Added
+  }), [
+    mealPlan, shoppingList, userProfile, addMealToPlan, removeMealFromPlan, 
+    updatePlannedMealServings, getDailyMacros, toggleShoppingListItem, 
+    clearMealPlanForDate, clearAllData, getMealsForDate, setMacroTargets,
+    setDietaryPreferences, setAllergens // Added to dependencies
+  ]);
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 };
