@@ -30,7 +30,7 @@ const macroTargetSchema = z.object({
 type MacroTargetFormValues = z.infer<typeof macroTargetSchema>;
 
 export default function HomePage() {
-  const { getDailyMacros, macroTargets, setMacroTargets, mealPlan } = useAppContext(); // Added mealPlan for useEffect dependency
+  const { getDailyMacros, macroTargets, setMacroTargets, mealPlan } = useAppContext();
   const { toast } = useToast();
   
   const [clientTodayDate, setClientTodayDate] = useState<string>('');
@@ -38,16 +38,14 @@ export default function HomePage() {
   const [showSetTargetsDialog, setShowSetTargetsDialog] = useState(false);
 
   useEffect(() => {
-    // Set date on client-side to avoid hydration mismatch
     setClientTodayDate(format(new Date(), 'yyyy-MM-dd'));
   }, []);
 
   useEffect(() => {
-    // Calculate today's macros once clientTodayDate is set and getDailyMacros is available
     if (clientTodayDate && getDailyMacros) {
       setClientTodayMacros(getDailyMacros(clientTodayDate));
     }
-  }, [clientTodayDate, getDailyMacros, mealPlan]); // mealPlan changes trigger getDailyMacros re-creation
+  }, [clientTodayDate, getDailyMacros, mealPlan]);
 
   const features = [
     {
@@ -89,15 +87,30 @@ export default function HomePage() {
     defaultValues: macroTargets || { calories: 2000, protein: 150, carbs: 200, fat: 60 },
   });
 
+  const proteinValue = macroTargetForm.watch("protein");
+  const carbsValue = macroTargetForm.watch("carbs");
+  const fatValue = macroTargetForm.watch("fat");
+
   useEffect(() => {
-    // This effect updates the form if macroTargets change (e.g., after saving new ones)
-    // or ensures the form is correctly populated when the dialog opens.
-    if (macroTargets) {
-      macroTargetForm.reset(macroTargets);
-    } else {
-      macroTargetForm.reset({ calories: 2000, protein: 150, carbs: 200, fat: 60 });
+    const protein = parseFloat(proteinValue as any) || 0;
+    const carbs = parseFloat(carbsValue as any) || 0;
+    const fat = parseFloat(fatValue as any) || 0;
+
+    const calculatedCalories = (protein * 4) + (carbs * 4) + (fat * 9);
+    macroTargetForm.setValue("calories", Math.round(calculatedCalories), { shouldValidate: true, shouldDirty: true });
+  }, [proteinValue, carbsValue, fatValue, macroTargetForm.setValue]);
+
+
+  useEffect(() => {
+    if (showSetTargetsDialog) {
+      if (macroTargets) {
+        macroTargetForm.reset(macroTargets);
+      } else {
+        // Initial default values, calories will be auto-calculated by the effect above
+        macroTargetForm.reset({ calories: 0, protein: 150, carbs: 200, fat: 60 });
+      }
     }
-  }, [macroTargets, showSetTargetsDialog, macroTargetForm.reset]); // macroTargetForm.reset is a stable function
+  }, [macroTargets, showSetTargetsDialog, macroTargetForm.reset]);
 
   const handleSetTargets: SubmitHandler<MacroTargetFormValues> = (data) => {
     setMacroTargets(data);
@@ -199,14 +212,9 @@ export default function HomePage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="font-headline text-primary">Set Your Daily Macro Targets</DialogTitle>
-            <DialogDescription>Enter your desired daily intake for calories and macronutrients.</DialogDescription>
+            <DialogDescription>Enter your desired daily intake for calories and macronutrients. Calories will be auto-calculated.</DialogDescription>
           </DialogHeader>
           <form onSubmit={macroTargetForm.handleSubmit(handleSetTargets)} className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="calories">Calories (kcal)</Label>
-              <Input id="calories" type="number" min="0" {...macroTargetForm.register("calories")} />
-              {macroTargetForm.formState.errors.calories && <p className="text-sm text-destructive mt-1">{macroTargetForm.formState.errors.calories.message}</p>}
-            </div>
             <div>
               <Label htmlFor="protein">Protein (g)</Label>
               <Input id="protein" type="number" min="0" {...macroTargetForm.register("protein")} />
@@ -222,6 +230,11 @@ export default function HomePage() {
               <Input id="fat" type="number" min="0" {...macroTargetForm.register("fat")} />
               {macroTargetForm.formState.errors.fat && <p className="text-sm text-destructive mt-1">{macroTargetForm.formState.errors.fat.message}</p>}
             </div>
+            <div>
+              <Label htmlFor="calories">Calories (kcal)</Label>
+              <Input id="calories" type="number" min="0" {...macroTargetForm.register("calories")} />
+              {macroTargetForm.formState.errors.calories && <p className="text-sm text-destructive mt-1">{macroTargetForm.formState.errors.calories.message}</p>}
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowSetTargetsDialog(false)}>Cancel</Button>
               <Button type="submit" className="bg-accent hover:bg-accent/90 text-accent-foreground">Save Targets</Button>
@@ -232,3 +245,4 @@ export default function HomePage() {
     </PageWrapper>
   );
 }
+
