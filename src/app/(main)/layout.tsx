@@ -16,6 +16,7 @@ import {
   SidebarInset,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
+// Removed SheetTitle import as it was causing issues
 import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, PanelLeft } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -50,7 +51,8 @@ export default function MainLayout({
               <Link href="/" className="flex items-center gap-2">
                 <UtensilsCrossed className="h-7 w-7 text-sidebar-primary" />
                 <div className="group-data-[collapsible=icon]:hidden">
-                  <h1 className="text-xl font-bold font-headline text-sidebar-primary">
+                  {/* Add id to h1 for aria-labelledby */}
+                  <h1 id="sidebar-title" className="text-xl font-bold font-headline text-sidebar-primary">
                     MealPlanner<span className="text-sidebar-accent">Pro</span>
                   </h1>
                 </div>
