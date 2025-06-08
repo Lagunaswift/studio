@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Footer } from '@/components/layout/Footer';
+import { ThemeToggleButton } from '@/components/layout/ThemeToggleButton';
 import {
   Accordion,
   AccordionContent,
@@ -24,7 +25,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { SheetTitle } from '@/components/ui/sheet';
-import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, PanelLeft, Target, Leaf, Ban, Salad, ListChecks } from 'lucide-react';
+import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, PanelLeft, Target, Leaf, Ban, Salad, ListChecks, UserCog } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 interface NavItem {
@@ -156,10 +157,11 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-16 items-center border-b px-4 justify-start sticky top-0 bg-background z-40">
+        <header className="flex h-16 items-center border-b px-4 justify-between sticky top-0 bg-background z-40">
           <SidebarTrigger className="text-primary hover:text-accent">
             <PanelLeft />
           </SidebarTrigger>
+          <ThemeToggleButton />
         </header>
         <main className="flex-grow">
           {children}
