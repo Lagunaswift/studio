@@ -39,9 +39,10 @@ export interface PlannedMeal {
   id: string; // Unique ID for this planned instance, e.g., recipe.id + date + mealType
   recipeId: number; // Changed from string
   date: string; // YYYY-MM-DD
-  mealType: MealType;
+  mealType: MealType; // This refers to the general category of the meal
   servings: number; // Number of servings planned for this meal
   recipeDetails?: Recipe; // Optional: denormalized recipe details for easier access
+  // mealSlotId?: string; // Optionally link to a specific MealSlotConfig.id if needed for more granular planning
 }
 
 export type UKSupermarketCategory =
@@ -75,4 +76,18 @@ export interface MacroTargets {
   protein: number;
   carbs: number;
   fat: number;
+}
+
+// New: Defines a single meal slot in the user's desired meal structure
+export interface MealSlotConfig {
+  id: string; // Unique ID for this slot, e.g., timestamp or uuid
+  name: string; // User-defined name, e.g., "Breakfast", "Morning Snack"
+  type: MealType; // The general category: "Breakfast", "Lunch", "Dinner", "Snack"
+}
+
+export interface UserProfileSettings {
+  macroTargets: MacroTargets | null;
+  dietaryPreferences: string[];
+  allergens: string[];
+  mealStructure: MealSlotConfig[]; // Added
 }

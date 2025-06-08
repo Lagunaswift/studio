@@ -24,7 +24,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { SheetTitle } from '@/components/ui/sheet';
-import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, PanelLeft, UserCog, Target, Leaf, Ban, Salad } from 'lucide-react';
+import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, PanelLeft, Target, Leaf, Ban, Salad, ListChecks } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 interface NavItem {
@@ -46,6 +46,7 @@ const profileNavItems: NavItem[] = [
   { href: '/profile/targets', label: 'Targets', icon: Target },
   { href: '/profile/diet-type', label: 'Diet Type', icon: Leaf },
   { href: '/profile/allergens', label: 'Allergens', icon: Ban },
+  { href: '/profile/meal-structure', label: 'Meal Structure', icon: ListChecks },
 ];
 
 // Inner component to use hooks within SidebarProvider context

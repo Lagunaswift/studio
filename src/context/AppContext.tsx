@@ -3,18 +3,26 @@
 
 import type React from 'react';
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import type { PlannedMeal, ShoppingListItem, Recipe, MealType, Macros, MacroTargets, UserProfileSettings } from '@/types';
+import type { PlannedMeal, ShoppingListItem, Recipe, MealType, Macros, MacroTargets, UserProfileSettings, MealSlotConfig } from '@/types';
 import { loadState, saveState } from '@/lib/localStorage';
-import { getRecipeById, calculateTotalMacros, generateShoppingList as generateShoppingListUtil } from '@/lib/data';
+import { getRecipeById, calculateTotalMacros, generateShoppingList as generateShoppingListUtil, MEAL_TYPES } from '@/lib/data';
 
 const MEAL_PLAN_KEY = 'macroTealMealPlan';
 const SHOPPING_LIST_KEY = 'macroTealShoppingList';
-const USER_PROFILE_KEY = 'macroTealUserProfile'; // Changed from MACRO_TARGETS_KEY
+const USER_PROFILE_KEY = 'macroTealUserProfile';
+
+// Default meal structure
+const DEFAULT_MEAL_STRUCTURE: MealSlotConfig[] = [
+  { id: 'default-breakfast', name: 'Breakfast', type: 'Breakfast' },
+  { id: 'default-lunch', name: 'Lunch', type: 'Lunch' },
+  { id: 'default-dinner', name: 'Dinner', type: 'Dinner' },
+  { id: 'default-snack1', name: 'Snack', type: 'Snack' },
+];
 
 interface AppContextType {
   mealPlan: PlannedMeal[];
   shoppingList: ShoppingListItem[];
-  userProfile: UserProfileSettings | null; // Changed from macroTargets
+  userProfile: UserProfileSettings | null;
   addMealToPlan: (recipe: Recipe, date: string, mealType: MealType, servings: number) => void;
   removeMealFromPlan: (plannedMealId: string) => void;
   updatePlannedMealServings: (plannedMealId: string, newServings: number) => void;
@@ -24,8 +32,9 @@ interface AppContextType {
   clearAllData: () => void;
   getMealsForDate: (date: string) => PlannedMeal[];
   setMacroTargets: (targets: MacroTargets) => void;
-  setDietaryPreferences: (preferences: string[]) => void; // Added
-  setAllergens: (allergens: string[]) => void; // Added
+  setDietaryPreferences: (preferences: string[]) => void;
+  setAllergens: (allergens: string[]) => void;
+  setMealStructure: (mealStructure: MealSlotConfig[]) => void; // Added
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -33,7 +42,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [mealPlan, setMealPlan] = useState<PlannedMeal[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
-  const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null); // Changed state
+  const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
@@ -43,7 +52,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       macroTargets: null,
       dietaryPreferences: [],
       allergens: [],
-    }; // Load userProfile
+      mealStructure: DEFAULT_MEAL_STRUCTURE, // Initialize with default
+    };
+    // Ensure mealStructure exists, if loading from older state
+    if (!loadedUserProfile.mealStructure) {
+        loadedUserProfile.mealStructure = DEFAULT_MEAL_STRUCTURE;
+    }
+
 
     const populatedMealPlan = loadedMealPlan.map(pm => {
       const recipeDetails = getRecipeById(pm.recipeId);
@@ -51,7 +66,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     setMealPlan(populatedMealPlan);
     
-    setUserProfile(loadedUserProfile); // Set userProfile state
+    setUserProfile(loadedUserProfile);
 
     if (loadedShoppingList.length === 0 && populatedMealPlan.length > 0) {
       setShoppingList(generateShoppingListUtil(populatedMealPlan));
@@ -61,6 +76,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsInitialized(true);
   }, []);
 
+  useEffect(() => {
+    if (isInitialized && userProfile) { // Check userProfile is not null
+      saveState(USER_PROFILE_KEY, userProfile);
+    }
+  }, [userProfile, isInitialized]);
+  
+  // Save mealPlan and shoppingList separately as before
   useEffect(() => {
     if (isInitialized) {
       saveState(MEAL_PLAN_KEY, mealPlan.map(({recipeDetails, ...pm}) => pm));
@@ -73,12 +95,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [shoppingList, isInitialized]);
 
-  useEffect(() => {
-    if (isInitialized) {
-      saveState(USER_PROFILE_KEY, userProfile); // Save userProfile state
-    }
-  }, [userProfile, isInitialized]);
-  
+
   const regenerateShoppingList = useCallback((currentMealPlan: PlannedMeal[]) => {
     const newShoppingList = generateShoppingListUtil(currentMealPlan);
     setShoppingList(newShoppingList);
@@ -86,10 +103,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addMealToPlan = useCallback((recipe: Recipe, date: string, mealType: MealType, servings: number) => {
     const newPlannedMeal: PlannedMeal = {
-      id: `${recipe.id}-${date}-${mealType}-${Date.now()}`,
+      id: `${recipe.id}-${date}-${mealType}-${Date.now()}`, // Ensure mealType is part of ID for uniqueness if user adds same recipe as different meal types
       recipeId: recipe.id,
       date,
-      mealType,
+      mealType, // This mealType refers to the general category selected during planning
       servings,
       recipeDetails: recipe,
     };
@@ -149,12 +166,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const clearAllData = useCallback(() => {
     setMealPlan([]);
     setShoppingList([]);
-    setUserProfile({ macroTargets: null, dietaryPreferences: [], allergens: [] }); // Clear userProfile
+    setUserProfile({ 
+      macroTargets: null, 
+      dietaryPreferences: [], 
+      allergens: [],
+      mealStructure: DEFAULT_MEAL_STRUCTURE, // Reset to default
+    });
   }, []);
 
   const updateUserProfileState = useCallback((updates: Partial<UserProfileSettings>) => {
     setUserProfile(prev => ({
-      ...(prev || { macroTargets: null, dietaryPreferences: [], allergens: [] }),
+      ...(prev || { macroTargets: null, dietaryPreferences: [], allergens: [], mealStructure: DEFAULT_MEAL_STRUCTURE }),
       ...updates,
     }));
   }, []);
@@ -171,10 +193,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateUserProfileState({ allergens });
   }, [updateUserProfileState]);
 
+  const setMealStructure = useCallback((mealStructure: MealSlotConfig[]) => {
+    updateUserProfileState({ mealStructure });
+  }, [updateUserProfileState]);
+
   const contextValue = useMemo(() => ({
     mealPlan,
     shoppingList,
-    userProfile, // Changed
+    userProfile,
     addMealToPlan,
     removeMealFromPlan,
     updatePlannedMealServings,
@@ -184,14 +210,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     clearAllData,
     getMealsForDate,
     setMacroTargets,
-    setDietaryPreferences, // Added
-    setAllergens, // Added
+    setDietaryPreferences,
+    setAllergens,
+    setMealStructure, // Added
   }), [
     mealPlan, shoppingList, userProfile, addMealToPlan, removeMealFromPlan, 
     updatePlannedMealServings, getDailyMacros, toggleShoppingListItem, 
     clearMealPlanForDate, clearAllData, getMealsForDate, setMacroTargets,
-    setDietaryPreferences, setAllergens // Added to dependencies
+    setDietaryPreferences, setAllergens, setMealStructure // Added
   ]);
+
+  if (!isInitialized) {
+    // Potentially return a loading state or null if preferred, 
+    // to avoid consumers using the context before it's ready
+    return null; 
+  }
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 };
@@ -199,7 +232,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 export const useAppContext = (): AppContextType => {
   const context = useContext(AppContext);
   if (context === undefined) {
-    throw new Error('useAppContext must be used within an AppProvider');
+    throw new Error('useAppContext must be used within an AppProvider. It might be that the context is not yet initialized.');
   }
   return context;
 };
