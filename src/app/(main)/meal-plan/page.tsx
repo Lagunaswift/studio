@@ -14,7 +14,7 @@ import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2 } from 'l
 import Image from 'next/image';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter as EditDialogFooter } from '@/components/ui/dialog'; // Renamed to avoid conflict if another DialogFooter is needed
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
@@ -144,7 +144,7 @@ export default function MealPlanPage() {
             {MEAL_TYPES.map((mealType) => (
               <div key={mealType}>
                 <h3 className="text-xl font-semibold font-headline text-primary/90 mb-3">{mealType} Recipes</h3>
-                <div className="flex overflow-x-auto space-x-4 pb-4 -mb-4 scrollbar-thin scrollbar-thumb-primary/50 scrollbar-track-muted">
+                <div className="flex w-full overflow-x-auto space-x-4 pb-4 scrollbar-thin scrollbar-thumb-primary/50 scrollbar-track-muted">
                   {allRecipes.length > 0 ? allRecipes.map((recipe) => (
                     <div key={`${mealType}-${recipe.id}`} className="min-w-[300px] md:min-w-[320px]">
                       <RecipeCard
@@ -273,13 +273,14 @@ export default function MealPlanPage() {
                 min="1"
               />
             </div>
-            <DialogFooter>
+            <EditDialogFooter>
               <Button variant="outline" onClick={() => setEditingMeal(null)}>Cancel</Button>
               <Button onClick={handleSaveServings} className="bg-accent hover:bg-accent/90 text-accent-foreground">Save Changes</Button>
-            </DialogFooter>
+            </EditDialogFooter>
           </DialogContent>
         </Dialog>
       )}
     </PageWrapper>
   );
 }
+
