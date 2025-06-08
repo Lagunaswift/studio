@@ -1,6 +1,6 @@
 import type { Recipe, Macros, Ingredient, MealType, PlannedMeal, ShoppingListItem } from '@/types';
 
-export const mockRecipes: Recipe[] = [
+const mockRecipesData: Recipe[] = [
   {
     id: '1',
     name: 'Chicken Stir-fry with Broccoli',
@@ -110,11 +110,37 @@ export const mockRecipes: Recipe[] = [
   },
 ];
 
+// Add data-ai-hint attributes to mock recipe images
+mockRecipesData.forEach(recipe => {
+  if (recipe.image === 'https://placehold.co/600x400.png') {
+    const keywords = recipe.name.toLowerCase().split(' ').slice(0, 2).join(' ');
+    // @ts-ignore
+    recipe['data-ai-hint'] = keywords;
+  }
+});
+
 export const MEAL_TYPES: MealType[] = ["Breakfast", "Lunch", "Dinner", "Snack"];
 
+/**
+ * Retrieves a recipe by its ID.
+ * For now, it fetches from mock data. In the future, this could fetch from a database.
+ * NOTE: This function is currently synchronous. When integrating a database,
+ * it will likely become asynchronous (returning a Promise).
+ */
 export const getRecipeById = (id: string): Recipe | undefined => {
-  return mockRecipes.find(recipe => recipe.id === id);
+  return mockRecipesData.find(recipe => recipe.id === id);
 };
+
+/**
+ * Retrieves all recipes.
+ * For now, it fetches from mock data. In the future, this would fetch from a database.
+ */
+export const getAllRecipes = async (): Promise<Recipe[]> => {
+  // Simulate API delay
+  // await new Promise(resolve => setTimeout(resolve, 500));
+  return Promise.resolve(mockRecipesData);
+};
+
 
 export const calculateTotalMacros = (plannedMeals: PlannedMeal[]): Macros => {
   return plannedMeals.reduce((acc, plannedMeal) => {
@@ -164,12 +190,3 @@ export const generateShoppingList = (plannedMeals: PlannedMeal[]): ShoppingListI
 
   return Array.from(ingredientMap.values()).sort((a,b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
 };
-
-// Add data-ai-hint attributes to mock recipe images
-mockRecipes.forEach(recipe => {
-  if (recipe.image === 'https://placehold.co/600x400.png') {
-    const keywords = recipe.name.toLowerCase().split(' ').slice(0, 2).join(' ');
-    // @ts-ignore
-    recipe['data-ai-hint'] = keywords;
-  }
-});

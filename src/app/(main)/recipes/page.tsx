@@ -1,9 +1,10 @@
+
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { RecipeCard } from '@/components/shared/RecipeCard';
-import { mockRecipes, MEAL_TYPES, getRecipeById } from '@/lib/data';
+import { getAllRecipes, MEAL_TYPES, getRecipeById } from '@/lib/data';
 import type { Recipe, MealType } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Filter, Search, PlusCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2 } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -20,6 +21,9 @@ import { Label } from '@/components/ui/label';
 export default function RecipesPage() {
   const { addMealToPlan } = useAppContext();
   const { toast } = useToast();
+  
+  const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
@@ -27,7 +31,27 @@ export default function RecipesPage() {
   const [planMealType, setPlanMealType] = useState<MealType | undefined>(MEAL_TYPES[0]);
   const [planServings, setPlanServings] = useState<number>(1);
 
-  const filteredRecipes = mockRecipes.filter(recipe =>
+  useEffect(() => {
+    const fetchRecipes = async () => {
+      try {
+        setIsLoading(true);
+        const recipes = await getAllRecipes();
+        setAllRecipes(recipes);
+      } catch (error) {
+        console.error("Failed to fetch recipes:", error);
+        toast({
+          title: "Error",
+          description: "Could not load recipes. Please try again later.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchRecipes();
+  }, [toast]);
+
+  const filteredRecipes = allRecipes.filter(recipe =>
     recipe.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     recipe.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (recipe.tags && recipe.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())))
@@ -77,7 +101,11 @@ export default function RecipesPage() {
         </Button> */}
       </div>
 
-      {filteredRecipes.length > 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center items-center min-h-[200px]">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+      ) : filteredRecipes.length > 0 ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredRecipes.map((recipe) => (
             <RecipeCard 
