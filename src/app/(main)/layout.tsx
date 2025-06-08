@@ -15,7 +15,7 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarTrigger,
-  useSidebar, // Import useSidebar
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { SheetTitle } from '@/components/ui/sheet';
 import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, PanelLeft } from 'lucide-react';
@@ -36,7 +36,7 @@ const navItems: NavItem[] = [
   { href: '/shopping-list', label: 'Shopping List', icon: ShoppingBag },
 ];
 
-// New inner component to use hooks within SidebarProvider context
+// Inner component to use hooks within SidebarProvider context
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isMobile } = useSidebar(); // Get isMobile state from context
@@ -49,10 +49,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             <UtensilsCrossed className="h-7 w-7 text-sidebar-primary" />
             <div className="group-data-[collapsible=icon]:hidden">
               {isMobile ? (
-                <SheetTitle asChild>
-                  <h1 id="sidebar-title" className="text-xl font-bold font-headline text-sidebar-primary">
-                    MealPlanner<span className="text-sidebar-accent">Pro</span>
-                  </h1>
+                <SheetTitle className="text-xl font-bold font-headline text-sidebar-primary">
+                  MealPlanner<span className="text-sidebar-accent">Pro</span>
                 </SheetTitle>
               ) : (
                 <h1 id="sidebar-title" className="text-xl font-bold font-headline text-sidebar-primary">
