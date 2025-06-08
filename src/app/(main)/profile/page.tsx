@@ -5,16 +5,16 @@ import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label'; // Label is used for non-Form items, keep this
+// Label is used for non-Form items, keep this. FormLabel is used within FormField.
 import { Checkbox } from '@/components/ui/checkbox';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
-import type { MacroTargets, UserProfileSettings } from '@/types';
+import type { UserProfileSettings } from '@/types'; // MacroTargets is part of UserProfileSettings
 import { useEffect } from 'react';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'; // Added missing imports
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 // Form Schemas
 const macroTargetSchema = z.object({
@@ -62,7 +62,7 @@ export default function ProfilePage() {
     if (userProfile?.macroTargets) {
       macroForm.reset(userProfile.macroTargets);
     }
-  }, [userProfile?.macroTargets, macroForm.reset]);
+  }, [userProfile?.macroTargets, macroForm]);
 
   // Effect to update preferences form when userProfile changes
   useEffect(() => {
@@ -70,7 +70,7 @@ export default function ProfilePage() {
       dietaryPreferences: userProfile?.dietaryPreferences || [],
       allergens: userProfile?.allergens || [],
     });
-  }, [userProfile?.dietaryPreferences, userProfile?.allergens, preferencesForm.reset]);
+  }, [userProfile?.dietaryPreferences, userProfile?.allergens, preferencesForm]);
 
 
   // Auto-calculate calories
@@ -83,8 +83,15 @@ export default function ProfilePage() {
     const carbs = parseFloat(carbsValue as any) || 0;
     const fat = parseFloat(fatValue as any) || 0;
     const calculatedCalories = (protein * 4) + (carbs * 4) + (fat * 9);
-    macroForm.setValue("calories", Math.round(calculatedCalories), { shouldValidate: true, shouldDirty: macroForm.formState.isDirty });
-  }, [proteinValue, carbsValue, fatValue, macroForm.setValue, macroForm.formState.isDirty]);
+    
+    const currentCalories = macroForm.getValues("calories");
+    if (Math.round(calculatedCalories) !== Math.round(currentCalories)) {
+      macroForm.setValue("calories", Math.round(calculatedCalories), { 
+        shouldValidate: true, 
+        shouldDirty: true 
+      });
+    }
+  }, [proteinValue, carbsValue, fatValue, macroForm]);
 
 
   const handleMacroSubmit: SubmitHandler<MacroTargetFormValues> = (data) => {
@@ -93,7 +100,7 @@ export default function ProfilePage() {
       title: "Macro Targets Updated",
       description: "Your daily caloric and macro targets have been saved.",
     });
-     macroForm.reset(data, { keepValues: true, keepDirty: false, keepDefaultValues: false });
+    macroForm.reset(data); // Simpler reset
   };
 
   const handlePreferencesSubmit: SubmitHandler<PreferencesFormValues> = (data) => {
@@ -103,7 +110,7 @@ export default function ProfilePage() {
       title: "Preferences Updated",
       description: "Your dietary preferences and allergen filters have been saved.",
     });
-    preferencesForm.reset(data, { keepValues: true, keepDirty: false, keepDefaultValues: false });
+    preferencesForm.reset(data); // Simpler reset
   };
 
   return (
@@ -203,13 +210,16 @@ export default function ProfilePage() {
                               <Checkbox
                                 checked={field.value?.includes(preference)}
                                 onCheckedChange={(checked) => {
-                                  return checked
-                                    ? field.onChange([...field.value, preference])
-                                    : field.onChange(
-                                        field.value?.filter(
-                                          (value) => value !== preference
-                                        )
-                                      );
+                                  const currentValue = field.value || [];
+                                  let newValue;
+                                  if (checked) {
+                                    newValue = [...currentValue, preference];
+                                  } else {
+                                    newValue = currentValue.filter(
+                                      (value) => value !== preference
+                                    );
+                                  }
+                                  field.onChange(newValue);
                                 }}
                               />
                             </FormControl>
@@ -236,13 +246,16 @@ export default function ProfilePage() {
                               <Checkbox
                                 checked={field.value?.includes(allergen)}
                                 onCheckedChange={(checked) => {
-                                  return checked
-                                    ? field.onChange([...field.value, allergen])
-                                    : field.onChange(
-                                        field.value?.filter(
-                                          (value) => value !== allergen
-                                        )
-                                      );
+                                  const currentValue = field.value || [];
+                                  let newValue;
+                                  if (checked) {
+                                    newValue = [...currentValue, allergen];
+                                  } else {
+                                    newValue = currentValue.filter(
+                                      (value) => value !== allergen
+                                    );
+                                  }
+                                  field.onChange(newValue);
                                 }}
                               />
                             </FormControl>
