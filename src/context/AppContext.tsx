@@ -1,3 +1,4 @@
+
 "use client";
 
 import type React from 'react';
@@ -38,11 +39,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const loadedShoppingList = loadState<ShoppingListItem[]>(SHOPPING_LIST_KEY) || [];
     const loadedMacroTargets = loadState<MacroTargets>(MACRO_TARGETS_KEY) || null;
 
-    setMealPlan(loadedMealPlan.map(pm => ({...pm, recipeDetails: getRecipeById(pm.recipeId)})));
+    // Ensure recipeDetails are populated, especially if loaded from localStorage
+    const populatedMealPlan = loadedMealPlan.map(pm => {
+      const recipeDetails = getRecipeById(pm.recipeId);
+      return {...pm, recipeDetails: recipeDetails || undefined }; // Ensure recipeDetails can be undefined if not found
+    });
+    setMealPlan(populatedMealPlan);
+    
     setMacroTargetsState(loadedMacroTargets);
 
-    if (loadedShoppingList.length === 0 && loadedMealPlan.length > 0) {
-      setShoppingList(generateShoppingListUtil(loadedMealPlan));
+    if (loadedShoppingList.length === 0 && populatedMealPlan.length > 0) {
+      setShoppingList(generateShoppingListUtil(populatedMealPlan));
     } else {
       setShoppingList(loadedShoppingList);
     }
@@ -51,6 +58,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     if (isInitialized) {
+      // Strip recipeDetails before saving to avoid circular references or large objects in localStorage
       saveState(MEAL_PLAN_KEY, mealPlan.map(({recipeDetails, ...pm}) => pm));
     }
   }, [mealPlan, isInitialized]);
@@ -74,7 +82,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addMealToPlan = useCallback((recipe: Recipe, date: string, mealType: MealType, servings: number) => {
     const newPlannedMeal: PlannedMeal = {
-      id: `${recipe.id}-${date}-${mealType}-${Date.now()}`,
+      id: `${recipe.id}-${date}-${mealType}-${Date.now()}`, // recipe.id is now number, JS will cast to string here
       recipeId: recipe.id,
       date,
       mealType,

@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ShoppingListItem } from '@/types';
@@ -18,7 +19,11 @@ interface ShoppingListItemProps {
 }
 
 export function ShoppingListItemComponent({ item, onToggle }: ShoppingListItemProps) {
-  const quantity = Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(1);
+  // Quantity might be a string if it's "Varies" or similar, or a number.
+  const displayQuantity = typeof item.quantity === 'number' 
+    ? (Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(1))
+    : item.quantity;
+
   return (
     <div
       className={cn(
@@ -64,7 +69,7 @@ export function ShoppingListItemComponent({ item, onToggle }: ShoppingListItemPr
           </TooltipProvider>
         )}
         <span className={cn("text-sm", item.purchased ? "text-muted-foreground" : "text-foreground/80")}>
-          {quantity} {item.unit}
+          {displayQuantity} {item.unit}
         </span>
       </div>
     </div>

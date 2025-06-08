@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useParams, useRouter } from 'next/navigation';
@@ -10,10 +11,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft } from 'lucide-react';
+import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -25,19 +26,31 @@ import { format } from 'date-fns';
 export default function RecipeDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const id = typeof params.id === 'string' ? params.id : '';
-  const recipe = getRecipeById(id);
-
+  const idParam = typeof params.id === 'string' ? params.id : '';
+  const recipeId = parseInt(idParam, 10);
+  
+  const [recipe, setRecipe] = useState<RecipeType | undefined>(undefined);
   const { addMealToPlan } = useAppContext();
   const { toast } = useToast();
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
   const [planDate, setPlanDate] = useState<Date | undefined>(new Date());
   const [planMealType, setPlanMealType] = useState<MealType | undefined>(MEAL_TYPES[0]);
-  const [planServings, setPlanServings] = useState<number>(recipe?.servings || 1);
+  const [planServings, setPlanServings] = useState<number>(1);
+
+  useEffect(() => {
+    if (!isNaN(recipeId)) {
+      const foundRecipe = getRecipeById(recipeId);
+      setRecipe(foundRecipe);
+      if (foundRecipe) {
+        setPlanServings(foundRecipe.servings || 1);
+      }
+    }
+  }, [recipeId]);
+
 
   const handleOpenAddToPlanDialog = () => {
     if (recipe) {
-      setPlanServings(recipe.servings);
+      setPlanServings(recipe.servings); // Default to recipe's default servings
       setShowAddToPlanDialog(true);
     }
   };
@@ -59,10 +72,10 @@ export default function RecipeDetailPage() {
     }
   };
 
-  if (!recipe) {
+  if (isNaN(recipeId) || !recipe) {
     return (
       <PageWrapper title="Recipe Not Found">
-        <p>The recipe you are looking for does not exist.</p>
+        <p>The recipe you are looking for does not exist or the ID is invalid.</p>
         <Button onClick={() => router.back()} variant="outline" className="mt-4">
           <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
         </Button>
@@ -78,20 +91,17 @@ export default function RecipeDetailPage() {
       <Card className="overflow-hidden shadow-xl rounded-lg">
         <div className="relative w-full h-64 md:h-96">
           <Image
-            // @ts-ignore next-line
-            src={recipe['data-ai-hint'] ? `${recipe.image}?text=${recipe['data-ai-hint']}` : recipe.image}
+            src={recipe.image}
             alt={recipe.name}
             fill
             sizes="(max-width: 768px) 100vw, 100vw"
             className="object-cover"
             priority
-            // @ts-ignore next-line
-            data-ai-hint={recipe['data-ai-hint'] || recipe.name.toLowerCase().split(" ").slice(0,2).join(" ")}
           />
         </div>
         <CardHeader className="p-6">
           <CardTitle className="text-3xl md:text-4xl font-bold font-headline text-primary">{recipe.name}</CardTitle>
-          <p className="text-muted-foreground mt-2">{recipe.description}</p>
+          {recipe.description && <p className="text-muted-foreground mt-2">{recipe.description}</p>}
           <div className="mt-4 flex flex-wrap gap-2">
             <Badge variant="secondary" className="text-sm">
               <Clock className="w-4 h-4 mr-1 text-accent" /> Prep: {recipe.prepTime}
@@ -99,6 +109,11 @@ export default function RecipeDetailPage() {
             <Badge variant="secondary" className="text-sm">
               <Clock className="w-4 h-4 mr-1 text-accent" /> Cook: {recipe.cookTime}
             </Badge>
+            {recipe.chillTime && (
+              <Badge variant="secondary" className="text-sm">
+                <Hourglass className="w-4 h-4 mr-1 text-accent" /> Chill: {recipe.chillTime}
+              </Badge>
+            )}
             <Badge variant="secondary" className="text-sm">
               <Users className="w-4 h-4 mr-1 text-accent" /> Serves: {recipe.servings}
             </Badge>
@@ -128,7 +143,7 @@ export default function RecipeDetailPage() {
               <ul className="space-y-2 list-disc list-inside bg-secondary/30 p-4 rounded-md">
                 {recipe.ingredients.map((ingredient, index) => (
                   <li key={index} className="text-foreground/90">
-                    {ingredient.quantity} {ingredient.unit} {ingredient.name}
+                    {ingredient}
                   </li>
                 ))}
               </ul>

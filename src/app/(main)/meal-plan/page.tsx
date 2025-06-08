@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -129,17 +130,23 @@ export default function MealPlanPage() {
                     {mealsForType.map((meal) => {
                       const recipe = meal.recipeDetails || getRecipeById(meal.recipeId);
                       if (!recipe) return null;
+
+                      // Calculate macros for the planned servings
+                      const plannedServingsMacros = {
+                        calories: recipe.macrosPerServing.calories * meal.servings,
+                        protein: recipe.macrosPerServing.protein * meal.servings,
+                        carbs: recipe.macrosPerServing.carbs * meal.servings,
+                        fat: recipe.macrosPerServing.fat * meal.servings,
+                      };
+
                       return (
                         <Card key={meal.id} className="shadow-md overflow-hidden flex flex-col sm:flex-row">
                           <div className="sm:w-1/4 relative h-32 sm:h-auto">
                             <Image
-                              // @ts-ignore
-                              src={recipe['data-ai-hint'] ? `${recipe.image}?text=${recipe['data-ai-hint']}` : recipe.image}
+                              src={recipe.image}
                               alt={recipe.name}
                               fill
                               className="object-cover"
-                              // @ts-ignore
-                              data-ai-hint={recipe['data-ai-hint'] || recipe.name.toLowerCase().split(" ").slice(0,2).join(" ")}
                             />
                           </div>
                           <div className="sm:w-3/4 p-4 flex flex-col justify-between">
@@ -149,12 +156,7 @@ export default function MealPlanPage() {
                               </CardTitle>
                               <CardDescription>Servings: {meal.servings}</CardDescription>
                               <div className="mt-2">
-                                <MacroDisplay macros={{
-                                  calories: recipe.macrosPerServing.calories * (meal.servings / recipe.servings),
-                                  protein: recipe.macrosPerServing.protein * (meal.servings / recipe.servings),
-                                  carbs: recipe.macrosPerServing.carbs * (meal.servings / recipe.servings),
-                                  fat: recipe.macrosPerServing.fat * (meal.servings / recipe.servings),
-                                }} title="" />
+                                <MacroDisplay macros={plannedServingsMacros} title="" />
                               </div>
                             </div>
                             <CardFooter className="p-0 pt-4 flex gap-2 justify-end">

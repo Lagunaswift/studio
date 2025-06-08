@@ -1,3 +1,4 @@
+
 import Image from 'next/image';
 import type { Recipe } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,19 +19,16 @@ export function RecipeCard({ recipe, onAddToMealPlan, showAddToMealPlanButton = 
     <Card className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg h-full">
       <div className="relative w-full h-48">
         <Image
-          // @ts-ignore next-line
-          src={recipe['data-ai-hint'] ? `${recipe.image}?text=${recipe['data-ai-hint']}` : recipe.image}
+          src={recipe.image}
           alt={recipe.name}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           className="object-cover"
-          // @ts-ignore next-line
-          data-ai-hint={recipe['data-ai-hint'] || recipe.name.toLowerCase().split(" ").slice(0,2).join(" ")}
         />
       </div>
       <CardHeader>
         <CardTitle className="font-headline text-xl text-primary">{recipe.name}</CardTitle>
-        <CardDescription className="h-10 overflow-hidden text-ellipsis">{recipe.description}</CardDescription>
+        {recipe.description && <CardDescription className="h-10 overflow-hidden text-ellipsis">{recipe.description}</CardDescription>}
       </CardHeader>
       <CardContent className="flex-grow">
         <div className="space-y-2 text-sm text-muted-foreground">
