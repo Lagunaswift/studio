@@ -44,12 +44,24 @@ export interface PlannedMeal {
   recipeDetails?: Recipe; // Optional: denormalized recipe details for easier access
 }
 
+export type UKSupermarketCategory =
+  | "Fresh Fruit & Vegetables"
+  | "Bakery"
+  | "Meat & Poultry"
+  | "Fish & Seafood"
+  | "Dairy, Butter & Eggs"
+  | "Chilled Foods"
+  | "Frozen Foods"
+  | "Food Cupboard"
+  | "Drinks"
+  | "Other Food Items";
+
 export interface ShoppingListItem {
   id: string; // ingredientName (now a simple string)
   name: string;
   quantity: number; // Will be simplified
   unit: string; // Will be simplified
-  category: string; // Will be simplified
+  category: UKSupermarketCategory; 
   purchased: boolean;
   recipes: Array<{ recipeId: number; recipeName: string }>; // Track which recipes need this ingredient
 }

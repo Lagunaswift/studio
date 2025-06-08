@@ -1,5 +1,5 @@
 
-import type { Recipe, Macros, MealType, PlannedMeal, ShoppingListItem } from '@/types';
+import type { Recipe, Macros, MealType, PlannedMeal, ShoppingListItem, UKSupermarketCategory } from '@/types';
 
 // Helper to create a full Recipe object from the new partial structure
 const createRecipeFromNewFormat = (data: Omit<Recipe, 'macrosPerServing' | 'image' | 'description'> & { description?: string, image?: string }): Recipe => {
@@ -20,10 +20,10 @@ const mockRecipesInput: Array<Omit<Recipe, 'macrosPerServing' | 'image' | 'descr
   {
     id: 1,
     name: "Spanish Zucchini Tortilla",
-    calories: 377, // Assuming per serving
-    protein: 21,  // Assuming per serving
-    carbs: 22,   // Assuming per serving
-    fat: 22,     // Assuming per serving
+    calories: 377, 
+    protein: 21,  
+    carbs: 22,   
+    fat: 22,     
     servings: 2,
     ingredients: [
       "1 tbsp. olive oil",
@@ -43,15 +43,15 @@ const mockRecipesInput: Array<Omit<Recipe, 'macrosPerServing' | 'image' | 'descr
     "After 8-10 minutes, flip the tortilla this might take more or less, depending on heat, size and pan, using a plate over the pan. Slide the uncooked part back into the pan.",
     "After another 5-6 minutes, the tortilla should becooked. Remove from heat and serve"
     ],
-    description: "A classic Spanish tortilla with a healthy zucchini twist." // Added example description
+    description: "A classic Spanish tortilla with a healthy zucchini twist." 
   },
   {
     id: 2,
     name: "Omelet Wraps",
-    calories: 237, // Assuming per serving
-    protein: 20,  // Assuming per serving
-    carbs: 3,    // Assuming per serving
-    fat: 15,     // Assuming per serving
+    calories: 237, 
+    protein: 20,  
+    carbs: 3,    
+    fat: 15,     
     servings: 4,
     ingredients: [
       "200g cottage cheese",
@@ -73,17 +73,15 @@ const mockRecipesInput: Array<Omit<Recipe, 'macrosPerServing' | 'image' | 'descr
       "Remove the omelet from the pan and set aside. Fry the other omelets with the rest of the oil.",
       "To serve, spread the cottage cheese paste over the omelets and top with smoked salmon. Roll up the omelet as a wrap and cut in half."
     ],
-    description: "Versatile omelet wraps perfect for a light meal or snack." // Added example description
+    description: "Versatile omelet wraps perfect for a light meal or snack."
   },
-  // Add more recipes here following the new structure
-  // Example adapted from old structure:
   {
     id: 3,
     name: 'Chicken Stir-fry with Broccoli',
-    calories: 455, // Assuming per serving
-    protein: 45,   // Assuming per serving
-    carbs: 35,    // Assuming per serving
-    fat: 15,      // Assuming per serving
+    calories: 455, 
+    protein: 45,   
+    carbs: 35,    
+    fat: 15,      
     servings: 2,
     prepTime: '15 mins',
     cookTime: '15 mins',
@@ -126,26 +124,6 @@ export const calculateTotalMacros = (plannedMeals: PlannedMeal[]): Macros => {
   return plannedMeals.reduce((acc, plannedMeal) => {
     const recipe = getRecipeById(plannedMeal.recipeId);
     if (recipe) {
-      // Assuming macrosPerServing is already calculated correctly for one serving of the recipe
-      // and plannedMeal.servings is how many of those standard servings the user plans to eat.
-      const servingsMultiplier = plannedMeal.servings / recipe.servings;
-      
-      // If recipe.macrosPerServing is for "recipe.servings" number of portions,
-      // and plannedMeal.servings is the actual number of portions the user will eat.
-      // E.g. recipe says it makes 4 servings, macrosPerServing is for 1 of those 4.
-      // User plans to eat 2 of those 4 (plannedMeal.servings = 2).
-      // So total macros for user is macrosPerServing * 2.
-
-      // If the top-level calorie/protein/fat in Recipe type is for THE WHOLE RECIPE (i.e. for recipe.servings portions),
-      // then macrosPerServing should be (total recipe macros / recipe.servings).
-      // And the final calculation would be: (recipe.macrosPerServing.calories * plannedMeal.servings)
-      // This seems to be the most logical interpretation.
-      // The `createRecipeFromNewFormat` already sets `macrosPerServing` as the top-level values,
-      // assuming they are per-serving. If they are total for `recipe.servings`, that helper needs adjustment.
-      // For now, assuming the values in `mockRecipesInput` for cal,pro,carb,fat ARE PER SERVING.
-
-      // If the macros in Recipe are per default serving, and user plans 'plannedMeal.servings'
-      // of those default servings.
       acc.calories += recipe.macrosPerServing.calories * plannedMeal.servings;
       acc.protein += recipe.macrosPerServing.protein * plannedMeal.servings;
       acc.carbs += recipe.macrosPerServing.carbs * plannedMeal.servings;
@@ -155,38 +133,54 @@ export const calculateTotalMacros = (plannedMeals: PlannedMeal[]): Macros => {
   }, { protein: 0, carbs: 0, fat: 0, calories: 0 });
 };
 
+const categoryKeywords: Record<UKSupermarketCategory, string[]> = {
+  "Fresh Fruit & Vegetables": ["apple", "orange", "banana", "berries", "grapes", "melon", "pear", "plum", "avocado", "potato", "onion", "garlic", "ginger", "carrot", "broccoli", "spinach", "lettuce", "cabbage", "peppers", "tomato", "cucumber", "zucchini", "courgette", "aubergine", "mushroom", "corn", "peas", "beans (fresh)", "lemon", "lime", "herb (fresh)", "watercress", "spring onion", "leek"],
+  "Bakery": ["bread", "baguette", "rolls", "croissant", "bagel", "muffin", "cake", "pastry", "wrap", "tortilla (bread)"],
+  "Meat & Poultry": ["chicken", "beef", "pork", "lamb", "turkey", "mince", "sausage", "bacon", "ham", "steak", "gammon"],
+  "Fish & Seafood": ["salmon", "cod", "haddock", "tuna", "mackerel", "prawns", "shrimp", "scallops", "mussels", "fish"],
+  "Dairy, Butter & Eggs": ["milk", "cheese", "cheddar", "mozzarella", "yogurt", "yoghurt", "butter", "cream", "eggs", "cottage cheese", "creme fraiche"],
+  "Chilled Foods": ["deli meat", "cooked meat", "pate", "fresh pasta", "fresh soup", "ready meal", "quiche", "coleslaw", "houmous", "hummus", "dip", "soy milk", "tofu"], // soy milk can be here or Food Cupboard depending on UHT
+  "Frozen Foods": ["frozen peas", "frozen corn", "frozen chips", "frozen fruit", "ice cream", "frozen pizza", "frozen vegetables"],
+  "Food Cupboard": ["pasta (dried)", "rice", "noodles", "flour", "sugar", "salt", "pepper", "spice", "herbs (dried)", "oil (olive, vegetable, sunflower, coconut, sesame)", "vinegar", "tinned tomatoes", "canned tomatoes", "tinned beans", "canned beans", "lentils", "chickpeas", "soup (canned/packet)", "stock cube", "bouillon", "jam", "honey", "peanut butter", "cereal", "oats", "biscuits", "crackers", "tea", "coffee", "hot chocolate", "soy sauce", "ketchup", "mayonnaise", "mustard", "nuts", "seeds", "dried fruit"],
+  "Drinks": ["water", "juice", "soda", "fizzy drink", "cordial", "squash"],
+  "Other Food Items": [] // Fallback
+};
+
+const assignCategory = (ingredientName: string): UKSupermarketCategory => {
+  const lowerIngredientName = ingredientName.toLowerCase();
+  for (const category in categoryKeywords) {
+    const keywords = categoryKeywords[category as UKSupermarketCategory];
+    if (keywords.some(keyword => lowerIngredientName.includes(keyword))) {
+      return category as UKSupermarketCategory;
+    }
+  }
+  return "Other Food Items";
+};
+
+
 export const generateShoppingList = (plannedMeals: PlannedMeal[]): ShoppingListItem[] => {
   const ingredientMap = new Map<string, ShoppingListItem>();
 
   plannedMeals.forEach(plannedMeal => {
     const recipe = getRecipeById(plannedMeal.recipeId);
     if (recipe) {
-      // Since recipe.ingredients is now string[], we can't accurately sum quantities or get categories.
-      // We will list each ingredient string as a separate item, or count occurrences if they are identical strings.
-      // For simplicity, we'll aim to list unique ingredient strings and how many recipes they are in.
-      // The plannedMeal.servings multiplier is tricky without structured quantities.
-      // We'll just list the ingredient as needed for the recipe.
-
       recipe.ingredients.forEach(ingredientString => {
-        const itemId = ingredientString.toLowerCase(); // Use the string itself as an ID
+        const itemId = ingredientString.toLowerCase(); 
         const existingItem = ingredientMap.get(itemId);
+        const category = assignCategory(ingredientString);
 
         if (existingItem) {
-          // Increment if needed, or simply ensure it's on the list
-          // For now, let's just make sure it's linked to all relevant recipes
           if (!existingItem.recipes.find(r => r.recipeId === recipe.id)) {
             existingItem.recipes.push({ recipeId: recipe.id, recipeName: recipe.name });
           }
-           // We can't sum quantities properly anymore with string ingredients.
-           // Defaulting quantity to 1 to signify "needed".
-          existingItem.quantity = Math.max(existingItem.quantity, 1);
+          existingItem.quantity = Math.max(existingItem.quantity, 1); // Keep quantity as "needed"
         } else {
           ingredientMap.set(itemId, {
             id: itemId,
-            name: ingredientString, // The full ingredient string
-            quantity: 1, // Default quantity
-            unit: 'item(s)', // Default unit
-            category: 'Uncategorized', // Default category
+            name: ingredientString, 
+            quantity: 1, 
+            unit: 'item(s)', 
+            category: category,
             purchased: false,
             recipes: [{ recipeId: recipe.id, recipeName: recipe.name }],
           });
@@ -194,6 +188,10 @@ export const generateShoppingList = (plannedMeals: PlannedMeal[]): ShoppingListI
       });
     }
   });
-  // Sort by name as category is now less reliable
-  return Array.from(ingredientMap.values()).sort((a,b) => a.name.localeCompare(b.name));
+  return Array.from(ingredientMap.values()).sort((a,b) => {
+    // Sort by category first, then by name
+    if (a.category < b.category) return -1;
+    if (a.category > b.category) return 1;
+    return a.name.localeCompare(b.name);
+  });
 };
