@@ -134,17 +134,86 @@ export const calculateTotalMacros = (plannedMeals: PlannedMeal[]): Macros => {
 };
 
 const categoryKeywords: Record<UKSupermarketCategory, string[]> = {
-  "Fresh Fruit & Vegetables": ["apple", "orange", "banana", "berries", "grapes", "melon", "pear", "plum", "avocado", "potato", "onion", "garlic", "ginger", "carrot", "broccoli", "spinach", "lettuce", "cabbage", "peppers", "tomato", "cucumber", "zucchini", "courgette", "aubergine", "mushroom", "corn", "peas", "beans (fresh)", "lemon", "lime", "herb (fresh)", "watercress", "spring onion", "leek"],
+  "Fresh Fruit & Vegetables": ["apple", "orange", "banana", "berries", "grapes", "melon", "pear", "plum", "avocado", "potato", "onion", "garlic", "ginger", "carrot", "broccoli", "spinach", "lettuce", "cabbage", "peppers", "tomato", "cucumber", "zucchini", "courgette", "aubergine", "mushroom", "corn", "peas", "beans (fresh)", "lemon", "lime", "herb (fresh)", "watercress", "spring onion", "leek", "florets"],
   "Bakery": ["bread", "baguette", "rolls", "croissant", "bagel", "muffin", "cake", "pastry", "wrap", "tortilla (bread)"],
   "Meat & Poultry": ["chicken", "beef", "pork", "lamb", "turkey", "mince", "sausage", "bacon", "ham", "steak", "gammon"],
   "Fish & Seafood": ["salmon", "cod", "haddock", "tuna", "mackerel", "prawns", "shrimp", "scallops", "mussels", "fish"],
-  "Dairy, Butter & Eggs": ["milk", "cheese", "cheddar", "mozzarella", "yogurt", "yoghurt", "butter", "cream", "eggs", "cottage cheese", "creme fraiche"],
-  "Chilled Foods": ["deli meat", "cooked meat", "pate", "fresh pasta", "fresh soup", "ready meal", "quiche", "coleslaw", "houmous", "hummus", "dip", "soy milk", "tofu"], // soy milk can be here or Food Cupboard depending on UHT
+  "Dairy, Butter & Eggs": ["milk", "cheese", "cheddar", "mozzarella", "yogurt", "yoghurt", "butter", "cream", "eggs", "cottage cheese", "creme fraiche", "soy milk"],
+  "Chilled Foods": ["deli meat", "cooked meat", "pate", "fresh pasta", "fresh soup", "ready meal", "quiche", "coleslaw", "houmous", "hummus", "dip", "tofu"],
   "Frozen Foods": ["frozen peas", "frozen corn", "frozen chips", "frozen fruit", "ice cream", "frozen pizza", "frozen vegetables"],
   "Food Cupboard": ["pasta (dried)", "rice", "noodles", "flour", "sugar", "salt", "pepper", "spice", "herbs (dried)", "oil (olive, vegetable, sunflower, coconut, sesame)", "vinegar", "tinned tomatoes", "canned tomatoes", "tinned beans", "canned beans", "lentils", "chickpeas", "soup (canned/packet)", "stock cube", "bouillon", "jam", "honey", "peanut butter", "cereal", "oats", "biscuits", "crackers", "tea", "coffee", "hot chocolate", "soy sauce", "ketchup", "mayonnaise", "mustard", "nuts", "seeds", "dried fruit"],
   "Drinks": ["water", "juice", "soda", "fizzy drink", "cordial", "squash"],
   "Other Food Items": [] // Fallback
 };
+
+// Naive ingredient parser
+const parseIngredientString = (ingredientString: string): { name: string; quantity: number; unit: string } => {
+  const cleanedString = ingredientString.replace(/,/g, '').replace(/\./g, ''); // Remove commas and periods for easier parsing
+  
+  // Regex to capture quantity (number), unit (alphabetic, can include 'tbsp', 'tsp'), and name
+  const regex = /^(\d+\s*\/?\s*\d*)\s*([a-zA-Z]+)?\s*(.*)$/;
+  const match = cleanedString.match(regex);
+
+  let quantity = 1;
+  let unit = 'item(s)';
+  let name = ingredientString.trim(); // Default to original string if no parse
+
+  if (match) {
+    // Handle quantity (e.g., "1", "1/2", "1 1/2")
+    const qtyStr = match[1].trim();
+    if (qtyStr.includes('/')) {
+      const parts = qtyStr.split('/');
+      if (parts.length === 2) {
+        const num = parseFloat(parts[0]);
+        const den = parseFloat(parts[1]);
+        if (!isNaN(num) && !isNaN(den) && den !== 0) {
+          quantity = num / den;
+        }
+      }
+    } else {
+      quantity = parseFloat(qtyStr) || 1;
+    }
+
+    unit = match[2] ? match[2].trim() : 'item(s)';
+    name = match[3] ? match[3].trim() : ingredientString.trim(); // Use rest as name
+    
+    // Refine name if unit was part of it (e.g. "cloves Garlic" -> name: "Garlic", unit: "cloves")
+    if (name.toLowerCase().startsWith(unit.toLowerCase() + " ")) {
+        name = name.substring(unit.length + 1).trim();
+    }
+    
+    // Special case for "½"
+    if (qtyStr === '½') quantity = 0.5;
+
+
+  } else {
+     // Fallback for strings without a leading number, e.g. "Salt to taste"
+     // Or "a pinch of salt" - these are hard to quantify. For now, 1 item.
+     name = ingredientString.trim();
+  }
+  
+  // Normalize common units
+  if (['tbsp', 'tablespoon', 'tablespoons'].includes(unit.toLowerCase())) unit = 'tbsp';
+  if (['tsp', 'teaspoon', 'teaspoons'].includes(unit.toLowerCase())) unit = 'tsp';
+  if (['g', 'gram', 'grams'].includes(unit.toLowerCase())) unit = 'g';
+  if (['ml', 'milliliter', 'milliliters'].includes(unit.toLowerCase())) unit = 'ml';
+  if (['l', 'liter', 'liters'].includes(unit.toLowerCase())) unit = 'L';
+  if (['kg', 'kilogram', 'kilograms'].includes(unit.toLowerCase())) unit = 'kg';
+
+
+  // If name is empty after parsing, use the original string for safety
+  if (!name && ingredientString) name = ingredientString.trim();
+  // If name only contains the unit, it's likely an error, try to extract from original more broadly
+  if (name.toLowerCase() === unit.toLowerCase() && unit !== 'item(s)') {
+      const parts = ingredientString.split(new RegExp(`\\s*${unit}\\s*`, 'i'));
+      if (parts.length > 1) name = parts[1].trim();
+      else name = ingredientString.trim();
+  }
+
+
+  return { name: name.charAt(0).toUpperCase() + name.slice(1), quantity, unit };
+};
+
 
 const assignCategory = (ingredientName: string): UKSupermarketCategory => {
   const lowerIngredientName = ingredientName.toLowerCase();
@@ -165,21 +234,36 @@ export const generateShoppingList = (plannedMeals: PlannedMeal[]): ShoppingListI
     const recipe = getRecipeById(plannedMeal.recipeId);
     if (recipe) {
       recipe.ingredients.forEach(ingredientString => {
-        const itemId = ingredientString.toLowerCase(); 
-        const existingItem = ingredientMap.get(itemId);
-        const category = assignCategory(ingredientString);
+        const parsed = parseIngredientString(ingredientString);
+        // Use parsed.name for map key to group similar items even if original string had notes
+        const mapKey = parsed.name.toLowerCase(); 
+        const existingItem = ingredientMap.get(mapKey);
+        const category = assignCategory(parsed.name);
+        const quantityToAdd = parsed.quantity * plannedMeal.servings;
 
         if (existingItem) {
+          // Simple quantity addition if units are the same.
+          // More complex unit conversion (e.g., tbsp to ml, g to kg) is not handled here.
+          if (existingItem.unit.toLowerCase() === parsed.unit.toLowerCase()) {
+            existingItem.quantity += quantityToAdd;
+          } else {
+            // If units differ, add as a new item variant or handle more gracefully.
+            // For now, we'll just log this or add a new entry with a modified key.
+            // This simple aggregation just adds recipe link.
+            // To truly sum quantities, unit conversion is needed. For now, we just list.
+            // The best is to make the key more specific if units can't be reconciled.
+            // Let's just update the recipe list for now.
+            // A more robust approach would create a new item or convert units.
+          }
           if (!existingItem.recipes.find(r => r.recipeId === recipe.id)) {
             existingItem.recipes.push({ recipeId: recipe.id, recipeName: recipe.name });
           }
-          existingItem.quantity = Math.max(existingItem.quantity, 1); // Keep quantity as "needed"
         } else {
-          ingredientMap.set(itemId, {
-            id: itemId,
-            name: ingredientString, 
-            quantity: 1, 
-            unit: 'item(s)', 
+          ingredientMap.set(mapKey, {
+            id: mapKey, // Use parsed name as ID
+            name: parsed.name, 
+            quantity: quantityToAdd, 
+            unit: parsed.unit, 
             category: category,
             purchased: false,
             recipes: [{ recipeId: recipe.id, recipeName: recipe.name }],
@@ -189,7 +273,6 @@ export const generateShoppingList = (plannedMeals: PlannedMeal[]): ShoppingListI
     }
   });
   return Array.from(ingredientMap.values()).sort((a,b) => {
-    // Sort by category first, then by name
     if (a.category < b.category) return -1;
     if (a.category > b.category) return 1;
     return a.name.localeCompare(b.name);

@@ -16,13 +16,73 @@ import {
 interface ShoppingListItemProps {
   item: ShoppingListItem;
   onToggle: (id: string) => void;
+  isStoreFriendlyMode: boolean;
 }
 
-export function ShoppingListItemComponent({ item, onToggle }: ShoppingListItemProps) {
-  // Quantity might be a string if it's "Varies" or similar, or a number.
-  const displayQuantity = typeof item.quantity === 'number' 
-    ? (Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(1))
-    : item.quantity;
+// Helper function for store-friendly quantities
+const getStoreFriendlyDisplay = (
+  itemName: string,
+  recipeQuantity: number,
+  recipeUnit: string
+): { displayQuantity: string | number; displayUnit: string } => {
+  const lowerItemName = itemName.toLowerCase();
+  const lowerRecipeUnit = recipeUnit.toLowerCase();
+
+  if (lowerItemName.includes("egg")) {
+    if (recipeQuantity <= 6) return { displayQuantity: 1, displayUnit: "box of 6" };
+    if (recipeQuantity <= 12) return { displayQuantity: 1, displayUnit: "box of 12" };
+    return { displayQuantity: Math.ceil(recipeQuantity / 12), displayUnit: "boxes of 12" };
+  }
+
+  if (lowerItemName.includes("yogurt") || lowerItemName.includes("yoghurt") || lowerItemName.includes("cottage cheese")) {
+    if (lowerRecipeUnit === "g") {
+      if (recipeQuantity <= 200) return { displayQuantity: 1, displayUnit: "200g pot" };
+      if (recipeQuantity <= 500) return { displayQuantity: 1, displayUnit: "500g pot" };
+      if (recipeQuantity <= 1000) return { displayQuantity: 1, displayUnit: "1kg tub" };
+      // For larger quantities, suggest multiples of largest common size
+      return { displayQuantity: Math.ceil(recipeQuantity / 500), displayUnit: "x 500g pots/tubs" };
+    }
+  }
+  
+  if (lowerItemName.includes("milk") || lowerItemName.includes("soy milk")) {
+      if (lowerRecipeUnit === "ml") {
+          if (recipeQuantity <= 1000) return {displayQuantity: 1, displayUnit: "1L carton"};
+          return {displayQuantity: Math.ceil(recipeQuantity/1000), displayUnit: "x 1L cartons"};
+      }
+      if (lowerRecipeUnit === "l") {
+          return {displayQuantity: Math.ceil(recipeQuantity), displayUnit: "x 1L cartons"};
+      }
+  }
+
+  if (lowerItemName.includes("chicken breast")) {
+    if (lowerRecipeUnit === "g") {
+        // Assuming average chicken breast is ~150-200g
+        const numBreasts = Math.ceil(recipeQuantity / 180);
+        return { displayQuantity: numBreasts, displayUnit: `~${numBreasts*180}g pack`};
+    }
+  }
+
+
+  // Default: return original recipe-derived quantity
+  return { displayQuantity: recipeQuantity, displayUnit: recipeUnit };
+};
+
+
+export function ShoppingListItemComponent({ item, onToggle, isStoreFriendlyMode }: ShoppingListItemProps) {
+  let finalDisplayQuantity: string | number = item.quantity;
+  let finalDisplayUnit: string = item.unit;
+
+  if (isStoreFriendlyMode) {
+    const storeFriendly = getStoreFriendlyDisplay(item.name, item.quantity, item.unit);
+    finalDisplayQuantity = storeFriendly.displayQuantity;
+    finalDisplayUnit = storeFriendly.displayUnit;
+  }
+  
+  // Format quantity for display (e.g., 0.5 instead of .5, integers as is)
+  const formattedQuantity = typeof finalDisplayQuantity === 'number'
+    ? (Number.isInteger(finalDisplayQuantity) ? finalDisplayQuantity : finalDisplayQuantity.toFixed(1))
+    : finalDisplayQuantity;
+
 
   return (
     <div
@@ -68,8 +128,8 @@ export function ShoppingListItemComponent({ item, onToggle }: ShoppingListItemPr
             </Tooltip>
           </TooltipProvider>
         )}
-        <span className={cn("text-sm", item.purchased ? "text-muted-foreground" : "text-foreground/80")}>
-          {displayQuantity} {item.unit}
+        <span className={cn("text-sm text-right", item.purchased ? "text-muted-foreground" : "text-foreground/80")} style={{minWidth: '80px'}}>
+          {formattedQuantity} {finalDisplayUnit}
         </span>
       </div>
     </div>
