@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { getRecipeById, getAllRecipes as fetchAllRecipes } from '@/lib/data'; // MEAL_TYPES removed as it's defined locally for slots
 import { RecipeCard } from '@/components/shared/RecipeCard';
