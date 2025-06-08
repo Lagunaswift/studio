@@ -10,18 +10,16 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Calendar } from '@/components/ui/calendar';
 import { format, addDays, subDays, isValid } from 'date-fns';
-import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Calendar as CalendarIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { getRecipeById, getAllRecipes as fetchAllRecipes, MEAL_TYPES } from '@/lib/data';
 import { RecipeCard } from '@/components/shared/RecipeCard';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function MealPlanPage() {
   const { 
@@ -39,12 +37,6 @@ export default function MealPlanPage() {
   const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
   const [isLoadingRecipes, setIsLoadingRecipes] = useState(true);
   const { toast } = useToast();
-
-  // State for the "Add to Plan" dialog
-  const [isAddToPlanDialogOpen, setIsAddToPlanDialogOpen] = useState(false);
-  const [recipeForDialog, setRecipeForDialog] = useState<Recipe | null>(null);
-  const [dialogMealType, setDialogMealType] = useState<MealType | undefined>(undefined);
-  const [dialogServings, setDialogServings] = useState<number>(1);
 
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
   const dailyMeals = getMealsForDate(formattedDate);
@@ -86,29 +78,16 @@ export default function MealPlanPage() {
       toast({ title: "Error", description: "Invalid servings amount.", variant: "destructive" });
     }
   };
-
-  const openAddToPlanDialog = (recipe: Recipe) => {
-    setRecipeForDialog(recipe);
-    setDialogServings(recipe.servings || 1);
-    setDialogMealType(MEAL_TYPES[0]); // Default to the first meal type
-    setIsAddToPlanDialogOpen(true);
-  };
-
-  const handleConfirmAddToPlan = () => {
-    if (recipeForDialog && dialogMealType && dialogServings > 0) {
-      addMealToPlan(recipeForDialog, formattedDate, dialogMealType, dialogServings);
-      toast({
-        title: "Meal Added",
-        description: `${recipeForDialog.name} added as ${dialogMealType} for ${format(selectedDate, 'PPP')}.`,
-      });
-      setIsAddToPlanDialogOpen(false);
-      setRecipeForDialog(null);
-    } else {
-      toast({ title: "Error", description: "Please select a meal type and valid servings.", variant: "destructive" });
-    }
-  };
   
   const mealDisplayOrder: MealType[] = ["Breakfast", "Lunch", "Dinner", "Snack"];
+
+  const handleAddRecipeDirectlyToMeal = (recipe: Recipe, mealType: MealType) => {
+    addMealToPlan(recipe, formattedDate, mealType, recipe.servings);
+    toast({
+      title: "Meal Added",
+      description: `${recipe.name} added as ${mealType} for ${format(selectedDate, 'PPP')}.`,
+    });
+  };
 
   return (
     <PageWrapper title="Interactive Meal Planner">
@@ -150,7 +129,7 @@ export default function MealPlanPage() {
         </div>
       </div>
 
-      {/* Single Recipe Slider Section */}
+      {/* Recipe Sliders Section */}
       <section className="mb-12">
         <h2 className="text-2xl font-bold font-headline text-primary mb-6">
           Browse Recipes to Add for {format(selectedDate, 'PPP')}
@@ -161,21 +140,26 @@ export default function MealPlanPage() {
             <p className="ml-4 text-muted-foreground">Loading recipes...</p>
           </div>
         ) : (
-          <div>
-            <div className="flex overflow-x-auto space-x-4 pb-4 -mb-4 scrollbar-thin scrollbar-thumb-primary/50 scrollbar-track-muted">
-              {allRecipes.length > 0 ? allRecipes.map((recipe) => (
-                <div key={`all-recipes-${recipe.id}`} className="min-w-[300px] md:min-w-[320px]">
-                  <RecipeCard
-                    recipe={recipe}
-                    showViewDetailsButton={true}
-                    showAddToMealPlanButton={true}
-                    onAddToMealPlan={() => openAddToPlanDialog(recipe)}
-                  />
+          <div className="space-y-8"> {/* Vertical stack for meal type sections */}
+            {MEAL_TYPES.map((mealType) => (
+              <div key={mealType}>
+                <h3 className="text-xl font-semibold font-headline text-primary/90 mb-3">{mealType} Recipes</h3>
+                <div className="flex overflow-x-auto space-x-4 pb-4 -mb-4 scrollbar-thin scrollbar-thumb-primary/50 scrollbar-track-muted">
+                  {allRecipes.length > 0 ? allRecipes.map((recipe) => (
+                    <div key={`${mealType}-${recipe.id}`} className="min-w-[300px] md:min-w-[320px]">
+                      <RecipeCard
+                        recipe={recipe}
+                        showViewDetailsButton={true}
+                        showAddToMealPlanButton={true}
+                        onAddToMealPlan={() => handleAddRecipeDirectlyToMeal(recipe, mealType)}
+                      />
+                    </div>
+                  )) : (
+                      <p className="text-muted-foreground pl-2">No recipes available to display.</p>
+                  )}
                 </div>
-              )) : (
-                  <p className="text-muted-foreground">No recipes available to display.</p>
-              )}
-            </div>
+              </div>
+            ))}
           </div>
         )}
       </section>
@@ -228,13 +212,15 @@ export default function MealPlanPage() {
                     return (
                       <Card key={meal.id} className="shadow-md overflow-hidden flex flex-col sm:flex-row">
                         <div className="sm:w-1/4 relative h-32 sm:h-auto">
-                          <Image
-                            src={recipe.image}
-                            alt={recipe.name}
-                            fill
-                            className="object-cover"
-                            data-ai-hint="food meal"
-                          />
+                           {recipe.image && (
+                            <Image
+                                src={recipe.image}
+                                alt={recipe.name}
+                                fill
+                                className="object-cover"
+                                data-ai-hint="food meal"
+                            />
+                           )}
                         </div>
                         <div className="sm:w-3/4 p-4 flex flex-col justify-between">
                           <div>
@@ -294,55 +280,6 @@ export default function MealPlanPage() {
           </DialogContent>
         </Dialog>
       )}
-
-      {/* Add to Meal Plan Dialog */}
-      {isAddToPlanDialogOpen && recipeForDialog && (
-        <Dialog open={isAddToPlanDialogOpen} onOpenChange={() => {setIsAddToPlanDialogOpen(false); setRecipeForDialog(null);}}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle className="font-headline text-primary">Add "{recipeForDialog.name}" to Meal Plan</DialogTitle>
-              <DialogDescription>
-                Select the meal type and servings for {format(selectedDate, 'PPP')}.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="mealType-dialog" className="text-right">Meal Type</Label>
-                <Select value={dialogMealType} onValueChange={(value: MealType) => setDialogMealType(value)}>
-                  <SelectTrigger id="mealType-dialog" className="col-span-3">
-                    <SelectValue placeholder="Select meal type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MEAL_TYPES.map(type => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="servings-dialog" className="text-right">Servings</Label>
-                <Input
-                  id="servings-dialog"
-                  type="number"
-                  min="1"
-                  value={dialogServings}
-                  onChange={(e) => setDialogServings(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                  className="col-span-3"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="outline">Cancel</Button>
-              </DialogClose>
-              <Button onClick={handleConfirmAddToPlan} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add to Plan
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </PageWrapper>
   );
 }
-
