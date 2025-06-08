@@ -100,7 +100,7 @@ export default function ProfilePage() {
       title: "Macro Targets Updated",
       description: "Your daily caloric and macro targets have been saved.",
     });
-    macroForm.reset(data); // Simpler reset
+    macroForm.reset(data);
   };
 
   const handlePreferencesSubmit: SubmitHandler<PreferencesFormValues> = (data) => {
@@ -110,7 +110,7 @@ export default function ProfilePage() {
       title: "Preferences Updated",
       description: "Your dietary preferences and allergen filters have been saved.",
     });
-    preferencesForm.reset(data); // Simpler reset
+    preferencesForm.reset(data);
   };
 
   return (
@@ -210,16 +210,18 @@ export default function ProfilePage() {
                               <Checkbox
                                 checked={field.value?.includes(preference)}
                                 onCheckedChange={(checked) => {
-                                  const currentValue = field.value || [];
-                                  let newValue;
-                                  if (checked) {
-                                    newValue = [...currentValue, preference];
-                                  } else {
-                                    newValue = currentValue.filter(
-                                      (value) => value !== preference
-                                    );
-                                  }
-                                  field.onChange(newValue);
+                                  setTimeout(() => {
+                                    const currentValue = field.value || [];
+                                    let newValue;
+                                    if (checked) {
+                                      newValue = [...currentValue, preference];
+                                    } else {
+                                      newValue = currentValue.filter(
+                                        (value) => value !== preference
+                                      );
+                                    }
+                                    field.onChange(newValue);
+                                  }, 0);
                                 }}
                               />
                             </FormControl>
@@ -246,16 +248,18 @@ export default function ProfilePage() {
                               <Checkbox
                                 checked={field.value?.includes(allergen)}
                                 onCheckedChange={(checked) => {
-                                  const currentValue = field.value || [];
-                                  let newValue;
-                                  if (checked) {
-                                    newValue = [...currentValue, allergen];
-                                  } else {
-                                    newValue = currentValue.filter(
-                                      (value) => value !== allergen
-                                    );
-                                  }
-                                  field.onChange(newValue);
+                                  setTimeout(() => {
+                                    const currentValue = field.value || [];
+                                    let newValue;
+                                    if (checked) {
+                                      newValue = [...currentValue, allergen];
+                                    } else {
+                                      newValue = currentValue.filter(
+                                        (value) => value !== allergen
+                                      );
+                                    }
+                                    field.onChange(newValue);
+                                  }, 0);
                                 }}
                               />
                             </FormControl>
@@ -281,5 +285,6 @@ export default function ProfilePage() {
     </PageWrapper>
   );
 }
+    
 
     
