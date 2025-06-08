@@ -34,7 +34,7 @@ export function RecipeCard({
   }
   return (
     <Card className={cn("flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg h-full", className)}>
-      <div className="relative w-full h-48">
+      <div className="relative w-full h-60"> {/* Changed h-48 to h-60 */}
         <Image
           src={recipe.image}
           alt={recipe.name}
