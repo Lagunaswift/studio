@@ -1,9 +1,10 @@
+
 "use client";
 
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { useAppContext } from '@/context/AppContext';
 import { ShoppingListItemComponent } from '@/components/shopping/ShoppingListItemComponent';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, ShoppingCart, Trash2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
