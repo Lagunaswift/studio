@@ -110,6 +110,7 @@ export default function HomePage() {
         macroTargetForm.reset({ calories: 0, protein: 150, carbs: 200, fat: 60 });
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [macroTargets, showSetTargetsDialog, macroTargetForm.reset]);
 
   const handleSetTargets: SubmitHandler<MacroTargetFormValues> = (data) => {
@@ -127,7 +128,7 @@ export default function HomePage() {
     <PageWrapper>
       <section className="text-center mb-12 py-8 bg-gradient-to-br from-primary/20 to-accent/10 rounded-lg shadow-lg">
         <h1 className="text-4xl md:text-5xl font-bold font-headline mb-4 text-primary">
-          Welcome to Macro<span className="text-accent">Teal</span> Planner
+          Welcome to MealPlanner<span className="text-accent">Pro</span>
         </h1>
         <p className="text-lg text-foreground/80 max-w-2xl mx-auto">
           Your personal assistant for healthy eating. Plan meals, track macros, get AI suggestions, and simplify your shopping.
@@ -245,4 +246,3 @@ export default function HomePage() {
     </PageWrapper>
   );
 }
-

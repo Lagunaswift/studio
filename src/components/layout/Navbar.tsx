@@ -23,7 +23,7 @@ export function Navbar() {
         <Link href="/" className="flex items-center gap-2">
           <UtensilsCrossed className="h-7 w-7 text-primary" />
           <h1 className="text-xl font-bold font-headline text-primary">
-            Macro<span className="text-accent">Teal</span> Planner
+            MealPlanner<span className="text-accent">Pro</span>
           </h1>
         </Link>
         <nav className="hidden md:flex items-center space-x-2 lg:space-x-4">

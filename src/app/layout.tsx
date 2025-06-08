@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AppProvider } from '@/context/AppContext';
 
 export const metadata: Metadata = {
-  title: 'Macro Teal Meal Planner',
+  title: 'MealPlannerPro',
   description: 'Plan your meals, track macros, and generate shopping lists with AI suggestions.',
   icons: {
     icon: '/favicon.ico', // Assuming a favicon might be added later
