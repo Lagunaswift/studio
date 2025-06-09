@@ -6,16 +6,17 @@ import { PageWrapper } from '@/components/layout/PageWrapper';
 import { suggestMealPlan, type SuggestMealPlanInput, type SuggestMealPlanOutput, type RecipeForAI, type MealSlotForAI } from '@/ai/flows/suggest-meal-plan';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Settings, Info } from 'lucide-react';
+import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Settings, Info, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppContext } from '@/context/AppContext';
-import { getAllRecipes, getRecipeById } from '@/lib/data'; // Assuming getAllRecipes is async
+import { getAllRecipes } from '@/lib/data'; 
 import type { Recipe, Macros, MealSlotConfig } from '@/types';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 
 export default function AISuggestionsPage() {
