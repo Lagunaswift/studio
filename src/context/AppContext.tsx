@@ -3,9 +3,21 @@
 
 import type React from 'react';
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import type { PlannedMeal, ShoppingListItem, Recipe, MealType, Macros, MacroTargets, UserProfileSettings, MealSlotConfig } from '@/types';
+import type { 
+  PlannedMeal, 
+  ShoppingListItem, 
+  Recipe, 
+  MealType, 
+  Macros, 
+  MacroTargets, 
+  UserProfileSettings, 
+  MealSlotConfig,
+  Sex,
+  ActivityLevel
+} from '@/types';
+import { ACTIVITY_LEVEL_OPTIONS } from '@/types'; // Import activity level options
 import { loadState, saveState } from '@/lib/localStorage';
-import { getRecipeById, calculateTotalMacros, generateShoppingList as generateShoppingListUtil, MEAL_TYPES } from '@/lib/data';
+import { getRecipeById, calculateTotalMacros, generateShoppingList as generateShoppingListUtil } from '@/lib/data';
 
 const MEAL_PLAN_KEY = 'macroTealMealPlan';
 const SHOPPING_LIST_KEY = 'macroTealShoppingList';
@@ -18,6 +30,55 @@ const DEFAULT_MEAL_STRUCTURE: MealSlotConfig[] = [
   { id: 'default-dinner', name: 'Dinner', type: 'Dinner' },
   { id: 'default-snack1', name: 'Snack', type: 'Snack' },
 ];
+
+const DEFAULT_USER_PROFILE: UserProfileSettings = {
+  macroTargets: null,
+  dietaryPreferences: [],
+  allergens: [],
+  mealStructure: DEFAULT_MEAL_STRUCTURE,
+  heightCm: null,
+  weightKg: null,
+  age: null,
+  sex: null,
+  activityLevel: null,
+  bodyFatPercentage: null,
+  tdee: null,
+  leanBodyMassKg: null,
+};
+
+
+// Helper function to calculate LBM
+const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
+  if (weightKg && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
+    return weightKg * (1 - bodyFatPercentage / 100);
+  }
+  return null;
+};
+
+// Helper function to calculate TDEE (Mifflin-St Jeor)
+const calculateTDEE = (
+  weightKg: number | null,
+  heightCm: number | null,
+  age: number | null,
+  sex: Sex | null,
+  activityLevel: ActivityLevel | null
+): number | null => {
+  if (!weightKg || !heightCm || !age || !sex || !activityLevel) {
+    return null;
+  }
+  let bmr: number;
+  if (sex === 'male') {
+    bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
+  } else {
+    bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
+  }
+  const activity = ACTIVITY_LEVEL_OPTIONS.find(opt => opt.value === activityLevel);
+  if (activity) {
+    return Math.round(bmr * activity.multiplier);
+  }
+  return null;
+};
+
 
 interface AppContextType {
   mealPlan: PlannedMeal[];
@@ -34,7 +95,8 @@ interface AppContextType {
   setMacroTargets: (targets: MacroTargets) => void;
   setDietaryPreferences: (preferences: string[]) => void;
   setAllergens: (allergens: string[]) => void;
-  setMealStructure: (mealStructure: MealSlotConfig[]) => void; // Added
+  setMealStructure: (mealStructure: MealSlotConfig[]) => void;
+  setUserInformation: (info: Partial<Pick<UserProfileSettings, 'heightCm' | 'weightKg' | 'age' | 'sex' | 'activityLevel' | 'bodyFatPercentage'>>) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -48,14 +110,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const loadedMealPlan = loadState<PlannedMeal[]>(MEAL_PLAN_KEY) || [];
     const loadedShoppingList = loadState<ShoppingListItem[]>(SHOPPING_LIST_KEY) || [];
-    const loadedUserProfile = loadState<UserProfileSettings>(USER_PROFILE_KEY) || {
-      macroTargets: null,
-      dietaryPreferences: [],
-      allergens: [],
-      mealStructure: DEFAULT_MEAL_STRUCTURE, // Initialize with default
-    };
-    // Ensure mealStructure exists, if loading from older state
-    if (!loadedUserProfile.mealStructure) {
+    let loadedUserProfile = loadState<UserProfileSettings>(USER_PROFILE_KEY);
+
+    if (!loadedUserProfile) {
+      loadedUserProfile = DEFAULT_USER_PROFILE;
+    } else {
+      // Ensure all fields from DEFAULT_USER_PROFILE are present
+      loadedUserProfile = { ...DEFAULT_USER_PROFILE, ...loadedUserProfile };
+       // Recalculate TDEE and LBM on load if necessary data exists
+      loadedUserProfile.tdee = calculateTDEE(
+        loadedUserProfile.weightKg,
+        loadedUserProfile.heightCm,
+        loadedUserProfile.age,
+        loadedUserProfile.sex,
+        loadedUserProfile.activityLevel
+      );
+      loadedUserProfile.leanBodyMassKg = calculateLBM(
+        loadedUserProfile.weightKg,
+        loadedUserProfile.bodyFatPercentage
+      );
+    }
+     if (!loadedUserProfile.mealStructure || loadedUserProfile.mealStructure.length === 0) {
         loadedUserProfile.mealStructure = DEFAULT_MEAL_STRUCTURE;
     }
 
@@ -77,12 +152,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   useEffect(() => {
-    if (isInitialized && userProfile) { // Check userProfile is not null
+    if (isInitialized && userProfile) { 
       saveState(USER_PROFILE_KEY, userProfile);
     }
   }, [userProfile, isInitialized]);
   
-  // Save mealPlan and shoppingList separately as before
   useEffect(() => {
     if (isInitialized) {
       saveState(MEAL_PLAN_KEY, mealPlan.map(({recipeDetails, ...pm}) => pm));
@@ -103,10 +177,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addMealToPlan = useCallback((recipe: Recipe, date: string, mealType: MealType, servings: number) => {
     const newPlannedMeal: PlannedMeal = {
-      id: `${recipe.id}-${date}-${mealType}-${Date.now()}`, // Ensure mealType is part of ID for uniqueness if user adds same recipe as different meal types
+      id: `${recipe.id}-${date}-${mealType}-${Date.now()}`, 
       recipeId: recipe.id,
       date,
-      mealType, // This mealType refers to the general category selected during planning
+      mealType, 
       servings,
       recipeDetails: recipe,
     };
@@ -166,19 +240,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const clearAllData = useCallback(() => {
     setMealPlan([]);
     setShoppingList([]);
-    setUserProfile({ 
-      macroTargets: null, 
-      dietaryPreferences: [], 
-      allergens: [],
-      mealStructure: DEFAULT_MEAL_STRUCTURE, // Reset to default
-    });
+    setUserProfile(DEFAULT_USER_PROFILE);
   }, []);
 
   const updateUserProfileState = useCallback((updates: Partial<UserProfileSettings>) => {
-    setUserProfile(prev => ({
-      ...(prev || { macroTargets: null, dietaryPreferences: [], allergens: [], mealStructure: DEFAULT_MEAL_STRUCTURE }),
-      ...updates,
-    }));
+    setUserProfile(prevProfile => {
+      const currentProfile = prevProfile || DEFAULT_USER_PROFILE;
+      const updatedProfile = { ...currentProfile, ...updates };
+
+      // Recalculate TDEE and LBM
+      updatedProfile.tdee = calculateTDEE(
+        updatedProfile.weightKg,
+        updatedProfile.heightCm,
+        updatedProfile.age,
+        updatedProfile.sex,
+        updatedProfile.activityLevel
+      );
+      updatedProfile.leanBodyMassKg = calculateLBM(
+        updatedProfile.weightKg,
+        updatedProfile.bodyFatPercentage
+      );
+      return updatedProfile;
+    });
   }, []);
 
   const setMacroTargets = useCallback((targets: MacroTargets) => {
@@ -197,6 +280,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateUserProfileState({ mealStructure });
   }, [updateUserProfileState]);
 
+  const setUserInformation = useCallback((info: Partial<Pick<UserProfileSettings, 'heightCm' | 'weightKg' | 'age' | 'sex' | 'activityLevel' | 'bodyFatPercentage'>>) => {
+    updateUserProfileState(info);
+  }, [updateUserProfileState]);
+
+
   const contextValue = useMemo(() => ({
     mealPlan,
     shoppingList,
@@ -212,17 +300,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMacroTargets,
     setDietaryPreferences,
     setAllergens,
-    setMealStructure, // Added
+    setMealStructure,
+    setUserInformation,
   }), [
     mealPlan, shoppingList, userProfile, addMealToPlan, removeMealFromPlan, 
     updatePlannedMealServings, getDailyMacros, toggleShoppingListItem, 
     clearMealPlanForDate, clearAllData, getMealsForDate, setMacroTargets,
-    setDietaryPreferences, setAllergens, setMealStructure // Added
+    setDietaryPreferences, setAllergens, setMealStructure, setUserInformation
   ]);
 
   if (!isInitialized) {
-    // Potentially return a loading state or null if preferred, 
-    // to avoid consumers using the context before it's ready
     return null; 
   }
 

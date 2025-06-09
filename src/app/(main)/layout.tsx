@@ -25,7 +25,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { SheetTitle } from '@/components/ui/sheet';
-import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, PanelLeft, Target, Leaf, Ban, Salad, ListChecks, UserCog } from 'lucide-react';
+import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, PanelLeft, Target, Leaf, Ban, ListChecks, UserCog, UserCircle2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 interface NavItem {
@@ -44,6 +44,7 @@ const mainNavItems: NavItem[] = [
 ];
 
 const profileNavItems: NavItem[] = [
+  { href: '/profile/user-info', label: 'User Info', icon: UserCircle2 },
   { href: '/profile/targets', label: 'Targets', icon: Target },
   { href: '/profile/diet-type', label: 'Diet Type', icon: Leaf },
   { href: '/profile/allergens', label: 'Allergens', icon: Ban },
@@ -97,19 +98,18 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             })}
             
             <SidebarMenuItem className="group-data-[collapsible=icon]:hidden">
-              <Accordion type="single" collapsible className="w-full" defaultValue={isProfileSectionActive && sidebarState === 'expanded' ? "dietary-prefs" : undefined}>
-                <AccordionItem value="dietary-prefs" className="border-none">
+              <Accordion type="single" collapsible className="w-full" defaultValue={isProfileSectionActive && sidebarState === 'expanded' ? "profile-settings" : undefined}>
+                <AccordionItem value="profile-settings" className="border-none">
                   <AccordionTrigger className={cn(
                     "flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:[&>span:last-child]:hidden [&>svg]:size-4 [&>svg]:shrink-0",
-                    "py-0 hover:no-underline", // Reset AccordionTrigger's default py and hover underline
+                    "py-0 hover:no-underline", 
                     isProfileSectionActive && "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                   )}
                   >
                      <div className="flex items-center gap-2">
-                        <Salad />
-                        <span>Dietary Preferences</span>
+                        <UserCog />
+                        <span>Profile Settings</span>
                       </div>
-                      {/* AccordionTrigger adds its own ChevronDown */}
                   </AccordionTrigger>
                   <AccordionContent className="pt-1 pb-0 pl-2 group-data-[collapsible=icon]:hidden">
                     <SidebarMenu>
@@ -120,7 +120,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                             <SidebarMenuButton
                               asChild
                               isActive={isActive}
-                              size="sm" // Make sub-items slightly smaller
+                              size="sm" 
                               tooltip={{ children: item.label, side: 'right', align: 'center' }}
                             >
                               <Link href={item.href}>
@@ -137,17 +137,15 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
               </Accordion>
             </SidebarMenuItem>
 
-            {/* Tooltip for collapsed Dietary Preferences section */}
             <SidebarMenuItem className="hidden group-data-[collapsible=icon]:block">
                  <SidebarMenuButton
                     asChild
                     isActive={isProfileSectionActive}
-                    tooltip={{ children: "Dietary Preferences", side: 'right', align: 'center' }}
+                    tooltip={{ children: "Profile Settings", side: 'right', align: 'center' }}
                   >
-                    {/* This Link is a placeholder for tooltip appearance, actual navigation to a default profile page could be added */}
-                    <Link href="/profile/targets"> 
-                      <Salad />
-                      <span className="sr-only">Dietary Preferences</span>
+                    <Link href="/profile/user-info"> 
+                      <UserCog />
+                      <span className="sr-only">Profile Settings</span>
                     </Link>
                   </SidebarMenuButton>
             </SidebarMenuItem>

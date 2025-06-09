@@ -1,5 +1,4 @@
 
-
 export interface Ingredient {
   name: string;
   quantity: number;
@@ -81,18 +80,37 @@ export interface MacroTargets {
   fat: number;
 }
 
-// New: Defines a single meal slot in the user's desired meal structure
 export interface MealSlotConfig {
   id: string; // Unique ID for this slot, e.g., timestamp or uuid
   name: string; // User-defined name, e.g., "Breakfast", "Morning Snack"
   type: MealType; // The general category: "Breakfast", "Lunch", "Dinner", "Snack"
 }
 
+export type Sex = 'male' | 'female';
+export const SEX_OPTIONS: Sex[] = ['male', 'female'];
+
+export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'veryActive';
+export const ACTIVITY_LEVEL_OPTIONS: { value: ActivityLevel; label: string; multiplier: number }[] = [
+  { value: 'sedentary', label: 'Sedentary (little or no exercise)', multiplier: 1.2 },
+  { value: 'light', label: 'Lightly active (light exercise/sports 1-3 days/week)', multiplier: 1.375 },
+  { value: 'moderate', label: 'Moderately active (moderate exercise/sports 3-5 days/week)', multiplier: 1.55 },
+  { value: 'active', label: 'Very active (hard exercise/sports 6-7 days a week)', multiplier: 1.725 },
+  { value: 'veryActive', label: 'Extra active (very hard exercise/sports & physical job)', multiplier: 1.9 },
+];
+
 export interface UserProfileSettings {
-  macroTargets: MacroTargets | null; // Can be null if not set
+  macroTargets: MacroTargets | null; 
   dietaryPreferences: string[];
   allergens: string[];
   mealStructure: MealSlotConfig[]; 
+  // Physical attributes
+  heightCm: number | null;
+  weightKg: number | null;
+  age: number | null;
+  sex: Sex | null;
+  activityLevel: ActivityLevel | null;
+  bodyFatPercentage: number | null; // Optional
+  // Calculated values
+  tdee: number | null; // Total Daily Energy Expenditure
+  leanBodyMassKg: number | null;
 }
-
-    
