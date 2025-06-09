@@ -1,4 +1,5 @@
 
+
 export interface Ingredient {
   name: string;
   quantity: number;
@@ -24,9 +25,11 @@ export interface Recipe {
   chillTime?: string; // New optional field
   ingredients: string[]; // Changed from Ingredient[]
   macrosPerServing: Macros; // Will be populated from top-level cal, pro, carb, fat
+  instructions: string[]; // Added instructions
   tags?: string[]; // e.g., "vegetarian", "quick", "high-protein"
 
   // Raw macro fields from new structure, used to populate macrosPerServing
+  // These are kept for source data, but macrosPerServing is the canonical one
   calories: number;
   protein: number;
   carbs: number;
@@ -86,8 +89,10 @@ export interface MealSlotConfig {
 }
 
 export interface UserProfileSettings {
-  macroTargets: MacroTargets | null;
+  macroTargets: MacroTargets | null; // Can be null if not set
   dietaryPreferences: string[];
   allergens: string[];
-  mealStructure: MealSlotConfig[]; // Added
+  mealStructure: MealSlotConfig[]; 
 }
+
+    
