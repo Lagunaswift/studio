@@ -64,7 +64,7 @@ export interface ShoppingListItem {
   name: string;
   quantity: number; // Will be simplified
   unit: string; // Will be simplified
-  category: UKSupermarketCategory; 
+  category: UKSupermarketCategory;
   purchased: boolean;
   recipes: Array<{ recipeId: number; recipeName: string }>; // Track which recipes need this ingredient
 }
@@ -98,11 +98,27 @@ export const ACTIVITY_LEVEL_OPTIONS: { value: ActivityLevel; label: string; mult
   { value: 'veryActive', label: 'Extra active (very hard exercise/sports & physical job)', multiplier: 1.9 },
 ];
 
+export type AthleteType = 'endurance' | 'strengthPower' | 'generalFitness' | 'notSpecified';
+export const ATHLETE_TYPE_OPTIONS: { value: AthleteType; label: string }[] = [
+  { value: 'notSpecified', label: 'Not Specified' },
+  { value: 'endurance', label: 'Endurance Athlete' },
+  { value: 'strengthPower', label: 'Strength/Power Athlete' },
+  { value: 'generalFitness', label: 'General Fitness' },
+];
+
+export type PrimaryGoal = 'fatLoss' | 'muscleGain' | 'maintenance' | 'notSpecified';
+export const PRIMARY_GOAL_OPTIONS: { value: PrimaryGoal; label: string }[] = [
+  { value: 'notSpecified', label: 'Not Specified' },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'fatLoss', label: 'Fat Loss' },
+  { value: 'muscleGain', label: 'Muscle Gain' },
+];
+
 export interface UserProfileSettings {
-  macroTargets: MacroTargets | null; 
+  macroTargets: MacroTargets | null;
   dietaryPreferences: string[];
   allergens: string[];
-  mealStructure: MealSlotConfig[]; 
+  mealStructure: MealSlotConfig[];
   // Physical attributes
   heightCm: number | null;
   weightKg: number | null;
@@ -110,6 +126,8 @@ export interface UserProfileSettings {
   sex: Sex | null;
   activityLevel: ActivityLevel | null;
   bodyFatPercentage: number | null; // Optional
+  athleteType: AthleteType | null;
+  primaryGoal: PrimaryGoal | null;
   // Calculated values
   tdee: number | null; // Total Daily Energy Expenditure
   leanBodyMassKg: number | null;

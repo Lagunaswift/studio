@@ -13,9 +13,9 @@ import * as z from 'zod';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import type { UserProfileSettings, Sex, ActivityLevel } from '@/types';
-import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS } from '@/types';
-import { Save, Calculator, Activity, UserCircle } from 'lucide-react';
+import type { UserProfileSettings, Sex, ActivityLevel, AthleteType, PrimaryGoal } from '@/types';
+import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS } from '@/types';
+import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell } from 'lucide-react'; // Added TargetIcon, Dumbbell
 
 const userInfoSchema = z.object({
   heightCm: z.coerce.number().min(50, "Height must be at least 50cm").max(300, "Height must be at most 300cm").nullable().optional(),
@@ -24,9 +24,11 @@ const userInfoSchema = z.object({
   sex: z.enum(SEX_OPTIONS).nullable().optional(),
   activityLevel: z.enum(ACTIVITY_LEVEL_OPTIONS.map(o => o.value) as [ActivityLevel, ...ActivityLevel[]]).nullable().optional(),
   bodyFatPercentage: z.coerce.number().min(1, "Body fat % must be at least 1").max(70, "Body fat % must be at most 70").nullable().optional(),
+  athleteType: z.enum(ATHLETE_TYPE_OPTIONS.map(o => o.value) as [AthleteType, ...AthleteType[]]).nullable().optional(),
+  primaryGoal: z.enum(PRIMARY_GOAL_OPTIONS.map(o => o.value) as [PrimaryGoal, ...PrimaryGoal[]]).nullable().optional(),
 });
 
-type UserInfoFormValues = Pick<UserProfileSettings, 'heightCm' | 'weightKg' | 'age' | 'sex' | 'activityLevel' | 'bodyFatPercentage'>;
+type UserInfoFormValues = Pick<UserProfileSettings, 'heightCm' | 'weightKg' | 'age' | 'sex' | 'activityLevel' | 'bodyFatPercentage' | 'athleteType' | 'primaryGoal'>;
 
 export default function UserInfoPage() {
   const { userProfile, setUserInformation } = useAppContext();
@@ -41,6 +43,8 @@ export default function UserInfoPage() {
       sex: userProfile?.sex || null,
       activityLevel: userProfile?.activityLevel || null,
       bodyFatPercentage: userProfile?.bodyFatPercentage || null,
+      athleteType: userProfile?.athleteType || 'notSpecified',
+      primaryGoal: userProfile?.primaryGoal || 'notSpecified',
     },
   });
 
@@ -53,6 +57,8 @@ export default function UserInfoPage() {
         sex: userProfile.sex,
         activityLevel: userProfile.activityLevel,
         bodyFatPercentage: userProfile.bodyFatPercentage,
+        athleteType: userProfile.athleteType,
+        primaryGoal: userProfile.primaryGoal,
       });
     }
   }, [userProfile, form]);
@@ -61,7 +67,7 @@ export default function UserInfoPage() {
     setUserInformation(data);
     toast({
       title: "User Information Saved",
-      description: "Your physical attributes and activity level have been updated.",
+      description: "Your profile details have been updated.",
     });
   };
 
@@ -74,7 +80,7 @@ export default function UserInfoPage() {
           <CardHeader>
             <CardTitle className="flex items-center"><UserCircle className="mr-2 h-5 w-5 text-accent"/> Your Details</CardTitle>
             <CardDescription>
-              Provide your physical attributes to help calculate your energy needs and LBM.
+              Provide your physical attributes, activity level, and goals to help personalize your experience.
             </CardDescription>
           </CardHeader>
           <Form {...form}>
@@ -147,6 +153,19 @@ export default function UserInfoPage() {
                 </div>
                 <FormField
                   control={form.control}
+                  name="bodyFatPercentage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Body Fat % (Optional)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.1" placeholder="e.g., 15.5" {...field} value={field.value ?? ""} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
                   name="activityLevel"
                   render={({ field }) => (
                     <FormItem>
@@ -167,19 +186,52 @@ export default function UserInfoPage() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="bodyFatPercentage"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Body Fat % (Optional)</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.1" placeholder="e.g., 15.5" {...field} value={field.value ?? ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid sm:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="athleteType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center"><Dumbbell className="mr-2 h-4 w-4 text-muted-foreground"/> Athlete Type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value ?? 'notSpecified'}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select athlete type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {ATHLETE_TYPE_OPTIONS.map(option => (
+                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="primaryGoal"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center"><TargetIcon className="mr-2 h-4 w-4 text-muted-foreground"/> Primary Goal</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value ?? 'notSpecified'}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select primary goal" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {PRIMARY_GOAL_OPTIONS.map(option => (
+                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </CardContent>
               <CardFooter>
                 <Button type="submit" disabled={form.formState.isSubmitting || !form.formState.isDirty} className="bg-accent hover:bg-accent/90 text-accent-foreground">

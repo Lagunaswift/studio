@@ -3,19 +3,21 @@
 
 import type React from 'react';
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import type { 
-  PlannedMeal, 
-  ShoppingListItem, 
-  Recipe, 
-  MealType, 
-  Macros, 
-  MacroTargets, 
-  UserProfileSettings, 
+import type {
+  PlannedMeal,
+  ShoppingListItem,
+  Recipe,
+  MealType,
+  Macros,
+  MacroTargets,
+  UserProfileSettings,
   MealSlotConfig,
   Sex,
-  ActivityLevel
+  ActivityLevel,
+  AthleteType,
+  PrimaryGoal
 } from '@/types';
-import { ACTIVITY_LEVEL_OPTIONS } from '@/types'; // Import activity level options
+import { ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS } from '@/types'; // Import options
 import { loadState, saveState } from '@/lib/localStorage';
 import { getRecipeById, calculateTotalMacros, generateShoppingList as generateShoppingListUtil } from '@/lib/data';
 
@@ -42,6 +44,8 @@ const DEFAULT_USER_PROFILE: UserProfileSettings = {
   sex: null,
   activityLevel: null,
   bodyFatPercentage: null,
+  athleteType: 'notSpecified',
+  primaryGoal: 'notSpecified',
   tdee: null,
   leanBodyMassKg: null,
 };
@@ -96,7 +100,7 @@ interface AppContextType {
   setDietaryPreferences: (preferences: string[]) => void;
   setAllergens: (allergens: string[]) => void;
   setMealStructure: (mealStructure: MealSlotConfig[]) => void;
-  setUserInformation: (info: Partial<Pick<UserProfileSettings, 'heightCm' | 'weightKg' | 'age' | 'sex' | 'activityLevel' | 'bodyFatPercentage'>>) => void;
+  setUserInformation: (info: Partial<UserProfileSettings>) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -140,7 +144,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return {...pm, recipeDetails: recipeDetails || undefined };
     });
     setMealPlan(populatedMealPlan);
-    
+
     setUserProfile(loadedUserProfile);
 
     if (loadedShoppingList.length === 0 && populatedMealPlan.length > 0) {
@@ -152,11 +156,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   useEffect(() => {
-    if (isInitialized && userProfile) { 
+    if (isInitialized && userProfile) {
       saveState(USER_PROFILE_KEY, userProfile);
     }
   }, [userProfile, isInitialized]);
-  
+
   useEffect(() => {
     if (isInitialized) {
       saveState(MEAL_PLAN_KEY, mealPlan.map(({recipeDetails, ...pm}) => pm));
@@ -177,10 +181,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addMealToPlan = useCallback((recipe: Recipe, date: string, mealType: MealType, servings: number) => {
     const newPlannedMeal: PlannedMeal = {
-      id: `${recipe.id}-${date}-${mealType}-${Date.now()}`, 
+      id: `${recipe.id}-${date}-${mealType}-${Date.now()}`,
       recipeId: recipe.id,
       date,
-      mealType, 
+      mealType,
       servings,
       recipeDetails: recipe,
     };
@@ -201,7 +205,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updatePlannedMealServings = useCallback((plannedMealId: string, newServings: number) => {
     setMealPlan(prev => {
-      const updatedPlan = prev.map(pm => 
+      const updatedPlan = prev.map(pm =>
         pm.id === plannedMealId ? { ...pm, servings: newServings } : pm
       );
       regenerateShoppingList(updatedPlan);
@@ -280,7 +284,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateUserProfileState({ mealStructure });
   }, [updateUserProfileState]);
 
-  const setUserInformation = useCallback((info: Partial<Pick<UserProfileSettings, 'heightCm' | 'weightKg' | 'age' | 'sex' | 'activityLevel' | 'bodyFatPercentage'>>) => {
+  const setUserInformation = useCallback((info: Partial<UserProfileSettings>) => {
     updateUserProfileState(info);
   }, [updateUserProfileState]);
 
@@ -303,14 +307,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMealStructure,
     setUserInformation,
   }), [
-    mealPlan, shoppingList, userProfile, addMealToPlan, removeMealFromPlan, 
-    updatePlannedMealServings, getDailyMacros, toggleShoppingListItem, 
+    mealPlan, shoppingList, userProfile, addMealToPlan, removeMealFromPlan,
+    updatePlannedMealServings, getDailyMacros, toggleShoppingListItem,
     clearMealPlanForDate, clearAllData, getMealsForDate, setMacroTargets,
     setDietaryPreferences, setAllergens, setMealStructure, setUserInformation
   ]);
 
   if (!isInitialized) {
-    return null; 
+    return null;
   }
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
