@@ -14,7 +14,7 @@ import type { AthleteType, PrimaryGoal, Sex } from '@/types'; // Assuming types 
 
 const KG_TO_LB = 2.20462;
 
-export const SuggestProteinIntakeInputSchema = z.object({
+const SuggestProteinIntakeInputSchema = z.object({
   leanBodyMassKg: z.number().positive().describe("User's lean body mass in kilograms (kg). This is required."),
   athleteType: z.enum(['endurance', 'strengthPower', 'generalFitness', 'notSpecified']).optional().default('notSpecified')
     .describe("Type of athlete (e.g., endurance, strength/power, general fitness)."),
@@ -27,7 +27,7 @@ export const SuggestProteinIntakeInputSchema = z.object({
 });
 export type SuggestProteinIntakeInput = z.infer<typeof SuggestProteinIntakeInputSchema>;
 
-export const SuggestProteinIntakeOutputSchema = z.object({
+const SuggestProteinIntakeOutputSchema = z.object({
   minProteinGramsPerDay: z.number().describe("Minimum suggested daily protein intake in grams."),
   maxProteinGramsPerDay: z.number().describe("Maximum suggested daily protein intake in grams."),
   minProteinFactor: z.number().describe("The lower-bound multiplier used for calculation (e.g., 1.75 if displayUnit is 'g/kg LBM')."),
@@ -110,3 +110,4 @@ const suggestProteinIntakeFlow = ai.defineFlow(
     return output;
   }
 );
+
