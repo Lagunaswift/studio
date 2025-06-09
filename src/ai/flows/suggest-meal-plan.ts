@@ -49,7 +49,7 @@ const MealSlotSchemaForAI = z.object({
 export type MealSlotForAI = z.infer<typeof MealSlotSchemaForAI>;
 
 // Input schema for the meal planning flow
-export const SuggestMealPlanInputSchema = z.object({
+const SuggestMealPlanInputSchema = z.object({
   macroTargets: MacroTargetsSchemaForAI.optional().nullable().describe("User's daily macronutrient targets. Aim to meet these. Can be null if not set."),
   dietaryPreferences: z.array(z.string()).optional().describe("List of dietary preferences (e.g., 'Vegetarian', 'Vegan'). Adhere to these strictly."),
   allergens: z.array(z.string()).optional().describe("List of allergens to avoid (e.g., 'Nuts', 'Dairy'). Exclude recipes containing these."),
@@ -71,7 +71,7 @@ const PlannedRecipeItemSchema = z.object({
 export type PlannedRecipeItem = z.infer<typeof PlannedRecipeItemSchema>;
 
 // Output schema for the meal planning flow
-export const SuggestMealPlanOutputSchema = z.object({
+const SuggestMealPlanOutputSchema = z.object({
   plannedMeals: z.array(PlannedRecipeItemSchema).describe("An array of recipes planned for each meal slot."),
   totalAchievedMacros: MacroDataSchema.describe("The total aggregated macronutrients for the entire suggested meal plan."),
   aiJustification: z.string().describe("A brief justification from the AI explaining its choices and how it tried to meet the targets and preferences."),
