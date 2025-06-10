@@ -14,21 +14,19 @@ export interface Macros {
 }
 
 export interface Recipe {
-  id: number; // Changed from string
+  id: number;
   name: string;
-  description?: string; // Made optional
-  image: string; // URL to image, will use placeholder
+  description?: string;
+  image: string;
   servings: number;
-  prepTime: string; // e.g., "15 mins"
-  cookTime: string; // e.g., "30 mins"
-  chillTime?: string; // New optional field
-  ingredients: string[]; // Changed from Ingredient[]
-  macrosPerServing: Macros; // Will be populated from top-level cal, pro, carb, fat
-  instructions: string[]; // Added instructions
-  tags?: string[]; // e.g., "vegetarian", "quick", "high-protein"
+  prepTime: string;
+  cookTime: string;
+  chillTime?: string;
+  ingredients: string[];
+  macrosPerServing: Macros;
+  instructions: string[];
+  tags?: string[];
 
-  // Raw macro fields from new structure, used to populate macrosPerServing
-  // These are kept for source data, but macrosPerServing is the canonical one
   calories: number;
   protein: number;
   carbs: number;
@@ -38,13 +36,12 @@ export interface Recipe {
 export type MealType = "Breakfast" | "Lunch" | "Dinner" | "Snack";
 
 export interface PlannedMeal {
-  id: string; // Unique ID for this planned instance, e.g., recipe.id + date + mealType
-  recipeId: number; // Changed from string
+  id: string;
+  recipeId: number;
   date: string; // YYYY-MM-DD
-  mealType: MealType; // This refers to the general category of the meal
-  servings: number; // Number of servings planned for this meal
-  recipeDetails?: Recipe; // Optional: denormalized recipe details for easier access
-  // mealSlotId?: string; // Optionally link to a specific MealSlotConfig.id if needed for more granular planning
+  mealType: MealType;
+  servings: number;
+  recipeDetails?: Recipe;
 }
 
 export type UKSupermarketCategory =
@@ -60,13 +57,13 @@ export type UKSupermarketCategory =
   | "Other Food Items";
 
 export interface ShoppingListItem {
-  id: string; // ingredientName (now a simple string)
+  id: string;
   name: string;
-  quantity: number; // Will be simplified
-  unit: string; // Will be simplified
+  quantity: number;
+  unit: string;
   category: UKSupermarketCategory;
   purchased: boolean;
-  recipes: Array<{ recipeId: number; recipeName: string }>; // Track which recipes need this ingredient
+  recipes: Array<{ recipeId: number; recipeName: string }>;
 }
 
 export interface DailyMacros extends Macros {
@@ -81,9 +78,9 @@ export interface MacroTargets {
 }
 
 export interface MealSlotConfig {
-  id: string; // Unique ID for this slot, e.g., timestamp or uuid
-  name: string; // User-defined name, e.g., "Breakfast", "Morning Snack"
-  type: MealType; // The general category: "Breakfast", "Lunch", "Dinner", "Snack"
+  id: string;
+  name: string;
+  type: MealType;
 }
 
 export type Sex = 'male' | 'female';
@@ -114,21 +111,26 @@ export const PRIMARY_GOAL_OPTIONS: { value: PrimaryGoal; label: string }[] = [
   { value: 'muscleGain', label: 'Muscle Gain' },
 ];
 
+export type SubscriptionStatus = 'active' | 'inactive' | 'none' | null;
+
 export interface UserProfileSettings {
   macroTargets: MacroTargets | null;
   dietaryPreferences: string[];
   allergens: string[];
   mealStructure: MealSlotConfig[];
-  // Physical attributes
   heightCm: number | null;
   weightKg: number | null;
   age: number | null;
   sex: Sex | null;
   activityLevel: ActivityLevel | null;
-  bodyFatPercentage: number | null; // Optional
+  bodyFatPercentage: number | null;
   athleteType: AthleteType | null;
   primaryGoal: PrimaryGoal | null;
-  // Calculated values
-  tdee: number | null; // Total Daily Energy Expenditure
+  tdee: number | null;
   leanBodyMassKg: number | null;
+  subscription_status: SubscriptionStatus;
+  plan_name?: string | null;
+  subscription_start_date?: string | null;
+  subscription_end_date?: string | null;
+  subscription_duration?: string | null;
 }

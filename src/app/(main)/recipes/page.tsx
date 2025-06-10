@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { RecipeCard } from '@/components/shared/RecipeCard';
-import { getAllRecipes, MEAL_TYPES } from '@/lib/data'; // getRecipeById removed as not directly used here
+import { MEAL_TYPES } from '@/lib/data'; 
 import type { Recipe, MealType } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,15 +12,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2, Info } from 'lucide-react';
+import { format, startOfDay, addDays, isWithinInterval, isSameDay, isAfter } from 'date-fns';
+import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2, Info, Lock } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import Link from 'next/link';
+
+const FREE_TIER_RECIPE_DISPLAY_LIMIT = 15;
+
+const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
+  if (!date) return false;
+  const today = startOfDay(new Date());
+  const tomorrow = addDays(today, 1);
+  return isWithinInterval(startOfDay(date), { start: today, end: tomorrow });
+};
 
 export default function RecipesPage() {
-  const { addMealToPlan, allRecipesCache, isRecipeCacheLoading: isAppRecipeCacheLoading } = useAppContext();
+  const { userProfile, addMealToPlan, allRecipesCache, isRecipeCacheLoading: isAppRecipeCacheLoading } = useAppContext();
   const { toast } = useToast();
   
   const [recipesToDisplay, setRecipesToDisplay] = useState<Recipe[]>([]);
@@ -33,39 +43,53 @@ export default function RecipesPage() {
   const [planMealType, setPlanMealType] = useState<MealType | undefined>(MEAL_TYPES[0]);
   const [planServings, setPlanServings] = useState<number>(1);
 
+  const isSubscribedActive = userProfile?.subscription_status === 'active';
+
   useEffect(() => {
-    // Use the cache from AppContext if available and not loading
     if (!isAppRecipeCacheLoading) {
-      setIsLoading(true); // Internal loading state for filtering
+      setIsLoading(true);
       if (allRecipesCache.length > 0) {
         setRecipesToDisplay(allRecipesCache);
         setError(null);
       } else {
-        // This case might mean Firestore fetch failed at AppContext level
         setError("No recipes found or failed to load recipes from the database.");
         setRecipesToDisplay([]);
       }
       setIsLoading(false);
     } else {
-      setIsLoading(true); // AppContext is still loading the cache
+      setIsLoading(true);
     }
   }, [allRecipesCache, isAppRecipeCacheLoading]);
 
-
-  const filteredRecipes = recipesToDisplay.filter(recipe =>
+  let filteredRecipes = recipesToDisplay.filter(recipe =>
     recipe.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (recipe.description && recipe.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (recipe.tags && recipe.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())))
   );
 
+  const totalFilteredRecipesCount = filteredRecipes.length;
+  if (!isSubscribedActive) {
+    filteredRecipes = filteredRecipes.slice(0, FREE_TIER_RECIPE_DISPLAY_LIMIT);
+  }
+
   const handleOpenAddToPlanDialog = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
     setPlanServings(recipe.servings);
+    // Reset date to today if opening dialog for free user, ensure it's valid
+    setPlanDate(isSubscribedActive ? new Date() : (isDateAllowedForFreeTier(new Date()) ? new Date() : startOfDay(new Date())));
     setShowAddToPlanDialog(true);
   };
 
   const handleAddToMealPlan = () => {
     if (selectedRecipe && planDate && planMealType && planServings > 0) {
+      if (!isSubscribedActive && !isDateAllowedForFreeTier(planDate)) {
+        toast({
+          title: "Date Restricted",
+          description: "Free users can only plan meals for today or tomorrow. Please upgrade for more flexibility.",
+          variant: 'destructive',
+        });
+        return;
+      }
       addMealToPlan(selectedRecipe, format(planDate, 'yyyy-MM-dd'), planMealType, planServings);
       toast({
         title: "Meal Added",
@@ -82,6 +106,11 @@ export default function RecipesPage() {
       });
     }
   };
+  
+  const todayForCalendar = startOfDay(new Date());
+  const tomorrowForCalendar = addDays(todayForCalendar, 1);
+  const disabledCalendarMatcher = isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
+
 
   return (
     <PageWrapper title="Discover Recipes">
@@ -97,6 +126,18 @@ export default function RecipesPage() {
           />
         </div>
       </div>
+
+      {!isSubscribedActive && totalFilteredRecipesCount > FREE_TIER_RECIPE_DISPLAY_LIMIT && (
+        <Alert variant="default" className="mb-6 border-accent">
+          <Lock className="h-5 w-5 text-accent" />
+          <AlertTitle className="text-accent">Recipe Limit Reached</AlertTitle>
+          <AlertDescription>
+            You are viewing {FREE_TIER_RECIPE_DISPLAY_LIMIT} of {totalFilteredRecipesCount} available recipes. 
+            <Link href="/profile/subscription" className="underline hover:text-primary"> Upgrade your plan </Link> 
+            to access all recipes and features.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {isLoading ? (
         <div className="flex justify-center items-center min-h-[200px]">
@@ -122,7 +163,9 @@ export default function RecipesPage() {
           ))}
         </div>
       ) : (
-        <p className="text-center text-muted-foreground mt-10">No recipes found matching your criteria.</p>
+        <p className="text-center text-muted-foreground mt-10">
+          {searchTerm ? "No recipes found matching your search." : "No recipes available."}
+        </p>
       )}
 
       {selectedRecipe && (
@@ -132,6 +175,7 @@ export default function RecipesPage() {
               <DialogTitle className="font-headline text-primary">Add "{selectedRecipe.name}" to Meal Plan</DialogTitle>
               <DialogDescription>
                 Select the date, meal type, and servings for this recipe.
+                {!isSubscribedActive && " Free users can plan for today or tomorrow only."}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -152,7 +196,10 @@ export default function RecipesPage() {
                       mode="single"
                       selected={planDate}
                       onSelect={setPlanDate}
-                      initialFocus
+                      disabled={disabledCalendarMatcher}
+                      initialFocus={!isSubscribedActive} // Focus if restricted to ensure user sees constraint
+                       fromDate={!isSubscribedActive ? todayForCalendar : undefined}
+                       toDate={!isSubscribedActive ? tomorrowForCalendar : undefined}
                     />
                   </PopoverContent>
                 </Popover>
@@ -184,7 +231,11 @@ export default function RecipesPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAddToPlanDialog(false)}>Cancel</Button>
-              <Button onClick={handleAddToMealPlan} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+              <Button 
+                onClick={handleAddToMealPlan} 
+                className="bg-accent hover:bg-accent/90 text-accent-foreground"
+                disabled={!isSubscribedActive && !isDateAllowedForFreeTier(planDate)}
+              >
                 <PlusCircle className="mr-2 h-4 w-4" /> Add to Plan
               </Button>
             </DialogFooter>
@@ -194,5 +245,3 @@ export default function RecipesPage() {
     </PageWrapper>
   );
 }
-
-    

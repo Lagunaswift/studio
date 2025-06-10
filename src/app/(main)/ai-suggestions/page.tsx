@@ -6,63 +6,75 @@ import { PageWrapper } from '@/components/layout/PageWrapper';
 import { suggestMealPlan, type SuggestMealPlanInput, type SuggestMealPlanOutput, type RecipeForAI, type MealSlotForAI } from '@/ai/flows/suggest-meal-plan';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Settings, Info, PlusCircle } from 'lucide-react';
+import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Settings, Info, PlusCircle, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppContext } from '@/context/AppContext';
-// getAllRecipes removed as we use allRecipesCache from context
 import type { Recipe, Macros, MealSlotConfig } from '@/types';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
-import { format } from 'date-fns';
+import { format, startOfDay, isSameDay } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
+const FREE_TIER_RECIPE_LIMIT = 15;
 
 export default function AISuggestionsPage() {
   const { userProfile, addMealToPlan, allRecipesCache, isRecipeCacheLoading: isAppRecipeCacheLoading } = useAppContext();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false); // For AI generation
+  const [isLoading, setIsLoading] = useState(false);
   const [suggestion, setSuggestion] = useState<SuggestMealPlanOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recipesForAI, setRecipesForAI] = useState<RecipeForAI[]>([]);
 
+  const isSubscribedActive = userProfile?.subscription_status === 'active';
 
   useEffect(() => {
     if (!isAppRecipeCacheLoading) {
       if (allRecipesCache.length > 0) {
-        const transformedForAI = allRecipesCache.map(r => ({
+        let transformedForAI = allRecipesCache.map(r => ({
           id: r.id,
           name: r.name,
           macrosPerServing: r.macrosPerServing,
           tags: r.tags || [],
         }));
+        if (!isSubscribedActive) {
+          transformedForAI = transformedForAI.slice(0, FREE_TIER_RECIPE_LIMIT);
+        }
         setRecipesForAI(transformedForAI);
       } else {
-        setRecipesForAI([]); // Ensure it's empty if cache is empty
+        setRecipesForAI([]);
       }
     }
-  }, [allRecipesCache, isAppRecipeCacheLoading]);
+  }, [allRecipesCache, isAppRecipeCacheLoading, isSubscribedActive]);
 
   const handleGeneratePlan = async () => {
     if (!userProfile) {
       setError("User profile not loaded. Please wait or try refreshing.");
       return;
     }
+    if (!isSubscribedActive) {
+      setError("AI Meal Plan generation is a premium feature. Please upgrade your subscription to use it.");
+      toast({
+        title: "Premium Feature",
+        description: "Upgrade to generate AI meal plans.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!userProfile.mealStructure || userProfile.mealStructure.length === 0) {
       setError("Please set up your meal structure in Profile Settings before generating a plan.");
       return;
     }
-     if (!userProfile.macroTargets) {
+    if (!userProfile.macroTargets) {
       setError("Please set your Macro Targets in Profile Settings for the AI to generate a more accurate plan.");
-      // Allow proceeding without macro targets, AI will be prompted to create a "balanced" plan
     }
     if (isAppRecipeCacheLoading) {
-        setError("Recipe data is still loading. Please wait a moment and try again.");
-        return;
+      setError("Recipe data is still loading. Please wait a moment and try again.");
+      return;
     }
     if (recipesForAI.length === 0) {
-      setError("No recipes available in the database. Please add some recipes first or ensure they have loaded.");
+      setError(`No recipes available for AI planning. ${!isSubscribedActive ? `(Free tier limited to ${FREE_TIER_RECIPE_LIMIT} recipes for AI consideration)` : 'Add recipes or ensure they have loaded.'}`);
       return;
     }
 
@@ -81,7 +93,7 @@ export default function AISuggestionsPage() {
       dietaryPreferences: userProfile.dietaryPreferences || [],
       allergens: userProfile.allergens || [],
       mealStructure: mealStructureForAI,
-      availableRecipes: recipesForAI,
+      availableRecipes: recipesForAI, // Already sliced if not subscribed
       currentDate: format(new Date(), 'yyyy-MM-dd'),
     };
 
@@ -99,6 +111,15 @@ export default function AISuggestionsPage() {
   const handleAddPlanToCalendar = (date: Date) => {
     if (!suggestion || !suggestion.plannedMeals || allRecipesCache.length === 0) return;
 
+    if (!isSubscribedActive && !isSameDay(date, startOfDay(new Date()))) {
+        toast({
+            title: "Plan Addition Restricted",
+            description: "Free users can only add AI-generated plans for today. Please upgrade for more flexibility.",
+            variant: "destructive",
+        });
+        return;
+    }
+
     suggestion.plannedMeals.forEach(plannedMealItem => {
       const fullRecipe = allRecipesCache.find(r => r.id === plannedMealItem.recipeId);
       if (fullRecipe) {
@@ -107,6 +128,8 @@ export default function AISuggestionsPage() {
            addMealToPlan(fullRecipe, format(date, 'yyyy-MM-dd'), originalMealSlot.type, plannedMealItem.servings);
         } else {
             console.warn(`Could not find original meal slot for ID: ${plannedMealItem.mealSlotId}. Defaulting meal type.`);
+             // Fallback if slot type is somehow missing
+            addMealToPlan(fullRecipe, format(date, 'yyyy-MM-dd'), 'Snack', plannedMealItem.servings);
         }
       }
     });
@@ -116,9 +139,7 @@ export default function AISuggestionsPage() {
     });
   };
 
-
   const isProfileSetupMissing = !userProfile || !userProfile.mealStructure || userProfile.mealStructure.length === 0;
-
 
   return (
     <PageWrapper title="Automated AI Meal Planner">
@@ -130,14 +151,28 @@ export default function AISuggestionsPage() {
               Generate Your Daily Meal Plan
             </CardTitle>
             <CardDescription>
-              Let our AI craft a personalized meal plan for you based on your profile settings (targets, preferences, meal structure) and our recipe database.
+              {!isSubscribedActive && "AI Meal Planning is a premium feature. "}
+              Let our AI craft a personalized meal plan for you based on your profile settings and recipe database.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isProfileSetupMissing ? (
+            {!isSubscribedActive ? (
+              <Alert variant="default" className="border-accent">
+                <Lock className="h-5 w-5 text-accent" />
+                <AlertTitle className="text-accent">Premium Feature Locked</AlertTitle>
+                <AlertDescription>
+                  AI-powered meal plan generation is available for subscribed users. 
+                  Please <Link href="/profile/subscription" className="underline hover:text-primary">upgrade your plan</Link> to unlock this feature and more.
+                   <Button disabled className="w-full mt-4 bg-muted hover:bg-muted">
+                      <Lock className="mr-2 h-4 w-4" />
+                      Generate My AI Meal Plan
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            ) : isProfileSetupMissing ? (
               <Alert variant="default" className="border-accent">
                 <Info className="h-5 w-5 text-accent" />
-                <AlertTitle className="text-accent">Profile Setup Required</AlertTitle>
+                <AlertTitle className="text-accent">Profile Setup Recommended</AlertTitle>
                 <AlertDescription>
                   To get the best AI-generated meal plan, please ensure you have:
                   <ul className="list-disc pl-5 mt-2 space-y-1">
@@ -145,10 +180,10 @@ export default function AISuggestionsPage() {
                       <li>Defined your <Link href="/profile/meal-structure" className="underline hover:text-accent">Meal Structure</Link>.</li>
                     ) : null}
                     {!userProfile?.macroTargets ? (
-                       <li>Set your <Link href="/profile/targets" className="underline hover:text-accent">Macro Targets</Link> (Recommended).</li>
+                       <li>Set your <Link href="/profile/targets" className="underline hover:text-accent">Macro Targets</Link>.</li>
                     ) : null}
                      {(!userProfile?.dietaryPreferences || userProfile.dietaryPreferences.length === 0) && (!userProfile?.allergens || userProfile.allergens.length === 0) ? (
-                       <li>Configured your <Link href="/profile/diet-type" className="underline hover:text-accent">Diet Type</Link> and <Link href="/profile/allergens" className="underline hover:text-accent">Allergens</Link> (Recommended).</li>
+                       <li>Configured your <Link href="/profile/diet-type" className="underline hover:text-accent">Diet Type</Link> and <Link href="/profile/allergens" className="underline hover:text-accent">Allergens</Link>.</li>
                     ) : null}
                   </ul>
                    <Button onClick={handleGeneratePlan} disabled={isLoading || isAppRecipeCacheLoading || recipesForAI.length === 0} className="w-full mt-4 bg-primary hover:bg-primary/90">
@@ -162,7 +197,7 @@ export default function AISuggestionsPage() {
                 </AlertDescription>
               </Alert>
             ) : (
-              <Button onClick={handleGeneratePlan} disabled={isLoading || isAppRecipeCacheLoading || recipesForAI.length === 0} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+              <Button onClick={handleGeneratePlan} disabled={isLoading || isAppRecipeCacheLoading || recipesForAI.length === 0 || !isSubscribedActive} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
                 {isLoading || isAppRecipeCacheLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
@@ -172,8 +207,11 @@ export default function AISuggestionsPage() {
               </Button>
             )}
             {isAppRecipeCacheLoading && <p className="text-sm text-muted-foreground mt-2 text-center">Loading recipe data for AI...</p>}
-            {!isAppRecipeCacheLoading && recipesForAI.length === 0 && !isLoading && (
+            {!isAppRecipeCacheLoading && recipesForAI.length === 0 && !isLoading && isSubscribedActive && (
                  <p className="text-sm text-muted-foreground mt-2 text-center">No recipes found in the database. Add recipes to enable AI planning.</p>
+            )}
+            {!isAppRecipeCacheLoading && recipesForAI.length === 0 && !isLoading && !isSubscribedActive && (
+                 <p className="text-sm text-muted-foreground mt-2 text-center">No recipes available for AI to consider (Free tier limited to {FREE_TIER_RECIPE_LIMIT} base recipes for planning).</p>
             )}
           </CardContent>
         </Card>
@@ -274,7 +312,7 @@ export default function AISuggestionsPage() {
             </CardContent>
             <CardFooter>
               <Button onClick={() => handleAddPlanToCalendar(new Date())} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                <PlusCircle className="mr-2 h-5 w-5" /> Add This Plan to My Calendar (Today)
+                <PlusCircle className="mr-2 h-5 w-5" /> Add This Plan to My Calendar ({isSubscribedActive ? "Today or other date" : "Today Only"})
               </Button>
             </CardFooter>
           </Card>
@@ -283,5 +321,3 @@ export default function AISuggestionsPage() {
     </PageWrapper>
   );
 }
-
-    

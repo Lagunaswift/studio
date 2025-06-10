@@ -15,9 +15,10 @@ import type {
   Sex,
   ActivityLevel,
   AthleteType,
-  PrimaryGoal
+  PrimaryGoal,
+  SubscriptionStatus
 } from '@/types';
-import { ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS } from '@/types';
+import { ACTIVITY_LEVEL_OPTIONS } from '@/types'; // Removed ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS as they are not used here
 import { loadState, saveState } from '@/lib/localStorage';
 import { getAllRecipes as getAllRecipesFromDb, calculateTotalMacros, generateShoppingList as generateShoppingListUtil } from '@/lib/data';
 
@@ -47,6 +48,11 @@ const DEFAULT_USER_PROFILE: UserProfileSettings = {
   primaryGoal: 'notSpecified',
   tdee: null,
   leanBodyMassKg: null,
+  subscription_status: 'active', // Default to 'active' for now. Change to 'none' or null for production.
+  plan_name: null,
+  subscription_start_date: null,
+  subscription_end_date: null,
+  subscription_duration: null,
 };
 
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
@@ -83,7 +89,7 @@ interface AppContextType {
   mealPlan: PlannedMeal[];
   shoppingList: ShoppingListItem[];
   userProfile: UserProfileSettings | null;
-  allRecipesCache: Recipe[]; // Cache for all recipes
+  allRecipesCache: Recipe[];
   addMealToPlan: (recipe: Recipe, date: string, mealType: MealType, servings: number) => void;
   removeMealFromPlan: (plannedMealId: string) => void;
   updatePlannedMealServings: (plannedMealId: string, newServings: number) => void;
@@ -113,12 +119,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const initializeData = async () => {
       setIsRecipeCacheLoading(true);
+      let recipes: Recipe[] = [];
       try {
-        const recipes = await getAllRecipesFromDb();
+        recipes = await getAllRecipesFromDb(); // Fetch recipes from Firestore
         setAllRecipesCache(recipes);
       } catch (error) {
         console.error("Failed to load recipes into cache:", error);
-        setAllRecipesCache([]); // Set to empty if error
+        setAllRecipesCache([]);
       } finally {
         setIsRecipeCacheLoading(false);
       }
@@ -131,6 +138,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loadedUserProfile = DEFAULT_USER_PROFILE;
       } else {
         loadedUserProfile = { ...DEFAULT_USER_PROFILE, ...loadedUserProfile };
+        if (loadedUserProfile.subscription_status === undefined) { // Ensure default if not present
+            loadedUserProfile.subscription_status = DEFAULT_USER_PROFILE.subscription_status;
+        }
         loadedUserProfile.tdee = calculateTDEE(
           loadedUserProfile.weightKg,
           loadedUserProfile.heightCm,
@@ -149,15 +159,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       setUserProfile(loadedUserProfile);
 
-      // Populate recipeDetails for mealPlan using the freshly loaded cache
+      // Populate recipeDetails for mealPlan using the fetched recipes
       const populatedMealPlan = loadedMealPlan.map(pm => {
-        const recipeDetails = allRecipesCache.find(r => r.id === pm.recipeId);
+        const recipeDetails = recipes.find(r => r.id === pm.recipeId); // Use 'recipes' directly here
         return {...pm, recipeDetails: recipeDetails || undefined };
       });
       setMealPlan(populatedMealPlan);
       
       if (loadedShoppingList.length === 0 && populatedMealPlan.length > 0) {
-        setShoppingList(generateShoppingListUtil(populatedMealPlan, allRecipesCache));
+        setShoppingList(generateShoppingListUtil(populatedMealPlan, recipes)); // Use 'recipes'
       } else {
         setShoppingList(loadedShoppingList);
       }
@@ -165,12 +175,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     initializeData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount. allRecipesCache dependency removed to avoid re-running on its update within this effect
+  }, []);
 
    useEffect(() => {
-    // This effect ensures mealPlan details are updated if allRecipesCache changes after initial load
-    // (e.g. if cache was empty initially and then populated)
     if (allRecipesCache.length > 0 && mealPlan.some(pm => !pm.recipeDetails)) {
         setMealPlan(prevMealPlan => 
             prevMealPlan.map(pm => {
@@ -193,7 +200,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     if (isInitialized) {
-      saveState(MEAL_PLAN_KEY, mealPlan.map(({recipeDetails, ...pm}) => pm)); // Save without details
+      saveState(MEAL_PLAN_KEY, mealPlan.map(({recipeDetails, ...pm}) => pm));
     }
   }, [mealPlan, isInitialized]);
 
@@ -215,7 +222,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       date,
       mealType,
       servings,
-      recipeDetails: recipe, // Ensure recipeDetails are included
+      recipeDetails: recipe,
     };
     setMealPlan(prev => {
       const updatedPlan = [...prev, newPlannedMeal];
@@ -272,9 +279,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const clearAllData = useCallback(() => {
     setMealPlan([]);
-    setShoppingList([]);
-    setUserProfile(DEFAULT_USER_PROFILE);
-  }, [regenerateShoppingList]); // regenerateShoppingList removed, as it's for non-empty plans
+    setShoppingList([]); // Also clears shopping list when all data is cleared
+    // Re-initialize userProfile to default, but preserve any fetched values if they exist by spreading.
+    setUserProfile(prevProfile => ({
+      ...DEFAULT_USER_PROFILE,
+      // Potentially preserve some critical non-resettable fields if needed
+      // For now, full reset to default:
+       ...DEFAULT_USER_PROFILE
+    }));
+  }, []); // regenerateShoppingList removed here, no mealPlan to generate from
 
   const updateUserProfileState = useCallback((updates: Partial<UserProfileSettings>) => {
     setUserProfile(prevProfile => {
@@ -342,8 +355,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ]);
 
   if (!isInitialized) {
-    // Potentially show a global loading spinner or a minimal layout
-    return null; // Or a loading component
+    return null;
   }
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
@@ -356,5 +368,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-
-    

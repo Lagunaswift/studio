@@ -4,7 +4,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { getRecipeById, MEAL_TYPES } from '@/lib/data';
+import { getRecipeById, MEAL_TYPES } from '@/lib/data'; // getRecipeById is now async from Firestore via data.ts
 import type { Recipe as RecipeType, MealType } from '@/types';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Badge } from '@/components/ui/badge';
@@ -21,8 +21,15 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { format } from 'date-fns';
+import { format, startOfDay, addDays, isWithinInterval } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
+  if (!date) return false;
+  const today = startOfDay(new Date());
+  const tomorrow = addDays(today, 1);
+  return isWithinInterval(startOfDay(date), { start: today, end: tomorrow });
+};
 
 export default function RecipeDetailPage() {
   const params = useParams();
@@ -33,12 +40,14 @@ export default function RecipeDetailPage() {
   const [recipe, setRecipe] = useState<RecipeType | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { addMealToPlan, allRecipesCache, isRecipeCacheLoading: isAppRecipeCacheLoading } = useAppContext();
+  const { userProfile, addMealToPlan, allRecipesCache, isRecipeCacheLoading: isAppRecipeCacheLoading } = useAppContext();
   const { toast } = useToast();
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
   const [planDate, setPlanDate] = useState<Date | undefined>(new Date());
   const [planMealType, setPlanMealType] = useState<MealType | undefined>(MEAL_TYPES[0]);
   const [planServings, setPlanServings] = useState<number>(1);
+
+  const isSubscribedActive = userProfile?.subscription_status === 'active';
 
   useEffect(() => {
     async function fetchRecipe() {
@@ -50,45 +59,43 @@ export default function RecipeDetailPage() {
       setIsLoading(true);
       setError(null);
       
-      let foundRecipe: RecipeType | undefined = undefined;
-      if (!isAppRecipeCacheLoading && allRecipesCache.length > 0) {
-        foundRecipe = allRecipesCache.find(r => r.id === recipeId);
-      } else if (!isAppRecipeCacheLoading && allRecipesCache.length === 0) {
-        // Cache is loaded but empty, try direct fetch (fallback, ideally cache is source of truth)
-        foundRecipe = await getRecipeById(recipeId);
-      } else if (isAppRecipeCacheLoading) {
-        // Cache is still loading, wait for it or try direct fetch if urgent
-        // For simplicity, we'll let the AppContext load, but a direct fetch could be added here
-        // For now, if cache is loading, we show loading until cache is ready.
-        // The below check handles when cache becomes available.
-      }
-
-
-      if (foundRecipe) {
-        setRecipe(foundRecipe);
-        setPlanServings(foundRecipe.servings || 1);
-      } else if (!isAppRecipeCacheLoading) { // Only set error if cache is loaded and recipe not found
-        setError(`Recipe with ID ${recipeId} not found.`);
-      }
-      // If isAppRecipeCacheLoading is true, isLoading will remain true until cache is populated
-      // and this effect re-runs.
-      if (!isAppRecipeCacheLoading) {
+      try {
+        const foundRecipe = await getRecipeById(recipeId); // This now fetches from Firestore
+        if (foundRecipe) {
+          setRecipe(foundRecipe);
+          setPlanServings(foundRecipe.servings || 1);
+        } else {
+          setError(`Recipe with ID ${recipeId} not found.`);
+        }
+      } catch (e: any) {
+        console.error("Error fetching recipe by ID:", e);
+        setError(e.message || "Failed to load recipe.");
+      } finally {
         setIsLoading(false);
       }
     }
     fetchRecipe();
-  }, [recipeId, allRecipesCache, isAppRecipeCacheLoading]);
+  }, [recipeId]);
 
 
   const handleOpenAddToPlanDialog = () => {
     if (recipe) {
-      setPlanServings(recipe.servings); 
+      setPlanServings(recipe.servings);
+      setPlanDate(isSubscribedActive ? new Date() : (isDateAllowedForFreeTier(new Date()) ? new Date() : startOfDay(new Date())));
       setShowAddToPlanDialog(true);
     }
   };
 
   const handleAddToMealPlan = () => {
     if (recipe && planDate && planMealType && planServings > 0) {
+       if (!isSubscribedActive && !isDateAllowedForFreeTier(planDate)) {
+        toast({
+          title: "Date Restricted",
+          description: "Free users can only plan meals for today or tomorrow. Please upgrade for more flexibility.",
+          variant: 'destructive',
+        });
+        return;
+      }
       addMealToPlan(recipe, format(planDate, 'yyyy-MM-dd'), planMealType, planServings);
       toast({
         title: "Meal Added",
@@ -103,6 +110,11 @@ export default function RecipeDetailPage() {
       });
     }
   };
+  
+  const todayForCalendar = startOfDay(new Date());
+  const tomorrowForCalendar = addDays(todayForCalendar, 1);
+  const disabledCalendarMatcher = isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
+
 
   if (isLoading) {
     return (
@@ -130,10 +142,13 @@ export default function RecipeDetailPage() {
   }
 
   if (!recipe) {
-    // This case should ideally be covered by the error state if recipe isn't found after loading.
     return (
       <PageWrapper title="Recipe Not Found">
-        <p>The recipe you are looking for does not exist or could not be loaded.</p>
+        <Alert variant="default">
+           <Info className="h-4 w-4" />
+          <AlertTitle>Recipe Not Found</AlertTitle>
+          <AlertDescription>The recipe you are looking for does not exist or could not be loaded.</AlertDescription>
+        </Alert>
         <Button onClick={() => router.back()} variant="outline" className="mt-4">
           <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
         </Button>
@@ -229,6 +244,7 @@ export default function RecipeDetailPage() {
             <DialogTitle className="font-headline text-primary">Add "{recipe.name}" to Meal Plan</DialogTitle>
             <DialogDescription>
               Select the date, meal type, and servings for this recipe.
+              {!isSubscribedActive && " Free users can plan for today or tomorrow only."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -249,7 +265,10 @@ export default function RecipeDetailPage() {
                     mode="single"
                     selected={planDate}
                     onSelect={setPlanDate}
-                    initialFocus
+                    disabled={disabledCalendarMatcher}
+                    initialFocus={!isSubscribedActive}
+                    fromDate={!isSubscribedActive ? todayForCalendar : undefined}
+                    toDate={!isSubscribedActive ? tomorrowForCalendar : undefined}
                   />
                 </PopoverContent>
               </Popover>
@@ -281,7 +300,11 @@ export default function RecipeDetailPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddToPlanDialog(false)}>Cancel</Button>
-            <Button onClick={handleAddToMealPlan} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+            <Button 
+              onClick={handleAddToMealPlan} 
+              className="bg-accent hover:bg-accent/90 text-accent-foreground"
+              disabled={!isSubscribedActive && !isDateAllowedForFreeTier(planDate)}
+            >
               <PlusCircle className="mr-2 h-4 w-4" /> Add to Plan
             </Button>
           </DialogFooter>
@@ -290,5 +313,3 @@ export default function RecipeDetailPage() {
     </PageWrapper>
   );
 }
-
-    

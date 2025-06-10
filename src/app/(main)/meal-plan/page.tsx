@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Calendar } from '@/components/ui/calendar';
-import { format, addDays, subDays, isValid } from 'date-fns';
-import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info } from 'lucide-react';
+import { format, addDays, subDays, isValid, startOfDay, isWithinInterval } from 'date-fns';
+import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info, Lock } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { MEAL_TYPES } from '@/lib/data'; // Removed getRecipeById, getAllRecipes as they are async now and handled by context
+import { MEAL_TYPES } from '@/lib/data';
 import { RecipeCard } from '@/components/shared/RecipeCard';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -30,24 +30,31 @@ const MEAL_SLOT_CONFIG: Array<{ type: MealType; displayName: string }> = [
   { type: "Snack", displayName: "Snack 2" }, 
 ];
 
+const FREE_TIER_RECIPE_PICKER_LIMIT = 15;
+
+const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
+  if (!date) return false;
+  const today = startOfDay(new Date());
+  const tomorrow = addDays(today, 1);
+  return isWithinInterval(startOfDay(date), { start: today, end: tomorrow });
+};
 
 export default function MealPlanPage() {
   const { 
+    userProfile,
     getDailyMacros, 
     removeMealFromPlan, 
     updatePlannedMealServings, 
     clearMealPlanForDate, 
     getMealsForDate,
     addMealToPlan,
-    allRecipesCache, // Use cache from context
+    allRecipesCache,
     isRecipeCacheLoading: isAppRecipeCacheLoading
   } = useAppContext();
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [editingMeal, setEditingMeal] = useState<PlannedMeal | null>(null);
   const [newServings, setNewServings] = useState<number>(1);
-  // const [allRecipes, setAllRecipes] = useState<Recipe[]>([]); // Replaced by allRecipesCache
-  // const [isLoadingRecipes, setIsLoadingRecipes] = useState(true); // Replaced by isAppRecipeCacheLoading
   const { toast } = useToast();
   
   const [recipePickerIndices, setRecipePickerIndices] = useState<{[key: string]: number}>(
@@ -57,14 +64,25 @@ export default function MealPlanPage() {
     }, {} as {[key: string]: number})
   );
 
+  const isSubscribedActive = userProfile?.subscription_status === 'active';
+  const availableRecipesForPicker = isSubscribedActive ? allRecipesCache : allRecipesCache.slice(0, FREE_TIER_RECIPE_PICKER_LIMIT);
+
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
   const dailyMeals = getMealsForDate(formattedDate);
   const dailyMacros = getDailyMacros(formattedDate);
 
-  // No longer need useEffect to load recipes here, AppContext handles it.
-
   const handleDateChange = (date: Date | undefined) => {
     if (date && isValid(date)) {
+      if (!isSubscribedActive && !isDateAllowedForFreeTier(date)) {
+        toast({
+          title: "Date Restricted",
+          description: "Free users can only plan meals for today or tomorrow. Please upgrade for more flexibility.",
+          variant: "destructive",
+        });
+        // Optionally, reset to today if out of bounds for free tier, or just don't change
+        // setSelectedDate(startOfDay(new Date())); 
+        return;
+      }
       setSelectedDate(date);
     }
   };
@@ -85,23 +103,31 @@ export default function MealPlanPage() {
   };
 
   const handleRecipePickerNavigate = (slotKey: string, direction: 'prev' | 'next') => {
-    if (allRecipesCache.length === 0) return;
+    if (availableRecipesForPicker.length === 0) return;
     setRecipePickerIndices(prev => {
       const currentIndex = prev[slotKey] || 0;
       let newIndex;
       if (direction === 'next') {
-        newIndex = (currentIndex + 1) % allRecipesCache.length;
+        newIndex = (currentIndex + 1) % availableRecipesForPicker.length;
       } else {
-        newIndex = (currentIndex - 1 + allRecipesCache.length) % allRecipesCache.length;
+        newIndex = (currentIndex - 1 + availableRecipesForPicker.length) % availableRecipesForPicker.length;
       }
       return { ...prev, [slotKey]: newIndex };
     });
   };
 
   const handleAddRecipeFromPicker = (slotKey: string, mealType: MealType) => {
-    if (allRecipesCache.length === 0) return;
+    if (availableRecipesForPicker.length === 0) return;
+     if (!isSubscribedActive && !isDateAllowedForFreeTier(selectedDate)) {
+        toast({
+          title: "Date Restricted",
+          description: "Free users can only plan meals for today or tomorrow. Please upgrade for more flexibility.",
+          variant: "destructive",
+        });
+        return;
+      }
     const recipeIndex = recipePickerIndices[slotKey] || 0;
-    const recipeToAdd = allRecipesCache[recipeIndex];
+    const recipeToAdd = availableRecipesForPicker[recipeIndex];
     if (recipeToAdd) {
       addMealToPlan(recipeToAdd, formattedDate, mealType, recipeToAdd.servings);
       toast({
@@ -112,16 +138,28 @@ export default function MealPlanPage() {
   };
   
   const getPlannedMealForSlot = (slotType: MealType, slotIndexWithinType: number): PlannedMeal | undefined => {
-    // This logic finds the Nth meal of a given type for the day.
-    // It assumes that if you have two "Snack" slots in MEAL_SLOT_CONFIG,
-    // the first planned snack goes to "Snack 1", the second to "Snack 2".
     const mealsOfThisType = dailyMeals.filter(dm => dm.mealType === slotType);
     return mealsOfThisType[slotIndexWithinType];
   };
 
+  const todayForCalendar = startOfDay(new Date());
+  const tomorrowForCalendar = addDays(todayForCalendar, 1);
+  const disabledCalendarMatcher = isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
 
   return (
     <PageWrapper title="Interactive Meal Planner">
+      {!isSubscribedActive && (
+         <Alert variant="default" className="mb-6 border-accent">
+          <Lock className="h-5 w-5 text-accent" />
+          <AlertTitle className="text-accent">Limited Access</AlertTitle>
+          <AlertDescription>
+            You are on the free plan. Meal planning is restricted to today and tomorrow only. 
+            Recipe selection for planning is limited to {FREE_TIER_RECIPE_PICKER_LIMIT} items. 
+            <Link href="/profile/subscription" className="underline hover:text-primary"> Upgrade your plan </Link> 
+            for full access.
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="flex flex-col lg:flex-row gap-8 mb-8">
         <div className="w-full lg:w-1/3 xl:w-1/4">
           <Card className="shadow-lg">
@@ -133,7 +171,11 @@ export default function MealPlanPage() {
                 mode="single"
                 selected={selectedDate}
                 onSelect={handleDateChange}
+                disabled={disabledCalendarMatcher}
                 className="rounded-md border"
+                initialFocus={!isSubscribedActive}
+                fromDate={!isSubscribedActive ? todayForCalendar : undefined}
+                toDate={!isSubscribedActive ? tomorrowForCalendar : undefined}
               />
               <div className="flex justify-between mt-4">
                 <Button variant="outline" onClick={() => handleDateChange(subDays(selectedDate, 1))}>
@@ -179,14 +221,22 @@ export default function MealPlanPage() {
             <AlertTitle>No Recipes Available</AlertTitle>
             <AlertDescription>
               No recipes found in the database. Please add some recipes or check if the database is accessible.
-              You can try migrating your recipes if you haven't done so yet.
             </AlertDescription>
           </Alert>
         )}
+         {!isAppRecipeCacheLoading && !isSubscribedActive && allRecipesCache.length > 0 && availableRecipesForPicker.length === 0 && (
+             <Alert variant="default" className="border-info">
+                <Info className="h-4 w-4" />
+                <AlertTitle>Recipe Limit Note</AlertTitle>
+                <AlertDescription>
+                The free tier recipe picker is limited. If the first {FREE_TIER_RECIPE_PICKER_LIMIT} recipes in the database don't load correctly, the picker might appear empty.
+                </AlertDescription>
+            </Alert>
+        )}
 
-        {!isAppRecipeCacheLoading && allRecipesCache.length > 0 && MEAL_SLOT_CONFIG.map((slotConfig, index) => {
+
+        {!isAppRecipeCacheLoading && availableRecipesForPicker.length > 0 && MEAL_SLOT_CONFIG.map((slotConfig, index) => {
           const slotKey = `${slotConfig.type}-${index}`; 
-          // Find which occurrence of this meal type this slot represents
           let NthInstanceOfType = 0;
           for(let i=0; i < index; i++){
             if(MEAL_SLOT_CONFIG[i].type === slotConfig.type) {
@@ -249,34 +299,37 @@ export default function MealPlanPage() {
               ) : (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-x-2 sm:gap-x-4">
-                    <Button variant="outline" size="icon" onClick={() => handleRecipePickerNavigate(slotKey, 'prev')} disabled={allRecipesCache.length <= 1}>
+                    <Button variant="outline" size="icon" onClick={() => handleRecipePickerNavigate(slotKey, 'prev')} disabled={availableRecipesForPicker.length <= 1}>
                       <ChevronLeft className="h-5 w-5" />
                       <span className="sr-only">Previous Recipe</span>
                     </Button>
                     <div className="flex-grow w-full max-w-md mx-auto">
-                      {allRecipesCache.length > 0 && (
+                      {availableRecipesForPicker.length > 0 && (
                         <RecipeCard 
-                          recipe={allRecipesCache[recipePickerIndices[slotKey] || 0]} 
+                          recipe={availableRecipesForPicker[recipePickerIndices[slotKey] || 0]} 
                           showAddToMealPlanButton={false}
                           showViewDetailsButton={true}
                           className="w-full shadow-none border-0" 
                         />
                       )}
                     </div>
-                    <Button variant="outline" size="icon" onClick={() => handleRecipePickerNavigate(slotKey, 'next')} disabled={allRecipesCache.length <= 1}>
+                    <Button variant="outline" size="icon" onClick={() => handleRecipePickerNavigate(slotKey, 'next')} disabled={availableRecipesForPicker.length <= 1}>
                       <ChevronRight className="h-5 w-5" />
                       <span className="sr-only">Next Recipe</span>
                     </Button>
                   </div>
-                  {allRecipesCache.length > 0 && (
+                  {availableRecipesForPicker.length > 0 && (
                     <Button 
                       onClick={() => handleAddRecipeFromPicker(slotKey, slotConfig.type)} 
                       className="w-full sm:w-auto mx-auto flex items-center justify-center bg-accent hover:bg-accent/90 text-accent-foreground"
-                      disabled={!allRecipesCache[recipePickerIndices[slotKey] || 0]}
+                      disabled={!availableRecipesForPicker[recipePickerIndices[slotKey] || 0] || (!isSubscribedActive && !isDateAllowedForFreeTier(selectedDate))}
                     >
                       <PlusCircle className="mr-2 h-5 w-5" />
-                      Add "{allRecipesCache[recipePickerIndices[slotKey] || 0]?.name}" as {slotConfig.displayName}
+                      Add "{availableRecipesForPicker[recipePickerIndices[slotKey] || 0]?.name}" as {slotConfig.displayName}
                     </Button>
+                  )}
+                  {!isSubscribedActive && !isDateAllowedForFreeTier(selectedDate) && (
+                     <p className="text-xs text-destructive text-center">Planning for this date is restricted on the free plan.</p>
                   )}
                 </div>
               )}
@@ -357,5 +410,3 @@ export default function MealPlanPage() {
     </PageWrapper>
   );
 }
-
-    
