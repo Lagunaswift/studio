@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { AppProvider } from '@/context/AppContext';
+import { AuthProvider } from '@/context/AuthContext'; // <-- IMPORT
 import { ThemeProvider } from "next-themes";
 
 export const metadata: Metadata = {
@@ -31,10 +32,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AppProvider>
-            {children}
-            <Toaster />
-          </AppProvider>
+          <AuthProvider> {/* <-- WRAP HERE */}
+            <AppProvider>
+              {children}
+              <Toaster />
+            </AppProvider>
+          </AuthProvider> {/* <-- WRAP HERE */}
         </ThemeProvider>
       </body>
     </html>
