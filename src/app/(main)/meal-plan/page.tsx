@@ -18,15 +18,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { getRecipeById, getAllRecipes as fetchAllRecipes, MEAL_TYPES } from '@/lib/data';
+import { MEAL_TYPES } from '@/lib/data'; // Removed getRecipeById, getAllRecipes as they are async now and handled by context
 import { RecipeCard } from '@/components/shared/RecipeCard';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const MEAL_SLOT_CONFIG: Array<{ type: MealType; displayName: string }> = [
   { type: "Breakfast", displayName: "Breakfast" },
   { type: "Lunch", displayName: "Lunch" },
   { type: "Dinner", displayName: "Dinner" },
   { type: "Snack", displayName: "Snack 1" },
-  { type: "Snack", displayName: "Snack 2" }, // Example for multiple snacks
+  { type: "Snack", displayName: "Snack 2" }, 
 ];
 
 
@@ -37,19 +38,21 @@ export default function MealPlanPage() {
     updatePlannedMealServings, 
     clearMealPlanForDate, 
     getMealsForDate,
-    addMealToPlan
+    addMealToPlan,
+    allRecipesCache, // Use cache from context
+    isRecipeCacheLoading: isAppRecipeCacheLoading
   } = useAppContext();
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [editingMeal, setEditingMeal] = useState<PlannedMeal | null>(null);
   const [newServings, setNewServings] = useState<number>(1);
-  const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
-  const [isLoadingRecipes, setIsLoadingRecipes] = useState(true);
+  // const [allRecipes, setAllRecipes] = useState<Recipe[]>([]); // Replaced by allRecipesCache
+  // const [isLoadingRecipes, setIsLoadingRecipes] = useState(true); // Replaced by isAppRecipeCacheLoading
   const { toast } = useToast();
   
   const [recipePickerIndices, setRecipePickerIndices] = useState<{[key: string]: number}>(
     MEAL_SLOT_CONFIG.reduce((acc, slot, index) => {
-      acc[`${slot.type}-${index}`] = 0; // Unique key for each slot
+      acc[`${slot.type}-${index}`] = 0; 
       return acc;
     }, {} as {[key: string]: number})
   );
@@ -58,21 +61,7 @@ export default function MealPlanPage() {
   const dailyMeals = getMealsForDate(formattedDate);
   const dailyMacros = getDailyMacros(formattedDate);
 
-  useEffect(() => {
-    const loadRecipes = async () => {
-      setIsLoadingRecipes(true);
-      try {
-        const recipes = await fetchAllRecipes();
-        setAllRecipes(recipes);
-      } catch (error) {
-        console.error("Failed to load recipes:", error);
-        toast({ title: "Error", description: "Could not load recipes.", variant: "destructive" });
-      } finally {
-        setIsLoadingRecipes(false);
-      }
-    };
-    loadRecipes();
-  }, [toast]);
+  // No longer need useEffect to load recipes here, AppContext handles it.
 
   const handleDateChange = (date: Date | undefined) => {
     if (date && isValid(date)) {
@@ -96,23 +85,23 @@ export default function MealPlanPage() {
   };
 
   const handleRecipePickerNavigate = (slotKey: string, direction: 'prev' | 'next') => {
-    if (allRecipes.length === 0) return;
+    if (allRecipesCache.length === 0) return;
     setRecipePickerIndices(prev => {
       const currentIndex = prev[slotKey] || 0;
       let newIndex;
       if (direction === 'next') {
-        newIndex = (currentIndex + 1) % allRecipes.length;
+        newIndex = (currentIndex + 1) % allRecipesCache.length;
       } else {
-        newIndex = (currentIndex - 1 + allRecipes.length) % allRecipes.length;
+        newIndex = (currentIndex - 1 + allRecipesCache.length) % allRecipesCache.length;
       }
       return { ...prev, [slotKey]: newIndex };
     });
   };
 
   const handleAddRecipeFromPicker = (slotKey: string, mealType: MealType) => {
-    if (allRecipes.length === 0) return;
+    if (allRecipesCache.length === 0) return;
     const recipeIndex = recipePickerIndices[slotKey] || 0;
-    const recipeToAdd = allRecipes[recipeIndex];
+    const recipeToAdd = allRecipesCache[recipeIndex];
     if (recipeToAdd) {
       addMealToPlan(recipeToAdd, formattedDate, mealType, recipeToAdd.servings);
       toast({
@@ -122,24 +111,17 @@ export default function MealPlanPage() {
     }
   };
   
-  // Determine which meal slots are filled for the current day
-  const getPlannedMealsForSlot = (mealType: MealType, slotIndex: number): PlannedMeal[] => {
-    // For "Snack", we need to differentiate if we allow multiple distinct snacks of type "Snack"
-    // This example assumes only one meal per unique type on a given day for simplicity, 
-    // or if you add multiple snacks they all get "Snack" type.
-    // For a more robust system, PlannedMeal would need a unique slotKey.
-    // For now, if it's a snack, we check all snacks. This logic might need refinement
-    // if you want distinct "Snack 1", "Snack 2" that can't be the same recipe.
-    if (mealType === "Snack") {
-      return dailyMeals.filter(dm => dm.mealType === "Snack");
-    }
-    return dailyMeals.filter(dm => dm.mealType === mealType);
+  const getPlannedMealForSlot = (slotType: MealType, slotIndexWithinType: number): PlannedMeal | undefined => {
+    // This logic finds the Nth meal of a given type for the day.
+    // It assumes that if you have two "Snack" slots in MEAL_SLOT_CONFIG,
+    // the first planned snack goes to "Snack 1", the second to "Snack 2".
+    const mealsOfThisType = dailyMeals.filter(dm => dm.mealType === slotType);
+    return mealsOfThisType[slotIndexWithinType];
   };
 
 
   return (
     <PageWrapper title="Interactive Meal Planner">
-      {/* Date Selector and Daily Totals */}
       <div className="flex flex-col lg:flex-row gap-8 mb-8">
         <div className="w-full lg:w-1/3 xl:w-1/4">
           <Card className="shadow-lg">
@@ -179,63 +161,45 @@ export default function MealPlanPage() {
       
       <Separator className="my-12"/>
 
-      {/* Meal Slot Pickers / Display Section */}
       <section className="space-y-10">
         <h2 className="text-2xl font-bold font-headline text-primary mb-6">
           Plan Your Meals for {format(selectedDate, 'PPP')}
         </h2>
 
-        {isLoadingRecipes && (
+        {isAppRecipeCacheLoading && (
           <div className="flex justify-center items-center min-h-[200px]">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
             <p className="ml-4 text-muted-foreground">Loading recipes...</p>
           </div>
         )}
 
-        {!isLoadingRecipes && allRecipes.length === 0 && (
-          <p className="text-center text-muted-foreground py-10">
-            No recipes available to plan. Please add some recipes first.
-          </p>
+        {!isAppRecipeCacheLoading && allRecipesCache.length === 0 && (
+           <Alert variant="destructive">
+            <Info className="h-4 w-4" />
+            <AlertTitle>No Recipes Available</AlertTitle>
+            <AlertDescription>
+              No recipes found in the database. Please add some recipes or check if the database is accessible.
+              You can try migrating your recipes if you haven't done so yet.
+            </AlertDescription>
+          </Alert>
         )}
 
-        {!isLoadingRecipes && allRecipes.length > 0 && MEAL_SLOT_CONFIG.map((slotConfig, slotIndex) => {
-          const slotKey = `${slotConfig.type}-${slotIndex}`;
-          // This needs a more robust way to find *the specific meal for this slot* if multiple of same type are allowed.
-          // For now, assuming one meal of each type (Breakfast, Lunch, Dinner) and generic "Snack"
-          const plannedMealForThisExactSlot = dailyMeals.find(dm => 
-            dm.mealType === slotConfig.type && 
-            // This matching logic is simple; if you add multiple snacks, it will find the first one.
-            // A more complex system would assign unique IDs to plan slots.
-            (slotConfig.type !== "Snack" || dm.id.includes(`Snack-${slotIndex}`)) // A pseudo-way to link if we had unique snack IDs
-          );
-          // A better way for snacks if we allow multiple: check if there are *enough* snacks already planned
-          // For now, let's simplify: If it's a "Snack" slot, and *any* snack is planned, show it.
-          // Or, check if a specific meal corresponds to this logical slot (e.g., if the plan stored slotKey)
-          // The current `dailyMeals` doesn't distinguish between "Snack 1" and "Snack 2" if both are just "Snack" type.
-          // For this example, we'll show a picker if *no* meal of that type exists, or if it's a snack slot and we haven't filled 'enough'
-          // Let's assume for simplicity: one Breakfast, one Lunch, one Dinner. Any number of Snacks.
-          // We will show picker for B,L,D if not present. For Snacks, we'll show multiple pickers.
-          
-          let mealToDisplay: PlannedMeal | undefined;
-          if (slotConfig.type !== "Snack") {
-            mealToDisplay = dailyMeals.find(dm => dm.mealType === slotConfig.type);
-          } else {
-            // For snacks, this is tricky. We'd need to associate planned snacks with specific slots.
-            // Let's find the Nth snack if N pickers are shown.
-            const snacksPlanned = dailyMeals.filter(dm => dm.mealType === "Snack");
-            const currentSnackSlotIndex = MEAL_SLOT_CONFIG.filter(s => s.type === "Snack").findIndex(s => `${s.type}-${MEAL_SLOT_CONFIG.indexOf(s)}` === slotKey);
-            if (currentSnackSlotIndex !== -1 && currentSnackSlotIndex < snacksPlanned.length) {
-                 mealToDisplay = snacksPlanned[currentSnackSlotIndex];
+        {!isAppRecipeCacheLoading && allRecipesCache.length > 0 && MEAL_SLOT_CONFIG.map((slotConfig, index) => {
+          const slotKey = `${slotConfig.type}-${index}`; 
+          // Find which occurrence of this meal type this slot represents
+          let NthInstanceOfType = 0;
+          for(let i=0; i < index; i++){
+            if(MEAL_SLOT_CONFIG[i].type === slotConfig.type) {
+                NthInstanceOfType++;
             }
           }
-
+          const mealToDisplay = getPlannedMealForSlot(slotConfig.type, NthInstanceOfType);
 
           return (
             <div key={slotKey} className="p-4 border rounded-lg shadow-md bg-card">
               <h3 className="text-xl font-semibold font-headline text-primary/90 mb-4">{slotConfig.displayName}</h3>
               {mealToDisplay ? (
-                // Display already planned meal
-                <div className="w-full max-w-lg mx-auto"> {/* Centering the planned meal card */}
+                <div className="w-full max-w-lg mx-auto"> 
                   <Card className="overflow-hidden shadow-md flex flex-col sm:flex-row">
                     {mealToDisplay.recipeDetails?.image && (
                       <div className="sm:w-1/3 relative h-32 sm:h-auto">
@@ -244,7 +208,7 @@ export default function MealPlanPage() {
                           alt={mealToDisplay.recipeDetails.name}
                           fill
                           className="object-cover"
-                          data-ai-hint="food meal"
+                          data-ai-hint={mealToDisplay.recipeDetails.tags ? mealToDisplay.recipeDetails.tags.slice(0,2).join(' ') : "food meal"}
                         />
                       </div>
                     )}
@@ -283,36 +247,35 @@ export default function MealPlanPage() {
                   </Card>
                 </div>
               ) : (
-                // Display Recipe Picker
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-x-2 sm:gap-x-4">
-                    <Button variant="outline" size="icon" onClick={() => handleRecipePickerNavigate(slotKey, 'prev')} disabled={allRecipes.length <= 1}>
+                    <Button variant="outline" size="icon" onClick={() => handleRecipePickerNavigate(slotKey, 'prev')} disabled={allRecipesCache.length <= 1}>
                       <ChevronLeft className="h-5 w-5" />
                       <span className="sr-only">Previous Recipe</span>
                     </Button>
-                    <div className="flex-grow w-full max-w-md mx-auto"> {/* Max width for the card in picker */}
-                      {allRecipes.length > 0 && (
+                    <div className="flex-grow w-full max-w-md mx-auto">
+                      {allRecipesCache.length > 0 && (
                         <RecipeCard 
-                          recipe={allRecipes[recipePickerIndices[slotKey] || 0]} 
-                          showAddToMealPlanButton={false} // We use a dedicated button below
+                          recipe={allRecipesCache[recipePickerIndices[slotKey] || 0]} 
+                          showAddToMealPlanButton={false}
                           showViewDetailsButton={true}
-                          className="w-full shadow-none border-0" // Make card take full width of its constrained parent
+                          className="w-full shadow-none border-0" 
                         />
                       )}
                     </div>
-                    <Button variant="outline" size="icon" onClick={() => handleRecipePickerNavigate(slotKey, 'next')} disabled={allRecipes.length <= 1}>
+                    <Button variant="outline" size="icon" onClick={() => handleRecipePickerNavigate(slotKey, 'next')} disabled={allRecipesCache.length <= 1}>
                       <ChevronRight className="h-5 w-5" />
                       <span className="sr-only">Next Recipe</span>
                     </Button>
                   </div>
-                  {allRecipes.length > 0 && (
+                  {allRecipesCache.length > 0 && (
                     <Button 
                       onClick={() => handleAddRecipeFromPicker(slotKey, slotConfig.type)} 
                       className="w-full sm:w-auto mx-auto flex items-center justify-center bg-accent hover:bg-accent/90 text-accent-foreground"
-                      disabled={!allRecipes[recipePickerIndices[slotKey] || 0]}
+                      disabled={!allRecipesCache[recipePickerIndices[slotKey] || 0]}
                     >
                       <PlusCircle className="mr-2 h-5 w-5" />
-                      Add "{allRecipes[recipePickerIndices[slotKey] || 0]?.name}" as {slotConfig.displayName}
+                      Add "{allRecipesCache[recipePickerIndices[slotKey] || 0]?.name}" as {slotConfig.displayName}
                     </Button>
                   )}
                 </div>
@@ -324,7 +287,6 @@ export default function MealPlanPage() {
 
       <Separator className="my-12"/>
 
-      {/* Planned Meals Summary Display Section - This might be redundant if above shows planned meals well */}
       <section>
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold font-headline text-primary">
@@ -348,9 +310,8 @@ export default function MealPlanPage() {
           </Card>
         ) : (
           <div className="space-y-6">
-            {/* This could just list the meals in a simpler format or be removed if the slot display is sufficient */}
             {dailyMeals.map((meal) => {
-                const recipe = meal.recipeDetails || getRecipeById(meal.recipeId);
+                const recipe = meal.recipeDetails || allRecipesCache.find(r => r.id === meal.recipeId);
                 if (!recipe) return null;
                 const plannedServingsMacros = {
                     calories: recipe.macrosPerServing.calories * meal.servings,
@@ -362,7 +323,6 @@ export default function MealPlanPage() {
                     <Card key={`summary-${meal.id}`} className="shadow-sm p-3">
                         <CardTitle className="text-md font-semibold">{recipe.name} ({meal.mealType}) - {meal.servings} servings</CardTitle>
                         <MacroDisplay macros={plannedServingsMacros} title=""/>
-                         {/* Minimal actions here, or rely on main pickers */}
                     </Card>
                 );
             })}
@@ -370,8 +330,6 @@ export default function MealPlanPage() {
         )}
       </section>
 
-
-      {/* Edit Servings Dialog */}
       {editingMeal && (
         <Dialog open={!!editingMeal} onOpenChange={() => setEditingMeal(null)}>
           <DialogContent>

@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { RecipeCard } from '@/components/shared/RecipeCard';
-import { getAllRecipes, MEAL_TYPES, getRecipeById } from '@/lib/data';
+import { getAllRecipes, MEAL_TYPES } from '@/lib/data'; // getRecipeById removed as not directly used here
 import type { Recipe, MealType } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,17 +13,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2, Info } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function RecipesPage() {
-  const { addMealToPlan } = useAppContext();
+  const { addMealToPlan, allRecipesCache, isRecipeCacheLoading: isAppRecipeCacheLoading } = useAppContext();
   const { toast } = useToast();
   
-  const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
+  const [recipesToDisplay, setRecipesToDisplay] = useState<Recipe[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
@@ -32,34 +34,33 @@ export default function RecipesPage() {
   const [planServings, setPlanServings] = useState<number>(1);
 
   useEffect(() => {
-    const fetchRecipes = async () => {
-      try {
-        setIsLoading(true);
-        const recipes = await getAllRecipes();
-        setAllRecipes(recipes);
-      } catch (error) {
-        console.error("Failed to fetch recipes:", error);
-        toast({
-          title: "Error",
-          description: "Could not load recipes. Please try again later.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
+    // Use the cache from AppContext if available and not loading
+    if (!isAppRecipeCacheLoading) {
+      setIsLoading(true); // Internal loading state for filtering
+      if (allRecipesCache.length > 0) {
+        setRecipesToDisplay(allRecipesCache);
+        setError(null);
+      } else {
+        // This case might mean Firestore fetch failed at AppContext level
+        setError("No recipes found or failed to load recipes from the database.");
+        setRecipesToDisplay([]);
       }
-    };
-    fetchRecipes();
-  }, [toast]);
+      setIsLoading(false);
+    } else {
+      setIsLoading(true); // AppContext is still loading the cache
+    }
+  }, [allRecipesCache, isAppRecipeCacheLoading]);
 
-  const filteredRecipes = allRecipes.filter(recipe =>
+
+  const filteredRecipes = recipesToDisplay.filter(recipe =>
     recipe.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    recipe.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (recipe.description && recipe.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (recipe.tags && recipe.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())))
   );
 
   const handleOpenAddToPlanDialog = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
-    setPlanServings(recipe.servings); // Default to recipe's default servings
+    setPlanServings(recipe.servings);
     setShowAddToPlanDialog(true);
   };
 
@@ -95,16 +96,19 @@ export default function RecipesPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        {/* Future filter button */}
-        {/* <Button variant="outline">
-          <Filter className="mr-2 h-4 w-4" /> Filters
-        </Button> */}
       </div>
 
       {isLoading ? (
         <div className="flex justify-center items-center min-h-[200px]">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="ml-2 text-muted-foreground">Loading recipes...</p>
         </div>
+      ) : error ? (
+         <Alert variant="destructive">
+            <Info className="h-4 w-4" />
+            <AlertTitle>Error Loading Recipes</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
       ) : filteredRecipes.length > 0 ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredRecipes.map((recipe) => (
@@ -190,3 +194,5 @@ export default function RecipesPage() {
     </PageWrapper>
   );
 }
+
+    

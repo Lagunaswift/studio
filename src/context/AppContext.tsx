@@ -17,15 +17,14 @@ import type {
   AthleteType,
   PrimaryGoal
 } from '@/types';
-import { ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS } from '@/types'; // Import options
+import { ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS } from '@/types';
 import { loadState, saveState } from '@/lib/localStorage';
-import { getRecipeById, calculateTotalMacros, generateShoppingList as generateShoppingListUtil } from '@/lib/data';
+import { getAllRecipes as getAllRecipesFromDb, calculateTotalMacros, generateShoppingList as generateShoppingListUtil } from '@/lib/data';
 
 const MEAL_PLAN_KEY = 'macroTealMealPlan';
 const SHOPPING_LIST_KEY = 'macroTealShoppingList';
 const USER_PROFILE_KEY = 'macroTealUserProfile';
 
-// Default meal structure
 const DEFAULT_MEAL_STRUCTURE: MealSlotConfig[] = [
   { id: 'default-breakfast', name: 'Breakfast', type: 'Breakfast' },
   { id: 'default-lunch', name: 'Lunch', type: 'Lunch' },
@@ -50,8 +49,6 @@ const DEFAULT_USER_PROFILE: UserProfileSettings = {
   leanBodyMassKg: null,
 };
 
-
-// Helper function to calculate LBM
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
   if (weightKg && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
     return weightKg * (1 - bodyFatPercentage / 100);
@@ -59,7 +56,6 @@ const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null)
   return null;
 };
 
-// Helper function to calculate TDEE (Mifflin-St Jeor)
 const calculateTDEE = (
   weightKg: number | null,
   heightCm: number | null,
@@ -83,11 +79,11 @@ const calculateTDEE = (
   return null;
 };
 
-
 interface AppContextType {
   mealPlan: PlannedMeal[];
   shoppingList: ShoppingListItem[];
   userProfile: UserProfileSettings | null;
+  allRecipesCache: Recipe[]; // Cache for all recipes
   addMealToPlan: (recipe: Recipe, date: string, mealType: MealType, servings: number) => void;
   removeMealFromPlan: (plannedMealId: string) => void;
   updatePlannedMealServings: (plannedMealId: string, newServings: number) => void;
@@ -101,6 +97,7 @@ interface AppContextType {
   setAllergens: (allergens: string[]) => void;
   setMealStructure: (mealStructure: MealSlotConfig[]) => void;
   setUserInformation: (info: Partial<UserProfileSettings>) => void;
+  isRecipeCacheLoading: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -109,51 +106,84 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [mealPlan, setMealPlan] = useState<PlannedMeal[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
+  const [allRecipesCache, setAllRecipesCache] = useState<Recipe[]>([]);
+  const [isRecipeCacheLoading, setIsRecipeCacheLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    const loadedMealPlan = loadState<PlannedMeal[]>(MEAL_PLAN_KEY) || [];
-    const loadedShoppingList = loadState<ShoppingListItem[]>(SHOPPING_LIST_KEY) || [];
-    let loadedUserProfile = loadState<UserProfileSettings>(USER_PROFILE_KEY);
+    const initializeData = async () => {
+      setIsRecipeCacheLoading(true);
+      try {
+        const recipes = await getAllRecipesFromDb();
+        setAllRecipesCache(recipes);
+      } catch (error) {
+        console.error("Failed to load recipes into cache:", error);
+        setAllRecipesCache([]); // Set to empty if error
+      } finally {
+        setIsRecipeCacheLoading(false);
+      }
 
-    if (!loadedUserProfile) {
-      loadedUserProfile = DEFAULT_USER_PROFILE;
-    } else {
-      // Ensure all fields from DEFAULT_USER_PROFILE are present
-      loadedUserProfile = { ...DEFAULT_USER_PROFILE, ...loadedUserProfile };
-       // Recalculate TDEE and LBM on load if necessary data exists
-      loadedUserProfile.tdee = calculateTDEE(
-        loadedUserProfile.weightKg,
-        loadedUserProfile.heightCm,
-        loadedUserProfile.age,
-        loadedUserProfile.sex,
-        loadedUserProfile.activityLevel
-      );
-      loadedUserProfile.leanBodyMassKg = calculateLBM(
-        loadedUserProfile.weightKg,
-        loadedUserProfile.bodyFatPercentage
-      );
+      const loadedMealPlan = loadState<PlannedMeal[]>(MEAL_PLAN_KEY) || [];
+      const loadedShoppingList = loadState<ShoppingListItem[]>(SHOPPING_LIST_KEY) || [];
+      let loadedUserProfile = loadState<UserProfileSettings>(USER_PROFILE_KEY);
+
+      if (!loadedUserProfile) {
+        loadedUserProfile = DEFAULT_USER_PROFILE;
+      } else {
+        loadedUserProfile = { ...DEFAULT_USER_PROFILE, ...loadedUserProfile };
+        loadedUserProfile.tdee = calculateTDEE(
+          loadedUserProfile.weightKg,
+          loadedUserProfile.heightCm,
+          loadedUserProfile.age,
+          loadedUserProfile.sex,
+          loadedUserProfile.activityLevel
+        );
+        loadedUserProfile.leanBodyMassKg = calculateLBM(
+          loadedUserProfile.weightKg,
+          loadedUserProfile.bodyFatPercentage
+        );
+      }
+      if (!loadedUserProfile.mealStructure || loadedUserProfile.mealStructure.length === 0) {
+          loadedUserProfile.mealStructure = DEFAULT_MEAL_STRUCTURE;
+      }
+      
+      setUserProfile(loadedUserProfile);
+
+      // Populate recipeDetails for mealPlan using the freshly loaded cache
+      const populatedMealPlan = loadedMealPlan.map(pm => {
+        const recipeDetails = allRecipesCache.find(r => r.id === pm.recipeId);
+        return {...pm, recipeDetails: recipeDetails || undefined };
+      });
+      setMealPlan(populatedMealPlan);
+      
+      if (loadedShoppingList.length === 0 && populatedMealPlan.length > 0) {
+        setShoppingList(generateShoppingListUtil(populatedMealPlan, allRecipesCache));
+      } else {
+        setShoppingList(loadedShoppingList);
+      }
+      setIsInitialized(true);
+    };
+
+    initializeData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount. allRecipesCache dependency removed to avoid re-running on its update within this effect
+
+   useEffect(() => {
+    // This effect ensures mealPlan details are updated if allRecipesCache changes after initial load
+    // (e.g. if cache was empty initially and then populated)
+    if (allRecipesCache.length > 0 && mealPlan.some(pm => !pm.recipeDetails)) {
+        setMealPlan(prevMealPlan => 
+            prevMealPlan.map(pm => {
+                if (!pm.recipeDetails) {
+                    const recipeDetails = allRecipesCache.find(r => r.id === pm.recipeId);
+                    return {...pm, recipeDetails: recipeDetails || undefined};
+                }
+                return pm;
+            })
+        );
     }
-     if (!loadedUserProfile.mealStructure || loadedUserProfile.mealStructure.length === 0) {
-        loadedUserProfile.mealStructure = DEFAULT_MEAL_STRUCTURE;
-    }
+  }, [allRecipesCache, mealPlan]);
 
-
-    const populatedMealPlan = loadedMealPlan.map(pm => {
-      const recipeDetails = getRecipeById(pm.recipeId);
-      return {...pm, recipeDetails: recipeDetails || undefined };
-    });
-    setMealPlan(populatedMealPlan);
-
-    setUserProfile(loadedUserProfile);
-
-    if (loadedShoppingList.length === 0 && populatedMealPlan.length > 0) {
-      setShoppingList(generateShoppingListUtil(populatedMealPlan));
-    } else {
-      setShoppingList(loadedShoppingList);
-    }
-    setIsInitialized(true);
-  }, []);
 
   useEffect(() => {
     if (isInitialized && userProfile) {
@@ -163,7 +193,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     if (isInitialized) {
-      saveState(MEAL_PLAN_KEY, mealPlan.map(({recipeDetails, ...pm}) => pm));
+      saveState(MEAL_PLAN_KEY, mealPlan.map(({recipeDetails, ...pm}) => pm)); // Save without details
     }
   }, [mealPlan, isInitialized]);
 
@@ -173,11 +203,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [shoppingList, isInitialized]);
 
-
   const regenerateShoppingList = useCallback((currentMealPlan: PlannedMeal[]) => {
-    const newShoppingList = generateShoppingListUtil(currentMealPlan);
+    const newShoppingList = generateShoppingListUtil(currentMealPlan, allRecipesCache);
     setShoppingList(newShoppingList);
-  }, []);
+  }, [allRecipesCache]);
 
   const addMealToPlan = useCallback((recipe: Recipe, date: string, mealType: MealType, servings: number) => {
     const newPlannedMeal: PlannedMeal = {
@@ -186,7 +215,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       date,
       mealType,
       servings,
-      recipeDetails: recipe,
+      recipeDetails: recipe, // Ensure recipeDetails are included
     };
     setMealPlan(prev => {
       const updatedPlan = [...prev, newPlannedMeal];
@@ -215,15 +244,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const getDailyMacros = useCallback((date: string): Macros => {
     const dailyMeals = mealPlan.filter(pm => pm.date === date);
-    return calculateTotalMacros(dailyMeals);
-  }, [mealPlan]);
+    return calculateTotalMacros(dailyMeals, allRecipesCache);
+  }, [mealPlan, allRecipesCache]);
 
   const getMealsForDate = useCallback((date: string): PlannedMeal[] => {
     return mealPlan.filter(pm => pm.date === date).map(pm => ({
       ...pm,
-      recipeDetails: pm.recipeDetails || getRecipeById(pm.recipeId)
+      recipeDetails: pm.recipeDetails || allRecipesCache.find(r => r.id === pm.recipeId)
     }));
-  }, [mealPlan]);
+  }, [mealPlan, allRecipesCache]);
 
   const toggleShoppingListItem = useCallback((itemId: string) => {
     setShoppingList(prev =>
@@ -245,14 +274,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMealPlan([]);
     setShoppingList([]);
     setUserProfile(DEFAULT_USER_PROFILE);
-  }, []);
+  }, [regenerateShoppingList]); // regenerateShoppingList removed, as it's for non-empty plans
 
   const updateUserProfileState = useCallback((updates: Partial<UserProfileSettings>) => {
     setUserProfile(prevProfile => {
       const currentProfile = prevProfile || DEFAULT_USER_PROFILE;
       const updatedProfile = { ...currentProfile, ...updates };
-
-      // Recalculate TDEE and LBM
       updatedProfile.tdee = calculateTDEE(
         updatedProfile.weightKg,
         updatedProfile.heightCm,
@@ -288,11 +315,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateUserProfileState(info);
   }, [updateUserProfileState]);
 
-
   const contextValue = useMemo(() => ({
     mealPlan,
     shoppingList,
     userProfile,
+    allRecipesCache,
     addMealToPlan,
     removeMealFromPlan,
     updatePlannedMealServings,
@@ -306,15 +333,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAllergens,
     setMealStructure,
     setUserInformation,
+    isRecipeCacheLoading,
   }), [
-    mealPlan, shoppingList, userProfile, addMealToPlan, removeMealFromPlan,
+    mealPlan, shoppingList, userProfile, allRecipesCache, addMealToPlan, removeMealFromPlan,
     updatePlannedMealServings, getDailyMacros, toggleShoppingListItem,
     clearMealPlanForDate, clearAllData, getMealsForDate, setMacroTargets,
-    setDietaryPreferences, setAllergens, setMealStructure, setUserInformation
+    setDietaryPreferences, setAllergens, setMealStructure, setUserInformation, isRecipeCacheLoading
   ]);
 
   if (!isInitialized) {
-    return null;
+    // Potentially show a global loading spinner or a minimal layout
+    return null; // Or a loading component
   }
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
@@ -327,3 +356,5 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
+    

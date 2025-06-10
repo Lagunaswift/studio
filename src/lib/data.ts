@@ -1,12 +1,15 @@
 
 import type { Recipe, Macros, MealType, PlannedMeal, ShoppingListItem, UKSupermarketCategory } from '@/types';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, query, where, doc, getDoc, limit } from 'firebase/firestore';
 
 // Helper to create a full Recipe object from the new partial structure
+// This remains for the initial mock data and potential migration script
 const createRecipeFromNewFormat = (data: Omit<Recipe, 'macrosPerServing' | 'image' | 'description'> & { description?: string, image?: string }): Recipe => {
   return {
     ...data,
-    description: data.description || "No description available.", // Default description
-    image: data.image || 'https://placehold.co/600x400.png', // Default image
+    description: data.description || "No description available.",
+    image: data.image || 'https://placehold.co/600x400.png',
     macrosPerServing: {
       calories: data.calories,
       protein: data.protein,
@@ -16,8 +19,9 @@ const createRecipeFromNewFormat = (data: Omit<Recipe, 'macrosPerServing' | 'imag
   };
 };
 
-const mockRecipesInput: Array<Omit<Recipe, 'macrosPerServing' | 'image' | 'description'> & { description?: string, image?: string }> = [
-  {
+// Kept for migration script - user will import this
+export const mockRecipesInput: Array<Omit<Recipe, 'macrosPerServing' | 'image' | 'description'> & { description?: string, image?: string }> = [
+   {
     id: 1,
     name: "Spanish Zucchini Tortilla",
     calories: 377, 
@@ -77,52 +81,174 @@ const mockRecipesInput: Array<Omit<Recipe, 'macrosPerServing' | 'image' | 'descr
   },
   {
     id: 3,
-    name: 'Chicken Stir-fry with Broccoli',
-    calories: 455, 
-    protein: 45,   
-    carbs: 35,    
-    fat: 15,      
-    servings: 2,
-    prepTime: '15 mins',
-    cookTime: '15 mins',
+    name: "Egg & Turkey Stuffed Peppers",
+    calories: 329,
+    protein: 43,
+    carbs: 11,
+    fat: 12,
+    servings: 4,
     ingredients: [
-      '300g Chicken Breast, sliced',
-      '200g Broccoli Florets',
-      '2 tbsp Soy Sauce',
-      '1 tbsp Sesame Oil',
-      '2 cloves Garlic, chopped',
-      '1 inch Ginger, chopped',
-      '1 cup Brown Rice (cooked), for serving',
+      "4 eggs",
+      "4 egg whites",
+      "2 tbsp almond milk",
+      "1 tsp coconut oil",
+      "1 small onion, chopped",
+      "450g lean ground turkey",
+      "2 tsp oregano",
+      "1 tsp cumin",
+      "2 cups (60g) spinach, chopped",
+      "4 red medium bell peppers",
+      "½ cup (50g) cheese (dairy or plant-based)",
+      "parsley, chopped to serve"
     ],
+    tags: ["GF", "LC", "MP", "HP", "Q"],
+    prepTime: "5 mins",
+    cookTime: "20 mins",
     instructions: [
-      'Slice chicken breast into strips.',
-      'Chop broccoli, garlic, and ginger.',
-      'Heat sesame oil in a wok or large skillet over medium-high heat.',
-      'Add chicken and cook until browned.',
-      'Add garlic and ginger, cook for 1 minute until fragrant.',
-      'Add broccoli and stir-fry for 3-5 minutes until tender-crisp.',
-      'Stir in soy sauce. Serve over brown rice.',
+      "Heat oven to 400°F (200°C).",
+      "Beat the eggs, egg whites and milk, then set aside.",
+      "Heat the coconut oil in a pan over medium heat. Add the onion and cook for 3 minutes until softened and browned.",
+      "Add in the turkey, oregano and cumin, season with salt and pepper. Cook until meat is cooked through, about 5 minutes. Then add the spinach, and mix until it wilts about 2 minutes.",
+      "Increase the heat and add in the eggs. Pull the eggs across the skillet with a spatula. Repeat for about 3 minutes until eggs are cooked. Then set aside.",
+      "Cut the peppers horizontally and remove the seeds, then stuff with the scrambled eggs and turkey.",
+      "Place the peppers in a baking dish and sprinkle them with grated cheese.",
+      "Bake in the oven for 15 minutes, until cheese has melted and the edges have browned.",
+      "To serve, sprinkle with chopped parsley."
+    ]
+  },
+  {
+    id: 4,
+    name: "Smoked Salmon, Feta & Asparagus Omelet",
+    calories: 302,
+    protein: 20,
+    carbs: 6,
+    fat: 21,
+    servings: 2,
+    ingredients: [
+      "125g asparagus",
+      "1 tsp coconut oil",
+      "3 large eggs",
+      "70ml milk, plant or dairy",
+      "60g smoked salmon, cut into pieces",
+      "30g feta cheese, cubed",
+      "4 cherry tomatoes, halved",
+      "dill, to serve"
     ],
-    tags: ['quick', 'high-protein', 'asian'],
-    description: 'A quick and healthy chicken stir-fry packed with protein and vegetables.'
+    tags: ["GF", "LC", "MP", "Q", "HP"],
+    prepTime: "10 mins",
+    cookTime: "15 mins",
+    instructions: [
+      "Wash the asparagus, break off the hard ends then discard (they will break themselves in the right place). Cut the softer stalks diagonally to about ½ cm pieces.",
+      "Boil in lightly salted water for about 2 minutes, then strain and set aside.",
+      "In a bowl, whisk eggs with the milk, salt and pepper. Add asparagus, salmon and cubed cheese, mix everything well.",
+      "Heat the oven to 350°F (180°C). Heat the oil in a pan (diameter of approx. 24cm) over medium heat, and pour in the egg mixture. Rearrange the toppings if necessary. Top with the halved cherry tomatoes (cut end up).",
+      "Cover the pan with a lid and cook until the mass is set for about 5 minutes. Then place in the oven (without cover), and cook for another 6-10 minutes, until the mass sets.",
+      "To serve sprinkle with fresh dill and season with freshly ground black pepper."
+    ]
+  },
+  {
+    id: 5,
+    name: "High Protein Blueberry Pancakes",
+    calories: 257,
+    protein: 36,
+    carbs: 18,
+    fat: 5,
+    servings: 1,
+    ingredients: [
+      "¼ cup liquid egg whites (around 4 eggs)",
+      "1 scoop (25g) of vanilla whey powder",
+      "½ banana, mashed",
+      "almond milk, if needed",
+      "¼ cup (25g) fresh or frozen blueberries",
+      "½ tsp coconut oil"
+    ],
+    tags: ["GF", "LC", "HP", "V", "Q", "N"],
+    prepTime: "5 mins",
+    cookTime: "10 mins",
+    instructions: [
+      "Whisk together the egg whites and protein powder.",
+      "Stir in the mashed banana and add the blueberries. If the pancake mixture seems too thick, add a splash of almond milk to thin it.",
+      "Heat the coconut oil in a pan to low-medium. Pour in the pancake mixture and cook until little bubbles form (about 5 minutes).",
+      "Make sure the pancake has set enough before you try flipping it, then flip over. Cook the pancake for another 2-3 minutes.",
+      "You can also make 3 small pancakes instead of 1 large.",
+      "Serve with your favorite toppings."
+    ]
+  },
+  {
+    id: 6,
+    name: "Eggs Fried On Tomatoes With Tuna",
+    calories: 307,
+    protein: 32,
+    carbs: 8,
+    fat: 15,
+    servings: 1,
+    ingredients: [
+      "1 large tomato",
+      "1 tsp coconut oil",
+      "2 eggs",
+      "3 oz. (80g) tuna in brine",
+      "pinch of oregano",
+      "pinch of chili flakes",
+      "parsley, chopped, to serve"
+    ],
+    tags: ["GF", "LC", "MP", "Q", "HP"],
+    prepTime: "5 mins",
+    cookTime: "10 mins",
+    instructions: [
+      "Slice the tomato into ½ inch thick slices. Heat the oil in a pan, and fry the tomato slices on both sides for about 2 minutes.",
+      "Place the fried tomato slices on a plate, leaving the remaining oil in the pan.",
+      "Fry the eggs to your preference in the same pan. Place on top of the tomatoes.",
+      "Season with salt, pepper, oregano and chili flakes. Add the tuna to the plate. Sprinkle with fresh parsley and serve."
+    ]
   },
 ];
 
-const mockRecipesData: Recipe[] = mockRecipesInput.map(createRecipeFromNewFormat);
+// Kept for migration script - user will import this
+export const mockRecipesData: Recipe[] = mockRecipesInput.map(createRecipeFromNewFormat);
+
 
 export const MEAL_TYPES: MealType[] = ["Breakfast", "Lunch", "Dinner", "Snack"];
 
-export const getRecipeById = (id: number): Recipe | undefined => {
-  return mockRecipesData.find(recipe => recipe.id === id);
-};
-
+// Fetches all recipes from Firestore
 export const getAllRecipes = async (): Promise<Recipe[]> => {
-  return Promise.resolve(mockRecipesData);
+  try {
+    const recipesCol = collection(db, "recipes");
+    const recipeSnapshot = await getDocs(recipesCol);
+    const recipeList = recipeSnapshot.docs.map(doc => doc.data() as Recipe);
+    return recipeList;
+  } catch (error) {
+    console.error("Error fetching all recipes from Firestore:", error);
+    return []; // Return empty array on error
+  }
 };
 
-export const calculateTotalMacros = (plannedMeals: PlannedMeal[]): Macros => {
+// Fetches a single recipe by its numeric ID from Firestore
+export const getRecipeById = async (id: number): Promise<Recipe | undefined> => {
+  try {
+    // Firestore queries require using `where` to filter by fields.
+    // Document IDs are strings. If you store the numeric ID as a field named 'id':
+    const recipesCol = collection(db, "recipes");
+    const q = query(recipesCol, where("id", "==", id), limit(1));
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+      // Should be only one document if IDs are unique
+      return querySnapshot.docs[0].data() as Recipe;
+    } else {
+      console.log(`No recipe found with ID: ${id}`);
+      return undefined;
+    }
+  } catch (error) {
+    console.error(`Error fetching recipe with ID ${id} from Firestore:`, error);
+    return undefined;
+  }
+};
+
+
+export const calculateTotalMacros = (plannedMeals: PlannedMeal[], allRecipesCache?: Recipe[]): Macros => {
   return plannedMeals.reduce((acc, plannedMeal) => {
-    const recipe = getRecipeById(plannedMeal.recipeId);
+    // Prefer recipeDetails if available, otherwise try to find in cache
+    const recipe = plannedMeal.recipeDetails || allRecipesCache?.find(r => r.id === plannedMeal.recipeId);
     if (recipe) {
       acc.calories += recipe.macrosPerServing.calories * plannedMeal.servings;
       acc.protein += recipe.macrosPerServing.protein * plannedMeal.servings;
@@ -136,32 +262,32 @@ export const calculateTotalMacros = (plannedMeals: PlannedMeal[]): Macros => {
 const categoryKeywords: Record<UKSupermarketCategory, string[]> = {
   "Fresh Fruit & Vegetables": ["apple", "orange", "banana", "berries", "grapes", "melon", "pear", "plum", "avocado", "potato", "onion", "garlic", "ginger", "carrot", "broccoli", "spinach", "lettuce", "cabbage", "peppers", "tomato", "cucumber", "zucchini", "courgette", "aubergine", "mushroom", "corn", "peas", "beans (fresh)", "lemon", "lime", "herb (fresh)", "watercress", "spring onion", "leek", "florets"],
   "Bakery": ["bread", "baguette", "rolls", "croissant", "bagel", "muffin", "cake", "pastry", "wrap", "tortilla (bread)"],
-  "Meat & Poultry": ["chicken", "beef", "pork", "lamb", "turkey", "mince", "sausage", "bacon", "ham", "steak", "gammon"],
+  "Meat & Poultry": ["chicken", "beef", "pork", "lamb", "turkey", "mince", "sausage", "bacon", "ham", "steak", "gammon", "ground turkey"],
   "Fish & Seafood": ["salmon", "cod", "haddock", "tuna", "mackerel", "prawns", "shrimp", "scallops", "mussels", "fish"],
-  "Dairy, Butter & Eggs": ["milk", "cheese", "cheddar", "mozzarella", "yogurt", "yoghurt", "butter", "cream", "eggs", "cottage cheese", "creme fraiche", "soy milk"],
+  "Dairy, Butter & Eggs": ["milk", "cheese", "cheddar", "mozzarella", "yogurt", "yoghurt", "butter", "cream", "eggs", "cottage cheese", "creme fraiche", "soy milk", "almond milk", "feta cheese", "egg whites"],
   "Chilled Foods": ["deli meat", "cooked meat", "pate", "fresh pasta", "fresh soup", "ready meal", "quiche", "coleslaw", "houmous", "hummus", "dip", "tofu"],
-  "Frozen Foods": ["frozen peas", "frozen corn", "frozen chips", "frozen fruit", "ice cream", "frozen pizza", "frozen vegetables"],
-  "Food Cupboard": ["pasta (dried)", "rice", "noodles", "flour", "sugar", "salt", "pepper", "spice", "herbs (dried)", "oil (olive, vegetable, sunflower, coconut, sesame)", "vinegar", "tinned tomatoes", "canned tomatoes", "tinned beans", "canned beans", "lentils", "chickpeas", "soup (canned/packet)", "stock cube", "bouillon", "jam", "honey", "peanut butter", "cereal", "oats", "biscuits", "crackers", "tea", "coffee", "hot chocolate", "soy sauce", "ketchup", "mayonnaise", "mustard", "nuts", "seeds", "dried fruit"],
+  "Frozen Foods": ["frozen peas", "frozen corn", "frozen chips", "frozen fruit", "ice cream", "frozen pizza", "frozen vegetables", "frozen blueberries"],
+  "Food Cupboard": ["pasta (dried)", "rice", "noodles", "flour", "sugar", "salt", "pepper", "spice", "herbs (dried)", "oil (olive, vegetable, sunflower, coconut, sesame)", "vinegar", "tinned tomatoes", "canned tomatoes", "tinned beans", "canned beans", "lentils", "chickpeas", "soup (canned/packet)", "stock cube", "bouillon", "jam", "honey", "peanut butter", "cereal", "oats", "biscuits", "crackers", "tea", "coffee", "hot chocolate", "soy sauce", "ketchup", "mayonnaise", "mustard", "nuts", "seeds", "dried fruit", "whey powder", "oregano", "cumin", "chili flakes", "mixed herbs", "coconut oil"],
   "Drinks": ["water", "juice", "soda", "fizzy drink", "cordial", "squash"],
-  "Other Food Items": [] // Fallback
+  "Other Food Items": ["parsley"]
 };
 
-// Naive ingredient parser
 const parseIngredientString = (ingredientString: string): { name: string; quantity: number; unit: string } => {
-  const cleanedString = ingredientString.replace(/,/g, '').replace(/\./g, ''); // Remove commas and periods for easier parsing
+  const cleanedString = ingredientString.replace(/,/g, '').replace(/\./g, ''); 
   
-  // Regex to capture quantity (number), unit (alphabetic, can include 'tbsp', 'tsp'), and name
-  const regex = /^(\d+\s*\/?\s*\d*)\s*([a-zA-Z]+)?\s*(.*)$/;
+  const regex = /^(\d+\s*\/?\s*\d*|\d*\s?½)\s*([a-zA-Zμ]+(?:cup|tbsp|tsp|g|kg|ml|L|oz)?\.?)\s*(.*)$/i;
   const match = cleanedString.match(regex);
 
   let quantity = 1;
   let unit = 'item(s)';
-  let name = ingredientString.trim(); // Default to original string if no parse
+  let name = ingredientString.trim(); 
 
   if (match) {
-    // Handle quantity (e.g., "1", "1/2", "1 1/2")
     const qtyStr = match[1].trim();
-    if (qtyStr.includes('/')) {
+    if (qtyStr.includes('½')) {
+        const parts = qtyStr.split(' ');
+        quantity = parseFloat(parts[0] || "0") + 0.5;
+    } else if (qtyStr.includes('/')) {
       const parts = qtyStr.split('/');
       if (parts.length === 2) {
         const num = parseFloat(parts[0]);
@@ -174,40 +300,44 @@ const parseIngredientString = (ingredientString: string): { name: string; quanti
       quantity = parseFloat(qtyStr) || 1;
     }
 
-    unit = match[2] ? match[2].trim() : 'item(s)';
-    name = match[3] ? match[3].trim() : ingredientString.trim(); // Use rest as name
+    unit = match[2] ? match[2].trim().replace(/\.$/, '') : 'item(s)'; // Remove trailing dot from unit
+    name = match[3] ? match[3].trim() : ingredientString.trim(); 
     
-    // Refine name if unit was part of it (e.g. "cloves Garlic" -> name: "Garlic", unit: "cloves")
     if (name.toLowerCase().startsWith(unit.toLowerCase() + " ")) {
         name = name.substring(unit.length + 1).trim();
     }
-    
-    // Special case for "½"
-    if (qtyStr === '½') quantity = 0.5;
-
-
   } else {
-     // Fallback for strings without a leading number, e.g. "Salt to taste"
-     // Or "a pinch of salt" - these are hard to quantify. For now, 1 item.
-     name = ingredientString.trim();
+     // Fallback for simple names or unmatchable patterns
+     const simpleQtyMatch = ingredientString.match(/^(\d+)\s+(.*)/);
+     if (simpleQtyMatch) {
+       quantity = parseInt(simpleQtyMatch[1], 10);
+       name = simpleQtyMatch[2].trim();
+       unit = 'item(s)'; // default if no unit specified
+     } else {
+       name = ingredientString.trim();
+     }
   }
   
-  // Normalize common units
-  if (['tbsp', 'tablespoon', 'tablespoons'].includes(unit.toLowerCase())) unit = 'tbsp';
-  if (['tsp', 'teaspoon', 'teaspoons'].includes(unit.toLowerCase())) unit = 'tsp';
-  if (['g', 'gram', 'grams'].includes(unit.toLowerCase())) unit = 'g';
-  if (['ml', 'milliliter', 'milliliters'].includes(unit.toLowerCase())) unit = 'ml';
-  if (['l', 'liter', 'liters'].includes(unit.toLowerCase())) unit = 'L';
-  if (['kg', 'kilogram', 'kilograms'].includes(unit.toLowerCase())) unit = 'kg';
+  const unitLower = unit.toLowerCase();
+  if (['tbsp', 'tablespoon', 'tablespoons'].includes(unitLower)) unit = 'tbsp';
+  else if (['tsp', 'teaspoon', 'teaspoons'].includes(unitLower)) unit = 'tsp';
+  else if (['g', 'gram', 'grams'].includes(unitLower)) unit = 'g';
+  else if (['ml', 'milliliter', 'milliliters'].includes(unitLower)) unit = 'ml';
+  else if (['l', 'liter', 'liters'].includes(unitLower)) unit = 'L';
+  else if (['kg', 'kilogram', 'kilograms'].includes(unitLower)) unit = 'kg';
+  else if (['oz', 'ounce', 'ounces'].includes(unitLower)) unit = 'oz.';
+  else if (unitLower === 'cup' || unitLower === 'cups') unit = 'cup';
 
 
-  // If name is empty after parsing, use the original string for safety
   if (!name && ingredientString) name = ingredientString.trim();
-  // If name only contains the unit, it's likely an error, try to extract from original more broadly
   if (name.toLowerCase() === unit.toLowerCase() && unit !== 'item(s)') {
-      const parts = ingredientString.split(new RegExp(`\\s*${unit}\\s*`, 'i'));
-      if (parts.length > 1) name = parts[1].trim();
+      const parts = ingredientString.split(new RegExp(`\\s*${unit.replace(/\\.$/, '')}\\.?\\s*`, 'i'));
+      if (parts.length > 1) name = parts.filter(p => p.trim() !== "").pop()?.trim() || ingredientString.trim();
       else name = ingredientString.trim();
+  }
+  // Remove "of" if it's at the start of the name, e.g. "of vanilla whey powder"
+  if (name.toLowerCase().startsWith('of ')) {
+    name = name.substring(3).trim();
   }
 
 
@@ -227,40 +357,50 @@ const assignCategory = (ingredientName: string): UKSupermarketCategory => {
 };
 
 
-export const generateShoppingList = (plannedMeals: PlannedMeal[]): ShoppingListItem[] => {
+export const generateShoppingList = (plannedMeals: PlannedMeal[], allRecipesCache?: Recipe[]): ShoppingListItem[] => {
   const ingredientMap = new Map<string, ShoppingListItem>();
 
   plannedMeals.forEach(plannedMeal => {
-    const recipe = getRecipeById(plannedMeal.recipeId);
+    const recipe = plannedMeal.recipeDetails || allRecipesCache?.find(r => r.id === plannedMeal.recipeId);
     if (recipe) {
       recipe.ingredients.forEach(ingredientString => {
         const parsed = parseIngredientString(ingredientString);
-        // Use parsed.name for map key to group similar items even if original string had notes
         const mapKey = parsed.name.toLowerCase(); 
         const existingItem = ingredientMap.get(mapKey);
         const category = assignCategory(parsed.name);
         const quantityToAdd = parsed.quantity * plannedMeal.servings;
 
         if (existingItem) {
-          // Simple quantity addition if units are the same.
-          // More complex unit conversion (e.g., tbsp to ml, g to kg) is not handled here.
           if (existingItem.unit.toLowerCase() === parsed.unit.toLowerCase()) {
             existingItem.quantity += quantityToAdd;
           } else {
-            // If units differ, add as a new item variant or handle more gracefully.
-            // For now, we'll just log this or add a new entry with a modified key.
-            // This simple aggregation just adds recipe link.
-            // To truly sum quantities, unit conversion is needed. For now, we just list.
-            // The best is to make the key more specific if units can't be reconciled.
-            // Let's just update the recipe list for now.
-            // A more robust approach would create a new item or convert units.
+            // For now, if units differ, we'll create a new entry with unit in name for distinction
+            // This is a simplification. True unit conversion would be complex.
+            const variantMapKey = `${parsed.name} (${parsed.unit})`.toLowerCase();
+            const variantExistingItem = ingredientMap.get(variantMapKey);
+            if(variantExistingItem){
+                variantExistingItem.quantity += quantityToAdd;
+                 if (!variantExistingItem.recipes.find(r => r.recipeId === recipe.id)) {
+                    variantExistingItem.recipes.push({ recipeId: recipe.id, recipeName: recipe.name });
+                 }
+            } else {
+                ingredientMap.set(variantMapKey, {
+                    id: variantMapKey,
+                    name: `${parsed.name} (${parsed.unit})`,
+                    quantity: quantityToAdd,
+                    unit: parsed.unit,
+                    category: category,
+                    purchased: false,
+                    recipes: [{ recipeId: recipe.id, recipeName: recipe.name }],
+                });
+            }
           }
-          if (!existingItem.recipes.find(r => r.recipeId === recipe.id)) {
+          if (existingItem.unit.toLowerCase() === parsed.unit.toLowerCase() && !existingItem.recipes.find(r => r.recipeId === recipe.id)) {
             existingItem.recipes.push({ recipeId: recipe.id, recipeName: recipe.name });
           }
         } else {
           ingredientMap.set(mapKey, {
-            id: mapKey, // Use parsed name as ID
+            id: mapKey, 
             name: parsed.name, 
             quantity: quantityToAdd, 
             unit: parsed.unit, 
@@ -278,3 +418,5 @@ export const generateShoppingList = (plannedMeals: PlannedMeal[]): ShoppingListI
     return a.name.localeCompare(b.name);
   });
 };
+
+    

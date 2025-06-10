@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass } from 'lucide-react';
+import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function RecipeDetailPage() {
   const params = useParams();
@@ -30,7 +31,9 @@ export default function RecipeDetailPage() {
   const recipeId = parseInt(idParam, 10);
   
   const [recipe, setRecipe] = useState<RecipeType | undefined>(undefined);
-  const { addMealToPlan } = useAppContext();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { addMealToPlan, allRecipesCache, isRecipeCacheLoading: isAppRecipeCacheLoading } = useAppContext();
   const { toast } = useToast();
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
   const [planDate, setPlanDate] = useState<Date | undefined>(new Date());
@@ -38,19 +41,48 @@ export default function RecipeDetailPage() {
   const [planServings, setPlanServings] = useState<number>(1);
 
   useEffect(() => {
-    if (!isNaN(recipeId)) {
-      const foundRecipe = getRecipeById(recipeId);
-      setRecipe(foundRecipe);
+    async function fetchRecipe() {
+      if (isNaN(recipeId)) {
+        setError("Invalid recipe ID.");
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
+      setError(null);
+      
+      let foundRecipe: RecipeType | undefined = undefined;
+      if (!isAppRecipeCacheLoading && allRecipesCache.length > 0) {
+        foundRecipe = allRecipesCache.find(r => r.id === recipeId);
+      } else if (!isAppRecipeCacheLoading && allRecipesCache.length === 0) {
+        // Cache is loaded but empty, try direct fetch (fallback, ideally cache is source of truth)
+        foundRecipe = await getRecipeById(recipeId);
+      } else if (isAppRecipeCacheLoading) {
+        // Cache is still loading, wait for it or try direct fetch if urgent
+        // For simplicity, we'll let the AppContext load, but a direct fetch could be added here
+        // For now, if cache is loading, we show loading until cache is ready.
+        // The below check handles when cache becomes available.
+      }
+
+
       if (foundRecipe) {
+        setRecipe(foundRecipe);
         setPlanServings(foundRecipe.servings || 1);
+      } else if (!isAppRecipeCacheLoading) { // Only set error if cache is loaded and recipe not found
+        setError(`Recipe with ID ${recipeId} not found.`);
+      }
+      // If isAppRecipeCacheLoading is true, isLoading will remain true until cache is populated
+      // and this effect re-runs.
+      if (!isAppRecipeCacheLoading) {
+        setIsLoading(false);
       }
     }
-  }, [recipeId]);
+    fetchRecipe();
+  }, [recipeId, allRecipesCache, isAppRecipeCacheLoading]);
 
 
   const handleOpenAddToPlanDialog = () => {
     if (recipe) {
-      setPlanServings(recipe.servings); // Default to recipe's default servings
+      setPlanServings(recipe.servings); 
       setShowAddToPlanDialog(true);
     }
   };
@@ -72,10 +104,36 @@ export default function RecipeDetailPage() {
     }
   };
 
-  if (isNaN(recipeId) || !recipe) {
+  if (isLoading) {
+    return (
+      <PageWrapper title="Loading Recipe...">
+        <div className="flex justify-center items-center min-h-[300px]">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+      </PageWrapper>
+    );
+  }
+
+  if (error) {
+    return (
+      <PageWrapper title="Error">
+        <Alert variant="destructive">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Could Not Load Recipe</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+        <Button onClick={() => router.back()} variant="outline" className="mt-4">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
+        </Button>
+      </PageWrapper>
+    );
+  }
+
+  if (!recipe) {
+    // This case should ideally be covered by the error state if recipe isn't found after loading.
     return (
       <PageWrapper title="Recipe Not Found">
-        <p>The recipe you are looking for does not exist or the ID is invalid.</p>
+        <p>The recipe you are looking for does not exist or could not be loaded.</p>
         <Button onClick={() => router.back()} variant="outline" className="mt-4">
           <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
         </Button>
@@ -97,6 +155,7 @@ export default function RecipeDetailPage() {
             sizes="(max-width: 768px) 100vw, 100vw"
             className="object-cover"
             priority
+            data-ai-hint={recipe.tags ? recipe.tags.slice(0,2).join(' ') : "food meal"}
           />
         </div>
         <CardHeader className="p-6">
@@ -231,3 +290,5 @@ export default function RecipeDetailPage() {
     </PageWrapper>
   );
 }
+
+    

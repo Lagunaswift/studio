@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Settings, Info, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppContext } from '@/context/AppContext';
-import { getAllRecipes } from '@/lib/data'; 
+// getAllRecipes removed as we use allRecipesCache from context
 import type { Recipe, Macros, MealSlotConfig } from '@/types';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Separator } from '@/components/ui/separator';
@@ -20,29 +20,29 @@ import { cn } from '@/lib/utils';
 
 
 export default function AISuggestionsPage() {
-  const { userProfile, addMealToPlan } = useAppContext();
+  const { userProfile, addMealToPlan, allRecipesCache, isRecipeCacheLoading: isAppRecipeCacheLoading } = useAppContext();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // For AI generation
   const [suggestion, setSuggestion] = useState<SuggestMealPlanOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
   const [recipesForAI, setRecipesForAI] = useState<RecipeForAI[]>([]);
 
+
   useEffect(() => {
-    const loadRecipes = async () => {
-      const fetchedRecipes = await getAllRecipes();
-      setAllRecipes(fetchedRecipes);
-      // Transform recipes for the AI prompt
-      const transformedForAI = fetchedRecipes.map(r => ({
-        id: r.id,
-        name: r.name,
-        macrosPerServing: r.macrosPerServing,
-        tags: r.tags || [],
-      }));
-      setRecipesForAI(transformedForAI);
-    };
-    loadRecipes();
-  }, []);
+    if (!isAppRecipeCacheLoading) {
+      if (allRecipesCache.length > 0) {
+        const transformedForAI = allRecipesCache.map(r => ({
+          id: r.id,
+          name: r.name,
+          macrosPerServing: r.macrosPerServing,
+          tags: r.tags || [],
+        }));
+        setRecipesForAI(transformedForAI);
+      } else {
+        setRecipesForAI([]); // Ensure it's empty if cache is empty
+      }
+    }
+  }, [allRecipesCache, isAppRecipeCacheLoading]);
 
   const handleGeneratePlan = async () => {
     if (!userProfile) {
@@ -57,8 +57,12 @@ export default function AISuggestionsPage() {
       setError("Please set your Macro Targets in Profile Settings for the AI to generate a more accurate plan.");
       // Allow proceeding without macro targets, AI will be prompted to create a "balanced" plan
     }
+    if (isAppRecipeCacheLoading) {
+        setError("Recipe data is still loading. Please wait a moment and try again.");
+        return;
+    }
     if (recipesForAI.length === 0) {
-      setError("Recipe data is not loaded yet. Please wait.");
+      setError("No recipes available in the database. Please add some recipes first or ensure they have loaded.");
       return;
     }
 
@@ -73,7 +77,7 @@ export default function AISuggestionsPage() {
     }));
 
     const input: SuggestMealPlanInput = {
-      macroTargets: userProfile.macroTargets, // Can be null
+      macroTargets: userProfile.macroTargets, 
       dietaryPreferences: userProfile.dietaryPreferences || [],
       allergens: userProfile.allergens || [],
       mealStructure: mealStructureForAI,
@@ -93,18 +97,16 @@ export default function AISuggestionsPage() {
   };
 
   const handleAddPlanToCalendar = (date: Date) => {
-    if (!suggestion || !suggestion.plannedMeals) return;
+    if (!suggestion || !suggestion.plannedMeals || allRecipesCache.length === 0) return;
 
     suggestion.plannedMeals.forEach(plannedMealItem => {
-      const fullRecipe = allRecipes.find(r => r.id === plannedMealItem.recipeId);
+      const fullRecipe = allRecipesCache.find(r => r.id === plannedMealItem.recipeId);
       if (fullRecipe) {
-        // Find the original meal slot type from userProfile.mealStructure using mealSlotId
         const originalMealSlot = userProfile?.mealStructure.find(ms => ms.id === plannedMealItem.mealSlotId);
         if (originalMealSlot) {
            addMealToPlan(fullRecipe, format(date, 'yyyy-MM-dd'), originalMealSlot.type, plannedMealItem.servings);
         } else {
             console.warn(`Could not find original meal slot for ID: ${plannedMealItem.mealSlotId}. Defaulting meal type.`);
-             // Fallback if slot not found, use a default or skip
         }
       }
     });
@@ -149,8 +151,8 @@ export default function AISuggestionsPage() {
                        <li>Configured your <Link href="/profile/diet-type" className="underline hover:text-accent">Diet Type</Link> and <Link href="/profile/allergens" className="underline hover:text-accent">Allergens</Link> (Recommended).</li>
                     ) : null}
                   </ul>
-                   <Button onClick={handleGeneratePlan} disabled={isLoading || recipesForAI.length === 0} className="w-full mt-4 bg-primary hover:bg-primary/90">
-                      {isLoading ? (
+                   <Button onClick={handleGeneratePlan} disabled={isLoading || isAppRecipeCacheLoading || recipesForAI.length === 0} className="w-full mt-4 bg-primary hover:bg-primary/90">
+                      {isLoading || isAppRecipeCacheLoading ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
                         <Send className="mr-2 h-4 w-4" />
@@ -160,8 +162,8 @@ export default function AISuggestionsPage() {
                 </AlertDescription>
               </Alert>
             ) : (
-              <Button onClick={handleGeneratePlan} disabled={isLoading || recipesForAI.length === 0} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                {isLoading ? (
+              <Button onClick={handleGeneratePlan} disabled={isLoading || isAppRecipeCacheLoading || recipesForAI.length === 0} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                {isLoading || isAppRecipeCacheLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <Send className="mr-2 h-4 w-4" />
@@ -169,7 +171,10 @@ export default function AISuggestionsPage() {
                 Generate My AI Meal Plan
               </Button>
             )}
-            {recipesForAI.length === 0 && !isLoading && <p className="text-sm text-muted-foreground mt-2 text-center">Loading recipe data...</p>}
+            {isAppRecipeCacheLoading && <p className="text-sm text-muted-foreground mt-2 text-center">Loading recipe data for AI...</p>}
+            {!isAppRecipeCacheLoading && recipesForAI.length === 0 && !isLoading && (
+                 <p className="text-sm text-muted-foreground mt-2 text-center">No recipes found in the database. Add recipes to enable AI planning.</p>
+            )}
           </CardContent>
         </Card>
 
@@ -183,6 +188,7 @@ export default function AISuggestionsPage() {
 
         {error && (
           <Alert variant="destructive">
+            <Info className="h-4 w-4" />
             <AlertTitle>Error Generating Plan</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
@@ -214,7 +220,7 @@ export default function AISuggestionsPage() {
               <h3 className="text-xl font-semibold font-headline text-primary-focus">Planned Meals:</h3>
               <div className="space-y-4">
                 {suggestion.plannedMeals.map((item) => {
-                  const recipeDetails = allRecipes.find(r => r.id === item.recipeId);
+                  const recipeDetails = allRecipesCache.find(r => r.id === item.recipeId);
                   return (
                     <Card key={item.mealSlotId} className="bg-card/70 border border-border hover:shadow-md transition-shadow">
                       <CardHeader className="pb-2">
@@ -265,8 +271,6 @@ export default function AISuggestionsPage() {
                     </div>
                 </div>
               )}
-
-
             </CardContent>
             <CardFooter>
               <Button onClick={() => handleAddPlanToCalendar(new Date())} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
