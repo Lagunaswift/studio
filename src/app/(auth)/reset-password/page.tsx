@@ -7,11 +7,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Mail, KeyRound, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabaseClient'; // Import Supabase client
 
 const resetPasswordSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -28,14 +28,33 @@ export default function ResetPasswordPage() {
     },
   });
 
-  const onSubmit: SubmitHandler<ResetPasswordFormValues> = (data) => {
-    console.log("Reset password form data:", data);
-    // Placeholder for Supabase password reset logic
-    toast({
-      title: "Password Reset Submitted (Placeholder)",
-      description: `If an account exists for ${data.email}, a reset link will be sent. Supabase integration needed.`,
-    });
-    form.reset(); // Clear the form
+  const onSubmit: SubmitHandler<ResetPasswordFormValues> = async (data) => {
+    form.clearErrors(); // Clear previous errors
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
+        // redirectTo: `${window.location.origin}/auth/update-password`, // URL to redirect to after clicking the link in the email
+      });
+
+      if (error) {
+        toast({
+          title: "Password Reset Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Password Reset Email Sent",
+          description: `If an account exists for ${data.email}, a password reset link has been sent. Please check your inbox.`,
+        });
+        form.reset();
+      }
+    } catch (e: any) {
+      toast({
+        title: "Password Reset Error",
+        description: e.message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

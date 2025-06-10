@@ -2,16 +2,17 @@
 "use client";
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Mail, Lock, LogIn } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabaseClient'; // Import Supabase client
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -22,6 +23,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const { toast } = useToast();
+  const router = useRouter();
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -30,13 +32,35 @@ export default function LoginPage() {
     },
   });
 
-  const onSubmit: SubmitHandler<LoginFormValues> = (data) => {
-    console.log("Login form data:", data);
-    // Placeholder for Supabase login logic
-    toast({
-      title: "Login Submitted (Placeholder)",
-      description: "Check console for form data. Supabase integration needed.",
-    });
+  const onSubmit: SubmitHandler<LoginFormValues> = async (data) => {
+    form.clearErrors(); // Clear previous errors
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+
+      if (error) {
+        toast({
+          title: "Login Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Login Successful!",
+          description: "Welcome back!",
+        });
+        router.push('/'); // Redirect to homepage or dashboard
+        router.refresh(); // Refresh to update server-side session state if needed
+      }
+    } catch (e: any) {
+      toast({
+        title: "Login Error",
+        description: e.message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
