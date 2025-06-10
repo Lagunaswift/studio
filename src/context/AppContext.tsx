@@ -18,9 +18,11 @@ import type {
   PrimaryGoal,
   SubscriptionStatus
 } from '@/types';
-import { ACTIVITY_LEVEL_OPTIONS } from '@/types'; // Removed ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS as they are not used here
+import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { loadState, saveState } from '@/lib/localStorage';
-import { getAllRecipes as getAllRecipesFromDb, calculateTotalMacros, generateShoppingList as generateShoppingListUtil } from '@/lib/data';
+// Import getAllRecipes directly, it's now using mock data but keeps async signature
+import { getAllRecipes as getAllRecipesFromData, calculateTotalMacros, generateShoppingList as generateShoppingListUtil } from '@/lib/data';
+
 
 const MEAL_PLAN_KEY = 'macroTealMealPlan';
 const SHOPPING_LIST_KEY = 'macroTealShoppingList';
@@ -48,7 +50,7 @@ const DEFAULT_USER_PROFILE: UserProfileSettings = {
   primaryGoal: 'notSpecified',
   tdee: null,
   leanBodyMassKg: null,
-  subscription_status: 'active', // Default to 'active' for now. Change to 'none' or null for production.
+  subscription_status: 'active', 
   plan_name: null,
   subscription_start_date: null,
   subscription_end_date: null,
@@ -121,7 +123,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsRecipeCacheLoading(true);
       let recipes: Recipe[] = [];
       try {
-        recipes = await getAllRecipesFromDb(); // Fetch recipes from Firestore
+        // getAllRecipesFromData now refers to the function in src/lib/data.ts which uses mock data
+        recipes = await getAllRecipesFromData(); 
         setAllRecipesCache(recipes);
       } catch (error) {
         console.error("Failed to load recipes into cache:", error);
@@ -138,7 +141,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loadedUserProfile = DEFAULT_USER_PROFILE;
       } else {
         loadedUserProfile = { ...DEFAULT_USER_PROFILE, ...loadedUserProfile };
-        if (loadedUserProfile.subscription_status === undefined) { // Ensure default if not present
+        if (loadedUserProfile.subscription_status === undefined) { 
             loadedUserProfile.subscription_status = DEFAULT_USER_PROFILE.subscription_status;
         }
         loadedUserProfile.tdee = calculateTDEE(
@@ -159,15 +162,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       setUserProfile(loadedUserProfile);
 
-      // Populate recipeDetails for mealPlan using the fetched recipes
       const populatedMealPlan = loadedMealPlan.map(pm => {
-        const recipeDetails = recipes.find(r => r.id === pm.recipeId); // Use 'recipes' directly here
+        const recipeDetails = recipes.find(r => r.id === pm.recipeId); 
         return {...pm, recipeDetails: recipeDetails || undefined };
       });
       setMealPlan(populatedMealPlan);
       
       if (loadedShoppingList.length === 0 && populatedMealPlan.length > 0) {
-        setShoppingList(generateShoppingListUtil(populatedMealPlan, recipes)); // Use 'recipes'
+        setShoppingList(generateShoppingListUtil(populatedMealPlan, recipes)); 
       } else {
         setShoppingList(loadedShoppingList);
       }
@@ -279,15 +281,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const clearAllData = useCallback(() => {
     setMealPlan([]);
-    setShoppingList([]); // Also clears shopping list when all data is cleared
-    // Re-initialize userProfile to default, but preserve any fetched values if they exist by spreading.
+    setShoppingList([]); 
     setUserProfile(prevProfile => ({
       ...DEFAULT_USER_PROFILE,
-      // Potentially preserve some critical non-resettable fields if needed
-      // For now, full reset to default:
        ...DEFAULT_USER_PROFILE
     }));
-  }, []); // regenerateShoppingList removed here, no mealPlan to generate from
+  }, []); 
 
   const updateUserProfileState = useCallback((updates: Partial<UserProfileSettings>) => {
     setUserProfile(prevProfile => {
@@ -354,9 +353,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDietaryPreferences, setAllergens, setMealStructure, setUserInformation, isRecipeCacheLoading
   ]);
 
-  if (!isInitialized) {
-    return null;
+  if (!isInitialized && !isRecipeCacheLoading) { // Ensure we don't return null if recipes are still loading
+    return null; 
   }
+  
+  // Still return loading indicator if cache is loading but context is otherwise ready
+  if (isRecipeCacheLoading && !isInitialized) {
+      // You might want a global loading spinner here, or let individual components handle it.
+      // For now, returning null until fully initialized or cache loaded.
+      // Consider if children should render with partial data or wait.
+  }
+
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 };
@@ -368,3 +375,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
