@@ -12,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Mail, KeyRound, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabaseClient'; // Import Supabase client
+import { useState } from 'react';
 
 const resetPasswordSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -21,6 +22,12 @@ type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
 export default function ResetPasswordPage() {
   const { toast } = useToast();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true); // Ensure window.location.origin is only accessed on the client
+  }, []);
+
   const form = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
@@ -30,9 +37,12 @@ export default function ResetPasswordPage() {
 
   const onSubmit: SubmitHandler<ResetPasswordFormValues> = async (data) => {
     form.clearErrors(); // Clear previous errors
+    if (!isClient) return; // Safeguard for server-side execution attempt
+
     try {
+      const redirectTo = `${window.location.origin}/auth/update-password`;
       const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-        // redirectTo: `${window.location.origin}/auth/update-password`, // URL to redirect to after clicking the link in the email
+        redirectTo: redirectTo,
       });
 
       if (error) {
@@ -44,7 +54,7 @@ export default function ResetPasswordPage() {
       } else {
         toast({
           title: "Password Reset Email Sent",
-          description: `If an account exists for ${data.email}, a password reset link has been sent. Please check your inbox.`,
+          description: `If an account exists for ${data.email}, a password reset link has been sent to ${redirectTo}. Please check your inbox.`,
         });
         form.reset();
       }
@@ -83,7 +93,7 @@ export default function ResetPasswordPage() {
             />
           </CardContent>
           <CardFooter className="flex flex-col items-center space-y-4">
-            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={form.formState.isSubmitting}>
+            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={form.formState.isSubmitting || !isClient}>
               {form.formState.isSubmitting ? "Sending..." : "Send Reset Link"}
             </Button>
             <div className="text-sm text-center w-full">
@@ -97,3 +107,4 @@ export default function ResetPasswordPage() {
     </Card>
   );
 }
+
