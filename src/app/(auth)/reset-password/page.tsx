@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Mail, KeyRound, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabaseClient'; // Import Supabase client
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Added useEffect import
 
 const resetPasswordSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -54,7 +54,7 @@ export default function ResetPasswordPage() {
       } else {
         toast({
           title: "Password Reset Email Sent",
-          description: `If an account exists for ${data.email}, a password reset link has been sent to ${redirectTo}. Please check your inbox.`,
+          description: `If an account exists for ${data.email}, a password reset link has been sent. Please check your inbox.`,
         });
         form.reset();
       }
@@ -107,4 +107,3 @@ export default function ResetPasswordPage() {
     </Card>
   );
 }
-
