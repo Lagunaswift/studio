@@ -28,68 +28,60 @@ type UpdatePasswordFormValues = z.infer<typeof updatePasswordSchema>;
 export default function UpdatePasswordPage() {
   const { toast } = useToast();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
-  const [isTokenValid, setIsTokenValid] = useState(false); // Assume invalid until verified by effect
+  const [isTokenValid, setIsTokenValid] = useState(false); 
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    // Supabase client handles the token from the URL hash fragment automatically on initialization.
-    // We check if the session indicates a recovery state.
-    // A more direct way to check for a recovery token would be to parse window.location.hash,
-    // but supabase.auth.onAuthStateChange or getSession can reflect this.
+    setIsClient(true);
+    if (typeof window !== 'undefined') {
+      console.log("UpdatePasswordPage loaded with URL:", window.location.href);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isClient) return; // Only run Supabase logic on the client
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("UpdatePasswordPage - Auth event:", event);
       if (event === 'PASSWORD_RECOVERY') {
         setIsTokenValid(true);
         setError(null);
-      } else if (event === 'SIGNED_IN' && session?.user && !session.user.updated_at) {
-        // This might also be a state post-recovery, before user object is fully updated
-        // For simplicity, we rely on PASSWORD_RECOVERY event or an existing session after recovery link.
-        // A robust check for a valid recovery token might be needed if this isn't reliable.
+        console.log("UpdatePasswordPage - PASSWORD_RECOVERY event received, token should be valid.");
+      } else if (session && event === 'SIGNED_IN' && window.location.hash.includes('type=recovery')) {
+        // This case handles when the user is already signed in but lands on the recovery page
+        // Potentially after the PASSWORD_RECOVERY event, the session is updated.
+        setIsTokenValid(true);
+        setError(null);
+        console.log("UpdatePasswordPage - SIGNED_IN event with recovery type in hash.");
       }
     });
     
-    // Initial check if there's already a session that might be from a recovery
-    const checkInitialSession = async () => {
-        const { data: { session }} = await supabase.auth.getSession();
-        // Check if the current session is the result of a password recovery flow.
-        // This is a bit indirect. Supabase automatically uses the token from the URL fragment
-        // to establish a temporary session. If the user object exists and there's an access_token,
-        // it's likely valid for an update.
-        // The 'PASSWORD_RECOVERY' event is more explicit.
-        if (session && session.access_token) {
-             // Heuristic: If there's a session and the URL suggests a recovery flow, assume valid.
-             // This can be tricky because the session might be a normal signed-in session.
-             // Relying on the `PASSWORD_RECOVERY` event from `onAuthStateChange` is generally better.
-             // For now, if we have a session, let's assume the form can be shown.
-             // A better check would be specific to the recovery token type.
-             if (window.location.hash.includes('type=recovery')) {
+    // Initial check for recovery token in URL hash, as onAuthStateChange might not fire immediately
+    // or if the user navigates directly with the hash.
+    if (window.location.hash.includes('type=recovery') && window.location.hash.includes('access_token')) {
+        console.log("UpdatePasswordPage - Recovery type and access_token found in URL hash on mount.");
+        setIsTokenValid(true);
+    } else {
+        // If no immediate token found, set a brief timer to check again,
+        // as Supabase client might take a moment to process the URL.
+        const timer = setTimeout(() => {
+            if (!isTokenValid && window.location.hash.includes('type=recovery') && window.location.hash.includes('access_token')) {
+                console.log("UpdatePasswordPage - Recovery token found in hash after short delay.");
                 setIsTokenValid(true);
-             }
-        }
-    };
-    checkInitialSession();
-
-
-    // Fallback if no PASSWORD_RECOVERY event is fired quickly (e.g. page loaded directly with hash)
-    // and no session found. A more robust check might involve parsing `window.location.hash`
-    // for `access_token` and `type=recovery`.
-    // This timeout is a simplified way to handle cases where `onAuthStateChange` might not fire as expected
-    // or if the user lands on the page without a clear 'PASSWORD_RECOVERY' event.
-    const timer = setTimeout(() => {
-        if (!isTokenValid && !window.location.hash.includes('type=recovery')) {
-           setError("Invalid or expired password recovery link. Please request a new one.");
-        } else if (window.location.hash.includes('type=recovery')) {
-            // If hash indicates recovery but state not set, set it
-            setIsTokenValid(true);
-        }
-    }, 2000); // Give 2 seconds for Supabase to process URL and fire event
+            } else if (!isTokenValid) {
+                 console.log("UpdatePasswordPage - No valid recovery token indicators found after delay.");
+                 // Avoid setting error too aggressively, as Supabase might still be processing.
+                 // The form will be disabled if isTokenValid remains false.
+            }
+        }, 500); // Reduced delay
+         return () => clearTimeout(timer);
+    }
 
     return () => {
       authListener?.subscription?.unsubscribe();
-      clearTimeout(timer);
     };
-  }, [isTokenValid]); // Rerun if isTokenValid changes (e.g. by auth event)
+  }, [isClient, isTokenValid]); // isTokenValid in dependency array to re-evaluate if it changes externally.
 
 
   const form = useForm<UpdatePasswordFormValues>({
@@ -103,6 +95,16 @@ export default function UpdatePasswordPage() {
   const onSubmit: SubmitHandler<UpdatePasswordFormValues> = async (data) => {
     form.clearErrors();
     setError(null);
+
+    if (!isTokenValid) {
+      setError("Password recovery token is not valid or session has expired. Please try requesting a new link.");
+      toast({
+        title: "Token Invalid",
+        description: "Password recovery token is not valid. Please request a new reset link.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       const { error: updateError } = await supabase.auth.updateUser({
@@ -133,27 +135,11 @@ export default function UpdatePasswordPage() {
     }
   };
 
-  if (error && !isTokenValid) { // Show error prominently if token determined to be invalid
-    return (
-      <Card className="shadow-2xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-headline text-destructive flex items-center justify-center">
-            <AlertTriangle className="mr-2 h-6 w-6" /> Error
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-center text-destructive">{error}</p>
-        </CardContent>
-        <CardFooter>
-            <Button asChild className="w-full">
-                <Link href="/reset-password">Request New Reset Link</Link>
-            </Button>
-        </CardFooter>
-      </Card>
-    );
+  if (!isClient) {
+    // Optional: Render a loading state or null during SSR phase
+    return <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4"><p>Loading...</p></div>;
   }
   
-  // Render form if token is potentially valid or still being checked
   return (
     <Card className="shadow-2xl">
       <CardHeader className="text-center">
@@ -191,21 +177,24 @@ export default function UpdatePasswordPage() {
                 </FormItem>
               )}
             />
-             {error && ( // Display general errors if token was initially considered valid
+             {error && (
               <p className="text-sm text-destructive text-center">{error}</p>
+            )}
+            {!isTokenValid && !form.formState.isSubmitting && (
+                 <p className="text-xs text-muted-foreground text-center p-2 bg-muted rounded-md">
+                    <AlertTriangle className="inline h-4 w-4 mr-1 text-destructive"/>
+                    Verifying reset link. If this message persists, the link may be invalid or expired. 
+                    Try <Link href="/reset-password" className="underline text-primary">requesting a new one</Link>.
+                 </p>
             )}
           </CardContent>
           <CardFooter className="flex flex-col items-center space-y-4">
             <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={form.formState.isSubmitting || !isTokenValid}>
               {form.formState.isSubmitting ? "Updating..." : "Update Password"}
             </Button>
-            {!isTokenValid && !form.formState.isSubmitting && (
-                 <p className="text-xs text-muted-foreground text-center">Verifying reset link...</p>
-            )}
           </CardFooter>
         </form>
       </Form>
     </Card>
   );
 }
-

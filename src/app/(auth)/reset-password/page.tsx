@@ -40,9 +40,11 @@ export default function ResetPasswordPage() {
     if (!isClient) return;
 
     try {
-      // Trim the origin to ensure no leading/trailing spaces affect the redirectTo URL
+      // Ensure origin is correctly determined on the client side
       const origin = window.location.origin.trim();
       const redirectTo = `${origin}/auth/update-password`;
+
+      console.log("Reset Password - Attempting to send reset email with redirectTo:", redirectTo);
 
       const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
         redirectTo: redirectTo,
