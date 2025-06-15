@@ -13,6 +13,7 @@ import { Mail, Lock, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabaseClient'; // Import Supabase client
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 const signUpSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -28,6 +29,12 @@ type SignUpFormValues = z.infer<typeof signUpSchema>;
 export default function SignUpPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   const form = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
@@ -38,16 +45,22 @@ export default function SignUpPage() {
   });
 
   const onSubmit: SubmitHandler<SignUpFormValues> = async (data) => {
-    form.clearErrors(); // Clear previous errors
+    form.clearErrors(); 
+
+    let emailRedirectToPath = '/login'; // Default if options were used
+    if (isClient) {
+      // This console.log helps if you decide to use emailRedirectTo in options
+      console.log("Sign Up - Potential emailRedirectTo if configured:", `${window.location.origin}${emailRedirectToPath}`);
+    }
+
     try {
       const { data: signUpData, error } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
-        options: {
-          // You can add email_redirect_to or other options here if needed
-          // For example, to redirect to a specific page after email confirmation:
-          // emailRedirectTo: `${window.location.origin}/auth/callback`,
-        }
+        // options: {
+        //   // If you enable this, ensure the full URL is in Supabase Additional Redirect URLs
+        //   emailRedirectTo: isClient ? `${window.location.origin}${emailRedirectToPath}` : undefined, 
+        // }
       });
 
       if (error) {
@@ -57,27 +70,31 @@ export default function SignUpPage() {
           variant: "destructive",
         });
       } else if (signUpData.user && signUpData.user.identities && signUpData.user.identities.length === 0) {
-        // This case might indicate an issue where the user is created but identities are empty, often meaning email confirmation is pending but user object exists.
-        // It could also indicate an existing user trying to sign up again without email confirmation flow enabled (unlikely with Supabase defaults).
-        // Supabase typically handles "user already registered" as an error.
+        // User exists but may need email confirmation (common for Supabase if email not verified yet and user tries to sign up again)
         toast({
-          title: "Account Exists or Action Required",
-          description: "If you're new, please check your email to confirm your account. If you've signed up before, try logging in.",
+          title: "Confirmation Sent or Account Exists",
+          description: "If you're new, please check your email to confirm your account. If you've signed up before, please log in.",
           variant: "default",
         });
-      } else if (signUpData.user?.identities?.length > 0) {
+      } else if (signUpData.user?.id && !signUpData.session) {
+        // User created, session is null - means confirmation email sent
          toast({
           title: "Sign Up Successful!",
-          description: "Please check your email to confirm your account.",
+          description: "Please check your email to confirm your account and complete the sign up process.",
         });
         form.reset();
-        // Optionally redirect to login or a "check your email" page
-        // router.push('/login'); 
+      } else if (signUpData.user && signUpData.session) {
+        // User created AND session exists (e.g., if auto-confirm is on, or user already confirmed and re-signed up)
+         toast({
+          title: "Sign Up Successful!",
+          description: "Your account is ready. You can now log in.",
+        });
+        form.reset();
+        router.push('/login'); 
       } else {
-        // Fallback for unexpected cases.
          toast({
           title: "Sign Up Attempted",
-          description: "Please check your email. If you encounter issues, try logging in or resetting your password.",
+          description: "Please check your email for a confirmation link. If you encounter issues, try logging in or resetting your password.",
         });
       }
     } catch (e: any) {

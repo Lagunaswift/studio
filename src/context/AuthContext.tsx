@@ -1,3 +1,4 @@
+
 // src/context/AuthContext.tsx
 'use client';
 
@@ -10,10 +11,9 @@ interface Profile {
   id: string;
   email?: string;
   full_name?: string;
-  subscription_status?: 'active' | 'inactive' | 'none' | null; // Made more specific
+  subscription_status?: 'active' | 'inactive' | 'none' | null; 
   plan_name?: string | null;
   // Add any other fields from your profiles table
-  // These are from UserProfileSettings in AppContext, ensure they are in your 'profiles' table if needed here
   heightCm?: number | null;
   weightKg?: number | null;
   age?: number | null;
@@ -30,8 +30,6 @@ interface Profile {
   mealStructure?: MealSlotConfig[];
 }
 
-// Re-defining these types here if AuthContext is self-contained and doesn't import from '@/types' for these
-// Or, preferably, import them if they are broadly used. For now, including subset for clarity based on Profile interface.
 type Sex = 'male' | 'female';
 type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'veryActive';
 type AthleteType = 'endurance' | 'strengthPower' | 'generalFitness' | 'notSpecified';
@@ -49,17 +47,17 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined); // Initialize with undefined
+const AuthContext = createContext<AuthContextType | undefined>(undefined); 
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null); // Initialize profile as null
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchSessionAndProfile = async () => {
-      setIsLoading(true); // Set loading true at the start of fetch
+      setIsLoading(true); 
       try {
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         setSession(currentSession);
@@ -68,7 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (currentUser) {
           const { data: userProfile, error: profileError } = await supabase
-            .from('profiles') // Make sure 'profiles' is your table name
+            .from('profiles') 
             .select('*')
             .eq('id', currentUser.id)
             .single();
@@ -80,11 +78,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setProfile(userProfile as Profile | null);
           }
         } else {
-          setProfile(null); // No user, so no profile
+          setProfile(null); 
         }
       } catch (error) {
         console.error("Error in fetchSessionAndProfile:", error);
-        // Ensure state is clean on error
         setSession(null);
         setUser(null);
         setProfile(null);
@@ -97,14 +94,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
-        setIsLoading(true); // Set loading true when auth state changes
+        setIsLoading(true); 
         setSession(newSession);
         const currentUser = newSession?.user;
         setUser(currentUser ?? null);
         if (currentUser) {
           try {
             const { data: userProfile, error: profileError } = await supabase
-              .from('profiles') // Make sure 'profiles' is your table name
+              .from('profiles') 
               .select('*')
               .eq('id', currentUser.id)
               .single();
@@ -120,7 +117,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
              setProfile(null);
           }
         } else {
-          setProfile(null); // No user, clear profile
+          setProfile(null); 
         }
         setIsLoading(false);
       }
@@ -134,8 +131,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     setIsLoading(true);
     await supabase.auth.signOut();
-    // State will be updated by onAuthStateChange listener
-    // No need to manually set isLoading to false here, listener will do it.
   };
 
   const value = { session, user, profile, isLoading, signOut };
