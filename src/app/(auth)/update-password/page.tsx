@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams }  from 'next/navigation'; // useSearchParams for future, not strictly needed for hash
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -25,64 +25,77 @@ const updatePasswordSchema = z.object({
 
 type UpdatePasswordFormValues = z.infer<typeof updatePasswordSchema>;
 
-export default function UpdatePasswordPage() {
+// Helper component to use Suspense for useSearchParams if ever needed for query params
+function UpdatePasswordFormComponent() {
   const { toast } = useToast();
   const router = useRouter();
+  // const searchParams = useSearchParams(); // For query params, not hash
   const [error, setError] = useState<string | null>(null);
-  const [isTokenValid, setIsTokenValid] = useState(false); 
+  const [isTokenValid, setIsTokenValid] = useState(false);
+  const [isCheckingToken, setIsCheckingToken] = useState(true);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
-    if (typeof window !== 'undefined') {
-      console.log("UpdatePasswordPage loaded with URL:", window.location.href);
+    console.log("UpdatePasswordPage loaded with URL (on mount):", window.location.href);
+    
+    // Check hash for Supabase recovery params immediately on client-side
+    if (window.location.hash.includes('type=recovery') && window.location.hash.includes('access_token')) {
+        console.log("UpdatePasswordPage - Recovery type and access_token found in URL hash on mount.");
+        // Supabase client will handle the token from the hash, leading to PASSWORD_RECOVERY event
+    } else {
+        console.log("UpdatePasswordPage - No immediate recovery indicators in hash on mount.");
     }
   }, []);
 
   useEffect(() => {
-    if (!isClient) return; // Only run Supabase logic on the client
+    if (!isClient) return;
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("UpdatePasswordPage - Auth event:", event);
+      console.log("UpdatePasswordPage - Auth event:", event, "Session:", session);
       if (event === 'PASSWORD_RECOVERY') {
+        console.log("UpdatePasswordPage - PASSWORD_RECOVERY event received. Session should contain user for update.");
         setIsTokenValid(true);
         setError(null);
-        console.log("UpdatePasswordPage - PASSWORD_RECOVERY event received, token should be valid.");
-      } else if (session && event === 'SIGNED_IN' && window.location.hash.includes('type=recovery')) {
-        // This case handles when the user is already signed in but lands on the recovery page
-        // Potentially after the PASSWORD_RECOVERY event, the session is updated.
+        setIsCheckingToken(false);
+      } else if (event === 'SIGNED_IN' && session && window.location.hash.includes('type=recovery')) {
+        // This might happen if user was already signed in elsewhere or if session is quickly established
+        console.log("UpdatePasswordPage - SIGNED_IN event with recovery type in hash. Session:", session);
         setIsTokenValid(true);
         setError(null);
-        console.log("UpdatePasswordPage - SIGNED_IN event with recovery type in hash.");
+        setIsCheckingToken(false);
+      } else if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        // If we get a session but it's not for recovery, and token isn't valid yet, keep checking
+        if (!isTokenValid) {
+            // No explicit error here, just let the timeout handle it if no recovery event comes
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setIsTokenValid(false);
+        setIsCheckingToken(false);
       }
     });
-    
-    // Initial check for recovery token in URL hash, as onAuthStateChange might not fire immediately
-    // or if the user navigates directly with the hash.
-    if (window.location.hash.includes('type=recovery') && window.location.hash.includes('access_token')) {
-        console.log("UpdatePasswordPage - Recovery type and access_token found in URL hash on mount.");
-        setIsTokenValid(true);
-    } else {
-        // If no immediate token found, set a brief timer to check again,
-        // as Supabase client might take a moment to process the URL.
-        const timer = setTimeout(() => {
-            if (!isTokenValid && window.location.hash.includes('type=recovery') && window.location.hash.includes('access_token')) {
-                console.log("UpdatePasswordPage - Recovery token found in hash after short delay.");
-                setIsTokenValid(true);
-            } else if (!isTokenValid) {
-                 console.log("UpdatePasswordPage - No valid recovery token indicators found after delay.");
-                 // Avoid setting error too aggressively, as Supabase might still be processing.
-                 // The form will be disabled if isTokenValid remains false.
+
+    // Fallback check after a short delay if no PASSWORD_RECOVERY event fired quickly
+    const timer = setTimeout(() => {
+        if (isCheckingToken && !isTokenValid) { // only if still checking and not yet valid
+            console.log("UpdatePasswordPage - Timeout check. isTokenValid:", isTokenValid, "isCheckingToken:", isCheckingToken);
+            if (window.location.hash.includes('type=recovery') && window.location.hash.includes('access_token')) {
+                 // This is a fallback; ideally, onAuthStateChange handles it.
+                 // If Supabase client hasn't processed it, this manual check doesn't make it valid for updateUser.
+                 // The PASSWORD_RECOVERY event is the key.
+                 console.log("UpdatePasswordPage - Recovery params still in hash after delay, but relying on Supabase event.");
+            } else {
+                setError("Invalid or expired password reset link. Please request a new one.");
             }
-        }, 500); // Reduced delay
-         return () => clearTimeout(timer);
-    }
+            setIsCheckingToken(false); // Stop checking
+        }
+    }, 2500); // Increased delay to give Supabase client more time
 
     return () => {
       authListener?.subscription?.unsubscribe();
+      clearTimeout(timer);
     };
-  }, [isClient, isTokenValid]); // isTokenValid in dependency array to re-evaluate if it changes externally.
-
+  }, [isClient, isTokenValid, isCheckingToken]); // Added isCheckingToken
 
   const form = useForm<UpdatePasswordFormValues>({
     resolver: zodResolver(updatePasswordSchema),
@@ -97,15 +110,19 @@ export default function UpdatePasswordPage() {
     setError(null);
 
     if (!isTokenValid) {
-      setError("Password recovery token is not valid or session has expired. Please try requesting a new link.");
+      const msg = "Password recovery token is not valid or session has expired. Please request a new reset link.";
+      setError(msg);
       toast({
         title: "Token Invalid",
-        description: "Password recovery token is not valid. Please request a new reset link.",
+        description: msg,
         variant: "destructive",
       });
       return;
     }
 
+    // At this point, Supabase client should have processed the token from the URL
+    // and a session for password recovery should be active.
+    // We update the user associated with this recovery session.
     try {
       const { error: updateError } = await supabase.auth.updateUser({
         password: data.password,
@@ -123,6 +140,8 @@ export default function UpdatePasswordPage() {
           title: "Password Updated Successfully!",
           description: "You can now sign in with your new password.",
         });
+        // Sign out to clear the recovery session before redirecting to login
+        await supabase.auth.signOut();
         router.push('/login');
       }
     } catch (e: any) {
@@ -135,9 +154,21 @@ export default function UpdatePasswordPage() {
     }
   };
 
-  if (!isClient) {
-    // Optional: Render a loading state or null during SSR phase
-    return <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4"><p>Loading...</p></div>;
+  if (!isClient || isCheckingToken) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+        <Card className="shadow-2xl w-full max-w-md">
+            <CardHeader className="text-center">
+                 <CardTitle className="text-2xl font-headline text-primary flex items-center justify-center">
+                    <KeyRound className="mr-2 h-6 w-6" /> Verifying Link...
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p className="text-center text-muted-foreground">Please wait while we verify your password reset link.</p>
+            </CardContent>
+        </Card>
+      </div>
+    );
   }
   
   return (
@@ -158,7 +189,7 @@ export default function UpdatePasswordPage() {
                 <FormItem>
                   <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-muted-foreground" />New Password</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="Minimum 8 characters" {...field} />
+                    <Input type="password" placeholder="Minimum 8 characters" {...field} disabled={!isTokenValid || form.formState.isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -171,21 +202,21 @@ export default function UpdatePasswordPage() {
                 <FormItem>
                   <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-muted-foreground" />Confirm New Password</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="Re-type your new password" {...field} />
+                    <Input type="password" placeholder="Re-type your new password" {...field} disabled={!isTokenValid || form.formState.isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
              {error && (
-              <p className="text-sm text-destructive text-center">{error}</p>
+              <p className="text-sm text-destructive text-center p-2 bg-destructive/10 rounded-md">{error}</p>
             )}
-            {!isTokenValid && !form.formState.isSubmitting && (
-                 <p className="text-xs text-muted-foreground text-center p-2 bg-muted rounded-md">
-                    <AlertTriangle className="inline h-4 w-4 mr-1 text-destructive"/>
-                    Verifying reset link. If this message persists, the link may be invalid or expired. 
-                    Try <Link href="/reset-password" className="underline text-primary">requesting a new one</Link>.
-                 </p>
+            {!isTokenValid && !isCheckingToken && ( // Only show if done checking and token is not valid
+                 <div className="text-sm text-muted-foreground text-center p-3 bg-muted rounded-md border border-dashed">
+                    <AlertTriangle className="inline h-5 w-5 mr-2 text-destructive"/>
+                    The password reset link is invalid or has expired. 
+                    Please <Link href="/reset-password" className="underline text-primary hover:text-primary/80">request a new one</Link>.
+                 </div>
             )}
           </CardContent>
           <CardFooter className="flex flex-col items-center space-y-4">
@@ -198,3 +229,14 @@ export default function UpdatePasswordPage() {
     </Card>
   );
 }
+
+// Wrap the component with Suspense for useSearchParams (even if not actively used for hash)
+// This is good practice if searchParams were to be used in the future.
+export default function UpdatePasswordPage() {
+    return (
+        <Suspense fallback={<div>Loading page details...</div>}>
+            <UpdatePasswordFormComponent />
+        </Suspense>
+    );
+}
+
