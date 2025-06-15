@@ -11,8 +11,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Mail, KeyRound, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabaseClient'; // Import Supabase client
-import { useState, useEffect } from 'react'; // Added useEffect import
+import { supabase } from '@/lib/supabaseClient';
+import { useState, useEffect } from 'react';
 
 const resetPasswordSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -25,7 +25,7 @@ export default function ResetPasswordPage() {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true); // Ensure window.location.origin is only accessed on the client
+    setIsClient(true);
   }, []);
 
   const form = useForm<ResetPasswordFormValues>({
@@ -36,11 +36,14 @@ export default function ResetPasswordPage() {
   });
 
   const onSubmit: SubmitHandler<ResetPasswordFormValues> = async (data) => {
-    form.clearErrors(); // Clear previous errors
-    if (!isClient) return; // Safeguard for server-side execution attempt
+    form.clearErrors();
+    if (!isClient) return;
 
     try {
-      const redirectTo = `${window.location.origin}/auth/update-password`;
+      // Trim the origin to ensure no leading/trailing spaces affect the redirectTo URL
+      const origin = window.location.origin.trim();
+      const redirectTo = `${origin}/auth/update-password`;
+
       const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
         redirectTo: redirectTo,
       });
