@@ -6,8 +6,9 @@ import { useState, useEffect } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, Target, Edit, Star, Loader2 } from 'lucide-react'; // Added Star, Loader2
+import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, Target, Edit, Star, Loader2 } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext'; // Import useAuth
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -17,9 +18,9 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import type { MacroTargets, Macros, Recipe } from '@/types'; // Added Recipe type
+import type { MacroTargets, Macros, Recipe } from '@/types';
 import { Progress } from '@/components/ui/progress';
-import { RecipeCard } from '@/components/shared/RecipeCard'; // Added RecipeCard import
+import { RecipeCard } from '@/components/shared/RecipeCard';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
@@ -33,15 +34,15 @@ const macroTargetSchema = z.object({
 type MacroTargetFormValues = z.infer<typeof macroTargetSchema>;
 
 export default function HomePage() {
+  const { user, isLoading: isAuthLoading, profile: authProfile } = useAuth(); // Use AuthContext
   const { 
     getDailyMacros, 
-    macroTargets, 
+    macroTargets: appContextMacroTargets, // Rename to avoid conflict
     setMacroTargets, 
     mealPlan,
-    allRecipesCache, // Get recipes from context
-    isRecipeCacheLoading, // Get loading state for recipes
-    addMealToPlan, // For RecipeCard potentially
-    userProfile // For subscription status to pass to RecipeCard if needed
+    allRecipesCache,
+    isRecipeCacheLoading: isAppRecipeCacheLoading,
+    userProfile: appContextUserProfile // Keep for now for non-auth related parts or merge logic later
   } = useAppContext();
   const { toast } = useToast();
   
@@ -49,6 +50,9 @@ export default function HomePage() {
   const [clientTodayMacros, setClientTodayMacros] = useState<Macros>({ calories: 0, protein: 0, carbs: 0, fat: 0 });
   const [showSetTargetsDialog, setShowSetTargetsDialog] = useState(false);
   const [featuredRecipe, setFeaturedRecipe] = useState<Recipe | null>(null);
+
+  // Determine which macroTargets to use: from AuthContext if available, else AppContext
+  const currentMacroTargets = authProfile?.macroTargets || appContextMacroTargets;
 
   useEffect(() => {
     setClientTodayDate(format(new Date(), 'yyyy-MM-dd'));
@@ -61,13 +65,13 @@ export default function HomePage() {
   }, [clientTodayDate, getDailyMacros, mealPlan]);
 
   useEffect(() => {
-    if (!isRecipeCacheLoading && allRecipesCache.length > 0) {
+    if (!isAppRecipeCacheLoading && allRecipesCache.length > 0) {
       const randomIndex = Math.floor(Math.random() * allRecipesCache.length);
       setFeaturedRecipe(allRecipesCache[randomIndex]);
     } else {
       setFeaturedRecipe(null);
     }
-  }, [isRecipeCacheLoading, allRecipesCache]);
+  }, [isAppRecipeCacheLoading, allRecipesCache]);
 
   const features = [
     {
@@ -106,7 +110,7 @@ export default function HomePage() {
 
   const macroTargetForm = useForm<MacroTargetFormValues>({
     resolver: zodResolver(macroTargetSchema),
-    defaultValues: macroTargets || { calories: 2000, protein: 150, carbs: 200, fat: 60 },
+    defaultValues: currentMacroTargets || { calories: 2000, protein: 150, carbs: 200, fat: 60 },
   });
 
   const proteinValue = macroTargetForm.watch("protein");
@@ -117,26 +121,27 @@ export default function HomePage() {
     const protein = parseFloat(proteinValue as any) || 0;
     const carbs = parseFloat(carbsValue as any) || 0;
     const fat = parseFloat(fatValue as any) || 0;
-
     const calculatedCalories = (protein * 4) + (carbs * 4) + (fat * 9);
     macroTargetForm.setValue("calories", Math.round(calculatedCalories), { shouldValidate: true, shouldDirty: true });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proteinValue, carbsValue, fatValue, macroTargetForm.setValue]);
+  }, [proteinValue, carbsValue, fatValue]);
 
 
   useEffect(() => {
     if (showSetTargetsDialog) {
-      if (macroTargets) {
-        macroTargetForm.reset(macroTargets);
+      if (currentMacroTargets) {
+        macroTargetForm.reset(currentMacroTargets);
       } else {
-        macroTargetForm.reset({ calories: 0, protein: 150, carbs: 200, fat: 60 });
+        // Recalculate calories based on default P/C/F if no targets exist
+        const defaultP = 150, defaultC = 200, defaultF = 60;
+        macroTargetForm.reset({ protein: defaultP, carbs: defaultC, fat: defaultF, calories: (defaultP*4 + defaultC*4 + defaultF*9) });
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [macroTargets, showSetTargetsDialog, macroTargetForm.reset]);
+  }, [currentMacroTargets, showSetTargetsDialog]);
 
   const handleSetTargets: SubmitHandler<MacroTargetFormValues> = (data) => {
-    setMacroTargets(data);
+    setMacroTargets(data); // This updates AppContext; consider updating AuthContext.profile if it's the source of truth
     toast({
       title: "Targets Updated",
       description: "Your macro targets have been saved.",
@@ -146,13 +151,44 @@ export default function HomePage() {
 
   const macroKeys: (keyof MacroTargets)[] = ['calories', 'protein', 'carbs', 'fat'];
 
-  const isSubscribedActive = userProfile?.subscription_status === 'active';
+  // Use subscription status from AuthContext if available, otherwise from AppContext
+  const isSubscribedActive = authProfile?.subscription_status === 'active' || appContextUserProfile?.subscription_status === 'active';
+
+  if (isAuthLoading || (isAppRecipeCacheLoading && !user) ) { // Also consider app recipe loading if no user yet
+    return (
+      <PageWrapper title="Dashboard">
+        <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
+          <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
+          <p className="text-lg">Loading dashboard data...</p>
+        </div>
+      </PageWrapper>
+    );
+  }
+
+  if (!user) {
+    return (
+      <PageWrapper title="Welcome to MealPlannerPro">
+        <Card className="max-w-md mx-auto mt-10 shadow-xl">
+          <CardHeader className="text-center">
+            <CardTitle className="font-headline text-2xl text-primary">Please Log In</CardTitle>
+            <CardDescription>You need to be logged in to access your personalized dashboard and features.</CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="mb-6">Access your meal plans, track macros, and get AI suggestions by signing in.</p>
+            <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+              <Link href="/login">Go to Login Page</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </PageWrapper>
+    );
+  }
 
   return (
-    <PageWrapper>
+    <PageWrapper title={`Dashboard - Welcome, ${authProfile?.email || user.email || 'User'}!`}>
       <section className="text-center mb-12 py-8 bg-gradient-to-br from-primary/20 to-accent/10 rounded-lg shadow-lg">
         <h1 className="text-4xl md:text-5xl font-bold font-headline mb-4 text-primary">
-          Welcome to MealPlanner<span className="text-accent">Pro</span>
+          MealPlanner<span className="text-accent">Pro</span> at a Glance
         </h1>
         <p className="text-lg text-foreground/80 max-w-2xl mx-auto">
           Your personal assistant for healthy eating. Plan meals, track macros, get AI suggestions, and simplify your shopping.
@@ -165,17 +201,17 @@ export default function HomePage() {
             Today's Macros ({clientTodayDate ? format(parseISO(clientTodayDate), "MMMM dd, yyyy") : 'Loading...'})
           </h2>
           <Button variant="outline" onClick={() => setShowSetTargetsDialog(true)}>
-            {macroTargets ? <Edit className="mr-2 h-4 w-4" /> : <Target className="mr-2 h-4 w-4" />}
-            {macroTargets ? "Update Targets" : "Set Targets"}
+            {currentMacroTargets ? <Edit className="mr-2 h-4 w-4" /> : <Target className="mr-2 h-4 w-4" />}
+            {currentMacroTargets ? "Update Targets" : "Set Targets"}
           </Button>
         </div>
 
-        {macroTargets ? (
+        {currentMacroTargets ? (
           <Card className="shadow-md">
             <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
               {macroKeys.map(key => {
                 const consumed = clientTodayMacros[key as keyof typeof clientTodayMacros] ?? 0;
-                const target = macroTargets[key] ?? 0;
+                const target = currentMacroTargets[key] ?? 0;
                 const progress = target > 0 ? Math.min((consumed / target) * 100, 100) : 0;
                 const unit = key === 'calories' ? 'kcal' : 'g';
                 const macroName = key.charAt(0).toUpperCase() + key.slice(1);
@@ -215,7 +251,7 @@ export default function HomePage() {
         <h2 className="text-2xl font-bold font-headline text-primary mb-6 flex items-center">
           <Star className="mr-2 h-6 w-6 text-accent" /> Featured Recipe
         </h2>
-        {isRecipeCacheLoading ? (
+        {isAppRecipeCacheLoading && !featuredRecipe ? ( // Show loader if app recipes are loading and no featured recipe yet
           <div className="flex items-center justify-center h-40">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="ml-2 text-muted-foreground">Loading featured recipe...</p>
@@ -225,7 +261,7 @@ export default function HomePage() {
             <RecipeCard 
               recipe={featuredRecipe} 
               showViewDetailsButton={true} 
-              showAddToMealPlanButton={false} // Or wire it up if desired
+              showAddToMealPlanButton={false}
               className="shadow-xl border-2 border-accent/50"
             />
           </div>
@@ -299,6 +335,3 @@ export default function HomePage() {
     </PageWrapper>
   );
 }
-
-
-    
