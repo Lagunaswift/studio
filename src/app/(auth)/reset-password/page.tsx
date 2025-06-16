@@ -40,14 +40,16 @@ export default function ResetPasswordPage() {
     if (!isClient) return;
 
     try {
-      // Ensure origin is correctly determined on the client side
       const origin = window.location.origin.trim();
       const redirectTo = `${origin}/auth/update-password`;
 
-      // CRITICAL LOG FOR DEBUGGING
-      console.log("Reset Password Page: Attempting to send reset email. redirectTo being sent to Supabase:", redirectTo);
-      // Removed alert: alert(`DEBUG: redirectTo being sent to Supabase is: ${redirectTo}\n\nPlease ensure this EXACT string is in your Supabase Project's "Additional Redirect URLs" list (Authentication -> URL Configuration).`);
-
+      // CRITICAL LOG FOR DEBUGGING:
+      console.log("======================================================================");
+      console.log("DEBUG: Reset Password Page - Attempting to send reset email.");
+      console.log("DEBUG: The 'redirectTo' URL being sent to Supabase is:");
+      console.log(`DEBUG: >>> ${redirectTo} <<<`);
+      console.log("DEBUG: Please ensure this EXACT string (including https:// and no trailing slash) is in your Supabase Project's 'Additional Redirect URLs' list (Authentication -> URL Configuration).");
+      console.log("======================================================================");
 
       const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
         redirectTo: redirectTo,
