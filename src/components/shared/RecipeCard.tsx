@@ -7,7 +7,7 @@ import { Clock, Users, Flame, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { useState, useEffect } from 'react'; // Added useEffect
+import { useState, useEffect } from 'react';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -25,17 +25,22 @@ export function RecipeCard({
   className 
 }: RecipeCardProps) {
   
-  const [imageSrc, setImageSrc] = useState(recipe?.image || `https://placehold.co/600x400/007bff/ffffff.png?text=Loading`);
-  const [imageError, setImageError] = useState(false);
+  const defaultPlaceholder = `https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipe?.id || 'Unknown'}`;
+  const [imageSrc, setImageSrc] = useState(recipe?.image || defaultPlaceholder);
+  const [imageError, setImageError] = useState(!recipe?.image); // Initially true if no recipe.image
 
   useEffect(() => {
-    if (recipe) {
-      setImageSrc(recipe.image); // Set initial image from recipe prop
-      setImageError(false); // Reset error state when recipe changes
-    } else {
-      setImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=No+Recipe`);
+    if (recipe && recipe.image) {
+      setImageSrc(recipe.image);
+      setImageError(false); 
+    } else if (recipe) {
+      setImageSrc(defaultPlaceholder);
+      setImageError(true);
+    } else { // No recipe prop
+      setImageSrc(`https://placehold.co/600x400.png`); // Generic placeholder if no recipe
       setImageError(true);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recipe]);
 
 
@@ -50,11 +55,13 @@ export function RecipeCard({
   }
   
   const handleImageError = () => {
-    setImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipe.id}`);
+    setImageSrc(defaultPlaceholder);
     setImageError(true);
   };
   
-  const aiHint = recipe.tags ? recipe.tags.slice(0,2).join(' ') : "food meal";
+  const aiHint = recipe.tags && recipe.tags.length > 0 
+    ? recipe.tags.slice(0, 2).join(' ') 
+    : "food meal";
 
   return (
     <Card className={cn("flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg h-full", className)}>
@@ -65,7 +72,7 @@ export function RecipeCard({
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           className="object-cover"
-          data-ai-hint={imageError ? aiHint : undefined} // Only add hint if it's a placeholder
+          data-ai-hint={imageError ? aiHint : undefined}
           onError={handleImageError} 
         />
       </div>
