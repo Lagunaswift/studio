@@ -7,6 +7,7 @@ import { Clock, Users, Flame, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { useState } from 'react'; // Added
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -23,25 +24,36 @@ export function RecipeCard({
   showViewDetailsButton = true,
   className 
 }: RecipeCardProps) {
-  if (!recipe) { // Add a guard clause for undefined recipe
+  
+  if (!recipe) {
     return (
       <Card className={cn("flex flex-col overflow-hidden shadow-lg rounded-lg h-full items-center justify-center p-4", className)}>
         <CardContent>
-          <p className="text-muted-foreground">No recipe to display.</p>
+          <p className="text-muted-foreground">No recipe data.</p>
         </CardContent>
       </Card>
     );
   }
+  
+  // Initialize imageSrc with the recipe's image or a conventional local path
+  const initialImageSrc = recipe.image || `/images/recipes/${recipe.id}.jpg`;
+  const [imageSrc, setImageSrc] = useState(initialImageSrc);
+
+  const handleImageError = () => {
+    setImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipe.id}`);
+  };
+  
   return (
     <Card className={cn("flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg h-full", className)}>
-      <div className="relative w-full h-60"> {/* Changed h-48 to h-60 */}
+      <div className="relative w-full h-60">
         <Image
-          src={recipe.image}
+          src={imageSrc} // Use state variable for image source
           alt={recipe.name}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           className="object-cover"
           data-ai-hint={recipe.tags ? recipe.tags.slice(0,2).join(' ') : "food meal"}
+          onError={handleImageError} // Add onError handler
         />
       </div>
       <CardHeader className="pb-2 pt-4 px-4">

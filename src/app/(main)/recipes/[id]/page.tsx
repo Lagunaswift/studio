@@ -4,7 +4,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { getRecipeById, MEAL_TYPES } from '@/lib/data'; // getRecipeById is now async from Firestore via data.ts
+import { getRecipeById, MEAL_TYPES } from '@/lib/data';
 import type { Recipe as RecipeType, MealType } from '@/types';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Badge } from '@/components/ui/badge';
@@ -40,12 +40,14 @@ export default function RecipeDetailPage() {
   const [recipe, setRecipe] = useState<RecipeType | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { userProfile, addMealToPlan, allRecipesCache, isRecipeCacheLoading: isAppRecipeCacheLoading } = useAppContext();
+  const { userProfile, addMealToPlan } = useAppContext(); // Removed unused cache variables
   const { toast } = useToast();
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
   const [planDate, setPlanDate] = useState<Date | undefined>(new Date());
   const [planMealType, setPlanMealType] = useState<MealType | undefined>(MEAL_TYPES[0]);
   const [planServings, setPlanServings] = useState<number>(1);
+
+  const [currentImageSrc, setCurrentImageSrc] = useState<string>('');
 
   const isSubscribedActive = userProfile?.subscription_status === 'active';
 
@@ -60,16 +62,20 @@ export default function RecipeDetailPage() {
       setError(null);
       
       try {
-        const foundRecipe = await getRecipeById(recipeId); // This now fetches from Firestore
+        const foundRecipe = await getRecipeById(recipeId);
         if (foundRecipe) {
           setRecipe(foundRecipe);
+          // Set initial image source: recipe's image or conventional path
+          setCurrentImageSrc(foundRecipe.image || `/images/recipes/${foundRecipe.id}.jpg`);
           setPlanServings(foundRecipe.servings || 1);
         } else {
           setError(`Recipe with ID ${recipeId} not found.`);
+          setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+Not+Found`);
         }
       } catch (e: any) {
         console.error("Error fetching recipe by ID:", e);
         setError(e.message || "Failed to load recipe.");
+        setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Error+Loading`);
       } finally {
         setIsLoading(false);
       }
@@ -77,6 +83,14 @@ export default function RecipeDetailPage() {
     fetchRecipe();
   }, [recipeId]);
 
+  const handleImageError = () => {
+    if (recipe) {
+      setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipe.id}`);
+    } else {
+      // Fallback if recipe object isn't available when error occurs (less likely but safe)
+      setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Image+Error`);
+    }
+  };
 
   const handleOpenAddToPlanDialog = () => {
     if (recipe) {
@@ -164,13 +178,14 @@ export default function RecipeDetailPage() {
       <Card className="overflow-hidden shadow-xl rounded-lg">
         <div className="relative w-full h-64 md:h-96">
           <Image
-            src={recipe.image}
+            src={currentImageSrc} // Use state variable for image source
             alt={recipe.name}
             fill
             sizes="(max-width: 768px) 100vw, 100vw"
             className="object-cover"
             priority
             data-ai-hint={recipe.tags ? recipe.tags.slice(0,2).join(' ') : "food meal"}
+            onError={handleImageError} // Add onError handler
           />
         </div>
         <CardHeader className="p-6">
@@ -313,3 +328,4 @@ export default function RecipeDetailPage() {
     </PageWrapper>
   );
 }
+

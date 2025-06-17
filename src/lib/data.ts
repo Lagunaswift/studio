@@ -7,13 +7,11 @@ const mapToFullRecipe = (rawRecipe: any): Recipe => {
   // Basic validation for essential fields
   if (typeof rawRecipe.id !== 'number' || !rawRecipe.name || typeof rawRecipe.name !== 'string') {
     console.warn('Skipping invalid raw recipe data:', rawRecipe);
-    // Return a dummy or throw error, here returning a structure that won't break map too much
-    // but indicates an issue. A more robust solution might filter these out earlier.
     return {
         id: -1, name: 'Invalid Recipe Data', calories: 0, protein: 0, carbs: 0, fat: 0,
         servings: 0, ingredients: [], instructions: [], prepTime: '', cookTime: '',
         macrosPerServing: { calories: 0, protein: 0, carbs: 0, fat: 0 },
-        image: 'https://placehold.co/600x400.png?text=Error',
+        image: 'https://placehold.co/600x400/007bff/ffffff.png?text=Error', // Blue placeholder for invalid data
         description: "This recipe data was invalid and could not be loaded."
     } as Recipe;
   }
@@ -38,7 +36,8 @@ const mapToFullRecipe = (rawRecipe: any): Recipe => {
       carbs: typeof rawRecipe.carbs === 'number' ? rawRecipe.carbs : 0,
       fat: typeof rawRecipe.fat === 'number' ? rawRecipe.fat : 0,
     },
-    image: rawRecipe.image || `https://placehold.co/600x400.png`,
+    // Use existing image if provided, otherwise construct path to /public/images/recipes/{id}.jpg
+    image: rawRecipe.image || `/images/recipes/${rawRecipe.id}.jpg`,
     description: rawRecipe.description || "No description available.",
   };
 };
