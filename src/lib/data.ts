@@ -47,6 +47,8 @@ const allRegisteredRecipesFull: Recipe[] = getAllRecipesFromRegistry()
   .map(mapToFullRecipe)
   .filter(recipe => recipe.id !== -1); // Filter out any invalid recipes marked by mapToFullRecipe
 
+console.log(`[AppContext/data.ts] Successfully loaded and processed ${allRegisteredRecipesFull.length} recipes from the registry.`);
+
 export const MEAL_TYPES: MealType[] = ["Breakfast", "Lunch", "Dinner", "Snack"];
 
 export const getAllRecipes = async (): Promise<Recipe[]> => {
