@@ -44,7 +44,7 @@ export default function AISuggestionsPage() {
   // Let's call it `userSettingsFromAuth` to avoid confusion with `userProfile` from `AppContext`.
   const userSettingsFromAuth = profile; 
 
-  const isSubscribedActive = profile?.subscription_status === 'active';
+  const isSubscribedActive = true; // profile?.subscription_status === 'active'; // TEMPORARILY UNLOCKED FOR TESTING
 
   useEffect(() => {
     if (!isAppRecipeCacheLoading) {
@@ -55,10 +55,10 @@ export default function AISuggestionsPage() {
           macrosPerServing: r.macrosPerServing,
           tags: r.tags || [],
         }));
-        if (!isSubscribedActive) {
-          // Limit recipes considered by AI if not subscribed
-          transformedForAI = transformedForAI.slice(0, FREE_TIER_RECIPE_LIMIT_FOR_AI);
-        }
+        // if (!isSubscribedActive) { // TEMPORARILY UNLOCKED: AI considers all recipes
+        //   // Limit recipes considered by AI if not subscribed
+        //   transformedForAI = transformedForAI.slice(0, FREE_TIER_RECIPE_LIMIT_FOR_AI);
+        // }
         setRecipesForAI(transformedForAI);
       } else {
         setRecipesForAI([]);
@@ -73,15 +73,15 @@ export default function AISuggestionsPage() {
     }
     // Gating is now primarily handled by the top-level check using isAuthLoading and profile.subscription_status
     // This explicit check here becomes a safeguard.
-    if (!isSubscribedActive) {
-      setError("AI Meal Plan generation is a premium feature. Please upgrade your subscription to use it.");
-      toast({
-        title: "Premium Feature",
-        description: "Upgrade to generate AI meal plans.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // if (!isSubscribedActive) { // TEMPORARILY UNLOCKED
+    //   setError("AI Meal Plan generation is a premium feature. Please upgrade your subscription to use it.");
+    //   toast({
+    //     title: "Premium Feature",
+    //     description: "Upgrade to generate AI meal plans.",
+    //     variant: "destructive",
+    //   });
+    //   return;
+    // }
 
     if (!userSettingsFromAuth.mealStructure || userSettingsFromAuth.mealStructure.length === 0) {
       setError("Please set up your meal structure in Profile Settings before generating a plan.");
@@ -96,7 +96,7 @@ export default function AISuggestionsPage() {
       return;
     }
     if (recipesForAI.length === 0) {
-       setError(`No recipes available for AI planning. ${!isSubscribedActive ? `(Free tier limited to ${FREE_TIER_RECIPE_LIMIT_FOR_AI} recipes for AI consideration)` : 'Add recipes or ensure they have loaded.'}`);
+       setError(`No recipes available for AI planning. Add recipes or ensure they have loaded.`);
       return;
     }
 
@@ -133,14 +133,14 @@ export default function AISuggestionsPage() {
   const handleAddPlanToCalendar = (date: Date) => {
     if (!suggestion || !suggestion.plannedMeals || allRecipesCache.length === 0 || !userSettingsFromAuth) return;
 
-    if (!isSubscribedActive && !isSameDay(date, startOfDay(new Date()))) {
-        toast({
-            title: "Plan Addition Restricted",
-            description: "Free users can only add AI-generated plans for today. Please upgrade for more flexibility.",
-            variant: "destructive",
-        });
-        return;
-    }
+    // if (!isSubscribedActive && !isSameDay(date, startOfDay(new Date()))) { // TEMPORARILY UNLOCKED
+    //     toast({
+    //         title: "Plan Addition Restricted",
+    //         description: "Free users can only add AI-generated plans for today. Please upgrade for more flexibility.",
+    //         variant: "destructive",
+    //     });
+    //     return;
+    // }
 
     suggestion.plannedMeals.forEach(plannedMealItem => {
       const fullRecipe = allRecipesCache.find(r => r.id === plannedMealItem.recipeId);
@@ -172,7 +172,7 @@ export default function AISuggestionsPage() {
   }
 
   // Check for active subscription (using profile from useAuth)
-  if (profile?.subscription_status !== 'active') {
+  if (false && profile?.subscription_status !== 'active') { // TEMPORARILY UNLOCKED
     return (
       <PageWrapper title="Automated AI Meal Planner">
         <Alert variant="default" className="border-accent mt-6">
@@ -247,7 +247,7 @@ export default function AISuggestionsPage() {
                  <p className="text-sm text-muted-foreground mt-2 text-center">No recipes found in the database. Add recipes to enable AI planning.</p>
             )}
             {!isAppRecipeCacheLoading && recipesForAI.length > 0 && recipesForAI.length < FREE_TIER_RECIPE_LIMIT_FOR_AI && !isSubscribedActive && (
-                 <p className="text-sm text-muted-foreground mt-2 text-center">AI considerations limited to {recipesForAI.length} recipes on the free tier.</p>
+                 <p className="text-sm text-muted-foreground mt-2 text-center">AI considerations limited to {recipesForAI.length} recipes on the free tier. (Currently unlocked for testing)</p>
             )}
           </CardContent>
         </Card>
@@ -348,7 +348,7 @@ export default function AISuggestionsPage() {
             </CardContent>
             <CardFooter>
               <Button onClick={() => handleAddPlanToCalendar(new Date())} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                <PlusCircle className="mr-2 h-5 w-5" /> Add This Plan to My Calendar ({isSubscribedActive ? "Today or other date" : "Today Only"})
+                <PlusCircle className="mr-2 h-5 w-5" /> Add This Plan to My Calendar (Full flexibility unlocked for testing)
               </Button>
             </CardFooter>
           </Card>
@@ -357,3 +357,6 @@ export default function AISuggestionsPage() {
     </PageWrapper>
   );
 }
+
+
+    

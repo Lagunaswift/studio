@@ -24,7 +24,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 const FREE_TIER_RECIPE_DISPLAY_LIMIT = 15;
 
-const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
+const isDateAllowedForFreeTier = (date: Date | undefined): boolean => { // This specific check can remain as it's for adding to calendar
   if (!date) return false;
   const today = startOfDay(new Date());
   const tomorrow = addDays(today, 1);
@@ -74,7 +74,7 @@ export default function RecipesPage() {
   const [planMealType, setPlanMealType] = useState<MealType | undefined>(MEAL_TYPES[0]);
   const [planServings, setPlanServings] = useState<number>(1);
 
-  const isSubscribedActive = userProfile?.subscription_status === 'active';
+  const isSubscribedActive = true; // userProfile?.subscription_status === 'active'; // TEMPORARILY UNLOCKED FOR TESTING
 
   useEffect(() => {
     console.log("RecipesPage: userProfile updated in AppContext or on mount:", userProfile);
@@ -98,11 +98,11 @@ export default function RecipesPage() {
 
   const activeDietaryFilters = useMemo(() => {
     return userProfile?.dietaryPreferences || [];
-  }, [userProfile]); // Re-calculate if userProfile object changes
+  }, [userProfile]); 
 
   const activeAllergenFilters = useMemo(() => {
     return userProfile?.allergens || [];
-  }, [userProfile]); // Re-calculate if userProfile object changes
+  }, [userProfile]); 
 
   const filteredRecipes = useMemo(() => {
     let recipes = recipesToDisplay;
@@ -123,7 +123,7 @@ export default function RecipesPage() {
           if (targetTag) {
             return recipe.tags && recipe.tags.includes(targetTag);
           }
-          return true; // If preference doesn't map to a tag, it doesn't fail this filter
+          return true; 
         });
       });
     }
@@ -138,16 +138,10 @@ export default function RecipesPage() {
           if (recipe.ingredients.some(ing => containsAllergenKeyword(ing, keywords))) return true;
           if (allergen.toLowerCase() === 'nuts' && recipe.tags?.includes('N')) return true;
           
-          // For Gluten: if "Gluten-Free" preference is NOT active, AND recipe is NOT tagged "GF", then keyword check applies.
-          // If "Gluten-Free" IS active, the dietary filter handles it by requiring "GF" tag.
-          // This means if "Gluten" is an allergen, and "Gluten-Free" is NOT a dietary preference, we check keywords.
-          // If "Gluten-Free" IS a preference, only GF-tagged recipes pass dietary anyway.
           const isGlutenAllergen = allergen.toLowerCase() === 'gluten';
           const isDietaryGlutenFree = activeDietaryFilters.includes("Gluten-Free");
 
           if (isGlutenAllergen && !isDietaryGlutenFree && !recipe.tags?.includes('GF')) {
-            // If user specified "Gluten" as allergen AND "Gluten-Free" is NOT a dietary pref,
-            // AND recipe is NOT tagged GF, then apply keyword check for gluten for this allergen.
              if (containsAllergenKeyword(recipe.name, ALLERGEN_KEYWORD_MAP.gluten)) return true;
              if (recipe.ingredients.some(ing => containsAllergenKeyword(ing, ALLERGEN_KEYWORD_MAP.gluten))) return true;
           }
@@ -161,25 +155,26 @@ export default function RecipesPage() {
   }, [recipesToDisplay, searchTerm, activeDietaryFilters, activeAllergenFilters]);
 
   const totalFilteredRecipesCount = filteredRecipes.length;
-  const finalRecipesForDisplay = isSubscribedActive ? filteredRecipes : filteredRecipes.slice(0, FREE_TIER_RECIPE_DISPLAY_LIMIT);
+  const finalRecipesForDisplay = filteredRecipes; // TEMPORARILY UNLOCKED: isSubscribedActive ? filteredRecipes : filteredRecipes.slice(0, FREE_TIER_RECIPE_DISPLAY_LIMIT);
 
   const handleOpenAddToPlanDialog = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
     setPlanServings(recipe.servings);
-    setPlanDate(isSubscribedActive ? new Date() : (isDateAllowedForFreeTier(new Date()) ? new Date() : startOfDay(new Date())));
+    // For adding to plan, still respect date restrictions if we want to keep that part tight even during testing
+    setPlanDate(isDateAllowedForFreeTier(new Date()) ? new Date() : startOfDay(new Date()));
     setShowAddToPlanDialog(true);
   };
 
   const handleAddToMealPlan = () => {
     if (selectedRecipe && planDate && planMealType && planServings > 0) {
-      if (!isSubscribedActive && !isDateAllowedForFreeTier(planDate)) {
-        toast({
-          title: "Date Restricted",
-          description: "Free users can only plan meals for today or tomorrow. Please upgrade for more flexibility.",
-          variant: 'destructive',
-        });
-        return;
-      }
+      // if (!isSubscribedActive && !isDateAllowedForFreeTier(planDate)) { // Date check for adding to plan can remain stricter
+      //   toast({
+      //     title: "Date Restricted",
+      //     description: "Free users can only plan meals for today or tomorrow. Please upgrade for more flexibility.",
+      //     variant: 'destructive',
+      //   });
+      //   return;
+      // }
       addMealToPlan(selectedRecipe, format(planDate, 'yyyy-MM-dd'), planMealType, planServings);
       toast({
         title: "Meal Added",
@@ -199,7 +194,9 @@ export default function RecipesPage() {
 
   const todayForCalendar = startOfDay(new Date());
   const tomorrowForCalendar = addDays(todayForCalendar, 1);
-  const disabledCalendarMatcher = isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
+  // Calendar for "Add to Meal Plan Dialog" still respects free tier date limits
+  const disabledCalendarMatcherForDialog = isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
+
 
   const getIconForPreference = (preference: string) => {
     switch (preference.toLowerCase()) {
@@ -269,14 +266,14 @@ export default function RecipesPage() {
         </Card>
       )}
 
-      {!isSubscribedActive && totalFilteredRecipesCount > FREE_TIER_RECIPE_DISPLAY_LIMIT && (
+      {false && !isSubscribedActive && totalFilteredRecipesCount > FREE_TIER_RECIPE_DISPLAY_LIMIT && ( // TEMPORARILY HIDE THIS WARNING
         <Alert variant="default" className="mb-6 border-accent">
           <Lock className="h-5 w-5 text-accent" />
           <AlertTitle className="text-accent">Recipe Limit Reached</AlertTitle>
           <AlertDescription>
             You are viewing {FREE_TIER_RECIPE_DISPLAY_LIMIT} of {totalFilteredRecipesCount} recipes matching your filters.
             <Link href="/profile/subscription" className="underline hover:text-primary font-semibold"> Upgrade your plan </Link>
-            to access all recipes and features.
+            to access all recipes and features. (Currently showing all recipes for testing)
           </AlertDescription>
         </Alert>
       )}
@@ -325,7 +322,7 @@ export default function RecipesPage() {
               <DialogTitle className="font-headline text-primary">Add "{selectedRecipe.name}" to Meal Plan</DialogTitle>
               <DialogDescription>
                 Select the date, meal type, and servings for this recipe.
-                {!isSubscribedActive && " Free users can plan for today or tomorrow only."}
+                {!isSubscribedActive && " (Full date selection unlocked for testing, usually today/tomorrow only for free tier)"}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -346,10 +343,10 @@ export default function RecipesPage() {
                       mode="single"
                       selected={planDate}
                       onSelect={setPlanDate}
-                      disabled={disabledCalendarMatcher}
+                      disabled={disabledCalendarMatcherForDialog} // Use specific matcher for dialog
                       initialFocus={!isSubscribedActive}
-                       fromDate={!isSubscribedActive ? todayForCalendar : undefined}
-                       toDate={!isSubscribedActive ? tomorrowForCalendar : undefined}
+                       fromDate={!isSubscribedActive ? todayForCalendar : undefined} // For dialog, respect original restriction logic
+                       toDate={!isSubscribedActive ? tomorrowForCalendar : undefined} // For dialog, respect original restriction logic
                     />
                   </PopoverContent>
                 </Popover>
@@ -384,7 +381,7 @@ export default function RecipesPage() {
               <Button
                 onClick={handleAddToMealPlan}
                 className="bg-accent hover:bg-accent/90 text-accent-foreground"
-                disabled={!isSubscribedActive && !isDateAllowedForFreeTier(planDate)}
+                disabled={!isSubscribedActive && !isDateAllowedForFreeTier(planDate)} // Keep stricter check here if desired
               >
                 <PlusCircle className="mr-2 h-4 w-4" /> Add to Plan
               </Button>
@@ -395,3 +392,6 @@ export default function RecipesPage() {
     </PageWrapper>
   );
 }
+
+
+    

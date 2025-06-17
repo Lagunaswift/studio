@@ -32,12 +32,12 @@ const MEAL_SLOT_CONFIG: Array<{ type: MealType; displayName: string }> = [
 
 const FREE_TIER_RECIPE_PICKER_LIMIT = 15;
 
-const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
-  if (!date) return false;
-  const today = startOfDay(new Date());
-  const tomorrow = addDays(today, 1);
-  return isWithinInterval(startOfDay(date), { start: today, end: tomorrow });
-};
+// const isDateAllowedForFreeTier = (date: Date | undefined): boolean => { // TEMPORARILY UNLOCKED
+//   if (!date) return false;
+//   const today = startOfDay(new Date());
+//   const tomorrow = addDays(today, 1);
+//   return isWithinInterval(startOfDay(date), { start: today, end: tomorrow });
+// };
 
 export default function MealPlanPage() {
   const { 
@@ -64,8 +64,8 @@ export default function MealPlanPage() {
     }, {} as {[key: string]: number})
   );
 
-  const isSubscribedActive = userProfile?.subscription_status === 'active';
-  const availableRecipesForPicker = isSubscribedActive ? allRecipesCache : allRecipesCache.slice(0, FREE_TIER_RECIPE_PICKER_LIMIT);
+  const isSubscribedActive = true; // userProfile?.subscription_status === 'active'; // TEMPORARILY UNLOCKED FOR TESTING
+  const availableRecipesForPicker = allRecipesCache; // TEMPORARILY UNLOCKED: isSubscribedActive ? allRecipesCache : allRecipesCache.slice(0, FREE_TIER_RECIPE_PICKER_LIMIT);
 
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
   const dailyMeals = getMealsForDate(formattedDate);
@@ -73,16 +73,14 @@ export default function MealPlanPage() {
 
   const handleDateChange = (date: Date | undefined) => {
     if (date && isValid(date)) {
-      if (!isSubscribedActive && !isDateAllowedForFreeTier(date)) {
-        toast({
-          title: "Date Restricted",
-          description: "Free users can only plan meals for today or tomorrow. Please upgrade for more flexibility.",
-          variant: "destructive",
-        });
-        // Optionally, reset to today if out of bounds for free tier, or just don't change
-        // setSelectedDate(startOfDay(new Date())); 
-        return;
-      }
+      // if (!isSubscribedActive && !isDateAllowedForFreeTier(date)) { // TEMPORARILY UNLOCKED
+      //   toast({
+      //     title: "Date Restricted",
+      //     description: "Free users can only plan meals for today or tomorrow. Please upgrade for more flexibility.",
+      //     variant: "destructive",
+      //   });
+      //   return;
+      // }
       setSelectedDate(date);
     }
   };
@@ -118,14 +116,14 @@ export default function MealPlanPage() {
 
   const handleAddRecipeFromPicker = (slotKey: string, mealType: MealType) => {
     if (availableRecipesForPicker.length === 0) return;
-     if (!isSubscribedActive && !isDateAllowedForFreeTier(selectedDate)) {
-        toast({
-          title: "Date Restricted",
-          description: "Free users can only plan meals for today or tomorrow. Please upgrade for more flexibility.",
-          variant: "destructive",
-        });
-        return;
-      }
+    //  if (!isSubscribedActive && !isDateAllowedForFreeTier(selectedDate)) { // TEMPORARILY UNLOCKED
+    //     toast({
+    //       title: "Date Restricted",
+    //       description: "Free users can only plan meals for today or tomorrow. Please upgrade for more flexibility.",
+    //       variant: "destructive",
+    //     });
+    //     return;
+    //   }
     const recipeIndex = recipePickerIndices[slotKey] || 0;
     const recipeToAdd = availableRecipesForPicker[recipeIndex];
     if (recipeToAdd) {
@@ -144,11 +142,11 @@ export default function MealPlanPage() {
 
   const todayForCalendar = startOfDay(new Date());
   const tomorrowForCalendar = addDays(todayForCalendar, 1);
-  const disabledCalendarMatcher = isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
+  const disabledCalendarMatcher = undefined; // TEMPORARILY UNLOCKED: isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
 
   return (
     <PageWrapper title="Interactive Meal Planner">
-      {!isSubscribedActive && (
+      {false && !isSubscribedActive && ( // TEMPORARILY HIDE THIS WARNING
          <Alert variant="default" className="mb-6 border-accent">
           <Lock className="h-5 w-5 text-accent" />
           <AlertTitle className="text-accent">Limited Access</AlertTitle>
@@ -173,9 +171,9 @@ export default function MealPlanPage() {
                 onSelect={handleDateChange}
                 disabled={disabledCalendarMatcher}
                 className="rounded-md border"
-                initialFocus={!isSubscribedActive}
-                fromDate={!isSubscribedActive ? todayForCalendar : undefined}
-                toDate={!isSubscribedActive ? tomorrowForCalendar : undefined}
+                initialFocus={false} // TEMPORARILY UNLOCKED: !isSubscribedActive
+                // fromDate={!isSubscribedActive ? todayForCalendar : undefined} // TEMPORARILY UNLOCKED
+                // toDate={!isSubscribedActive ? tomorrowForCalendar : undefined} // TEMPORARILY UNLOCKED
               />
               <div className="flex justify-between mt-4">
                 <Button variant="outline" onClick={() => handleDateChange(subDays(selectedDate, 1))}>
@@ -229,7 +227,7 @@ export default function MealPlanPage() {
                 <Info className="h-4 w-4" />
                 <AlertTitle>Recipe Limit Note</AlertTitle>
                 <AlertDescription>
-                The free tier recipe picker is limited. If the first {FREE_TIER_RECIPE_PICKER_LIMIT} recipes in the database don't load correctly, the picker might appear empty.
+                The free tier recipe picker is limited. If the first {FREE_TIER_RECIPE_PICKER_LIMIT} recipes in the database don't load correctly, the picker might appear empty. (Full picker unlocked for testing)
                 </AlertDescription>
             </Alert>
         )}
@@ -322,13 +320,13 @@ export default function MealPlanPage() {
                     <Button 
                       onClick={() => handleAddRecipeFromPicker(slotKey, slotConfig.type)} 
                       className="w-full sm:w-auto mx-auto flex items-center justify-center bg-accent hover:bg-accent/90 text-accent-foreground"
-                      disabled={!availableRecipesForPicker[recipePickerIndices[slotKey] || 0] || (!isSubscribedActive && !isDateAllowedForFreeTier(selectedDate))}
+                      disabled={!availableRecipesForPicker[recipePickerIndices[slotKey] || 0] /*|| (!isSubscribedActive && !isDateAllowedForFreeTier(selectedDate)) TEMPORARILY UNLOCKED */}
                     >
                       <PlusCircle className="mr-2 h-5 w-5" />
                       Add "{availableRecipesForPicker[recipePickerIndices[slotKey] || 0]?.name}" as {slotConfig.displayName}
                     </Button>
                   )}
-                  {!isSubscribedActive && !isDateAllowedForFreeTier(selectedDate) && (
+                  {false && !isSubscribedActive /*&& !isDateAllowedForFreeTier(selectedDate) TEMPORARILY HIDE */ && (
                      <p className="text-xs text-destructive text-center">Planning for this date is restricted on the free plan.</p>
                   )}
                 </div>
@@ -410,3 +408,6 @@ export default function MealPlanPage() {
     </PageWrapper>
   );
 }
+
+
+    
