@@ -40,7 +40,7 @@ export default function RecipeDetailPage() {
   const [recipe, setRecipe] = useState<RecipeType | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { userProfile, addMealToPlan } = useAppContext(); // Removed unused cache variables
+  const { userProfile, addMealToPlan } = useAppContext(); 
   const { toast } = useToast();
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
   const [planDate, setPlanDate] = useState<Date | undefined>(new Date());
@@ -48,6 +48,7 @@ export default function RecipeDetailPage() {
   const [planServings, setPlanServings] = useState<number>(1);
 
   const [currentImageSrc, setCurrentImageSrc] = useState<string>('');
+  const [imageError, setImageError] = useState(false);
 
   const isSubscribedActive = userProfile?.subscription_status === 'active';
 
@@ -60,22 +61,24 @@ export default function RecipeDetailPage() {
       }
       setIsLoading(true);
       setError(null);
+      setImageError(false);
       
       try {
         const foundRecipe = await getRecipeById(recipeId);
         if (foundRecipe) {
           setRecipe(foundRecipe);
-          // Set initial image source: recipe's image or conventional path
-          setCurrentImageSrc(foundRecipe.image || `/images/recipes/${foundRecipe.id}.jpg`);
+          setCurrentImageSrc(foundRecipe.image); // Use image path from recipe data
           setPlanServings(foundRecipe.servings || 1);
         } else {
           setError(`Recipe with ID ${recipeId} not found.`);
           setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+Not+Found`);
+          setImageError(true);
         }
       } catch (e: any) {
         console.error("Error fetching recipe by ID:", e);
         setError(e.message || "Failed to load recipe.");
         setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Error+Loading`);
+        setImageError(true);
       } finally {
         setIsLoading(false);
       }
@@ -87,9 +90,9 @@ export default function RecipeDetailPage() {
     if (recipe) {
       setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipe.id}`);
     } else {
-      // Fallback if recipe object isn't available when error occurs (less likely but safe)
       setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Image+Error`);
     }
+    setImageError(true);
   };
 
   const handleOpenAddToPlanDialog = () => {
@@ -129,6 +132,7 @@ export default function RecipeDetailPage() {
   const tomorrowForCalendar = addDays(todayForCalendar, 1);
   const disabledCalendarMatcher = isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
 
+  const aiHint = recipe && recipe.tags ? recipe.tags.slice(0,2).join(' ') : "food meal";
 
   if (isLoading) {
     return (
@@ -140,7 +144,7 @@ export default function RecipeDetailPage() {
     );
   }
 
-  if (error) {
+  if (error && !recipe) { // Only show full error page if recipe truly couldn't be found/loaded
     return (
       <PageWrapper title="Error">
         <Alert variant="destructive">
@@ -155,7 +159,7 @@ export default function RecipeDetailPage() {
     );
   }
 
-  if (!recipe) {
+  if (!recipe) { // Should be caught by error state above mostly, but as a fallback
     return (
       <PageWrapper title="Recipe Not Found">
         <Alert variant="default">
@@ -178,18 +182,19 @@ export default function RecipeDetailPage() {
       <Card className="overflow-hidden shadow-xl rounded-lg">
         <div className="relative w-full h-64 md:h-96">
           <Image
-            src={currentImageSrc} // Use state variable for image source
+            src={currentImageSrc} 
             alt={recipe.name}
             fill
             sizes="(max-width: 768px) 100vw, 100vw"
             className="object-cover"
             priority
-            data-ai-hint={recipe.tags ? recipe.tags.slice(0,2).join(' ') : "food meal"}
-            onError={handleImageError} // Add onError handler
+            data-ai-hint={imageError ? aiHint : undefined}
+            onError={handleImageError} 
           />
         </div>
         <CardHeader className="p-6">
           <CardTitle className="text-3xl md:text-4xl font-bold font-headline text-primary">{recipe.name}</CardTitle>
+          {error && <Alert variant="destructive" className="mt-2"><AlertDescription>{error} Displaying placeholder.</AlertDescription></Alert>}
           {recipe.description && <p className="text-muted-foreground mt-2">{recipe.description}</p>}
           <div className="mt-4 flex flex-wrap gap-2">
             <Badge variant="secondary" className="text-sm">
@@ -329,3 +334,4 @@ export default function RecipeDetailPage() {
   );
 }
 
+    

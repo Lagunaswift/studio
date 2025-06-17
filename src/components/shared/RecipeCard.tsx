@@ -7,7 +7,7 @@ import { Clock, Users, Flame, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { useState } from 'react'; // Added
+import { useState, useEffect } from 'react'; // Added useEffect
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -25,6 +25,20 @@ export function RecipeCard({
   className 
 }: RecipeCardProps) {
   
+  const [imageSrc, setImageSrc] = useState(recipe?.image || `https://placehold.co/600x400/007bff/ffffff.png?text=Loading`);
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    if (recipe) {
+      setImageSrc(recipe.image); // Set initial image from recipe prop
+      setImageError(false); // Reset error state when recipe changes
+    } else {
+      setImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=No+Recipe`);
+      setImageError(true);
+    }
+  }, [recipe]);
+
+
   if (!recipe) {
     return (
       <Card className={cn("flex flex-col overflow-hidden shadow-lg rounded-lg h-full items-center justify-center p-4", className)}>
@@ -35,25 +49,24 @@ export function RecipeCard({
     );
   }
   
-  // Initialize imageSrc with the recipe's image or a conventional local path
-  const initialImageSrc = recipe.image || `/images/recipes/${recipe.id}.jpg`;
-  const [imageSrc, setImageSrc] = useState(initialImageSrc);
-
   const handleImageError = () => {
     setImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipe.id}`);
+    setImageError(true);
   };
   
+  const aiHint = recipe.tags ? recipe.tags.slice(0,2).join(' ') : "food meal";
+
   return (
     <Card className={cn("flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg h-full", className)}>
       <div className="relative w-full h-60">
         <Image
-          src={imageSrc} // Use state variable for image source
+          src={imageSrc} 
           alt={recipe.name}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           className="object-cover"
-          data-ai-hint={recipe.tags ? recipe.tags.slice(0,2).join(' ') : "food meal"}
-          onError={handleImageError} // Add onError handler
+          data-ai-hint={imageError ? aiHint : undefined} // Only add hint if it's a placeholder
+          onError={handleImageError} 
         />
       </div>
       <CardHeader className="pb-2 pt-4 px-4">

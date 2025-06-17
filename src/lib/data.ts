@@ -36,8 +36,8 @@ const mapToFullRecipe = (rawRecipe: any): Recipe => {
       carbs: typeof rawRecipe.carbs === 'number' ? rawRecipe.carbs : 0,
       fat: typeof rawRecipe.fat === 'number' ? rawRecipe.fat : 0,
     },
-    // Use existing image if provided, otherwise construct path to /public/images/recipes/{id}.jpg
-    image: rawRecipe.image || `/images/recipes/${rawRecipe.id}.jpg`,
+    // Use existing image if provided, otherwise construct path to /public/images/{id}.jpg
+    image: rawRecipe.image || `/images/${rawRecipe.id}.jpg`,
     description: rawRecipe.description || "No description available.",
   };
 };
@@ -210,4 +210,6 @@ export const generateShoppingList = (plannedMeals: PlannedMeal[], recipesSource?
     return a.name.localeCompare(b.name);
   });
 };
+    
+
     
