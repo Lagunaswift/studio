@@ -1,10 +1,10 @@
 // Import recipe chunks
-import recipesChunk1 from './data/recipes-1';
-import recipesChunk2 from './data/recipes-2';
-import recipesChunk3 from './data/recipes-3';
-import recipesChunk4 from './data/recipes-4';
-import recipesChunk5 from './data/recipes-5';
-import recipesChunk6 from './data/recipes-6';
+import recipesChunk1 from './recipes/data/recipes-1';
+import recipesChunk2 from './recipes/data/recipes-2';
+import recipesChunk3 from './recipes/data/recipes-3';
+import recipesChunk4 from './recipes/data/recipes-4';
+import recipesChunk5 from './recipes/data/recipes-5';
+import recipesChunk6 from './recipes/data/recipes-6';
 
 // Internal state
 const allRecipes = [];
