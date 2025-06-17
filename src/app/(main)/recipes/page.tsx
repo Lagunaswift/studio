@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { RecipeCard } from '@/components/shared/RecipeCard';
-import { MEAL_TYPES } from '@/lib/data'; 
+import { MEAL_TYPES } from '@/lib/data';
 import type { Recipe, MealType } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,29 +34,28 @@ const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
 const DIETARY_PREFERENCE_TO_TAG_MAP: { [key: string]: string } = {
   "Vegetarian": "V",
   "Vegan": "VG",
-  "Pescatarian": "P",
+  "Pescatarian": "P", // Assuming P tag if you have one
   "Gluten-Free": "GF",
   "Dairy-Free": "DF",
-  "Low Carb": "LC",
-  "Keto": "KETO", // Assuming a KETO tag if used
+  "Low Carb": "LC", // Assuming LC tag
+  "Keto": "KETO", // Assuming KETO tag
 };
 
-// Simplified allergen keywords for client-side filtering.
-// For more robust allergen detection, a backend service or more comprehensive library would be better.
 const ALLERGEN_KEYWORD_MAP: { [key: string]: string[] } = {
-  nuts: ['nut', 'almond', 'walnut', 'pecan', 'cashew', 'pistachio', 'hazelnut', 'macadamia'], // Excludes "peanut" intentionally
+  nuts: ['nut', 'almond', 'walnut', 'pecan', 'cashew', 'pistachio', 'hazelnut', 'macadamia'],
   peanuts: ['peanut'],
-  dairy: ['milk', 'cheese', 'butter', 'cream', 'yogurt', 'yoghurt', 'casein', 'lactose', 'whey', 'dairy'],
-  eggs: ['egg', 'eggs'],
-  soy: ['soy', 'soya', 'tofu', 'tempeh', 'edamame', 'miso'],
-  gluten: ['gluten', 'wheat', 'barley', 'rye', 'flour', 'bread', 'pasta', 'couscous'], // Note: "flour" is broad
-  fish: ['fish', 'salmon', 'tuna', 'cod', 'haddock', 'trout', 'sardine', 'anchovy'],
-  shellfish: ['shellfish', 'shrimp', 'prawn', 'crab', 'lobster', 'mussel', 'oyster', 'clam'],
-  sesame: ['sesame'],
+  dairy: ['milk', 'cheese', 'butter', 'cream', 'yogurt', 'yoghurt', 'casein', 'lactose', 'whey', 'dairy', 'feta', 'mozzarella', 'parmesan', 'ricotta', 'quark', 'burrata', 'cheddar'],
+  eggs: ['egg', 'eggs', 'omelet', 'frittata', 'mayonnaise'],
+  soy: ['soy', 'soya', 'tofu', 'tempeh', 'edamame', 'miso', 'tamari'], // tamari is soy sauce
+  gluten: ['gluten', 'wheat', 'barley', 'rye', 'flour', 'bread', 'pasta', 'couscous', 'panko', 'breadcrumbs', 'digestive biscuits', 'spelt'],
+  fish: ['fish', 'salmon', 'tuna', 'cod', 'haddock', 'trout', 'sardine', 'anchovy', 'sea bass', 'halibut'],
+  shellfish: ['shellfish', 'shrimp', 'prawn', 'crab', 'lobster', 'mussel', 'oyster', 'clam', 'calamari'],
+  sesame: ['sesame', 'tahini'],
   mustard: ['mustard'],
 };
 
 const containsAllergenKeyword = (text: string, keywords: string[]): boolean => {
+  if (!text || typeof text !== 'string') return false;
   const lowerText = text.toLowerCase();
   return keywords.some(keyword => lowerText.includes(keyword));
 };
@@ -64,7 +63,7 @@ const containsAllergenKeyword = (text: string, keywords: string[]): boolean => {
 export default function RecipesPage() {
   const { userProfile, addMealToPlan, allRecipesCache, isRecipeCacheLoading: isAppRecipeCacheLoading } = useAppContext();
   const { toast } = useToast();
-  
+
   const [recipesToDisplay, setRecipesToDisplay] = useState<Recipe[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +75,10 @@ export default function RecipesPage() {
   const [planServings, setPlanServings] = useState<number>(1);
 
   const isSubscribedActive = userProfile?.subscription_status === 'active';
+
+  useEffect(() => {
+    console.log("RecipesPage: userProfile updated in AppContext or on mount:", userProfile);
+  }, [userProfile]);
 
   useEffect(() => {
     if (!isAppRecipeCacheLoading) {
@@ -93,13 +96,17 @@ export default function RecipesPage() {
     }
   }, [allRecipesCache, isAppRecipeCacheLoading]);
 
-  const activeDietaryFilters = useMemo(() => userProfile?.dietaryPreferences || [], [userProfile?.dietaryPreferences]);
-  const activeAllergenFilters = useMemo(() => userProfile?.allergens || [], [userProfile?.allergens]);
+  const activeDietaryFilters = useMemo(() => {
+    return userProfile?.dietaryPreferences || [];
+  }, [userProfile]); // Re-calculate if userProfile object changes
 
-  let filteredRecipes = useMemo(() => {
+  const activeAllergenFilters = useMemo(() => {
+    return userProfile?.allergens || [];
+  }, [userProfile]); // Re-calculate if userProfile object changes
+
+  const filteredRecipes = useMemo(() => {
     let recipes = recipesToDisplay;
 
-    // 1. Filter by search term
     if (searchTerm.trim()) {
       const lowerSearchTerm = searchTerm.toLowerCase();
       recipes = recipes.filter(recipe =>
@@ -109,31 +116,41 @@ export default function RecipesPage() {
       );
     }
 
-    // 2. Filter by Dietary Preferences (from userProfile)
     if (activeDietaryFilters.length > 0) {
       recipes = recipes.filter(recipe => {
-        if (!recipe.tags || recipe.tags.length === 0) return false;
         return activeDietaryFilters.every(preference => {
           const targetTag = DIETARY_PREFERENCE_TO_TAG_MAP[preference];
-          return targetTag ? recipe.tags.includes(targetTag) : true; 
+          if (targetTag) {
+            return recipe.tags && recipe.tags.includes(targetTag);
+          }
+          return true; // If preference doesn't map to a tag, it doesn't fail this filter
         });
       });
     }
 
-    // 3. Filter by Allergens (from userProfile)
     if (activeAllergenFilters.length > 0) {
       recipes = recipes.filter(recipe => {
         return !activeAllergenFilters.some(allergen => {
           const keywords = ALLERGEN_KEYWORD_MAP[allergen.toLowerCase()];
-          if (!keywords) return false; 
-          
+          if (!keywords) return false;
+
           if (containsAllergenKeyword(recipe.name, keywords)) return true;
           if (recipe.ingredients.some(ing => containsAllergenKeyword(ing, keywords))) return true;
-          
-          // Specific tag check for nuts
           if (allergen.toLowerCase() === 'nuts' && recipe.tags?.includes('N')) return true;
-          // Specific tag check for gluten (GF means it's okay)
-          if (allergen.toLowerCase() === 'gluten' && !recipe.tags?.includes('GF') && containsAllergenKeyword(recipe.name, keywords)) return true;
+          
+          // For Gluten: if "Gluten-Free" preference is NOT active, AND recipe is NOT tagged "GF", then keyword check applies.
+          // If "Gluten-Free" IS active, the dietary filter handles it by requiring "GF" tag.
+          // This means if "Gluten" is an allergen, and "Gluten-Free" is NOT a dietary preference, we check keywords.
+          // If "Gluten-Free" IS a preference, only GF-tagged recipes pass dietary anyway.
+          const isGlutenAllergen = allergen.toLowerCase() === 'gluten';
+          const isDietaryGlutenFree = activeDietaryFilters.includes("Gluten-Free");
+
+          if (isGlutenAllergen && !isDietaryGlutenFree && !recipe.tags?.includes('GF')) {
+            // If user specified "Gluten" as allergen AND "Gluten-Free" is NOT a dietary pref,
+            // AND recipe is NOT tagged GF, then apply keyword check for gluten for this allergen.
+             if (containsAllergenKeyword(recipe.name, ALLERGEN_KEYWORD_MAP.gluten)) return true;
+             if (recipe.ingredients.some(ing => containsAllergenKeyword(ing, ALLERGEN_KEYWORD_MAP.gluten))) return true;
+          }
 
 
           return false;
@@ -142,7 +159,6 @@ export default function RecipesPage() {
     }
     return recipes;
   }, [recipesToDisplay, searchTerm, activeDietaryFilters, activeAllergenFilters]);
-
 
   const totalFilteredRecipesCount = filteredRecipes.length;
   const finalRecipesForDisplay = isSubscribedActive ? filteredRecipes : filteredRecipes.slice(0, FREE_TIER_RECIPE_DISPLAY_LIMIT);
@@ -180,7 +196,7 @@ export default function RecipesPage() {
       });
     }
   };
-  
+
   const todayForCalendar = startOfDay(new Date());
   const tomorrowForCalendar = addDays(todayForCalendar, 1);
   const disabledCalendarMatcher = isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
@@ -191,12 +207,12 @@ export default function RecipesPage() {
       case 'vegan':
         return <Wheat className="h-4 w-4 mr-1 text-green-600" />;
       case 'gluten-free':
-        return <Drumstick className="h-4 w-4 mr-1 text-yellow-600" />; // Using Drumstick as a placeholder for "no wheat/gluten"
+        return <Drumstick className="h-4 w-4 mr-1 text-yellow-600" />;
       default:
         return <Filter className="h-4 w-4 mr-1 text-blue-600" />;
     }
   };
-  
+
   const getIconForAllergen = (allergen: string) => {
      switch (allergen.toLowerCase()) {
       case 'nuts':
@@ -214,7 +230,6 @@ export default function RecipesPage() {
         return <Info className="h-4 w-4 mr-1 text-red-600" />;
     }
   };
-
 
   return (
     <PageWrapper title="Discover Recipes">
@@ -247,6 +262,9 @@ export default function RecipesPage() {
                 </Badge>
               ))}
             </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              To change these filters, visit your <Link href="/profile/diet-type" className="underline">Diet Type</Link> or <Link href="/profile/allergens" className="underline">Allergens</Link> settings.
+            </p>
           </CardContent>
         </Card>
       )}
@@ -256,8 +274,8 @@ export default function RecipesPage() {
           <Lock className="h-5 w-5 text-accent" />
           <AlertTitle className="text-accent">Recipe Limit Reached</AlertTitle>
           <AlertDescription>
-            You are viewing {FREE_TIER_RECIPE_DISPLAY_LIMIT} of {totalFilteredRecipesCount} recipes matching your filters. 
-            <Link href="/profile/subscription" className="underline hover:text-primary font-semibold"> Upgrade your plan </Link> 
+            You are viewing {FREE_TIER_RECIPE_DISPLAY_LIMIT} of {totalFilteredRecipesCount} recipes matching your filters.
+            <Link href="/profile/subscription" className="underline hover:text-primary font-semibold"> Upgrade your plan </Link>
             to access all recipes and features.
           </AlertDescription>
         </Alert>
@@ -277,9 +295,9 @@ export default function RecipesPage() {
       ) : finalRecipesForDisplay.length > 0 ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {finalRecipesForDisplay.map((recipe) => (
-            <RecipeCard 
-              key={recipe.id} 
-              recipe={recipe} 
+            <RecipeCard
+              key={recipe.id}
+              recipe={recipe}
               onAddToMealPlan={handleOpenAddToPlanDialog}
               showAddToMealPlanButton={true}
               showViewDetailsButton={true}
@@ -287,9 +305,17 @@ export default function RecipesPage() {
           ))}
         </div>
       ) : (
-        <p className="text-center text-muted-foreground mt-10">
-          {searchTerm || activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0 ? "No recipes found matching your current search and profile filters." : "No recipes available."}
-        </p>
+        <div className="text-center py-10">
+            <Info className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground mt-2">
+            {searchTerm || activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0 ? "No recipes found matching your current search and profile filters." : "No recipes available."}
+            </p>
+            {(activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0) && (
+                <p className="text-sm text-muted-foreground mt-2">
+                    Try adjusting your <Link href="/profile/diet-type" className="underline hover:text-primary">Diet Type</Link> or <Link href="/profile/allergens" className="underline hover:text-primary">Allergens</Link> settings, or broaden your search.
+                </p>
+            )}
+        </div>
       )}
 
       {selectedRecipe && (
@@ -355,8 +381,8 @@ export default function RecipesPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAddToPlanDialog(false)}>Cancel</Button>
-              <Button 
-                onClick={handleAddToMealPlan} 
+              <Button
+                onClick={handleAddToMealPlan}
                 className="bg-accent hover:bg-accent/90 text-accent-foreground"
                 disabled={!isSubscribedActive && !isDateAllowedForFreeTier(planDate)}
               >
