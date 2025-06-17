@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, Target, Edit, Star, Loader2 } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext'; // Import useAuth
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -34,15 +34,15 @@ const macroTargetSchema = z.object({
 type MacroTargetFormValues = z.infer<typeof macroTargetSchema>;
 
 export default function HomePage() {
-  const { user, isLoading: isAuthLoading, profile: authProfile } = useAuth(); // Use AuthContext
+  const { user, isLoading: isAuthLoading, profile: authProfile } = useAuth(); 
   const { 
     getDailyMacros, 
-    macroTargets: appContextMacroTargets, // Rename to avoid conflict
+    macroTargets: appContextMacroTargets, 
     setMacroTargets, 
     mealPlan,
     allRecipesCache,
     isRecipeCacheLoading: isAppRecipeCacheLoading,
-    userProfile: appContextUserProfile // Keep for now for non-auth related parts or merge logic later
+    userProfile: appContextUserProfile 
   } = useAppContext();
   const { toast } = useToast();
   
@@ -51,8 +51,8 @@ export default function HomePage() {
   const [showSetTargetsDialog, setShowSetTargetsDialog] = useState(false);
   const [featuredRecipe, setFeaturedRecipe] = useState<Recipe | null>(null);
 
-  // Determine which macroTargets to use: from AuthContext if available, else AppContext
   const currentMacroTargets = authProfile?.macroTargets || appContextMacroTargets;
+  const welcomeName = authProfile?.email || user?.email || 'User';
 
   useEffect(() => {
     setClientTodayDate(format(new Date(), 'yyyy-MM-dd'));
@@ -141,7 +141,7 @@ export default function HomePage() {
   }, [currentMacroTargets, showSetTargetsDialog]);
 
   const handleSetTargets: SubmitHandler<MacroTargetFormValues> = (data) => {
-    setMacroTargets(data); // This updates AppContext; consider updating AuthContext.profile if it's the source of truth
+    setMacroTargets(data); 
     toast({
       title: "Targets Updated",
       description: "Your macro targets have been saved.",
@@ -151,10 +151,9 @@ export default function HomePage() {
 
   const macroKeys: (keyof MacroTargets)[] = ['calories', 'protein', 'carbs', 'fat'];
 
-  // Use subscription status from AuthContext if available, otherwise from AppContext
   const isSubscribedActive = authProfile?.subscription_status === 'active' || appContextUserProfile?.subscription_status === 'active';
 
-  if (isAuthLoading || (isAppRecipeCacheLoading && !user) ) { // Also consider app recipe loading if no user yet
+  if (isAuthLoading || (isAppRecipeCacheLoading && !user && !authProfile)) { 
     return (
       <PageWrapper title="Dashboard">
         <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
@@ -165,27 +164,11 @@ export default function HomePage() {
     );
   }
 
-  if (!user) {
-    return (
-      <PageWrapper title="Welcome to MealPlannerPro">
-        <Card className="max-w-md mx-auto mt-10 shadow-xl">
-          <CardHeader className="text-center">
-            <CardTitle className="font-headline text-2xl text-primary">Please Log In</CardTitle>
-            <CardDescription>You need to be logged in to access your personalized dashboard and features.</CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="mb-6">Access your meal plans, track macros, and get AI suggestions by signing in.</p>
-            <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Link href="/login">Go to Login Page</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </PageWrapper>
-    );
-  }
+  // If we are not requiring login for testing, we will render the dashboard content.
+  // The `!user` check that previously redirected to login is removed for this temporary setup.
 
   return (
-    <PageWrapper title={`Dashboard - Welcome, ${authProfile?.email || user.email || 'User'}!`}>
+    <PageWrapper title={`Dashboard - Welcome, ${welcomeName}!`}>
       <section className="text-center mb-12 py-8 bg-gradient-to-br from-primary/20 to-accent/10 rounded-lg shadow-lg">
         <h1 className="text-4xl md:text-5xl font-bold font-headline mb-4 text-primary">
           MealPlanner<span className="text-accent">Pro</span> at a Glance
@@ -198,12 +181,14 @@ export default function HomePage() {
       <section className="mb-12">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold font-headline text-primary">
-            Today's Macros ({clientTodayDate ? format(parseISO(clientTodayDate), "MMMM dd, yyyy") : 'Loading...'})
+            {user ? "Today's Macros" : "Daily Macro Tracker"} ({clientTodayDate && isValid(parseISO(clientTodayDate)) ? format(parseISO(clientTodayDate), "MMMM dd, yyyy") : 'Loading...'})
           </h2>
-          <Button variant="outline" onClick={() => setShowSetTargetsDialog(true)}>
-            {currentMacroTargets ? <Edit className="mr-2 h-4 w-4" /> : <Target className="mr-2 h-4 w-4" />}
-            {currentMacroTargets ? "Update Targets" : "Set Targets"}
-          </Button>
+          {user && ( // Only show button if user context might exist
+             <Button variant="outline" onClick={() => setShowSetTargetsDialog(true)}>
+              {currentMacroTargets ? <Edit className="mr-2 h-4 w-4" /> : <Target className="mr-2 h-4 w-4" />}
+              {currentMacroTargets ? "Update Targets" : "Set Targets"}
+            </Button>
+          )}
         </div>
 
         {currentMacroTargets ? (
@@ -238,10 +223,21 @@ export default function HomePage() {
         ) : (
           <Card className="shadow-md">
             <CardContent className="pt-6 text-center">
-              <p className="text-foreground/70 mb-4">Set your daily macro targets to track your progress!</p>
-              <Button onClick={() => setShowSetTargetsDialog(true)} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                <Target className="mr-2 h-4 w-4" /> Set Targets Now
-              </Button>
+              <p className="text-foreground/70 mb-4">
+                {user ? "Set your daily macro targets to track your progress!" : "Log in to set and track your daily macro targets!"}
+              </p>
+              {user && (
+                <Button onClick={() => setShowSetTargetsDialog(true)} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                  <Target className="mr-2 h-4 w-4" /> Set Targets Now
+                </Button>
+              )}
+              {!user && (
+                <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                  <Link href="/login">
+                     <Target className="mr-2 h-4 w-4" /> Log In to Set Targets
+                  </Link>
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}
@@ -251,7 +247,7 @@ export default function HomePage() {
         <h2 className="text-2xl font-bold font-headline text-primary mb-6 flex items-center">
           <Star className="mr-2 h-6 w-6 text-accent" /> Featured Recipe
         </h2>
-        {isAppRecipeCacheLoading && !featuredRecipe ? ( // Show loader if app recipes are loading and no featured recipe yet
+        {isAppRecipeCacheLoading && !featuredRecipe ? ( 
           <div className="flex items-center justify-center h-40">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="ml-2 text-muted-foreground">Loading featured recipe...</p>
@@ -321,7 +317,7 @@ export default function HomePage() {
               {macroTargetForm.formState.errors.fat && <p className="text-sm text-destructive mt-1">{macroTargetForm.formState.errors.fat.message}</p>}
             </div>
             <div>
-              <Label htmlFor="calories">Calories (kcal)</Label>
+              <Label htmlFor="calories">Calculated Calories (kcal)</Label>
               <Input id="calories" type="number" min="0" {...macroTargetForm.register("calories")} />
               {macroTargetForm.formState.errors.calories && <p className="text-sm text-destructive mt-1">{macroTargetForm.formState.errors.calories.message}</p>}
             </div>
