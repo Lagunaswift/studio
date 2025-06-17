@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { RecipeCard } from '@/components/shared/RecipeCard';
 import { MEAL_TYPES } from '@/lib/data'; 
@@ -12,13 +12,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format, startOfDay, addDays, isWithinInterval, isSameDay, isAfter } from 'date-fns';
-import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2, Info, Lock } from 'lucide-react';
+import { format, startOfDay, addDays, isWithinInterval } from 'date-fns';
+import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2, Info, Lock, Wheat, Milk, Shell, Fish, Egg, Peanut, TreeDeciduous, Drumstick } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 
 const FREE_TIER_RECIPE_DISPLAY_LIMIT = 15;
 
@@ -27,6 +29,36 @@ const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
   const today = startOfDay(new Date());
   const tomorrow = addDays(today, 1);
   return isWithinInterval(startOfDay(date), { start: today, end: tomorrow });
+};
+
+const DIETARY_PREFERENCE_TO_TAG_MAP: { [key: string]: string } = {
+  "Vegetarian": "V",
+  "Vegan": "VG",
+  "Pescatarian": "P",
+  "Gluten-Free": "GF",
+  "Dairy-Free": "DF",
+  "Low Carb": "LC",
+  "Keto": "KETO", // Assuming a KETO tag if used
+};
+
+// Simplified allergen keywords for client-side filtering.
+// For more robust allergen detection, a backend service or more comprehensive library would be better.
+const ALLERGEN_KEYWORD_MAP: { [key: string]: string[] } = {
+  nuts: ['nut', 'almond', 'walnut', 'pecan', 'cashew', 'pistachio', 'hazelnut', 'macadamia'], // Excludes "peanut" intentionally
+  peanuts: ['peanut'],
+  dairy: ['milk', 'cheese', 'butter', 'cream', 'yogurt', 'yoghurt', 'casein', 'lactose', 'whey', 'dairy'],
+  eggs: ['egg', 'eggs'],
+  soy: ['soy', 'soya', 'tofu', 'tempeh', 'edamame', 'miso'],
+  gluten: ['gluten', 'wheat', 'barley', 'rye', 'flour', 'bread', 'pasta', 'couscous'], // Note: "flour" is broad
+  fish: ['fish', 'salmon', 'tuna', 'cod', 'haddock', 'trout', 'sardine', 'anchovy'],
+  shellfish: ['shellfish', 'shrimp', 'prawn', 'crab', 'lobster', 'mussel', 'oyster', 'clam'],
+  sesame: ['sesame'],
+  mustard: ['mustard'],
+};
+
+const containsAllergenKeyword = (text: string, keywords: string[]): boolean => {
+  const lowerText = text.toLowerCase();
+  return keywords.some(keyword => lowerText.includes(keyword));
 };
 
 export default function RecipesPage() {
@@ -61,21 +93,63 @@ export default function RecipesPage() {
     }
   }, [allRecipesCache, isAppRecipeCacheLoading]);
 
-  let filteredRecipes = recipesToDisplay.filter(recipe =>
-    recipe.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (recipe.description && recipe.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (recipe.tags && recipe.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())))
-  );
+  const activeDietaryFilters = useMemo(() => userProfile?.dietaryPreferences || [], [userProfile?.dietaryPreferences]);
+  const activeAllergenFilters = useMemo(() => userProfile?.allergens || [], [userProfile?.allergens]);
+
+  let filteredRecipes = useMemo(() => {
+    let recipes = recipesToDisplay;
+
+    // 1. Filter by search term
+    if (searchTerm.trim()) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      recipes = recipes.filter(recipe =>
+        recipe.name.toLowerCase().includes(lowerSearchTerm) ||
+        (recipe.description && recipe.description.toLowerCase().includes(lowerSearchTerm)) ||
+        (recipe.tags && recipe.tags.some(tag => tag.toLowerCase().includes(lowerSearchTerm)))
+      );
+    }
+
+    // 2. Filter by Dietary Preferences (from userProfile)
+    if (activeDietaryFilters.length > 0) {
+      recipes = recipes.filter(recipe => {
+        if (!recipe.tags || recipe.tags.length === 0) return false;
+        return activeDietaryFilters.every(preference => {
+          const targetTag = DIETARY_PREFERENCE_TO_TAG_MAP[preference];
+          return targetTag ? recipe.tags.includes(targetTag) : true; 
+        });
+      });
+    }
+
+    // 3. Filter by Allergens (from userProfile)
+    if (activeAllergenFilters.length > 0) {
+      recipes = recipes.filter(recipe => {
+        return !activeAllergenFilters.some(allergen => {
+          const keywords = ALLERGEN_KEYWORD_MAP[allergen.toLowerCase()];
+          if (!keywords) return false; 
+          
+          if (containsAllergenKeyword(recipe.name, keywords)) return true;
+          if (recipe.ingredients.some(ing => containsAllergenKeyword(ing, keywords))) return true;
+          
+          // Specific tag check for nuts
+          if (allergen.toLowerCase() === 'nuts' && recipe.tags?.includes('N')) return true;
+          // Specific tag check for gluten (GF means it's okay)
+          if (allergen.toLowerCase() === 'gluten' && !recipe.tags?.includes('GF') && containsAllergenKeyword(recipe.name, keywords)) return true;
+
+
+          return false;
+        });
+      });
+    }
+    return recipes;
+  }, [recipesToDisplay, searchTerm, activeDietaryFilters, activeAllergenFilters]);
+
 
   const totalFilteredRecipesCount = filteredRecipes.length;
-  if (!isSubscribedActive) {
-    filteredRecipes = filteredRecipes.slice(0, FREE_TIER_RECIPE_DISPLAY_LIMIT);
-  }
+  const finalRecipesForDisplay = isSubscribedActive ? filteredRecipes : filteredRecipes.slice(0, FREE_TIER_RECIPE_DISPLAY_LIMIT);
 
   const handleOpenAddToPlanDialog = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
     setPlanServings(recipe.servings);
-    // Reset date to today if opening dialog for free user, ensure it's valid
     setPlanDate(isSubscribedActive ? new Date() : (isDateAllowedForFreeTier(new Date()) ? new Date() : startOfDay(new Date())));
     setShowAddToPlanDialog(true);
   };
@@ -111,6 +185,36 @@ export default function RecipesPage() {
   const tomorrowForCalendar = addDays(todayForCalendar, 1);
   const disabledCalendarMatcher = isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
 
+  const getIconForPreference = (preference: string) => {
+    switch (preference.toLowerCase()) {
+      case 'vegetarian':
+      case 'vegan':
+        return <Wheat className="h-4 w-4 mr-1 text-green-600" />;
+      case 'gluten-free':
+        return <Drumstick className="h-4 w-4 mr-1 text-yellow-600" />; // Using Drumstick as a placeholder for "no wheat/gluten"
+      default:
+        return <Filter className="h-4 w-4 mr-1 text-blue-600" />;
+    }
+  };
+  
+  const getIconForAllergen = (allergen: string) => {
+     switch (allergen.toLowerCase()) {
+      case 'nuts':
+      case 'peanuts':
+        return <TreeDeciduous className="h-4 w-4 mr-1 text-orange-600" />;
+      case 'dairy':
+        return <Milk className="h-4 w-4 mr-1 text-blue-400" />;
+      case 'eggs':
+        return <Egg className="h-4 w-4 mr-1 text-yellow-500" />;
+      case 'fish':
+        return <Fish className="h-4 w-4 mr-1 text-sky-500" />;
+       case 'shellfish':
+        return <Shell className="h-4 w-4 mr-1 text-pink-500" />;
+      default:
+        return <Info className="h-4 w-4 mr-1 text-red-600" />;
+    }
+  };
+
 
   return (
     <PageWrapper title="Discover Recipes">
@@ -127,13 +231,33 @@ export default function RecipesPage() {
         </div>
       </div>
 
+      {(activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0) && (
+        <Card className="mb-6 bg-secondary/30 border-accent/30">
+          <CardContent className="pt-4">
+            <p className="text-sm text-accent font-semibold mb-2">Filters from your profile are active:</p>
+            <div className="flex flex-wrap gap-2">
+              {activeDietaryFilters.map(pref => (
+                <Badge key={pref} variant="outline" className="border-green-600 text-green-700 bg-green-100">
+                  {getIconForPreference(pref)} {pref}
+                </Badge>
+              ))}
+              {activeAllergenFilters.map(allergen => (
+                <Badge key={allergen} variant="outline" className="border-red-600 text-red-700 bg-red-100">
+                  {getIconForAllergen(allergen)} Avoiding: {allergen}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {!isSubscribedActive && totalFilteredRecipesCount > FREE_TIER_RECIPE_DISPLAY_LIMIT && (
         <Alert variant="default" className="mb-6 border-accent">
           <Lock className="h-5 w-5 text-accent" />
           <AlertTitle className="text-accent">Recipe Limit Reached</AlertTitle>
           <AlertDescription>
-            You are viewing {FREE_TIER_RECIPE_DISPLAY_LIMIT} of {totalFilteredRecipesCount} available recipes. 
-            <Link href="/profile/subscription" className="underline hover:text-primary"> Upgrade your plan </Link> 
+            You are viewing {FREE_TIER_RECIPE_DISPLAY_LIMIT} of {totalFilteredRecipesCount} recipes matching your filters. 
+            <Link href="/profile/subscription" className="underline hover:text-primary font-semibold"> Upgrade your plan </Link> 
             to access all recipes and features.
           </AlertDescription>
         </Alert>
@@ -150,9 +274,9 @@ export default function RecipesPage() {
             <AlertTitle>Error Loading Recipes</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
-      ) : filteredRecipes.length > 0 ? (
+      ) : finalRecipesForDisplay.length > 0 ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredRecipes.map((recipe) => (
+          {finalRecipesForDisplay.map((recipe) => (
             <RecipeCard 
               key={recipe.id} 
               recipe={recipe} 
@@ -164,7 +288,7 @@ export default function RecipesPage() {
         </div>
       ) : (
         <p className="text-center text-muted-foreground mt-10">
-          {searchTerm ? "No recipes found matching your search." : "No recipes available."}
+          {searchTerm || activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0 ? "No recipes found matching your current search and profile filters." : "No recipes available."}
         </p>
       )}
 
@@ -197,7 +321,7 @@ export default function RecipesPage() {
                       selected={planDate}
                       onSelect={setPlanDate}
                       disabled={disabledCalendarMatcher}
-                      initialFocus={!isSubscribedActive} // Focus if restricted to ensure user sees constraint
+                      initialFocus={!isSubscribedActive}
                        fromDate={!isSubscribedActive ? todayForCalendar : undefined}
                        toDate={!isSubscribedActive ? tomorrowForCalendar : undefined}
                     />
