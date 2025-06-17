@@ -39,7 +39,7 @@ export default function RecipeDetailPage() {
   
   const [recipe, setRecipe] = useState<RecipeType | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null); // For overall recipe loading error
+  const [error, setError] = useState<string | null>(null); 
   const { userProfile, addMealToPlan } = useAppContext(); 
   const { toast } = useToast();
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
@@ -48,7 +48,7 @@ export default function RecipeDetailPage() {
   const [planServings, setPlanServings] = useState<number>(1);
 
   const [currentImageSrc, setCurrentImageSrc] = useState<string>('');
-  const [imageLoadError, setImageLoadError] = useState(false); // Specifically for image loading error
+  const [imageLoadError, setImageLoadError] = useState(false);
 
   const isSubscribedActive = userProfile?.subscription_status === 'active';
 
@@ -89,11 +89,7 @@ export default function RecipeDetailPage() {
   }, [recipeId]);
 
   const handleImageError = () => {
-    if (recipe) {
-      setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipe.id}`);
-    } else {
-      setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Image+Error`);
-    }
+    setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipeId}`);
     setImageLoadError(true);
   };
 
@@ -336,5 +332,3 @@ export default function RecipeDetailPage() {
     </PageWrapper>
   );
 }
-
-    

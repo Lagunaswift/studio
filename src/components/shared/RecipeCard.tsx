@@ -27,7 +27,7 @@ export function RecipeCard({
   
   const defaultPlaceholder = `https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipe?.id || 'Unknown'}`;
   const [imageSrc, setImageSrc] = useState(recipe?.image || defaultPlaceholder);
-  const [imageError, setImageError] = useState(!recipe?.image); // Initially true if no recipe.image
+  const [imageError, setImageError] = useState(!recipe?.image); 
 
   useEffect(() => {
     if (recipe && recipe.image) {
@@ -36,8 +36,8 @@ export function RecipeCard({
     } else if (recipe) {
       setImageSrc(defaultPlaceholder);
       setImageError(true);
-    } else { // No recipe prop
-      setImageSrc(`https://placehold.co/600x400.png`); // Generic placeholder if no recipe
+    } else {
+      setImageSrc(`https://placehold.co/600x400.png`);
       setImageError(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -122,5 +122,3 @@ export function RecipeCard({
     </Card>
   );
 }
-
-    
