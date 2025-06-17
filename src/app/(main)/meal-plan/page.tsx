@@ -159,7 +159,7 @@ export default function MealPlanPage() {
         </Alert>
       )}
       <div className="flex flex-col lg:flex-row gap-8 mb-8">
-        <div className="w-full lg:w-1/3 xl:w-1/4">
+        <div className="w-full lg:w-1/3"> {/* Removed xl:w-1/4 */}
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle className="font-headline text-primary">Select Date</CardTitle>
@@ -186,7 +186,7 @@ export default function MealPlanPage() {
             </CardContent>
           </Card>
         </div>
-        <div className="w-full lg:w-2/3 xl:w-3/4">
+        <div className="w-full lg:w-2/3"> {/* Removed xl:w-3/4 */}
            <Card className="shadow-lg h-full">
             <CardHeader>
               <CardTitle className="font-headline text-primary">Daily Totals for {format(selectedDate, 'PPP')}</CardTitle>
@@ -409,5 +409,3 @@ export default function MealPlanPage() {
   );
 }
 
-
-    
