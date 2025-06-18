@@ -14,35 +14,38 @@ interface RecipeCardProps {
   onAddToMealPlan?: (recipe: Recipe) => void;
   showAddToMealPlanButton?: boolean;
   showViewDetailsButton?: boolean;
-  className?: string; 
+  className?: string;
 }
 
-export function RecipeCard({ 
-  recipe, 
-  onAddToMealPlan, 
-  showAddToMealPlanButton = false, 
+export function RecipeCard({
+  recipe,
+  onAddToMealPlan,
+  showAddToMealPlanButton = false,
   showViewDetailsButton = true,
-  className 
+  className
 }: RecipeCardProps) {
-  
-  const defaultPlaceholder = `https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipe?.id || 'Unknown'}`;
-  const [imageSrc, setImageSrc] = useState(recipe?.image || defaultPlaceholder);
-  const [imageError, setImageError] = useState(!recipe?.image); 
+
+  const constructDefaultPlaceholder = (id: number | string | undefined) => `https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${id || 'Unknown'}`;
+
+  const getInitialImageSrc = () => {
+    if (!recipe) return `https://placehold.co/600x400.png`;
+    return recipe.image || constructDefaultPlaceholder(recipe.id);
+  };
+
+  const [imageSrc, setImageSrc] = useState<string>(getInitialImageSrc());
+  const [imageLoadError, setImageLoadError] = useState<boolean>(() => !(recipe && recipe.image));
 
   useEffect(() => {
-    if (recipe && recipe.image) {
-      setImageSrc(recipe.image);
-      setImageError(false); 
-    } else if (recipe) {
-      setImageSrc(defaultPlaceholder);
-      setImageError(true);
-    } else {
+    // This effect synchronizes imageSrc and imageLoadError when the `recipe` prop changes.
+    if (!recipe) {
       setImageSrc(`https://placehold.co/600x400.png`);
-      setImageError(true);
+      setImageLoadError(true);
+    } else {
+      const newImageSrc = recipe.image || constructDefaultPlaceholder(recipe.id);
+      setImageSrc(newImageSrc);
+      setImageLoadError(!recipe.image); // True if recipe.image is falsy, meaning we'd use placeholder
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recipe]);
-
+  }, [recipe]); // Only depend on the recipe object itself.
 
   if (!recipe) {
     return (
@@ -53,27 +56,30 @@ export function RecipeCard({
       </Card>
     );
   }
-  
+
   const handleImageError = () => {
-    setImageSrc(defaultPlaceholder);
-    setImageError(true);
+    // This is called by the <Image> component's onError prop.
+    // It means the current imageSrc (whether it was recipe.image or an initial placeholder) failed to load.
+    // We then set it to a definitive placeholder.
+    setImageSrc(constructDefaultPlaceholder(recipe.id));
+    setImageLoadError(true);
   };
-  
-  const aiHint = recipe.tags && recipe.tags.length > 0 
-    ? recipe.tags.slice(0, 2).join(' ') 
+
+  const aiHint = recipe.tags && recipe.tags.length > 0
+    ? recipe.tags.slice(0, 2).join(' ')
     : "food meal";
 
   return (
     <Card className={cn("flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg h-full", className)}>
       <div className="relative w-full h-60">
         <Image
-          src={imageSrc} 
+          src={imageSrc}
           alt={recipe.name}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           className="object-cover"
-          data-ai-hint={imageError ? aiHint : undefined}
-          onError={handleImageError} 
+          data-ai-hint={imageLoadError ? aiHint : undefined} // Use imageLoadError to decide if placeholder hint is needed
+          onError={handleImageError}
         />
       </div>
       <CardHeader className="pb-2 pt-4 px-4">
