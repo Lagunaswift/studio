@@ -3,9 +3,9 @@
 'use client';
 
 import { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { supabase } from '@/lib/supabaseClient'; // Uses App 1's existing client
-import { Session, User } from '@supabase/supabase-js';
-import type { MealSlotConfig, MealType, MacroTargets, Sex, ActivityLevel, AthleteType, PrimaryGoal } from '@/types';
+// import { supabase } from '@/lib/supabaseClient'; // Supabase calls commented out
+import type { Session, User } from '@supabase/supabase-js';
+import type { MealSlotConfig, MacroTargets, Sex, ActivityLevel, AthleteType, PrimaryGoal } from '@/types';
 
 
 // Define the shape of your profile data
@@ -44,99 +44,67 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Mock user and session for local testing
+const MOCK_USER_ID = 'local-test-user';
+const mockUser: User = {
+  id: MOCK_USER_ID,
+  app_metadata: { provider: 'email' },
+  user_metadata: { full_name: 'Local Tester' },
+  aud: 'authenticated',
+  created_at: new Date().toISOString(),
+  email: 'tester@example.com',
+};
+
+const mockSession: Session = {
+  access_token: 'mock-access-token',
+  refresh_token: 'mock-refresh-token',
+  expires_in: 3600,
+  token_type: 'bearer',
+  user: mockUser,
+  expires_at: Date.now() + 3600 * 1000,
+};
+
+// Minimal mock profile, or null. Detailed profile comes from AppContext for local testing.
+const mockProfile: Profile | null = {
+    id: MOCK_USER_ID,
+    email: 'tester@example.com',
+    full_name: 'Local Tester',
+    subscription_status: 'active', // Assuming active for testing unlocked features
+    // Other fields can be null or default if AISuggestionsPage will pull from AppContext
+    macroTargets: null, 
+    mealStructure: [], 
+};
+
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [session, setSession] = useState<Session | null>(mockSession);
+  const [user, setUser] = useState<User | null>(mockUser);
+  const [profile, setProfile] = useState<Profile | null>(mockProfile); // Provide a minimal mock or null
+  const [isLoading, setIsLoading] = useState(false); // Start as false for local testing
 
   useEffect(() => {
-    const fetchSessionAndProfile = async () => {
-      setIsLoading(true); // Ensure loading is true at the start
-      try {
-        const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error("Error fetching session:", sessionError);
-          setSession(null);
-          setUser(null);
-          setProfile(null);
-          setIsLoading(false);
-          return;
-        }
+    // No Supabase listeners needed for local testing
+    // Simulate initial load complete
+    setIsLoading(false);
+    
+    // Example: if you wanted to load a profile from localStorage for AuthContext (optional)
+    // const localProfile = localStorage.getItem('authContextLocalProfile');
+    // if (localProfile) {
+    //   setProfile(JSON.parse(localProfile));
+    // } else {
+    //   // setProfile(mockProfile); // Or some default if not found
+    //   localStorage.setItem('authContextLocalProfile', JSON.stringify(mockProfile));
+    // }
 
-        setSession(currentSession);
-        const currentUser = currentSession?.user;
-        setUser(currentUser ?? null);
-
-        if (currentUser) {
-          const { data: userProfile, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', currentUser.id)
-            .single();
-
-          if (profileError) {
-            console.error("Error fetching profile:", profileError.message);
-            setProfile(null);
-          } else {
-            setProfile(userProfile as Profile | null);
-          }
-        } else {
-          setProfile(null);
-        }
-      } catch (error: any) {
-        console.error("Error in fetchSessionAndProfile:", error.message);
-        setSession(null);
-        setUser(null);
-        setProfile(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchSessionAndProfile();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
-        setIsLoading(true);
-        setSession(newSession);
-        const currentUser = newSession?.user;
-        setUser(currentUser ?? null);
-        if (currentUser) {
-          try {
-            const { data: userProfile, error: profileError } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', currentUser.id)
-              .single();
-
-            if (profileError) {
-              console.error("Error fetching profile on auth change:", profileError.message);
-              setProfile(null);
-            } else {
-              setProfile(userProfile as Profile | null);
-            }
-          } catch (error: any) {
-             console.error("Error fetching profile after auth state change:", error.message);
-             setProfile(null);
-          }
-        } else {
-          setProfile(null);
-        }
-        setIsLoading(false);
-      }
-    );
-
-    return () => {
-      authListener?.subscription?.unsubscribe();
-    };
   }, []);
 
   const signOut = async () => {
-    setIsLoading(true); // Optionally set loading true during sign out
-    await supabase.auth.signOut();
-    // Auth listener will handle setting user/session/profile to null and isLoading to false
+    // For local testing, simulate sign out
+    setUser(null);
+    setSession(null);
+    setProfile(null);
+    // localStorage.removeItem('authContextLocalProfile'); // If you implement local storage for AuthContext profile
+    console.log("User signed out (local mock)");
   };
 
   const value = { session, user, profile, isLoading, signOut };

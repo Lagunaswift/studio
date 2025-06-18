@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Mail, Lock, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabaseClient'; // Import Supabase client
+// import { supabase } from '@/lib/supabaseClient'; // Supabase client import commented out
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -46,64 +46,68 @@ export default function SignUpPage() {
 
   const onSubmit: SubmitHandler<SignUpFormValues> = async (data) => {
     form.clearErrors(); 
+    console.log("Sign up attempt (local testing - Supabase disabled):", data.email);
+    toast({
+      title: "Sign Up Simulated (Local Testing)",
+      description: "Supabase authentication is temporarily disabled. Account creation simulated.",
+    });
+    form.reset();
+    // Optionally redirect or show a success message appropriate for local testing
+    // router.push('/login'); 
 
-    let emailRedirectToPath = '/login'; // Default if options were used
-    if (isClient) {
-      // This console.log helps if you decide to use emailRedirectTo in options
-      console.log("Sign Up - Potential emailRedirectTo if configured:", `${window.location.origin}${emailRedirectToPath}`);
-    }
+    // let emailRedirectToPath = '/login'; 
+    // if (isClient) {
+    //   console.log("Sign Up - Potential emailRedirectTo if configured:", `${window.location.origin}${emailRedirectToPath}`);
+    // }
 
-    try {
-      const { data: signUpData, error } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        // options: {
-        //   // If you enable this, ensure the full URL is in Supabase Additional Redirect URLs
-        //   emailRedirectTo: isClient ? `${window.location.origin}${emailRedirectToPath}` : undefined, 
-        // }
-      });
+    // try {
+    //   const { data: signUpData, error } = await supabase.auth.signUp({
+    //     email: data.email,
+    //     password: data.password,
+    //     // options: {
+    //     //   // If you enable this, ensure the full URL is in Supabase Additional Redirect URLs
+    //     //   emailRedirectTo: isClient ? `${window.location.origin}${emailRedirectToPath}` : undefined, 
+    //     // }
+    //   });
 
-      if (error) {
-        toast({
-          title: "Sign Up Failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else if (signUpData.user && signUpData.user.identities && signUpData.user.identities.length === 0) {
-        // User exists but may need email confirmation (common for Supabase if email not verified yet and user tries to sign up again)
-        toast({
-          title: "Confirmation Sent or Account Exists",
-          description: "If you're new, please check your email to confirm your account. If you've signed up before, please log in.",
-          variant: "default",
-        });
-      } else if (signUpData.user?.id && !signUpData.session) {
-        // User created, session is null - means confirmation email sent
-         toast({
-          title: "Sign Up Successful!",
-          description: "Please check your email to confirm your account and complete the sign up process.",
-        });
-        form.reset();
-      } else if (signUpData.user && signUpData.session) {
-        // User created AND session exists (e.g., if auto-confirm is on, or user already confirmed and re-signed up)
-         toast({
-          title: "Sign Up Successful!",
-          description: "Your account is ready. You can now log in.",
-        });
-        form.reset();
-        router.push('/login'); 
-      } else {
-         toast({
-          title: "Sign Up Attempted",
-          description: "Please check your email for a confirmation link. If you encounter issues, try logging in or resetting your password.",
-        });
-      }
-    } catch (e: any) {
-      toast({
-        title: "Sign Up Error",
-        description: e.message || "An unexpected error occurred.",
-        variant: "destructive",
-      });
-    }
+    //   if (error) {
+    //     toast({
+    //       title: "Sign Up Failed",
+    //       description: error.message,
+    //       variant: "destructive",
+    //     });
+    //   } else if (signUpData.user && signUpData.user.identities && signUpData.user.identities.length === 0) {
+    //     toast({
+    //       title: "Confirmation Sent or Account Exists",
+    //       description: "If you're new, please check your email to confirm your account. If you've signed up before, please log in.",
+    //       variant: "default",
+    //     });
+    //   } else if (signUpData.user?.id && !signUpData.session) {
+    //      toast({
+    //       title: "Sign Up Successful!",
+    //       description: "Please check your email to confirm your account and complete the sign up process.",
+    //     });
+    //     form.reset();
+    //   } else if (signUpData.user && signUpData.session) {
+    //      toast({
+    //       title: "Sign Up Successful!",
+    //       description: "Your account is ready. You can now log in.",
+    //     });
+    //     form.reset();
+    //     router.push('/login'); 
+    //   } else {
+    //      toast({
+    //       title: "Sign Up Attempted",
+    //       description: "Please check your email for a confirmation link. If you encounter issues, try logging in or resetting your password.",
+    //     });
+    //   }
+    // } catch (e: any) {
+    //   toast({
+    //     title: "Sign Up Error",
+    //     description: e.message || "An unexpected error occurred.",
+    //     variant: "destructive",
+    //   });
+    // }
   };
 
   return (
@@ -112,7 +116,7 @@ export default function SignUpPage() {
         <CardTitle className="text-2xl font-headline text-primary flex items-center justify-center">
           <UserPlus className="mr-2 h-6 w-6" /> Create Account
         </CardTitle>
-        <CardDescription>Join MealPlannerPro today. It's free!</CardDescription>
+        <CardDescription>Join MealPlannerPro today. It's free! (Supabase Auth Temporarily Disabled)</CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -159,7 +163,7 @@ export default function SignUpPage() {
           </CardContent>
           <CardFooter className="flex flex-col items-center space-y-4">
             <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? "Creating Account..." : "Create Account"}
+              {form.formState.isSubmitting ? "Creating Account..." : "Create Account (Local Test)"}
             </Button>
             <div className="text-sm text-center w-full">
               <Link href="/login" className="font-medium text-primary hover:underline">
