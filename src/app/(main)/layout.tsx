@@ -162,7 +162,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             </SidebarTrigger>
           </div>
           <h1 className="flex-grow text-center text-xl font-bold font-headline text-primary">
-            MealPlanner<span className="text-accent">Pro</span> at a Glance
+            MealPlanner<span className="text-accent">Pro</span>
           </h1>
           <div className="w-10"> {/* Container for ThemeToggleButton */}
             <ThemeToggleButton />
