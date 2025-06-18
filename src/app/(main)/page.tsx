@@ -171,7 +171,7 @@ export default function HomePage() {
 
   if (isAuthLoading || (isAppRecipeCacheLoading && !user && !authProfile)) {
     return (
-      <PageWrapper title="Dashboard">
+      <PageWrapper title={`Welcome, ${welcomeName}!`}>
         <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
           <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
           <p className="text-lg">Loading dashboard data...</p>
@@ -181,12 +181,8 @@ export default function HomePage() {
   }
 
   return (
-    <PageWrapper title={`Dashboard - Welcome, ${welcomeName}!`}>
-      <section className="text-center mb-12 py-8 bg-gradient-to-br from-primary/20 to-accent/10 rounded-lg shadow-lg">
-        <h1 className="text-4xl md:text-5xl font-bold font-headline mb-4 text-primary">
-          MealPlanner<span className="text-accent">Pro</span> at a Glance
-        </h1>
-      </section>
+    <PageWrapper title={`Welcome, ${welcomeName}!`}>
+      {/* Hero section removed */}
 
       <section className="mb-12">
         <div className="flex justify-between items-center mb-4">

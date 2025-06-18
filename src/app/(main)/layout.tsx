@@ -155,11 +155,18 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-16 items-center border-b px-4 justify-between sticky top-0 bg-background z-40">
-          <SidebarTrigger className="text-primary hover:text-accent">
-            <PanelLeft />
-          </SidebarTrigger>
-          <ThemeToggleButton />
+        <header className="flex h-16 items-center border-b px-4 sticky top-0 bg-background z-40">
+           <div className="w-10"> {/* Container for SidebarTrigger */}
+            <SidebarTrigger className="text-primary hover:text-accent">
+              <PanelLeft />
+            </SidebarTrigger>
+          </div>
+          <h1 className="flex-grow text-center text-xl font-bold font-headline text-primary">
+            MealPlanner<span className="text-accent">Pro</span> at a Glance
+          </h1>
+          <div className="w-10"> {/* Container for ThemeToggleButton */}
+            <ThemeToggleButton />
+          </div>
         </header>
         <main className="flex-grow">
           {children}
@@ -184,3 +191,4 @@ export default function MainLayout({
     </SidebarProvider>
   );
 }
+
