@@ -7,30 +7,31 @@ import { suggestMealPlan, type SuggestMealPlanInput, type SuggestMealPlanOutput,
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Settings, Info, PlusCircle, Lock } from 'lucide-react';
-import { useAppContext } from '@/context/AppContext'; 
-import { useAuth } from '@/context/AuthContext'; 
+import { useAppContext } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import type { Recipe, Macros, MealSlotConfig } from '@/types';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button'; // Added missing import
 import { format, startOfDay, isSameDay } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-const FREE_TIER_RECIPE_LIMIT_FOR_AI = 15; 
+const FREE_TIER_RECIPE_LIMIT_FOR_AI = 15;
 
 export default function AISuggestionsPage() {
   // Use AppContext for detailed user profile settings
-  const { 
-    addMealToPlan, 
-    allRecipesCache, 
+  const {
+    addMealToPlan,
+    allRecipesCache,
     isRecipeCacheLoading: isAppRecipeCacheLoading,
     userProfile // This is the UserProfileSettings from AppContext
   } = useAppContext();
-  
+
   // Use AuthContext primarily for user's authentication state (mocked for now)
-  const { user, isLoading: isAuthLoading } = useAuth(); 
-  
+  const { user, isLoading: isAuthLoading } = useAuth();
+
   const { toast } = useToast();
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [suggestion, setSuggestion] = useState<SuggestMealPlanOutput | null>(null);
@@ -38,10 +39,10 @@ export default function AISuggestionsPage() {
   const [recipesForAI, setRecipesForAI] = useState<RecipeForAI[]>([]);
 
   // This variable will now primarily use userProfile from AppContext
-  const userSettingsToUse = userProfile; 
+  const userSettingsToUse = userProfile;
 
   // TEMPORARILY UNLOCKED FOR TESTING - This controls UI elements related to subscription
-  const isSubscribedActive = true; // userProfile?.subscription_status === 'active'; 
+  const isSubscribedActive = true; // userProfile?.subscription_status === 'active';
 
   useEffect(() => {
     if (!isAppRecipeCacheLoading) {
@@ -64,12 +65,12 @@ export default function AISuggestionsPage() {
   }, [allRecipesCache, isAppRecipeCacheLoading, isSubscribedActive]);
 
   const handleGeneratePlan = async () => {
-    if (!userSettingsToUse) { 
+    if (!userSettingsToUse) {
       setError("User profile not loaded from AppContext. Please wait or try refreshing.");
       return;
     }
     // Gating based on subscription status is temporarily bypassed by isSubscribedActive = true
-    // if (!isSubscribedActive) { 
+    // if (!isSubscribedActive) {
     //   setError("AI Meal Plan generation is a premium feature. Please upgrade your subscription to use it.");
     //   return;
     // }
@@ -102,11 +103,11 @@ export default function AISuggestionsPage() {
     }));
 
     const input: SuggestMealPlanInput = {
-      macroTargets: userSettingsToUse.macroTargets, 
+      macroTargets: userSettingsToUse.macroTargets,
       dietaryPreferences: userSettingsToUse.dietaryPreferences || [],
       allergens: userSettingsToUse.allergens || [],
       mealStructure: mealStructureForAI,
-      availableRecipes: recipesForAI, 
+      availableRecipes: recipesForAI,
       currentDate: format(new Date(), 'yyyy-MM-dd'),
     };
 
@@ -170,14 +171,14 @@ export default function AISuggestionsPage() {
           <Lock className="h-5 w-5 text-accent" />
           <AlertTitle className="text-accent font-headline">Premium Feature Locked</AlertTitle>
           <AlertDescription>
-            AI-powered meal plan generation is available for subscribed users. 
+            AI-powered meal plan generation is available for subscribed users.
             Please <Link href="/profile/subscription" className="underline hover:text-primary font-semibold">upgrade your plan</Link> to unlock this feature and more.
           </AlertDescription>
         </Alert>
       </PageWrapper>
     );
   }
-  
+
   const isProfileSetupMissing = !userSettingsToUse || !userSettingsToUse.mealStructure || userSettingsToUse.mealStructure.length === 0;
 
   return (
@@ -194,7 +195,7 @@ export default function AISuggestionsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isProfileSetupMissing && userSettingsToUse ? ( 
+            {isProfileSetupMissing && userSettingsToUse ? (
               <Alert variant="default" className="border-accent">
                 <Info className="h-5 w-5 text-accent" />
                 <AlertTitle className="text-accent">Profile Setup Recommended</AlertTitle>
@@ -277,7 +278,7 @@ export default function AISuggestionsPage() {
                 <h3 className="text-lg font-semibold mb-1 text-primary-focus">Fitness Assessment:</h3>
                 <p className="text-sm text-foreground/80 bg-secondary/30 p-3 rounded-md">{suggestion.fitnessAssessment}</p>
               </div>
-              
+
               <Separator />
 
               <h3 className="text-xl font-semibold font-headline text-primary-focus">Planned Meals:</h3>
@@ -303,15 +304,15 @@ export default function AISuggestionsPage() {
                   );
                 })}
               </div>
-              
+
               <Separator />
-              
+
               <div>
                 <h3 className="text-xl font-semibold font-headline text-primary-focus mb-2">Total Achieved Macros for the Day:</h3>
                 <MacroDisplay macros={suggestion.totalAchievedMacros} title="" highlightTotal className="shadow-md" />
               </div>
 
-               {userSettingsToUse?.macroTargets && ( 
+               {userSettingsToUse?.macroTargets && (
                 <div className="mt-4">
                     <h4 className="text-md font-semibold text-muted-foreground mb-1">Comparison to Your Targets:</h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
