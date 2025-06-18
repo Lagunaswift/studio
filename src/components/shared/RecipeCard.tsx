@@ -24,28 +24,24 @@ export function RecipeCard({
   showViewDetailsButton = true,
   className
 }: RecipeCardProps) {
-
-  const constructDefaultPlaceholder = (id: number | string | undefined) => `https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${id || 'Unknown'}`;
-
-  const getInitialImageSrc = () => {
-    if (!recipe) return `https://placehold.co/600x400.png`;
-    return recipe.image || constructDefaultPlaceholder(recipe.id);
-  };
-
-  const [imageSrc, setImageSrc] = useState<string>(getInitialImageSrc());
-  const [imageLoadError, setImageLoadError] = useState<boolean>(() => !(recipe && recipe.image));
+  
+  const defaultPlaceholder = `https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipe?.id || 'Unknown'}`;
+  const [imageSrc, setImageSrc] = useState(recipe?.image || defaultPlaceholder);
+  const [imageError, setImageError] = useState(!recipe?.image); 
 
   useEffect(() => {
-    // This effect synchronizes imageSrc and imageLoadError when the `recipe` prop changes.
-    if (!recipe) {
-      setImageSrc(`https://placehold.co/600x400.png`);
-      setImageLoadError(true);
+    if (recipe && recipe.image) {
+      setImageSrc(recipe.image);
+      setImageError(false); 
+    } else if (recipe) {
+      setImageSrc(defaultPlaceholder);
+      setImageError(true);
     } else {
-      const newImageSrc = recipe.image || constructDefaultPlaceholder(recipe.id);
-      setImageSrc(newImageSrc);
-      setImageLoadError(!recipe.image); // True if recipe.image is falsy, meaning we'd use placeholder
+      setImageSrc(`https://placehold.co/600x400.png`); // General placeholder if no recipe
+      setImageError(true);
     }
-  }, [recipe]); // Only depend on the recipe object itself.
+  }, [recipe, defaultPlaceholder]);
+
 
   if (!recipe) {
     return (
@@ -56,35 +52,32 @@ export function RecipeCard({
       </Card>
     );
   }
-
+  
   const handleImageError = () => {
-    // This is called by the <Image> component's onError prop.
-    // It means the current imageSrc (whether it was recipe.image or an initial placeholder) failed to load.
-    // We then set it to a definitive placeholder.
-    setImageSrc(constructDefaultPlaceholder(recipe.id));
-    setImageLoadError(true);
+    setImageSrc(defaultPlaceholder);
+    setImageError(true);
   };
-
-  const aiHint = recipe.tags && recipe.tags.length > 0
-    ? recipe.tags.slice(0, 2).join(' ')
+  
+  const aiHint = recipe.tags && recipe.tags.length > 0 
+    ? recipe.tags.slice(0, 2).join(' ') 
     : "food meal";
 
   return (
     <Card className={cn("flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg h-full", className)}>
       <div className="relative w-full h-60">
         <Image
-          src={imageSrc}
+          src={imageSrc} 
           alt={recipe.name}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           className="object-cover"
-          data-ai-hint={imageLoadError ? aiHint : undefined} // Use imageLoadError to decide if placeholder hint is needed
-          onError={handleImageError}
+          data-ai-hint={imageError ? aiHint : undefined}
+          onError={handleImageError} 
         />
       </div>
       <CardHeader className="pb-2 pt-4 px-4">
         <CardTitle className="font-headline text-lg md:text-xl text-primary">{recipe.name}</CardTitle>
-        {recipe.description && <CardDescription className="h-10 overflow-hidden text-ellipsis text-xs md:text-sm">{recipe.description}</CardDescription>}
+        {/* Recipe description removed from here */}
       </CardHeader>
       <CardContent className="flex-grow px-4 py-2">
         <div className="space-y-1 text-xs md:text-sm text-muted-foreground">
