@@ -25,27 +25,27 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
 const macroTargetSchema = z.object({
-  calories: z.coerce.number().min(0, "Calories must be positive"),
-  protein: z.coerce.number().min(0, "Protein must be positive"),
-  carbs: z.coerce.number().min(0, "Carbs must be positive"),
-  fat: z.coerce.number().min(0, "Fat must be positive"),
+  calories: z.coerce.number().min(0, "Calories must be positive").default(0),
+  protein: z.coerce.number().min(0, "Protein must be positive").default(0),
+  carbs: z.coerce.number().min(0, "Carbs must be positive").default(0),
+  fat: z.coerce.number().min(0, "Fat must be positive").default(0),
 });
 
 type MacroTargetFormValues = z.infer<typeof macroTargetSchema>;
 
 export default function HomePage() {
-  const { user, isLoading: isAuthLoading, profile: authProfile } = useAuth(); 
-  const { 
-    getDailyMacros, 
-    macroTargets: appContextMacroTargets, 
-    setMacroTargets, 
+  const { user, isLoading: isAuthLoading, profile: authProfile } = useAuth();
+  const {
+    getDailyMacros,
+    macroTargets: appContextMacroTargets,
+    setMacroTargets,
     mealPlan,
     allRecipesCache,
     isRecipeCacheLoading: isAppRecipeCacheLoading,
-    userProfile: appContextUserProfile 
+    userProfile: appContextUserProfile
   } = useAppContext();
   const { toast } = useToast();
-  
+
   const [clientTodayDate, setClientTodayDate] = useState<string>('');
   const [clientTodayMacros, setClientTodayMacros] = useState<Macros>({ calories: 0, protein: 0, carbs: 0, fat: 0 });
   const [showSetTargetsDialog, setShowSetTargetsDialog] = useState(false);
@@ -130,7 +130,14 @@ export default function HomePage() {
     const carbs = parseFloat(carbsValue as any) || 0;
     const fat = parseFloat(fatValue as any) || 0;
     const calculatedCalories = (protein * 4) + (carbs * 4) + (fat * 9);
-    macroTargetForm.setValue("calories", Math.round(calculatedCalories), { shouldValidate: true, shouldDirty: true });
+
+    const currentCalories = macroTargetForm.getValues("calories");
+    if (Math.round(calculatedCalories) !== Math.round(currentCalories)) {
+      macroTargetForm.setValue("calories", Math.round(calculatedCalories), {
+        shouldValidate: true,
+        shouldDirty: true
+      });
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proteinValue, carbsValue, fatValue]);
 
@@ -149,19 +156,20 @@ export default function HomePage() {
   }, [currentMacroTargets, showSetTargetsDialog]);
 
   const handleSetTargets: SubmitHandler<MacroTargetFormValues> = (data) => {
-    setMacroTargets(data); 
+    setMacroTargets(data);
     toast({
       title: "Targets Updated",
       description: "Your macro targets have been saved.",
     });
     setShowSetTargetsDialog(false);
+    macroTargetForm.reset(data);
   };
 
   const macroKeys: (keyof MacroTargets)[] = ['calories', 'protein', 'carbs', 'fat'];
 
   const isSubscribedActive = appContextUserProfile?.subscription_status === 'active'; // Check AppContext for sub status
 
-  if (isAuthLoading || (isAppRecipeCacheLoading && !user && !authProfile)) { 
+  if (isAuthLoading || (isAppRecipeCacheLoading && !user && !authProfile)) {
     return (
       <PageWrapper title="Dashboard">
         <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
@@ -178,9 +186,6 @@ export default function HomePage() {
         <h1 className="text-4xl md:text-5xl font-bold font-headline mb-4 text-primary">
           MealPlanner<span className="text-accent">Pro</span> at a Glance
         </h1>
-        <p className="text-lg text-foreground/80 max-w-2xl mx-auto">
-          Your personal assistant for healthy eating. Plan meals, track macros, get AI suggestions, and simplify your shopping.
-        </p>
       </section>
 
       <section className="mb-12">
@@ -236,21 +241,21 @@ export default function HomePage() {
           </Card>
         )}
       </section>
-      
+
       <section className="mb-12">
         <h2 className="text-2xl font-bold font-headline text-primary mb-6 flex items-center">
           <Star className="mr-2 h-6 w-6 text-accent" /> Featured Recipe
         </h2>
-        {isAppRecipeCacheLoading && !featuredRecipe ? ( 
+        {isAppRecipeCacheLoading && !featuredRecipe ? (
           <div className="flex items-center justify-center h-40">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="ml-2 text-muted-foreground">Loading featured recipe...</p>
           </div>
         ) : featuredRecipe ? (
           <div className="max-w-sm mx-auto md:max-w-md">
-            <RecipeCard 
-              recipe={featuredRecipe} 
-              showViewDetailsButton={true} 
+            <RecipeCard
+              recipe={featuredRecipe}
+              showViewDetailsButton={true}
               showAddToMealPlanButton={false}
               className="shadow-xl border-2 border-accent/50"
             />
@@ -317,7 +322,7 @@ export default function HomePage() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowSetTargetsDialog(false)}>Cancel</Button>
-              <Button type="submit" className="bg-accent hover:bg-accent/90 text-accent-foreground" disabled={!macroTargetForm.formState.isDirty}>Save Targets</Button>
+              <Button type="submit" className="bg-accent hover:bg-accent/90 text-accent-foreground" disabled={!macroTargetForm.formState.isDirty || macroTargetForm.formState.isSubmitting}>Save Targets</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -325,3 +330,4 @@ export default function HomePage() {
     </PageWrapper>
   );
 }
+
