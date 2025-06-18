@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import type { UserProfileSettings, Sex, ActivityLevel, AthleteType, PrimaryGoal } from '@/types';
 import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS } from '@/types';
-import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, TapeMeasure } from 'lucide-react';
+import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
@@ -315,7 +315,7 @@ export default function UserInfoPage() {
                           name="sex"
                           control={form.control}
                           render={({ field: controllerField }) => (
-                            <Select 
+                            <Select
                               onValueChange={(value) => {
                                 controllerField.onChange(value as Sex);
                                 // Reset gender-specific fields when sex changes
@@ -325,7 +325,7 @@ export default function UserInfoPage() {
                                 } else if (value === 'female') {
                                   form.setValue('abdomenCircumferenceCm', null, {shouldValidate: true});
                                 }
-                              }} 
+                              }}
                               value={controllerField.value ?? undefined}
                             >
                               <FormControl>
@@ -349,7 +349,7 @@ export default function UserInfoPage() {
 
                 <div className="space-y-2 p-4 border rounded-md bg-muted/20">
                     <h4 className="text-md font-semibold text-primary flex items-center mb-3">
-                        <TapeMeasure className="mr-2 h-5 w-5 text-accent"/> Body Measurements (for optional Body Fat % calc)
+                        <Scale className="mr-2 h-5 w-5 text-accent"/> Body Measurements (for optional Body Fat % calc)
                     </h4>
                     <FormField
                         control={form.control}
@@ -534,7 +534,7 @@ export default function UserInfoPage() {
               </p>
               {!leanBodyMassKg && <p className="text-xs text-muted-foreground">Requires weight and body fat %.</p>}
             </div>
-             {(!tdee || !leanBodyMassKg) && userProfile && 
+             {(!tdee || !leanBodyMassKg) && userProfile &&
               (userProfile.heightCm && userProfile.weightKg && userProfile.age && userProfile.sex && userProfile.activityLevel && (userProfile.bodyFatPercentage !==null || leanBodyMassKg === null )) &&
                 <p className="text-xs text-muted-foreground pt-4">Make sure all required fields (Height, Weight, Age, Sex, Activity Level, and Body Fat % or measurements for calculation) are filled to see estimates.</p>
             }
@@ -544,3 +544,5 @@ export default function UserInfoPage() {
     </PageWrapper>
   );
 }
+
+    
