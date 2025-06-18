@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { suggestProteinIntake, type SuggestProteinIntakeInput, type SuggestProteinIntakeOutput } from '@/ai/flows/suggest-protein-intake-flow';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Sparkles, Loader2, Info, Lightbulb } from "lucide-react";
+import { Sparkles, Loader2, Info, Lightbulb, Droplets } from "lucide-react";
 import Link from 'next/link';
 
 const macroTargetSchema = z.object({
@@ -27,12 +27,21 @@ const macroTargetSchema = z.object({
 
 type MacroTargetFormValues = z.infer<typeof macroTargetSchema>;
 
+interface FatSuggestion {
+  suggestedFatGrams: number;
+  justification: string;
+}
+
 export default function DietaryTargetsPage() {
   const { userProfile, setMacroTargets } = useAppContext();
   const { toast } = useToast();
   const [isAISuggesting, setIsAISuggesting] = useState(false);
   const [proteinSuggestion, setProteinSuggestion] = useState<SuggestProteinIntakeOutput | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+
+  const [fatSuggestion, setFatSuggestion] = useState<FatSuggestion | null>(null);
+  const [fatSuggestionError, setFatSuggestionError] = useState<string | null>(null);
+
 
   const macroForm = useForm<MacroTargetFormValues>({
     resolver: zodResolver(macroTargetSchema),
@@ -72,7 +81,7 @@ export default function DietaryTargetsPage() {
       title: "Macro Targets Updated",
       description: "Your daily caloric and macro targets have been saved.",
     });
-    macroForm.reset(data); // Resets dirty state
+    macroForm.reset(data); 
   };
 
   const handleGetProteinSuggestion = async () => {
@@ -93,6 +102,9 @@ export default function DietaryTargetsPage() {
     setIsAISuggesting(true);
     setProteinSuggestion(null);
     setAiError(null);
+    setFatSuggestion(null); 
+    setFatSuggestionError(null);
+
 
     try {
       const input: SuggestProteinIntakeInput = {
@@ -100,7 +112,7 @@ export default function DietaryTargetsPage() {
         athleteType: userProfile.athleteType || 'notSpecified',
         primaryGoal: userProfile.primaryGoal || 'notSpecified',
         sex: userProfile.sex || 'notSpecified',
-        unitPreference: 'g/kgLBM', // Or make this a user choice
+        unitPreference: 'g/kgLBM', 
       };
       const suggestion = await suggestProteinIntake(input);
       setProteinSuggestion(suggestion);
@@ -127,6 +139,56 @@ export default function DietaryTargetsPage() {
       });
     }
   };
+
+  const handleGetFatSuggestion = () => {
+    setProteinSuggestion(null); 
+    setAiError(null); 
+    setFatSuggestion(null);
+    setFatSuggestionError(null);
+
+    if (!userProfile) {
+      setFatSuggestionError("User profile not loaded. Please try refreshing.");
+      return;
+    }
+    if (!userProfile.tdee) {
+      setFatSuggestionError(
+        "TDEE (Total Daily Energy Expenditure) is not calculated. Please complete your User Info (height, weight, age, sex, activity level) on the User Info page."
+      );
+       toast({
+        title: "TDEE Needed for Fat Suggestion",
+        description: (
+          <span>
+            Complete your <Link href="/profile/user-info" className="underline">User Information</Link> to calculate TDEE.
+          </span>
+        ),
+        variant: "destructive",
+      });
+      return;
+    }
+    if (userProfile.sex !== 'female') {
+      setFatSuggestionError(
+        "This specific fat suggestion (around 33% of TDEE) is tailored for female profiles based on common guidelines. Your profile sex is not set to 'female'."
+      );
+      return;
+    }
+
+    const suggestedFatGrams = (userProfile.tdee * 0.33) / 9;
+    setFatSuggestion({
+      suggestedFatGrams: Math.round(suggestedFatGrams),
+      justification: `General guidelines suggest dietary fat can make up 20-35% of total daily calories. For women, aiming towards 33% of TDEE (your TDEE is ~${userProfile.tdee.toFixed(0)} kcal) can be beneficial for hormone health and satiety. This suggests approximately ${Math.round(suggestedFatGrams)}g of fat per day.`,
+    });
+  };
+
+  const applyFatSuggestion = () => {
+    if (fatSuggestion) {
+      macroForm.setValue("fat", fatSuggestion.suggestedFatGrams, { shouldValidate: true, shouldDirty: true });
+      toast({
+        title: "Fat Target Applied",
+        description: `Fat set to ${fatSuggestion.suggestedFatGrams}g. Adjust other macros as needed.`,
+      });
+    }
+  };
+
 
   return (
     <PageWrapper title="Dietary Targets">
@@ -161,7 +223,7 @@ export default function DietaryTargetsPage() {
               {aiError && (
                 <Alert variant="destructive">
                   <Info className="h-4 w-4" />
-                  <AlertTitle>Suggestion Error</AlertTitle>
+                  <AlertTitle>AI Suggestion Error</AlertTitle>
                   <AlertDescription>{aiError}</AlertDescription>
                 </Alert>
               )}
@@ -205,8 +267,20 @@ export default function DietaryTargetsPage() {
                 control={macroForm.control}
                 name="fat"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Fat (g)</FormLabel>
+                   <FormItem>
+                    <div className="flex justify-between items-center">
+                      <FormLabel>Fat (g)</FormLabel>
+                       <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={handleGetFatSuggestion}
+                          disabled={!userProfile || !userProfile.tdee || userProfile.sex !== 'female'}
+                        >
+                         <Droplets className="mr-2 h-4 w-4 text-accent" />
+                         Suggest Fat (Women)
+                       </Button>
+                    </div>
                     <FormControl>
                       <Input type="number" {...field} />
                     </FormControl>
@@ -214,6 +288,35 @@ export default function DietaryTargetsPage() {
                   </FormItem>
                 )}
               />
+
+              {fatSuggestionError && (
+                <Alert variant="destructive">
+                  <Info className="h-4 w-4" />
+                  <AlertTitle>Fat Suggestion Info</AlertTitle>
+                  <AlertDescription>{fatSuggestionError} <Link href="/profile/user-info" className="underline">Update User Info here.</Link></AlertDescription>
+                </Alert>
+              )}
+
+              {fatSuggestion && !fatSuggestionError && (
+                <Card className="bg-secondary/50 p-4">
+                  <CardHeader className="p-0 pb-2">
+                    <CardTitle className="text-md flex items-center text-primary">
+                      <Lightbulb className="w-5 h-5 mr-2 text-accent" /> Fat Intake Suggestion
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0 text-sm space-y-2">
+                    <p>
+                      Suggested Fat: <strong>~{fatSuggestion.suggestedFatGrams}g per day</strong>
+                    </p>
+                    <p className="text-xs text-muted-foreground italic">{fatSuggestion.justification}</p>
+                    <Button type="button" size="sm" onClick={applyFatSuggestion} className="mt-2 bg-accent hover:bg-accent/90 text-accent-foreground">
+                      Apply Suggestion ({fatSuggestion.suggestedFatGrams}g)
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+
               <FormField
                 control={macroForm.control}
                 name="calories"
@@ -239,3 +342,4 @@ export default function DietaryTargetsPage() {
     </PageWrapper>
   );
 }
+
