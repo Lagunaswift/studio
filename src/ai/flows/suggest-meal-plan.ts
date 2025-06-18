@@ -18,10 +18,10 @@ import { MEAL_TYPES } from '@/lib/data'; // Assuming MEAL_TYPES is exported from
 
 // Reusable schema for macronutrient data
 const MacroDataSchema = z.object({
-  calories: z.number().describe("Total calories"),
-  protein: z.number().describe("Total protein in grams"),
-  carbs: z.number().describe("Total carbohydrates in grams"),
-  fat: z.number().describe("Total fat in grams"),
+  calories: z.number().finite().nonnegative().describe("Total calories"),
+  protein: z.number().finite().nonnegative().describe("Total protein in grams"),
+  carbs: z.number().finite().nonnegative().describe("Total carbohydrates in grams"),
+  fat: z.number().finite().nonnegative().describe("Total fat in grams"),
 });
 
 // Schema for recipes as provided to the AI
@@ -65,7 +65,7 @@ const PlannedRecipeItemSchema = z.object({
   mealSlotName: z.string().describe("The name of the meal slot (e.g., 'Breakfast')."),
   recipeId: z.number().describe("The ID of the chosen recipe."),
   recipeName: z.string().describe("The name of the chosen recipe."),
-  servings: z.number().min(0.25).describe("Number of servings of the recipe to plan for this meal slot (e.g., 1, 1.5, 0.5)."),
+  servings: z.number().finite().positive().min(0.25).describe("Number of servings of the recipe to plan for this meal slot (e.g., 1, 1.5, 0.5)."),
   calculatedMacros: MacroDataSchema.describe("Calculated macros for the chosen recipe and servings for this specific meal."),
 });
 export type PlannedRecipeItem = z.infer<typeof PlannedRecipeItemSchema>;

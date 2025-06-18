@@ -77,34 +77,41 @@ const calculateNavyBodyFatPercentage = (
   }
 
   try {
+    let bf: number;
     if (sex === 'male') {
-      if (!abdomenCm || abdomenCm <= 0 || abdomenCm <= neckCm) {
+      if (!abdomenCm || abdomenCm <= 0 || neckCm <= 0 || abdomenCm <= neckCm) {
         return null;
       }
-      const bf = 86.010 * Math.log10(abdomenCm - neckCm) - 70.041 * Math.log10(heightCm) + 36.76;
-      return Math.max(1, Math.min(100, parseFloat(bf.toFixed(1))));
+      const logTerm = abdomenCm - neckCm;
+      if (logTerm <= 0 || heightCm <= 0) return null;
+      bf = 86.010 * Math.log10(logTerm) - 70.041 * Math.log10(heightCm) + 36.76;
     } else if (sex === 'female') {
-      if (!waistCm || waistCm <= 0 || !hipCm || hipCm <= 0) {
+      if (!waistCm || waistCm <= 0 || !hipCm || hipCm <= 0 || neckCm <= 0) {
         return null;
       }
-      const waistPlusHipMinusNeck = waistCm + hipCm - neckCm;
-      if (waistPlusHipMinusNeck <= 0) {
-        return null;
-      }
-      const bf = 163.205 * Math.log10(waistPlusHipMinusNeck) - 97.684 * Math.log10(heightCm) - 78.387;
-      return Math.max(1, Math.min(100, parseFloat(bf.toFixed(1))));
+      const logTerm = waistCm + hipCm - neckCm;
+      if (logTerm <= 0 || heightCm <= 0) return null;
+      bf = 163.205 * Math.log10(logTerm) - 97.684 * Math.log10(heightCm) - 78.387;
+    } else {
+      return null;
     }
+
+    if (isNaN(bf) || !isFinite(bf)) return null;
+    const resultBFP = parseFloat(bf.toFixed(1));
+    if (isNaN(resultBFP) || !isFinite(resultBFP)) return null;
+    return Math.max(1, Math.min(100, resultBFP));
+
   } catch (error) {
     console.error("Error calculating Navy Body Fat %:", error);
     return null;
   }
-  return null;
 };
 
 
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
-  if (weightKg && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
+  if (weightKg && weightKg > 0 && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
     const lbm = weightKg * (1 - bodyFatPercentage / 100);
+    if (isNaN(lbm) || !isFinite(lbm) || lbm <= 0) return null;
     return parseFloat(lbm.toFixed(1));
   }
   return null;
@@ -128,7 +135,9 @@ const calculateTDEE = (
   }
   const activity = ACTIVITY_LEVEL_OPTIONS.find(opt => opt.value === activityLevel);
   if (activity) {
-    return Math.round(bmr * activity.multiplier);
+    const tdee = bmr * activity.multiplier;
+    if (isNaN(tdee) || !isFinite(tdee) || tdee <= 0) return null;
+    return Math.round(tdee);
   }
   return null;
 };
@@ -197,7 +206,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       // Initial calculation of derived values if necessary
       let initialBFP = loadedUserProfile.bodyFatPercentage;
-      if (initialBFP === null) {
+      if (initialBFP === null) { // Only calculate if not already set (e.g. manually or by previous calc)
         initialBFP = calculateNavyBodyFatPercentage(
           loadedUserProfile.sex,
           loadedUserProfile.heightCm,
@@ -207,7 +216,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           loadedUserProfile.hipCircumferenceCm
         );
       }
-      loadedUserProfile.bodyFatPercentage = initialBFP;
+      loadedUserProfile.bodyFatPercentage = initialBFP; // Will be null if calc failed or not enough data
+
       loadedUserProfile.tdee = calculateTDEE(
         loadedUserProfile.weightKg,
         loadedUserProfile.heightCm,
@@ -217,7 +227,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       loadedUserProfile.leanBodyMassKg = calculateLBM(
         loadedUserProfile.weightKg,
-        loadedUserProfile.bodyFatPercentage
+        loadedUserProfile.bodyFatPercentage // Use the potentially updated BFP
       );
       
       setUserProfile(loadedUserProfile);
@@ -358,8 +368,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       let finalBodyFatPercentage = newProfileData.bodyFatPercentage;
 
-      // If bodyFatPercentage was part of this specific update (e.g., user typed it or calc button set it), use that.
-      // Otherwise, if it's null, try to calculate it using Navy measurements.
       if (updates.bodyFatPercentage !== undefined) {
         finalBodyFatPercentage = updates.bodyFatPercentage;
       } else if (finalBodyFatPercentage === null) {
@@ -371,7 +379,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             newProfileData.waistCircumferenceCm,
             newProfileData.hipCircumferenceCm
         );
-        if (navyBFP !== null) {
+        // Only update BFP from Navy calculation if it's a valid number
+        if (navyBFP !== null && isFinite(navyBFP)) {
             finalBodyFatPercentage = navyBFP;
         }
       }
@@ -380,7 +389,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       newProfileData.leanBodyMassKg = calculateLBM(
         newProfileData.weightKg,
-        newProfileData.bodyFatPercentage
+        newProfileData.bodyFatPercentage 
       );
       newProfileData.tdee = calculateTDEE(
         newProfileData.weightKg,
@@ -440,7 +449,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ]);
 
   if (!isInitialized && !isRecipeCacheLoading) {
-    return null;
+    // Still initializing or recipes are loading but not yet finished, don't render children yet
+    // to prevent them from using a potentially incomplete context.
+    // You might want to show a global loading indicator here or return null.
+    return null; 
   }
   
 
@@ -454,3 +466,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
