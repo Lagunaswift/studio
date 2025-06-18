@@ -51,7 +51,7 @@ export default function HomePage() {
   const [showSetTargetsDialog, setShowSetTargetsDialog] = useState(false);
   const [featuredRecipe, setFeaturedRecipe] = useState<Recipe | null>(null);
 
-  const currentMacroTargets = authProfile?.macroTargets || appContextMacroTargets;
+  const currentMacroTargets = authProfile?.macroTargets || appContextUserProfile?.macroTargets || appContextMacroTargets;
   const welcomeName = authProfile?.email || user?.email || 'User';
 
   useEffect(() => {
@@ -60,9 +60,17 @@ export default function HomePage() {
 
   useEffect(() => {
     if (clientTodayDate && getDailyMacros) {
-      setClientTodayMacros(getDailyMacros(clientTodayDate));
+      const newMacros = getDailyMacros(clientTodayDate);
+      if (
+        newMacros.calories !== clientTodayMacros.calories ||
+        newMacros.protein !== clientTodayMacros.protein ||
+        newMacros.carbs !== clientTodayMacros.carbs ||
+        newMacros.fat !== clientTodayMacros.fat
+      ) {
+        setClientTodayMacros(newMacros);
+      }
     }
-  }, [clientTodayDate, getDailyMacros, mealPlan]);
+  }, [clientTodayDate, getDailyMacros, mealPlan, clientTodayMacros]); // Added clientTodayMacros to dependencies for comparison
 
   useEffect(() => {
     if (!isAppRecipeCacheLoading && allRecipesCache.length > 0) {
@@ -318,12 +326,12 @@ export default function HomePage() {
             </div>
             <div>
               <Label htmlFor="calories">Calculated Calories (kcal)</Label>
-              <Input id="calories" type="number" min="0" {...macroTargetForm.register("calories")} />
+              <Input id="calories" type="number" min="0" {...macroTargetForm.register("calories")} readOnly className="bg-muted/50"/>
               {macroTargetForm.formState.errors.calories && <p className="text-sm text-destructive mt-1">{macroTargetForm.formState.errors.calories.message}</p>}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowSetTargetsDialog(false)}>Cancel</Button>
-              <Button type="submit" className="bg-accent hover:bg-accent/90 text-accent-foreground">Save Targets</Button>
+              <Button type="submit" className="bg-accent hover:bg-accent/90 text-accent-foreground" disabled={!macroTargetForm.formState.isDirty}>Save Targets</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -331,3 +339,4 @@ export default function HomePage() {
     </PageWrapper>
   );
 }
+
