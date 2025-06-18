@@ -130,6 +130,11 @@ export interface UserProfileSettings {
   primaryGoal: PrimaryGoal | null;
   tdee: number | null;
   leanBodyMassKg: number | null;
+  // Navy Body Fat Calculation Inputs
+  neckCircumferenceCm?: number | null;
+  abdomenCircumferenceCm?: number | null; // Male
+  waistCircumferenceCm?: number | null;   // Female
+  hipCircumferenceCm?: number | null;     // Female
   subscription_status: SubscriptionStatus;
   plan_name?: string | null;
   subscription_start_date?: string | null;

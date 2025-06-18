@@ -52,16 +52,60 @@ const DEFAULT_USER_PROFILE: UserProfileSettings = {
   primaryGoal: 'notSpecified',
   tdee: null,
   leanBodyMassKg: null,
-  subscription_status: 'active', 
+  neckCircumferenceCm: null,
+  abdomenCircumferenceCm: null,
+  waistCircumferenceCm: null,
+  hipCircumferenceCm: null,
+  subscription_status: 'active',
   plan_name: null,
   subscription_start_date: null,
   subscription_end_date: null,
   subscription_duration: null,
 };
 
+// Helper function to calculate Navy Body Fat Percentage
+const calculateNavyBodyFatPercentage = (
+  sex: Sex | null,
+  heightCm: number | null,
+  neckCm: number | null,
+  abdomenCm?: number | null,
+  waistCm?: number | null,
+  hipCm?: number | null
+): number | null => {
+  if (!sex || !heightCm || heightCm <= 0 || !neckCm || neckCm <= 0) {
+    return null;
+  }
+
+  try {
+    if (sex === 'male') {
+      if (!abdomenCm || abdomenCm <= 0 || abdomenCm <= neckCm) {
+        return null;
+      }
+      const bf = 86.010 * Math.log10(abdomenCm - neckCm) - 70.041 * Math.log10(heightCm) + 36.76;
+      return Math.max(1, Math.min(100, parseFloat(bf.toFixed(1))));
+    } else if (sex === 'female') {
+      if (!waistCm || waistCm <= 0 || !hipCm || hipCm <= 0) {
+        return null;
+      }
+      const waistPlusHipMinusNeck = waistCm + hipCm - neckCm;
+      if (waistPlusHipMinusNeck <= 0) {
+        return null;
+      }
+      const bf = 163.205 * Math.log10(waistPlusHipMinusNeck) - 97.684 * Math.log10(heightCm) - 78.387;
+      return Math.max(1, Math.min(100, parseFloat(bf.toFixed(1))));
+    }
+  } catch (error) {
+    console.error("Error calculating Navy Body Fat %:", error);
+    return null;
+  }
+  return null;
+};
+
+
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
   if (weightKg && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
-    return weightKg * (1 - bodyFatPercentage / 100);
+    const lbm = weightKg * (1 - bodyFatPercentage / 100);
+    return parseFloat(lbm.toFixed(1));
   }
   return null;
 };
@@ -125,8 +169,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsRecipeCacheLoading(true);
       let recipes: Recipe[] = [];
       try {
-        // getAllRecipesFromData now refers to the function in src/lib/data.ts which uses mock data
-        recipes = await getAllRecipesFromData(); 
+        recipes = await getAllRecipesFromData();
         setAllRecipesCache(recipes);
       } catch (error) {
         console.error("Failed to load recipes into cache:", error);
@@ -140,43 +183,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let loadedUserProfile = loadState<UserProfileSettings>(USER_PROFILE_KEY);
 
       if (!loadedUserProfile) {
-        loadedUserProfile = DEFAULT_USER_PROFILE;
+        loadedUserProfile = { ...DEFAULT_USER_PROFILE };
       } else {
         loadedUserProfile = { ...DEFAULT_USER_PROFILE, ...loadedUserProfile };
-        if (loadedUserProfile.subscription_status === undefined) { 
-            loadedUserProfile.subscription_status = DEFAULT_USER_PROFILE.subscription_status;
+      }
+
+      // Ensure all fields from DEFAULT_USER_PROFILE are present
+      for (const key in DEFAULT_USER_PROFILE) {
+        if (loadedUserProfile[key as keyof UserProfileSettings] === undefined) {
+          loadedUserProfile[key as keyof UserProfileSettings] = DEFAULT_USER_PROFILE[key as keyof UserProfileSettings];
         }
-        loadedUserProfile.tdee = calculateTDEE(
-          loadedUserProfile.weightKg,
-          loadedUserProfile.heightCm,
-          loadedUserProfile.age,
+      }
+      
+      // Initial calculation of derived values if necessary
+      let initialBFP = loadedUserProfile.bodyFatPercentage;
+      if (initialBFP === null) {
+        initialBFP = calculateNavyBodyFatPercentage(
           loadedUserProfile.sex,
-          loadedUserProfile.activityLevel
+          loadedUserProfile.heightCm,
+          loadedUserProfile.neckCircumferenceCm,
+          loadedUserProfile.abdomenCircumferenceCm,
+          loadedUserProfile.waistCircumferenceCm,
+          loadedUserProfile.hipCircumferenceCm
         );
-        loadedUserProfile.leanBodyMassKg = calculateLBM(
-          loadedUserProfile.weightKg,
-          loadedUserProfile.bodyFatPercentage
-        );
       }
-      if (!loadedUserProfile.mealStructure || loadedUserProfile.mealStructure.length === 0) {
-          loadedUserProfile.mealStructure = [...DEFAULT_USER_PROFILE.mealStructure];
-      }
-      if (!loadedUserProfile.macroTargets && DEFAULT_USER_PROFILE.macroTargets) {
-            loadedUserProfile.macroTargets = {...DEFAULT_USER_PROFILE.macroTargets};
-      }
-      loadedUserProfile.dietaryPreferences = loadedUserProfile.dietaryPreferences || [];
-      loadedUserProfile.allergens = loadedUserProfile.allergens || [];
+      loadedUserProfile.bodyFatPercentage = initialBFP;
+      loadedUserProfile.tdee = calculateTDEE(
+        loadedUserProfile.weightKg,
+        loadedUserProfile.heightCm,
+        loadedUserProfile.age,
+        loadedUserProfile.sex,
+        loadedUserProfile.activityLevel
+      );
+      loadedUserProfile.leanBodyMassKg = calculateLBM(
+        loadedUserProfile.weightKg,
+        loadedUserProfile.bodyFatPercentage
+      );
       
       setUserProfile(loadedUserProfile);
 
       const populatedMealPlan = loadedMealPlan.map(pm => {
-        const recipeDetails = recipes.find(r => r.id === pm.recipeId); 
+        const recipeDetails = recipes.find(r => r.id === pm.recipeId);
         return {...pm, recipeDetails: recipeDetails || undefined };
       });
       setMealPlan(populatedMealPlan);
       
       if (loadedShoppingList.length === 0 && populatedMealPlan.length > 0) {
-        setShoppingList(generateShoppingListUtil(populatedMealPlan, recipes)); 
+        setShoppingList(generateShoppingListUtil(populatedMealPlan, recipes));
       } else {
         setShoppingList(loadedShoppingList);
       }
@@ -187,24 +240,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   useEffect(() => {
-    if (allRecipesCache.length > 0 && mealPlan.length > 0) {
+    if (allRecipesCache.length > 0 && mealPlan.length > 0 && isInitialized) {
       let madeAChange = false;
       const updatedMealPlan = mealPlan.map(pm => {
-        if (!pm.recipeDetails) { // If details are missing
+        if (!pm.recipeDetails) {
           const recipeDetails = allRecipesCache.find(r => r.id === pm.recipeId);
-          if (recipeDetails) { // And we found details
+          if (recipeDetails) {
             madeAChange = true;
-            return { ...pm, recipeDetails }; // Update this item
+            return { ...pm, recipeDetails };
           }
         }
-        return pm; // Otherwise, return the item as is
+        return pm;
       });
 
       if (madeAChange) {
-        setMealPlan(updatedMealPlan); // Only call setMealPlan if an actual update occurred
+        setMealPlan(updatedMealPlan);
       }
     }
-  }, [allRecipesCache, mealPlan]);
+  }, [allRecipesCache, mealPlan, isInitialized]);
 
 
   useEffect(() => {
@@ -294,29 +347,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const clearAllData = useCallback(() => {
     setMealPlan([]);
-    setShoppingList([]); 
-    setUserProfile(prevProfile => ({
-      ...DEFAULT_USER_PROFILE,
-       ...DEFAULT_USER_PROFILE
-    }));
-  }, []); 
+    setShoppingList([]);
+    setUserProfile({ ...DEFAULT_USER_PROFILE });
+  }, []);
 
   const updateUserProfileState = useCallback((updates: Partial<UserProfileSettings>) => {
     setUserProfile(prevProfile => {
-      const currentProfile = prevProfile || DEFAULT_USER_PROFILE;
-      const updatedProfile = { ...currentProfile, ...updates };
-      updatedProfile.tdee = calculateTDEE(
-        updatedProfile.weightKg,
-        updatedProfile.heightCm,
-        updatedProfile.age,
-        updatedProfile.sex,
-        updatedProfile.activityLevel
+      const currentProfile = prevProfile || { ...DEFAULT_USER_PROFILE };
+      let newProfileData = { ...currentProfile, ...updates };
+
+      let finalBodyFatPercentage = newProfileData.bodyFatPercentage;
+
+      // If bodyFatPercentage was part of this specific update (e.g., user typed it or calc button set it), use that.
+      // Otherwise, if it's null, try to calculate it using Navy measurements.
+      if (updates.bodyFatPercentage !== undefined) {
+        finalBodyFatPercentage = updates.bodyFatPercentage;
+      } else if (finalBodyFatPercentage === null) {
+        const navyBFP = calculateNavyBodyFatPercentage(
+            newProfileData.sex,
+            newProfileData.heightCm,
+            newProfileData.neckCircumferenceCm,
+            newProfileData.abdomenCircumferenceCm,
+            newProfileData.waistCircumferenceCm,
+            newProfileData.hipCircumferenceCm
+        );
+        if (navyBFP !== null) {
+            finalBodyFatPercentage = navyBFP;
+        }
+      }
+      
+      newProfileData.bodyFatPercentage = finalBodyFatPercentage;
+
+      newProfileData.leanBodyMassKg = calculateLBM(
+        newProfileData.weightKg,
+        newProfileData.bodyFatPercentage
       );
-      updatedProfile.leanBodyMassKg = calculateLBM(
-        updatedProfile.weightKg,
-        updatedProfile.bodyFatPercentage
+      newProfileData.tdee = calculateTDEE(
+        newProfileData.weightKg,
+        newProfileData.heightCm,
+        newProfileData.age,
+        newProfileData.sex,
+        newProfileData.activityLevel
       );
-      return updatedProfile;
+      return newProfileData;
     });
   }, []);
 
@@ -366,17 +439,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDietaryPreferences, setAllergens, setMealStructure, setUserInformation, isRecipeCacheLoading
   ]);
 
-  if (!isInitialized && !isRecipeCacheLoading) { // Ensure we don't return null if recipes are still loading
-    return null; 
+  if (!isInitialized && !isRecipeCacheLoading) {
+    return null;
   }
   
-  // Still return loading indicator if cache is loading but context is otherwise ready
-  if (isRecipeCacheLoading && !isInitialized) {
-      // You might want a global loading spinner here, or let individual components handle it.
-      // For now, returning null until fully initialized or cache loaded.
-      // Consider if children should render with partial data or wait.
-  }
-
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 };

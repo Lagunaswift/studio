@@ -1,13 +1,13 @@
 
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useForm, SubmitHandler } from 'react-hook-form';
+import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAppContext } from '@/context/AppContext';
@@ -15,7 +15,51 @@ import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import type { UserProfileSettings, Sex, ActivityLevel, AthleteType, PrimaryGoal } from '@/types';
 import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS } from '@/types';
-import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon } from 'lucide-react';
+import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, TapeMeasure } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+
+// Helper function (can be moved to utils if used elsewhere)
+const calculateNavyBodyFatPercentage = (
+  sex: Sex | null | undefined,
+  heightCm: number | null | undefined,
+  neckCm: number | null | undefined,
+  abdomenCm?: number | null | undefined,
+  waistCm?: number | null | undefined,
+  hipCm?: number | null | undefined
+): number | null => {
+  if (!sex || !heightCm || heightCm <= 0 || !neckCm || neckCm <= 0) {
+    return null;
+  }
+
+  try {
+    if (sex === 'male') {
+      if (!abdomenCm || abdomenCm <= 0 || abdomenCm <= neckCm) {
+         console.warn("Male BFP calc: Abdomen must be > Neck and > 0.");
+        return null;
+      }
+      const bf = 86.010 * Math.log10(abdomenCm - neckCm) - 70.041 * Math.log10(heightCm) + 36.76;
+      return Math.max(1, Math.min(100, parseFloat(bf.toFixed(1))));
+    } else if (sex === 'female') {
+      if (!waistCm || waistCm <= 0 || !hipCm || hipCm <= 0) {
+        console.warn("Female BFP calc: Waist and Hip must be > 0.");
+        return null;
+      }
+      const waistPlusHipMinusNeck = waistCm + hipCm - neckCm;
+      if (waistPlusHipMinusNeck <= 0) {
+        console.warn("Female BFP calc: Waist + Hip - Neck must be > 0.");
+        return null;
+      }
+      const bf = 163.205 * Math.log10(waistPlusHipMinusNeck) - 97.684 * Math.log10(heightCm) - 78.387;
+      return Math.max(1, Math.min(100, parseFloat(bf.toFixed(1))));
+    }
+  } catch (error) {
+    console.error("Error in Navy BFP calculation:", error);
+    return null;
+  }
+  return null;
+};
+
 
 const userInfoSchema = z.object({
   name: z.string().min(1, "Name is required.").max(100, "Name is too long.").nullable().optional(),
@@ -28,13 +72,37 @@ const userInfoSchema = z.object({
   bodyFatPercentage: z.coerce.number().min(1, "Body fat % must be at least 1").max(70, "Body fat % must be at most 70").nullable().optional(),
   athleteType: z.enum(ATHLETE_TYPE_OPTIONS.map(o => o.value) as [AthleteType, ...AthleteType[]]).nullable().optional(),
   primaryGoal: z.enum(PRIMARY_GOAL_OPTIONS.map(o => o.value) as [PrimaryGoal, ...PrimaryGoal[]]).nullable().optional(),
+  neckCircumferenceCm: z.coerce.number().min(1, "Neck circumference must be positive").nullable().optional(),
+  abdomenCircumferenceCm: z.coerce.number().min(1, "Abdomen circumference must be positive").nullable().optional(), // Male
+  waistCircumferenceCm: z.coerce.number().min(1, "Waist circumference must be positive").nullable().optional(),   // Female
+  hipCircumferenceCm: z.coerce.number().min(1, "Hip circumference must be positive").nullable().optional(),     // Female
+}).refine(data => { // Ensure abdomen > neck for males if both are provided
+  if (data.sex === 'male' && data.abdomenCircumferenceCm && data.neckCircumferenceCm) {
+    return data.abdomenCircumferenceCm > data.neckCircumferenceCm;
+  }
+  return true;
+}, {
+  message: "Abdomen circumference must be greater than neck circumference for males.",
+  path: ["abdomenCircumferenceCm"],
+}).refine(data => { // Ensure waist + hip > neck for females if all are provided
+    if (data.sex === 'female' && data.waistCircumferenceCm && data.hipCircumferenceCm && data.neckCircumferenceCm) {
+        return (data.waistCircumferenceCm + data.hipCircumferenceCm) > data.neckCircumferenceCm;
+    }
+    return true;
+}, {
+    message: "For females, the sum of waist and hip circumferences must be greater than neck circumference.",
+    path: ["hipCircumferenceCm"], // Or waistCircumferenceCm
 });
 
-type UserInfoFormValues = Pick<UserProfileSettings, 'name' | 'email' | 'heightCm' | 'weightKg' | 'age' | 'sex' | 'activityLevel' | 'bodyFatPercentage' | 'athleteType' | 'primaryGoal'>;
+
+type UserInfoFormValues = z.infer<typeof userInfoSchema>;
 
 export default function UserInfoPage() {
   const { userProfile, setUserInformation } = useAppContext();
   const { toast } = useToast();
+  const [calculationMessage, setCalculationMessage] = useState<string | null>(null);
+  const [calculationError, setCalculationError] = useState<boolean>(false);
+
 
   const form = useForm<UserInfoFormValues>({
     resolver: zodResolver(userInfoSchema),
@@ -49,33 +117,108 @@ export default function UserInfoPage() {
       bodyFatPercentage: userProfile?.bodyFatPercentage || null,
       athleteType: userProfile?.athleteType || 'notSpecified',
       primaryGoal: userProfile?.primaryGoal || 'notSpecified',
+      neckCircumferenceCm: userProfile?.neckCircumferenceCm || null,
+      abdomenCircumferenceCm: userProfile?.abdomenCircumferenceCm || null,
+      waistCircumferenceCm: userProfile?.waistCircumferenceCm || null,
+      hipCircumferenceCm: userProfile?.hipCircumferenceCm || null,
     },
   });
+
+  const watchedSex = form.watch("sex");
 
   useEffect(() => {
     if (userProfile) {
       form.reset({
-        name: userProfile.name,
-        email: userProfile.email,
-        heightCm: userProfile.heightCm,
-        weightKg: userProfile.weightKg,
-        age: userProfile.age,
-        sex: userProfile.sex,
-        activityLevel: userProfile.activityLevel,
-        bodyFatPercentage: userProfile.bodyFatPercentage,
-        athleteType: userProfile.athleteType,
-        primaryGoal: userProfile.primaryGoal,
+        name: userProfile.name || null,
+        email: userProfile.email || null,
+        heightCm: userProfile.heightCm || null,
+        weightKg: userProfile.weightKg || null,
+        age: userProfile.age || null,
+        sex: userProfile.sex || null,
+        activityLevel: userProfile.activityLevel || null,
+        bodyFatPercentage: userProfile.bodyFatPercentage || null,
+        athleteType: userProfile.athleteType || 'notSpecified',
+        primaryGoal: userProfile.primaryGoal || 'notSpecified',
+        neckCircumferenceCm: userProfile.neckCircumferenceCm || null,
+        abdomenCircumferenceCm: userProfile.abdomenCircumferenceCm || null,
+        waistCircumferenceCm: userProfile.waistCircumferenceCm || null,
+        hipCircumferenceCm: userProfile.hipCircumferenceCm || null,
       });
     }
   }, [userProfile, form]);
 
   const onSubmit: SubmitHandler<UserInfoFormValues> = (data) => {
-    setUserInformation(data);
+    setUserInformation(data); // AppContext will handle recalculating LBM/TDEE
     toast({
       title: "User Information Saved",
       description: "Your profile details have been updated.",
     });
+    form.reset(data); // Reset form with saved data to clear dirty state
   };
+
+  const handleCalculateBodyFat = () => {
+    setCalculationMessage(null);
+    setCalculationError(false);
+    const { heightCm, sex, neckCircumferenceCm, abdomenCircumferenceCm, waistCircumferenceCm, hipCircumferenceCm } = form.getValues();
+
+    if (!sex || !heightCm || !neckCircumferenceCm) {
+      setCalculationMessage("Sex, Height, and Neck circumference are required for body fat calculation.");
+      setCalculationError(true);
+      toast({ title: "Missing Information", description: "Sex, Height, and Neck circumference are required.", variant: "destructive"});
+      return;
+    }
+
+    let calculatedBFP: number | null = null;
+    if (sex === 'male') {
+        if (!abdomenCircumferenceCm) {
+            setCalculationMessage("Abdomen circumference is required for male body fat calculation.");
+            setCalculationError(true);
+            toast({ title: "Missing Information", description: "Abdomen circumference is required for males.", variant: "destructive"});
+            return;
+        }
+         if (abdomenCircumferenceCm <= neckCircumferenceCm) {
+            setCalculationMessage("For males, abdomen circumference must be greater than neck circumference.");
+            setCalculationError(true);
+            toast({ title: "Invalid Measurements", description: "Abdomen must be greater than neck for males.", variant: "destructive"});
+            return;
+        }
+    } else if (sex === 'female') {
+        if (!waistCircumferenceCm || !hipCircumferenceCm) {
+            setCalculationMessage("Waist and Hip circumferences are required for female body fat calculation.");
+            setCalculationError(true);
+            toast({ title: "Missing Information", description: "Waist and Hip circumferences are required for females.", variant: "destructive"});
+            return;
+        }
+        if ((waistCircumferenceCm + hipCircumferenceCm) <= neckCircumferenceCm) {
+            setCalculationMessage("For females, (Waist + Hip) must be greater than Neck circumference.");
+            setCalculationError(true);
+            toast({ title: "Invalid Measurements", description: "For females, (Waist + Hip) must be > Neck.", variant: "destructive"});
+            return;
+        }
+    }
+
+
+    calculatedBFP = calculateNavyBodyFatPercentage(
+      sex,
+      heightCm,
+      neckCircumferenceCm,
+      abdomenCircumferenceCm,
+      waistCircumferenceCm,
+      hipCircumferenceCm
+    );
+
+    if (calculatedBFP !== null && !isNaN(calculatedBFP)) {
+      form.setValue("bodyFatPercentage", parseFloat(calculatedBFP.toFixed(1)), { shouldValidate: true, shouldDirty: true });
+      setCalculationMessage(`Estimated Body Fat: ${calculatedBFP.toFixed(1)}%. This value has been updated in the form.`);
+      setCalculationError(false);
+      toast({ title: "Body Fat Calculated", description: `Estimated at ${calculatedBFP.toFixed(1)}%. You can now save your profile.`});
+    } else {
+      setCalculationMessage("Could not calculate body fat percentage. Please check your measurements. Ensure abdomen > neck (males) or waist + hip > neck (females).");
+      setCalculationError(true);
+      toast({ title: "Calculation Error", description: "Please check measurements. Abdomen > Neck (M), Waist + Hip > Neck (F).", variant: "destructive"});
+    }
+  };
+
 
   const { tdee, leanBodyMassKg } = userProfile || {};
 
@@ -126,7 +269,7 @@ export default function UserInfoPage() {
                     name="heightCm"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Height (cm)</FormLabel>
+                        <FormLabel className="flex items-center"><Ruler className="mr-2 h-4 w-4 text-muted-foreground"/>Height (cm)</FormLabel>
                         <FormControl>
                           <Input type="number" placeholder="e.g., 175" {...field} value={field.value ?? ""} />
                         </FormControl>
@@ -168,29 +311,122 @@ export default function UserInfoPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Sex</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value ?? undefined}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select sex" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {SEX_OPTIONS.map(option => (
-                              <SelectItem key={option} value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Controller
+                          name="sex"
+                          control={form.control}
+                          render={({ field: controllerField }) => (
+                            <Select 
+                              onValueChange={(value) => {
+                                controllerField.onChange(value as Sex);
+                                // Reset gender-specific fields when sex changes
+                                if (value === 'male') {
+                                  form.setValue('waistCircumferenceCm', null, {shouldValidate: true});
+                                  form.setValue('hipCircumferenceCm', null, {shouldValidate: true});
+                                } else if (value === 'female') {
+                                  form.setValue('abdomenCircumferenceCm', null, {shouldValidate: true});
+                                }
+                              }} 
+                              value={controllerField.value ?? undefined}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select sex" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {SEX_OPTIONS.map(option => (
+                                  <SelectItem key={option} value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
+
+                <div className="space-y-2 p-4 border rounded-md bg-muted/20">
+                    <h4 className="text-md font-semibold text-primary flex items-center mb-3">
+                        <TapeMeasure className="mr-2 h-5 w-5 text-accent"/> Body Measurements (for optional Body Fat % calc)
+                    </h4>
+                    <FormField
+                        control={form.control}
+                        name="neckCircumferenceCm"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Neck Circumference (cm)</FormLabel>
+                            <FormControl>
+                            <Input type="number" step="0.1" placeholder="e.g., 38.5" {...field} value={field.value ?? ""} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                    {watchedSex === 'male' && (
+                        <FormField
+                            control={form.control}
+                            name="abdomenCircumferenceCm"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Abdomen Circumference (cm)</FormLabel>
+                                <FormControl>
+                                <Input type="number" step="0.1" placeholder="e.g., 90.0 (at navel level)" {...field} value={field.value ?? ""} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                    )}
+                    {watchedSex === 'female' && (
+                        <>
+                        <FormField
+                            control={form.control}
+                            name="waistCircumferenceCm"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Waist Circumference (cm)</FormLabel>
+                                <FormControl>
+                                <Input type="number" step="0.1" placeholder="e.g., 70.0 (narrowest point)" {...field} value={field.value ?? ""} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="hipCircumferenceCm"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Hip Circumference (cm)</FormLabel>
+                                <FormControl>
+                                <Input type="number" step="0.1" placeholder="e.g., 95.0 (widest point)" {...field} value={field.value ?? ""} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        </>
+                    )}
+                    <Button type="button" variant="outline" onClick={handleCalculateBodyFat} className="mt-2 w-full sm:w-auto">
+                        <Calculator className="mr-2 h-4 w-4 text-accent"/> Calculate Body Fat % (Navy Method)
+                    </Button>
+                    {calculationMessage && (
+                         <Alert variant={calculationError ? "destructive" : "default"} className="mt-2">
+                            <AlertTitle>{calculationError ? "Error" : "Info"}</AlertTitle>
+                            <AlertDescription>{calculationMessage}</AlertDescription>
+                        </Alert>
+                    )}
+                </div>
+
+
                 <FormField
                   control={form.control}
                   name="bodyFatPercentage"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Body Fat % (Optional)</FormLabel>
+                      <FormLabel>Body Fat % (Direct Entry or Calculated)</FormLabel>
                       <FormControl>
                         <Input type="number" step="0.1" placeholder="e.g., 15.5" {...field} value={field.value ?? ""} />
                       </FormControl>
@@ -280,7 +516,7 @@ export default function UserInfoPage() {
           <CardHeader>
             <CardTitle className="flex items-center"><Calculator className="mr-2 h-5 w-5 text-accent"/> Calculated Estimates</CardTitle>
             <CardDescription>
-              Based on your inputs. These help in setting macro targets.
+              Based on your inputs. These help in setting macro targets. LBM requires Body Fat %.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -298,8 +534,9 @@ export default function UserInfoPage() {
               </p>
               {!leanBodyMassKg && <p className="text-xs text-muted-foreground">Requires weight and body fat %.</p>}
             </div>
-             {(!tdee || !leanBodyMassKg) && userProfile && (userProfile.heightCm && userProfile.weightKg && userProfile.age && userProfile.sex && userProfile.activityLevel && (userProfile.bodyFatPercentage || leanBodyMassKg === null )) &&
-                <p className="text-xs text-muted-foreground pt-4">Make sure all required fields are filled to see estimates.</p>
+             {(!tdee || !leanBodyMassKg) && userProfile && 
+              (userProfile.heightCm && userProfile.weightKg && userProfile.age && userProfile.sex && userProfile.activityLevel && (userProfile.bodyFatPercentage !==null || leanBodyMassKg === null )) &&
+                <p className="text-xs text-muted-foreground pt-4">Make sure all required fields (Height, Weight, Age, Sex, Activity Level, and Body Fat % or measurements for calculation) are filled to see estimates.</p>
             }
           </CardContent>
         </Card>
