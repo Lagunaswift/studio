@@ -11,8 +11,9 @@ import type { MealSlotConfig, MacroTargets, Sex, ActivityLevel, AthleteType, Pri
 // Define the shape of your profile data
 interface Profile {
   id: string;
+  name?: string | null;
   email?: string;
-  full_name?: string;
+  full_name?: string; // Supabase often uses full_name
   subscription_status?: 'active' | 'inactive' | 'none' | null;
   plan_name?: string | null;
   // Add any other fields from your profiles table
@@ -49,7 +50,7 @@ const MOCK_USER_ID = 'local-test-user';
 const mockUser: User = {
   id: MOCK_USER_ID,
   app_metadata: { provider: 'email' },
-  user_metadata: { full_name: 'Local Tester' },
+  user_metadata: { full_name: 'Local Tester', name: 'Local Tester' },
   aud: 'authenticated',
   created_at: new Date().toISOString(),
   email: 'tester@example.com',
@@ -67,6 +68,7 @@ const mockSession: Session = {
 // Minimal mock profile, or null. Detailed profile comes from AppContext for local testing.
 const mockProfile: Profile | null = {
     id: MOCK_USER_ID,
+    name: 'Local Tester',
     email: 'tester@example.com',
     full_name: 'Local Tester',
     subscription_status: 'active', // Assuming active for testing unlocked features

@@ -15,9 +15,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import type { UserProfileSettings, Sex, ActivityLevel, AthleteType, PrimaryGoal } from '@/types';
 import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS } from '@/types';
-import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell } from 'lucide-react'; // Added TargetIcon, Dumbbell
+import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon } from 'lucide-react';
 
 const userInfoSchema = z.object({
+  name: z.string().min(1, "Name is required.").max(100, "Name is too long.").nullable().optional(),
+  email: z.string().email("Invalid email address.").nullable().optional(),
   heightCm: z.coerce.number().min(50, "Height must be at least 50cm").max(300, "Height must be at most 300cm").nullable().optional(),
   weightKg: z.coerce.number().min(20, "Weight must be at least 20kg").max(500, "Weight must be at most 500kg").nullable().optional(),
   age: z.coerce.number().min(1, "Age must be at least 1").max(120, "Age must be at most 120").nullable().optional(),
@@ -28,7 +30,7 @@ const userInfoSchema = z.object({
   primaryGoal: z.enum(PRIMARY_GOAL_OPTIONS.map(o => o.value) as [PrimaryGoal, ...PrimaryGoal[]]).nullable().optional(),
 });
 
-type UserInfoFormValues = Pick<UserProfileSettings, 'heightCm' | 'weightKg' | 'age' | 'sex' | 'activityLevel' | 'bodyFatPercentage' | 'athleteType' | 'primaryGoal'>;
+type UserInfoFormValues = Pick<UserProfileSettings, 'name' | 'email' | 'heightCm' | 'weightKg' | 'age' | 'sex' | 'activityLevel' | 'bodyFatPercentage' | 'athleteType' | 'primaryGoal'>;
 
 export default function UserInfoPage() {
   const { userProfile, setUserInformation } = useAppContext();
@@ -37,6 +39,8 @@ export default function UserInfoPage() {
   const form = useForm<UserInfoFormValues>({
     resolver: zodResolver(userInfoSchema),
     defaultValues: {
+      name: userProfile?.name || null,
+      email: userProfile?.email || null,
       heightCm: userProfile?.heightCm || null,
       weightKg: userProfile?.weightKg || null,
       age: userProfile?.age || null,
@@ -51,6 +55,8 @@ export default function UserInfoPage() {
   useEffect(() => {
     if (userProfile) {
       form.reset({
+        name: userProfile.name,
+        email: userProfile.email,
         heightCm: userProfile.heightCm,
         weightKg: userProfile.weightKg,
         age: userProfile.age,
@@ -80,12 +86,40 @@ export default function UserInfoPage() {
           <CardHeader>
             <CardTitle className="flex items-center"><UserCircle className="mr-2 h-5 w-5 text-accent"/> Your Details</CardTitle>
             <CardDescription>
-              Provide your physical attributes, activity level, and goals to help personalize your experience.
+              Provide your name, email, physical attributes, activity level, and goals to help personalize your experience.
             </CardDescription>
           </CardHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
               <CardContent className="space-y-6">
+                <div className="grid sm:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center"><UserIcon className="mr-2 h-4 w-4 text-muted-foreground"/>Name</FormLabel>
+                        <FormControl>
+                          <Input type="text" placeholder="Your Name" {...field} value={field.value ?? ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center"><Mail className="mr-2 h-4 w-4 text-muted-foreground"/>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="you@example.com" {...field} value={field.value ?? ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <div className="grid sm:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}

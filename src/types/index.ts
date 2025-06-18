@@ -114,6 +114,8 @@ export const PRIMARY_GOAL_OPTIONS: { value: PrimaryGoal; label: string }[] = [
 export type SubscriptionStatus = 'active' | 'inactive' | 'none' | null;
 
 export interface UserProfileSettings {
+  name?: string | null;
+  email?: string | null;
   macroTargets: MacroTargets | null;
   dietaryPreferences: string[];
   allergens: string[];

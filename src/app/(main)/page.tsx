@@ -51,8 +51,8 @@ export default function HomePage() {
   const [showSetTargetsDialog, setShowSetTargetsDialog] = useState(false);
   const [featuredRecipe, setFeaturedRecipe] = useState<Recipe | null>(null);
 
-  const currentMacroTargets = authProfile?.macroTargets || appContextUserProfile?.macroTargets || appContextMacroTargets;
-  const welcomeName = authProfile?.email || user?.email || 'User';
+  const currentMacroTargets = appContextUserProfile?.macroTargets || appContextMacroTargets; // Prioritize AppContext for local user settings
+  const welcomeName = appContextUserProfile?.name || appContextUserProfile?.email || authProfile?.name || authProfile?.email || user?.email || 'User';
 
   useEffect(() => {
     setClientTodayDate(format(new Date(), 'yyyy-MM-dd'));
@@ -70,7 +70,7 @@ export default function HomePage() {
         setClientTodayMacros(newMacros);
       }
     }
-  }, [clientTodayDate, getDailyMacros, mealPlan, clientTodayMacros]); // Added clientTodayMacros to dependencies for comparison
+  }, [clientTodayDate, getDailyMacros, mealPlan, clientTodayMacros]);
 
   useEffect(() => {
     if (!isAppRecipeCacheLoading && allRecipesCache.length > 0) {
@@ -159,7 +159,7 @@ export default function HomePage() {
 
   const macroKeys: (keyof MacroTargets)[] = ['calories', 'protein', 'carbs', 'fat'];
 
-  const isSubscribedActive = authProfile?.subscription_status === 'active' || appContextUserProfile?.subscription_status === 'active';
+  const isSubscribedActive = appContextUserProfile?.subscription_status === 'active'; // Check AppContext for sub status
 
   if (isAuthLoading || (isAppRecipeCacheLoading && !user && !authProfile)) { 
     return (
@@ -171,9 +171,6 @@ export default function HomePage() {
       </PageWrapper>
     );
   }
-
-  // If we are not requiring login for testing, we will render the dashboard content.
-  // The `!user` check that previously redirected to login is removed for this temporary setup.
 
   return (
     <PageWrapper title={`Dashboard - Welcome, ${welcomeName}!`}>
@@ -189,14 +186,12 @@ export default function HomePage() {
       <section className="mb-12">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold font-headline text-primary">
-            {user ? "Today's Macros" : "Daily Macro Tracker"} ({clientTodayDate && isValid(parseISO(clientTodayDate)) ? format(parseISO(clientTodayDate), "MMMM dd, yyyy") : 'Loading...'})
+            {"Today's Macros"} ({clientTodayDate && isValid(parseISO(clientTodayDate)) ? format(parseISO(clientTodayDate), "MMMM dd, yyyy") : 'Loading...'})
           </h2>
-          {user && ( // Only show button if user context might exist
-             <Button variant="outline" onClick={() => setShowSetTargetsDialog(true)}>
-              {currentMacroTargets ? <Edit className="mr-2 h-4 w-4" /> : <Target className="mr-2 h-4 w-4" />}
-              {currentMacroTargets ? "Update Targets" : "Set Targets"}
-            </Button>
-          )}
+          <Button variant="outline" onClick={() => setShowSetTargetsDialog(true)}>
+            {currentMacroTargets ? <Edit className="mr-2 h-4 w-4" /> : <Target className="mr-2 h-4 w-4" />}
+            {currentMacroTargets ? "Update Targets" : "Set Targets"}
+          </Button>
         </div>
 
         {currentMacroTargets ? (
@@ -232,20 +227,11 @@ export default function HomePage() {
           <Card className="shadow-md">
             <CardContent className="pt-6 text-center">
               <p className="text-foreground/70 mb-4">
-                {user ? "Set your daily macro targets to track your progress!" : "Log in to set and track your daily macro targets!"}
+                Set your daily macro targets to track your progress!
               </p>
-              {user && (
-                <Button onClick={() => setShowSetTargetsDialog(true)} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                  <Target className="mr-2 h-4 w-4" /> Set Targets Now
-                </Button>
-              )}
-              {!user && (
-                <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                  <Link href="/login">
-                     <Target className="mr-2 h-4 w-4" /> Log In to Set Targets
-                  </Link>
-                </Button>
-              )}
+              <Button onClick={() => setShowSetTargetsDialog(true)} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                <Target className="mr-2 h-4 w-4" /> Set Targets Now
+              </Button>
             </CardContent>
           </Card>
         )}
@@ -326,7 +312,7 @@ export default function HomePage() {
             </div>
             <div>
               <Label htmlFor="calories">Calculated Calories (kcal)</Label>
-              <Input id="calories" type="number" min="0" {...macroTargetForm.register("calories")} readOnly className="bg-muted/50"/>
+              <Input id="calories" type="number" min="0" {...macroTargetForm.register("calories")} readOnly className="bg-muted/50 cursor-not-allowed"/>
               {macroTargetForm.formState.errors.calories && <p className="text-sm text-destructive mt-1">{macroTargetForm.formState.errors.calories.message}</p>}
             </div>
             <DialogFooter>
@@ -339,4 +325,3 @@ export default function HomePage() {
     </PageWrapper>
   );
 }
-

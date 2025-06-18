@@ -36,6 +36,8 @@ const DEFAULT_MEAL_STRUCTURE: MealSlotConfig[] = [
 ];
 
 const DEFAULT_USER_PROFILE: UserProfileSettings = {
+  name: null,
+  email: null,
   macroTargets: null,
   dietaryPreferences: [],
   allergens: [],
@@ -386,4 +388,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-
