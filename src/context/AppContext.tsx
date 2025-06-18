@@ -157,8 +157,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         );
       }
       if (!loadedUserProfile.mealStructure || loadedUserProfile.mealStructure.length === 0) {
-          loadedUserProfile.mealStructure = DEFAULT_MEAL_STRUCTURE;
+          loadedUserProfile.mealStructure = [...DEFAULT_USER_PROFILE.mealStructure];
       }
+      if (!loadedUserProfile.macroTargets && DEFAULT_USER_PROFILE.macroTargets) {
+            loadedUserProfile.macroTargets = {...DEFAULT_USER_PROFILE.macroTargets};
+      }
+      loadedUserProfile.dietaryPreferences = loadedUserProfile.dietaryPreferences || [];
+      loadedUserProfile.allergens = loadedUserProfile.allergens || [];
       
       setUserProfile(loadedUserProfile);
 
@@ -179,17 +184,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     initializeData();
   }, []);
 
-   useEffect(() => {
-    if (allRecipesCache.length > 0 && mealPlan.some(pm => !pm.recipeDetails)) {
-        setMealPlan(prevMealPlan => 
-            prevMealPlan.map(pm => {
-                if (!pm.recipeDetails) {
-                    const recipeDetails = allRecipesCache.find(r => r.id === pm.recipeId);
-                    return {...pm, recipeDetails: recipeDetails || undefined};
-                }
-                return pm;
-            })
-        );
+  useEffect(() => {
+    if (allRecipesCache.length > 0 && mealPlan.length > 0) {
+      let madeAChange = false;
+      const updatedMealPlan = mealPlan.map(pm => {
+        if (!pm.recipeDetails) { // If details are missing
+          const recipeDetails = allRecipesCache.find(r => r.id === pm.recipeId);
+          if (recipeDetails) { // And we found details
+            madeAChange = true;
+            return { ...pm, recipeDetails }; // Update this item
+          }
+        }
+        return pm; // Otherwise, return the item as is
+      });
+
+      if (madeAChange) {
+        setMealPlan(updatedMealPlan); // Only call setMealPlan if an actual update occurred
+      }
     }
   }, [allRecipesCache, mealPlan]);
 
