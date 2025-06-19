@@ -78,7 +78,7 @@ const categoryKeywords: Record<UKSupermarketCategory, string[]> = {
   "Bakery": ["bread", "baguette", "rolls", "croissant", "bagel", "muffin", "cake", "pastry", "wrap", "tortilla (bread)", "crackers", "biscuit", "panko breadcrumbs", "breadcrumbs", "digestive biscuits"],
   "Meat & Poultry": ["chicken", "beef", "pork", "lamb", "turkey", "mince", "sausage", "bacon", "ham", "steak", "gammon", "ground turkey", "ribs", "drumsticks", "tenderloin", "pork shoulder", "chicken breast", "chicken thighs"],
   "Fish & Seafood": ["salmon", "cod", "haddock", "tuna", "mackerel", "prawns", "shrimp", "scallops", "mussels", "fish", "smoked salmon", "sea bass", "halibut", "anchovies"],
-  "Dairy, Butter & Eggs": ["milk", "cheese", "cheddar", "mozzarella", "yogurt", "yoghurt", "butter", "cream", "eggs", "cottage cheese", "creme fraiche", "soy milk", "almond milk", "feta cheese", "egg whites", "plant or dairy", "goat's cheese", "goat cheese", "parmesan", "parmigiano reggiano", "ricotta", "cream cheese", "quark", "burrata"],
+  "Dairy, Butter & Eggs": ["milk", "cheese", "cheddar", "mozzarella", "yogurt", "yoghurt", "butter", "cream", "eggs", "egg", "cottage cheese", "creme fraiche", "soy milk", "almond milk", "feta cheese", "egg whites", "plant or dairy", "goat's cheese", "goat cheese", "parmesan", "parmigiano reggiano", "ricotta", "cream cheese", "quark", "burrata"],
   "Chilled Foods": ["deli meat", "cooked meat", "pate", "fresh pasta", "fresh soup", "ready meal", "quiche", "coleslaw", "houmous", "hummus", "dip", "tofu", "tempeh"],
   "Frozen Foods": ["frozen peas", "frozen corn", "frozen chips", "frozen fruit", "ice cream", "frozen pizza", "frozen vegetables", "frozen blueberries", "frozen berries", "frozen raspberries", "frozen strawberries", "frozen mangoes", "frozen green beans"],
   "Food Cupboard": ["pasta (dried)", "rice", "noodles", "flour", "sugar", "salt", "pepper", "spice", "herbs (dried)", "oil (olive, vegetable, sunflower, coconut, sesame)", "vinegar", "tinned tomatoes", "canned tomatoes", "tinned beans", "canned beans", "lentils", "chickpeas", "soup (canned/packet)", "stock cube", "bouillon", "jam", "honey", "peanut butter", "almond butter", "cashew butter", "cereal", "oats", "biscuits", "crackers", "tea", "coffee", "hot chocolate", "soy sauce", "tamari", "ketchup", "mayonnaise", "mustard", "nuts", "seeds", "dried fruit", "whey powder", "protein powder", "oregano", "cumin", "chili flakes", "mixed herbs", "coconut oil", "vanilla whey powder", "maple syrup", "chia seeds", "miso paste", "tahini", "curry paste", "fish sauce", "oyster sauce", "hoisin sauce", "ketjap manis", "sriracha", "sambal oelek", "capers", "olives", "pesto", "coconut milk", "cornflour", "potato starch", "baking powder", "baking soda", "cocoa powder", "chocolate chips", "dates", "desiccated coconut", "almond meal", "coconut flour", "nutritional yeast", "vermicelli rice noodles", "rice noodles", "egg noodles", "polenta", "graham crackers", "sun-dried tomatoes", "sun dried tomatoes"],
@@ -89,7 +89,7 @@ const categoryKeywords: Record<UKSupermarketCategory, string[]> = {
 
 export const parseIngredientString = (ingredientString: string): { name: string; quantity: number; unit: string } => {
   const cleanedString = ingredientString.replace(/,/g, '').replace(/\./g, '');
-  const regex = /^(\d+\s*\/?\s*\d*|\d*\s?½|\d*\s?¼|\d*\s?¾)\s*([a-zA-Zμ]+(?:cup|tbsp|tsp|g|kg|ml|L|oz|can|cans|bunch|clove|cloves|stalk|stalks|sprig|sprigs|slice|slices|sheet|sheets|fillet|fillets|head)?\.?)\s*(of\s+)?(.*)$/i;
+  const regex = /^(\d+\s*\/?\s*\d*|\d*\s?½|\d*\s?¼|\d*\s?¾)\s*([a-zA-Zμ]+(?:cup|tbsp|tsp|g|kg|ml|L|oz|can|cans|bunch|clove|cloves|stalk|stalks|sprig|sprigs|slice|slices|sheet|sheets|fillet|fillets|head|egg|eggs)?\.?)\s*(of\s+)?(.*)$/i;
   const match = cleanedString.match(regex);
 
   let quantity = 1;
@@ -114,13 +114,17 @@ export const parseIngredientString = (ingredientString: string): { name: string;
 
     unit = match[2] ? match[2].trim().replace(/\.$/, '') : 'item(s)';
     name = match[4] ? match[4].trim() : (ingredientString.split(match[2])[1] || ingredientString).trim();
+     if (name === ingredientString.trim() && !match[4] && match[2]) { // If name didn't change and there's a unit, likely name is empty
+       const potentialName = ingredientString.substring(qtyStr.length + match[2].length).replace(/^of\s+/, '').trim();
+       name = potentialName || name;
+     }
     
   } else {
      const simpleQtyMatch = ingredientString.match(/^(\d+)\s+(.*)/);
      if (simpleQtyMatch) {
        quantity = parseInt(simpleQtyMatch[1], 10);
        name = simpleQtyMatch[2].trim();
-       unit = 'item(s)';
+       unit = 'item(s)'; // Default unit if only quantity and name are found
      }
   }
 
@@ -134,17 +138,31 @@ export const parseIngredientString = (ingredientString: string): { name: string;
   else if (['oz', 'ounce', 'ounces'].includes(unitLower)) unit = 'oz.';
   else if (unitLower === 'cup' || unitLower === 'cups') unit = 'cup';
   else if (unitLower === 'can' || unitLower === 'cans') unit = 'can';
+  else if (['egg', 'eggs'].includes(unitLower)) {
+    unit = 'egg'; // Standardize unit to 'egg'
+    if (name.toLowerCase().includes('egg')) { // If name also contains 'egg' or 'eggs'
+        name = 'egg'; // Standardize name to 'egg'
+    }
+  }
 
 
   // Further attempt to isolate name if unit was part of it
-  if (name.toLowerCase().startsWith(unit.toLowerCase() + " ") && unit !== 'item(s)') {
+  if (name.toLowerCase().startsWith(unit.toLowerCase() + " ") && unit !== 'item(s)' && unit !== 'egg') {
     name = name.substring(unit.length + 1).trim();
   }
-  if (name.toLowerCase().startsWith('of ')) {
+   if (name.toLowerCase().startsWith('of ')) {
     name = name.substring(3).trim();
   }
-  name = name.replace(/(?:peeled|chopped|diced|sliced|minced|grated|crushed|trimmed|halved|quartered|rinsed|drained|frozen|fresh|cooked|uncooked|ripe|large|medium|small|thinly|finely|coarsely|skinless|boneless|canned|tinned|pitted|deseeded|shelled|raw|plus extra|plus more|for garnish|to serve|to taste|optional|room temperature|softened|melted|unsalted|unsweetened|light|full fat|reduced fat|lean|extra lean|natural|organic|heaping|rounded-sm|scant|ends trimmed|cut into chunks|cut into pieces|cut into strips|cut into bite-size pieces|white parts only|green part|flesh only|tough bottoms removed|core removed|seeds removed|stems removed|skin removed|skin on|bone-in|in brine|in olive oil|in water|in juice|with liquid|including juices|rehydrated|store bought or homemade|\(or similar.*?\)|e\.g\..*?\b|, diced|, chopped|, sliced|, minced|, grated|, crushed|, peeled|, cored|, pitted|, deseeded|, trimmed|, halved|, quartered|, rinsed|, drained|, frozen|, fresh|, cooked|, uncooked|, ripe|, large|, medium|, small|, thinly|, finely|, coarsely|, skinless|, boneless|, canned|, tinned|\(.*\))$/i, '').trim();
+  
+  // Remove common adjectives and preparation instructions from the end of the name
+  name = name.replace(/(?:peeled|chopped|diced|sliced|minced|grated|crushed|trimmed|halved|quartered|rinsed|drained|frozen|fresh|cooked|uncooked|ripe|large|medium|small|thinly|finely|coarsely|skinless|boneless|canned|tinned|pitted|deseeded|shelled|raw|plus extra|plus more|for garnish|to serve|to taste|optional|room temperature|softened|melted|unsalted|unsweetened|light|full fat|reduced fat|lean|extra lean|natural|organic|heaping|rounded-sm|scant|ends trimmed|cut into chunks|cut into pieces|cut into strips|cut into bite-size pieces|white parts only|green part|flesh only|tough bottoms removed|core removed|seeds removed|stems removed|skin removed|skin on|bone-in|in brine|in olive oil|in water|in juice|with liquid|including juices|rehydrated|store bought or homemade|\(.*\))$/i, '').trim();
   name = name.replace(/,$/, '').trim(); 
+  
+  // If after all that, name is empty but unit implies name (like 'egg'), use unit as name.
+  if (!name.trim() && (unit.toLowerCase() === 'egg')) {
+      name = 'egg';
+  }
+
 
   return { name: name.charAt(0).toUpperCase() + name.slice(1), quantity, unit };
 };
@@ -170,30 +188,38 @@ export const assignCategory = (ingredientName: string): UKSupermarketCategory =>
 export const generateShoppingList = (plannedMeals: PlannedMeal[], recipesSource?: Recipe[], pantryItems: PantryItem[] = []): ShoppingListItem[] => {
   const ingredientMap = new Map<string, ShoppingListItem>();
   const recipesToUse = recipesSource && recipesSource.length > 0 ? recipesSource : allRegisteredRecipesFull;
-  const pantryMap = new Map<string, PantryItem>(pantryItems.map(item => [item.id, item]));
+  
+  // Create a mutable copy of pantry quantities for this calculation session
+  const tempPantryQuantities = new Map<string, number>();
+  pantryItems.forEach(item => {
+    tempPantryQuantities.set(item.id, item.quantity);
+  });
 
   plannedMeals.forEach(plannedMeal => {
     const recipe = plannedMeal.recipeDetails || recipesToUse.find(r => r.id === plannedMeal.recipeId);
     if (recipe) {
       recipe.ingredients.forEach(ingredientString => {
         const parsed = parseIngredientString(ingredientString);
-        if (!parsed.name) return; 
+        if (!parsed.name || parsed.name.trim() === "") return; 
 
-        const requiredQuantityForMeal = parsed.quantity * plannedMeal.servings;
-        const mapKey = `${parsed.name.toLowerCase().trim()}|${parsed.unit.toLowerCase().trim()}`; // This is the ID for pantry and shopping list item
+        let requiredQuantityForMeal = parsed.quantity * plannedMeal.servings;
+        const mapKey = `${parsed.name.toLowerCase().trim()}|${parsed.unit.toLowerCase().trim()}`;
 
         let quantityToAddToShoppingList = requiredQuantityForMeal;
 
-        const pantryItem = pantryMap.get(mapKey);
-        if (pantryItem && pantryItem.quantity > 0) {
-          if (pantryItem.quantity >= requiredQuantityForMeal) {
+        // Check against tempPantryQuantities and update
+        const currentPantryQty = tempPantryQuantities.get(mapKey);
+        if (currentPantryQty !== undefined && currentPantryQty > 0) {
+          if (currentPantryQty >= requiredQuantityForMeal) {
             quantityToAddToShoppingList = 0; // Fully covered by pantry
+            tempPantryQuantities.set(mapKey, parseFloat((currentPantryQty - requiredQuantityForMeal).toFixed(2))); // Reduce available pantry qty
           } else {
-            quantityToAddToShoppingList = requiredQuantityForMeal - pantryItem.quantity; // Partially covered
+            quantityToAddToShoppingList = parseFloat((requiredQuantityForMeal - currentPantryQty).toFixed(2)); // Partially covered
+            tempPantryQuantities.set(mapKey, 0); // All pantry qty used up
           }
         }
         
-        quantityToAddToShoppingList = parseFloat(quantityToAddToShoppingList.toFixed(2)); // Avoid floating point inaccuracies
+        quantityToAddToShoppingList = parseFloat(quantityToAddToShoppingList.toFixed(2));
 
         if (quantityToAddToShoppingList > 0) {
           const existingShoppingItem = ingredientMap.get(mapKey);
@@ -226,3 +252,4 @@ export const generateShoppingList = (plannedMeals: PlannedMeal[], recipesSource?
     return a.name.localeCompare(b.name);
   });
 };
+
