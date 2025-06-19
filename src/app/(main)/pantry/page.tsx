@@ -28,7 +28,7 @@ const UK_SUPERMARKET_CATEGORIES: UKSupermarketCategory[] = [
 ];
 
 const COMMON_UNITS: string[] = [
-  "item(s)", "g", "kg", "ml", "L", "tsp", "tbsp", "cup", "oz", "lb", "slice(s)", "can(s)"
+  "item(s)", "g", "kg", "ml", "L", "tsp", "tbsp", "cup", "oz", "lb", "slice(s)", "can(s)", "egg"
 ];
 
 const pantryItemSchema = z.object({
@@ -97,7 +97,13 @@ export default function PantryPage() {
         title: "Item Added",
         description: `${data.quantity} ${data.unit} of ${data.name} added to your pantry.`,
       });
-      form.reset();
+      form.reset({
+        name: '',
+        quantity: 1,
+        unit: 'item(s)',
+        category: 'Food Cupboard',
+        expiryDate: undefined,
+      });
       setSelectedExpiryDate(undefined); // Reset date picker display
     } catch (error: any) {
       toast({
@@ -169,7 +175,7 @@ export default function PantryPage() {
                 <ul className="list-disc pl-5 mt-2">
                   {expiredItems.map(item => (
                     <li key={`expired-${item.id}`}>
-                      {item.name} (Expired on: {item.expiryDate ? format(parseISO(item.expiryDate), 'PPP') : 'N/A'})
+                      {item.name} (Expired on: {item.expiryDate ? format(parseISO(item.expiryDate), 'dd MMMM yyyy') : 'N/A'})
                     </li>
                   ))}
                 </ul>
@@ -177,15 +183,15 @@ export default function PantryPage() {
             </Alert>
           )}
           {expiringSoonItems.length > 0 && (
-            <Alert variant="default" className="border-orange-500 text-orange-700 [&>svg]:text-orange-500">
+            <Alert variant="default" className="border-orange-500 text-orange-700 dark:text-orange-400 dark:border-orange-600 [&>svg]:text-orange-500 dark:[&>svg]:text-orange-400">
               <Info className="h-5 w-5" />
               <AlertTitle>Items Expiring Soon</AlertTitle>
               <AlertDescription>
                 The following items are expiring within the next 7 days or are expired today:
                 <ul className="list-disc pl-5 mt-2">
                   {expiringSoonItems.map(item => (
-                    <li key={`expiring-${item.id}`} className={item.expiryDate && isBefore(parseISO(item.expiryDate), new Date()) && !isSameDay(parseISO(item.expiryDate), new Date()) ? "text-red-600 font-semibold" : ""}>
-                      {item.name} (Expires on: {item.expiryDate ? format(parseISO(item.expiryDate), 'PPP') : 'N/A'})
+                    <li key={`expiring-${item.id}`} className={item.expiryDate && isBefore(parseISO(item.expiryDate), new Date()) && !isSameDay(parseISO(item.expiryDate), new Date()) ? "text-red-600 dark:text-red-400 font-semibold" : ""}>
+                      {item.name} (Expires on: {item.expiryDate ? format(parseISO(item.expiryDate), 'dd MMMM yyyy') : 'N/A'})
                        {item.expiryDate && isBefore(parseISO(item.expiryDate), new Date()) && !isSameDay(parseISO(item.expiryDate), new Date()) && " - Already Expired!"}
                     </li>
                   ))}
@@ -300,7 +306,7 @@ export default function PantryPage() {
                                 )}
                               >
                                 {selectedExpiryDate ? (
-                                  format(selectedExpiryDate, "PPP")
+                                  format(selectedExpiryDate, "dd MMMM yyyy")
                                 ) : (
                                   <span>Pick a date</span>
                                 )}
@@ -396,7 +402,7 @@ export default function PantryPage() {
                                   "text-xs",
                                   isBefore(parseISO(item.expiryDate), new Date()) && !isSameDay(parseISO(item.expiryDate), new Date()) ? "text-destructive font-semibold" : "text-muted-foreground"
                                 )}>
-                                  Expires: {format(parseISO(item.expiryDate), 'PPP')}
+                                  Expires: {format(parseISO(item.expiryDate), 'dd MMMM yyyy')}
                                   {isBefore(parseISO(item.expiryDate), new Date()) && !isSameDay(parseISO(item.expiryDate), new Date()) && " (EXPIRED)"}
                                 </p>
                               )}
