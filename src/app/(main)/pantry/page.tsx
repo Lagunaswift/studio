@@ -23,15 +23,21 @@ const UK_SUPERMARKET_CATEGORIES: UKSupermarketCategory[] = [
   "Dairy, Butter & Eggs", "Chilled Foods", "Frozen Foods", "Food Cupboard", "Drinks", "Other Food Items"
 ];
 
+const COMMON_UNITS: string[] = [
+  "item(s)", "g", "kg", "ml", "L", "tsp", "tbsp", "cup", "oz", "lb", "slice(s)", "can(s)"
+];
+
 const pantryItemSchema = z.object({
-  ingredientString: z.string().min(1, "Ingredient details are required."),
+  name: z.string().min(1, "Ingredient name is required."),
+  quantity: z.coerce.number().positive({ message: "Quantity must be a positive number." }),
+  unit: z.string().min(1, "Unit is required."),
   category: z.enum(UK_SUPERMARKET_CATEGORIES),
 });
 
 type PantryItemFormValues = z.infer<typeof pantryItemSchema>;
 
 export default function PantryPage() {
-  const { pantryItems, addPantryItem, removePantryItem, updatePantryItemQuantity, parseIngredient, assignIngredientCategory } = useAppContext();
+  const { pantryItems, addPantryItem, removePantryItem, updatePantryItemQuantity, assignIngredientCategory } = useAppContext();
   const { toast } = useToast();
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingQuantity, setEditingQuantity] = useState<number>(0);
@@ -39,37 +45,30 @@ export default function PantryPage() {
   const form = useForm<PantryItemFormValues>({
     resolver: zodResolver(pantryItemSchema),
     defaultValues: {
-      ingredientString: '',
+      name: '',
+      quantity: 1,
+      unit: 'item(s)',
       category: 'Food Cupboard',
     },
   });
 
   const onSubmit: SubmitHandler<PantryItemFormValues> = (data) => {
     try {
-      const parsed = parseIngredient(data.ingredientString);
-      if (!parsed.name || parsed.quantity <= 0) {
-        toast({
-          title: "Invalid Ingredient Input",
-          description: "Please enter a valid ingredient with quantity (e.g., '2 cups flour', '1 apple').",
-          variant: "destructive",
-        });
-        return;
-      }
-      // If category is provided by form, use it. Otherwise, let assignIngredientCategory decide.
-      const category = data.category || assignIngredientCategory(parsed.name);
-      addPantryItem(parsed.name, parsed.quantity, parsed.unit, category);
+      // Use the explicit category from the form, or try to assign one if needed (though category is required by schema)
+      const category = data.category || assignIngredientCategory(data.name);
+      addPantryItem(data.name, data.quantity, data.unit, category);
       toast({
         title: "Item Added",
-        description: `${parsed.name} added to your pantry.`,
+        description: `${data.quantity} ${data.unit} of ${data.name} added to your pantry.`,
       });
       form.reset();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error Adding Item",
-        description: "Could not parse ingredient string. Please use a format like '100g Chicken Breast'.",
+        description: error.message || "Could not add item to pantry.",
         variant: "destructive",
       });
-      console.error("Error parsing ingredient:", error);
+      console.error("Error adding item:", error);
     }
   };
 
@@ -132,7 +131,6 @@ export default function PantryPage() {
               </CardTitle>
               <CardDescription>
                 Enter ingredient details to add them to your pantry.
-                Example: "2 cups flour" or "1 apple".
               </CardDescription>
             </CardHeader>
             <Form {...form}>
@@ -140,23 +138,60 @@ export default function PantryPage() {
                 <CardContent className="space-y-4">
                   <FormField
                     control={form.control}
-                    name="ingredientString"
+                    name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Ingredient (e.g., "200g Chicken Breast")</FormLabel>
+                        <FormLabel>Ingredient Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter full ingredient string" {...field} />
+                          <Input placeholder="e.g., Chicken Breast, Dates" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="quantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Quantity</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="e.g., 2" {...field} step="0.01" min="0.01"/>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="unit"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Unit</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select unit" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {COMMON_UNITS.map((unit) => (
+                                <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <FormField
                     control={form.control}
                     name="category"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Category (Overrides auto-detection)</FormLabel>
+                        <FormLabel>Category</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -223,7 +258,8 @@ export default function PantryPage() {
                                     value={editingQuantity}
                                     onChange={(e) => handleDirectQuantityUpdate(item.id, e.target.value)}
                                     className="h-8 w-20 text-sm"
-                                    step="0.1"
+                                    step="0.01"
+                                    min="0"
                                   />
                                   <span className="text-sm text-muted-foreground">{item.unit}</span>
                                   <Button size="icon" variant="ghost" onClick={() => saveEditedQuantity(item.id)} className="h-7 w-7">
