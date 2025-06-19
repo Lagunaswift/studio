@@ -3,7 +3,7 @@ import Image from 'next/image';
 import type { Recipe } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, Users, Flame, Info, Heart, PlusCircle, Beef, Wheat, Droplets } from 'lucide-react'; // Added Beef, Wheat, Droplets
+import { Clock, Users, Flame, Info, Heart, PlusCircle, Beef, Wheat, Droplets } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -107,20 +107,22 @@ export function RecipeCard({
             <Users className="w-3 h-3 md:w-4 md:h-4 mr-1.5 text-accent" />
             <span>Serves: {recipe.servings}</span>
           </div>
+        </div>
+        <div className="flex flex-wrap justify-start items-center gap-x-3 gap-y-1 text-xs md:text-sm text-muted-foreground mb-2">
           <div className="flex items-center">
-            <Flame className="w-3 h-3 md:w-4 md:h-4 mr-1.5 text-red-500" />
-            <span>{recipe.macrosPerServing.calories.toFixed(0)} kcal</span>
+            <Flame className="w-3 h-3 md:w-4 md:h-4 mr-1 text-red-500" />
+            <span>{recipe.macrosPerServing.calories.toFixed(0)}kcal</span>
           </div>
-           <div className="flex items-center">
-            <Beef className="w-3 h-3 md:w-4 md:h-4 mr-1.5 text-blue-500" />
+          <div className="flex items-center">
+            <Beef className="w-3 h-3 md:w-4 md:h-4 mr-1 text-blue-500" />
             <span>{recipe.macrosPerServing.protein.toFixed(0)}g P</span>
           </div>
           <div className="flex items-center">
-            <Wheat className="w-3 h-3 md:w-4 md:h-4 mr-1.5 text-green-500" />
+            <Wheat className="w-3 h-3 md:w-4 md:h-4 mr-1 text-green-500" />
             <span>{recipe.macrosPerServing.carbs.toFixed(0)}g C</span>
           </div>
           <div className="flex items-center">
-            <Droplets className="w-3 h-3 md:w-4 md:h-4 mr-1.5 text-yellow-500" />
+            <Droplets className="w-3 h-3 md:w-4 md:h-4 mr-1 text-yellow-500" />
             <span>{recipe.macrosPerServing.fat.toFixed(0)}g F</span>
           </div>
         </div>
