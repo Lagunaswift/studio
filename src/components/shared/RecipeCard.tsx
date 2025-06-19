@@ -3,11 +3,12 @@ import Image from 'next/image';
 import type { Recipe } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, Users, Flame, Info } from 'lucide-react';
+import { Clock, Users, Flame, Info, Heart, PlusCircle } from 'lucide-react'; // Added Heart and PlusCircle
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
+import { useAppContext } from '@/context/AppContext'; // Added useAppContext
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -24,10 +25,13 @@ export function RecipeCard({
   showViewDetailsButton = true,
   className
 }: RecipeCardProps) {
+  const { toggleFavoriteRecipe, isRecipeFavorite } = useAppContext(); // Get favorite functions
   
   const defaultPlaceholder = `https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipe?.id || 'Unknown'}`;
   const [imageSrc, setImageSrc] = useState(recipe?.image || defaultPlaceholder);
   const [imageError, setImageError] = useState(!recipe?.image); 
+
+  const isFavorited = recipe ? isRecipeFavorite(recipe.id) : false;
 
   useEffect(() => {
     if (recipe && recipe.image) {
@@ -62,8 +66,14 @@ export function RecipeCard({
     ? recipe.tags.slice(0, 2).join(' ') 
     : "food meal";
 
+  const handleFavoriteToggle = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent navigation if card is wrapped in Link somewhere else
+    e.stopPropagation();
+    toggleFavoriteRecipe(recipe.id);
+  };
+
   return (
-    <Card className={cn("flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg h-full", className)}>
+    <Card className={cn("flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg h-full group", className)}>
       <div className="relative w-full h-60">
         <Image
           src={imageSrc} 
@@ -74,10 +84,18 @@ export function RecipeCard({
           data-ai-hint={imageError ? aiHint : undefined}
           onError={handleImageError} 
         />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="absolute top-2 right-2 bg-background/70 hover:bg-background/90 text-primary hover:text-accent"
+          onClick={handleFavoriteToggle}
+          aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
+        >
+          <Heart className={cn("w-5 h-5", isFavorited ? "fill-accent text-accent" : "text-muted-foreground")} />
+        </Button>
       </div>
       <CardHeader className="pb-2 pt-4 px-4">
-        <CardTitle className="font-headline text-lg md:text-xl text-primary">{recipe.name}</CardTitle>
-        {/* Recipe description removed from here */}
+        <CardTitle className="font-headline text-lg md:text-xl text-primary group-hover:text-accent transition-colors">{recipe.name}</CardTitle>
       </CardHeader>
       <CardContent className="flex-grow px-4 py-2">
         <div className="space-y-1 text-xs md:text-sm text-muted-foreground">
@@ -99,6 +117,7 @@ export function RecipeCard({
             {recipe.tags.slice(0, 3).map(tag => (
               <Badge key={tag} variant="secondary" className="text-xs px-1.5 py-0.5">{tag}</Badge>
             ))}
+            {recipe.tags.length > 3 && <Badge variant="outline" className="text-xs px-1.5 py-0.5">+{recipe.tags.length - 3}</Badge>}
           </div>
         )}
       </CardContent>
@@ -113,7 +132,7 @@ export function RecipeCard({
           )}
           {showAddToMealPlanButton && onAddToMealPlan && (
             <Button onClick={() => onAddToMealPlan(recipe)} size="sm" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground text-xs md:text-sm">
-              Add to Meal Plan
+              <PlusCircle className="mr-1 h-3 w-3 md:mr-2 md:h-4 md:w-4" /> Add to Plan
             </Button>
           )}
         </CardFooter>

@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info } from 'lucide-react';
+import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info, Heart } from 'lucide-react'; // Added Heart
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { format, startOfDay, addDays, isWithinInterval } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from '@/lib/utils'; // Added cn
 
 const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
   if (!date) return false;
@@ -40,7 +41,7 @@ export default function RecipeDetailPage() {
   const [recipe, setRecipe] = useState<RecipeType | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null); 
-  const { userProfile, addMealToPlan } = useAppContext(); 
+  const { userProfile, addMealToPlan, toggleFavoriteRecipe, isRecipeFavorite } = useAppContext(); // Added favorite functions
   const { toast } = useToast();
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
   const [planDate, setPlanDate] = useState<Date | undefined>(new Date());
@@ -51,6 +52,7 @@ export default function RecipeDetailPage() {
   const [imageLoadError, setImageLoadError] = useState(false);
 
   const isSubscribedActive = userProfile?.subscription_status === 'active';
+  const isFavorited = recipe ? isRecipeFavorite(recipe.id) : false;
 
   useEffect(() => {
     async function fetchRecipe() {
@@ -126,6 +128,16 @@ export default function RecipeDetailPage() {
     }
   };
   
+  const handleFavoriteToggle = () => {
+    if (recipe) {
+      toggleFavoriteRecipe(recipe.id);
+      toast({
+        title: isRecipeFavorite(recipe.id) ? "Recipe Favorited!" : "Recipe Unfavorited",
+        description: isRecipeFavorite(recipe.id) ? `${recipe.name} added to your favorites.` : `${recipe.name} removed from your favorites.`,
+      });
+    }
+  };
+
   const todayForCalendar = startOfDay(new Date());
   const tomorrowForCalendar = addDays(todayForCalendar, 1);
   const disabledCalendarMatcher = isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
@@ -189,6 +201,15 @@ export default function RecipeDetailPage() {
             data-ai-hint={imageLoadError ? aiHint : undefined}
             onError={handleImageError} 
           />
+           <Button 
+              variant="ghost" 
+              size="icon" 
+              className="absolute top-3 right-3 bg-background/70 hover:bg-background/90 text-primary hover:text-accent p-2 rounded-full shadow-md"
+              onClick={handleFavoriteToggle}
+              aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
+            >
+              <Heart className={cn("w-6 h-6", isFavorited ? "fill-accent text-accent" : "text-muted-foreground")} />
+            </Button>
         </div>
         <CardHeader className="p-6">
           <CardTitle className="text-3xl md:text-4xl font-bold font-headline text-primary">{recipe.name}</CardTitle>

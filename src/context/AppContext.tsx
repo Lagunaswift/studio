@@ -27,6 +27,7 @@ import { getAllRecipes as getAllRecipesFromData, calculateTotalMacros, generateS
 const MEAL_PLAN_KEY = 'macroTealMealPlan';
 const SHOPPING_LIST_KEY = 'macroTealShoppingList';
 const USER_PROFILE_KEY = 'macroTealUserProfile';
+const FAVORITE_RECIPES_KEY = 'macroTealFavoriteRecipes';
 
 const DEFAULT_MEAL_STRUCTURE: MealSlotConfig[] = [
   { id: 'default-breakfast', name: 'Breakfast', type: 'Breakfast' },
@@ -161,6 +162,9 @@ interface AppContextType {
   setMealStructure: (mealStructure: MealSlotConfig[]) => void;
   setUserInformation: (info: Partial<UserProfileSettings>) => void;
   isRecipeCacheLoading: boolean;
+  favoriteRecipeIds: number[];
+  toggleFavoriteRecipe: (recipeId: number) => void;
+  isRecipeFavorite: (recipeId: number) => boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -171,6 +175,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
   const [allRecipesCache, setAllRecipesCache] = useState<Recipe[]>([]);
   const [isRecipeCacheLoading, setIsRecipeCacheLoading] = useState(true);
+  const [favoriteRecipeIds, setFavoriteRecipeIds] = useState<number[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
@@ -190,6 +195,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const loadedMealPlan = loadState<PlannedMeal[]>(MEAL_PLAN_KEY) || [];
       const loadedShoppingList = loadState<ShoppingListItem[]>(SHOPPING_LIST_KEY) || [];
       let loadedUserProfile = loadState<UserProfileSettings>(USER_PROFILE_KEY);
+      const loadedFavoriteRecipeIds = loadState<number[]>(FAVORITE_RECIPES_KEY) || [];
+      setFavoriteRecipeIds(loadedFavoriteRecipeIds);
+
 
       if (!loadedUserProfile) {
         loadedUserProfile = { ...DEFAULT_USER_PROFILE };
@@ -288,6 +296,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [shoppingList, isInitialized]);
 
+  useEffect(() => {
+    if (isInitialized) {
+      saveState(FAVORITE_RECIPES_KEY, favoriteRecipeIds);
+    }
+  }, [favoriteRecipeIds, isInitialized]);
+
+
   const regenerateShoppingList = useCallback((currentMealPlan: PlannedMeal[]) => {
     const newShoppingList = generateShoppingListUtil(currentMealPlan, allRecipesCache);
     setShoppingList(newShoppingList);
@@ -359,6 +374,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMealPlan([]);
     setShoppingList([]);
     setUserProfile({ ...DEFAULT_USER_PROFILE });
+    setFavoriteRecipeIds([]);
   }, []);
 
   const updateUserProfileState = useCallback((updates: Partial<UserProfileSettings>) => {
@@ -422,6 +438,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateUserProfileState(info);
   }, [updateUserProfileState]);
 
+  const toggleFavoriteRecipe = useCallback((recipeId: number) => {
+    setFavoriteRecipeIds(prevIds => {
+      if (prevIds.includes(recipeId)) {
+        return prevIds.filter(id => id !== recipeId);
+      } else {
+        return [...prevIds, recipeId];
+      }
+    });
+  }, []);
+
+  const isRecipeFavorite = useCallback((recipeId: number): boolean => {
+    return favoriteRecipeIds.includes(recipeId);
+  }, [favoriteRecipeIds]);
+
   const contextValue = useMemo(() => ({
     mealPlan,
     shoppingList,
@@ -441,11 +471,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMealStructure,
     setUserInformation,
     isRecipeCacheLoading,
+    favoriteRecipeIds,
+    toggleFavoriteRecipe,
+    isRecipeFavorite,
   }), [
     mealPlan, shoppingList, userProfile, allRecipesCache, addMealToPlan, removeMealFromPlan,
     updatePlannedMealServings, getDailyMacros, toggleShoppingListItem,
     clearMealPlanForDate, clearAllData, getMealsForDate, setMacroTargets,
-    setDietaryPreferences, setAllergens, setMealStructure, setUserInformation, isRecipeCacheLoading
+    setDietaryPreferences, setAllergens, setMealStructure, setUserInformation, isRecipeCacheLoading,
+    favoriteRecipeIds, toggleFavoriteRecipe, isRecipeFavorite
   ]);
 
   if (!isInitialized && !isRecipeCacheLoading) {

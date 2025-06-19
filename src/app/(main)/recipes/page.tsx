@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format, startOfDay, addDays, isWithinInterval } from 'date-fns';
-import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2, Info, Lock, Wheat, Milk, Shell, Fish, Egg, Peanut, TreeDeciduous, Drumstick } from 'lucide-react';
+import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2, Info, Lock, Wheat, Milk, Shell, Fish, Egg, Peanut, TreeDeciduous, Drumstick, Heart } from 'lucide-react'; // Added Heart
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -21,6 +21,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Switch } from "@/components/ui/switch"; // Added Switch
 
 const FREE_TIER_RECIPE_DISPLAY_LIMIT = 15;
 
@@ -61,7 +62,7 @@ const containsAllergenKeyword = (text: string, keywords: string[]): boolean => {
 };
 
 export default function RecipesPage() {
-  const { userProfile, addMealToPlan, allRecipesCache, isRecipeCacheLoading: isAppRecipeCacheLoading } = useAppContext();
+  const { userProfile, addMealToPlan, allRecipesCache, isRecipeCacheLoading: isAppRecipeCacheLoading, isRecipeFavorite } = useAppContext(); // Added isRecipeFavorite
   const { toast } = useToast();
 
   const [recipesToDisplay, setRecipesToDisplay] = useState<Recipe[]>([]);
@@ -73,6 +74,7 @@ export default function RecipesPage() {
   const [planDate, setPlanDate] = useState<Date | undefined>(new Date());
   const [planMealType, setPlanMealType] = useState<MealType | undefined>(MEAL_TYPES[0]);
   const [planServings, setPlanServings] = useState<number>(1);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false); // State for favorite filter
 
   const isSubscribedActive = true; // userProfile?.subscription_status === 'active'; // TEMPORARILY UNLOCKED FOR TESTING
 
@@ -145,14 +147,17 @@ export default function RecipesPage() {
              if (containsAllergenKeyword(recipe.name, ALLERGEN_KEYWORD_MAP.gluten)) return true;
              if (recipe.ingredients.some(ing => containsAllergenKeyword(ing, ALLERGEN_KEYWORD_MAP.gluten))) return true;
           }
-
-
           return false;
         });
       });
     }
+
+    if (showFavoritesOnly) {
+      recipes = recipes.filter(recipe => isRecipeFavorite(recipe.id));
+    }
+
     return recipes;
-  }, [recipesToDisplay, searchTerm, activeDietaryFilters, activeAllergenFilters]);
+  }, [recipesToDisplay, searchTerm, activeDietaryFilters, activeAllergenFilters, showFavoritesOnly, isRecipeFavorite]);
 
   const totalFilteredRecipesCount = filteredRecipes.length;
   const finalRecipesForDisplay = filteredRecipes; // TEMPORARILY UNLOCKED: isSubscribedActive ? filteredRecipes : filteredRecipes.slice(0, FREE_TIER_RECIPE_DISPLAY_LIMIT);
@@ -230,8 +235,8 @@ export default function RecipesPage() {
 
   return (
     <PageWrapper title="Discover Recipes">
-      <div className="mb-8 flex flex-col md:flex-row gap-4">
-        <div className="relative flex-grow">
+      <div className="mb-8 flex flex-col md:flex-row gap-4 items-center">
+        <div className="relative flex-grow w-full md:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
             type="search"
@@ -240,6 +245,17 @@ export default function RecipesPage() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+        </div>
+        <div className="flex items-center space-x-2 self-start md:self-center">
+          <Switch
+            id="favorites-filter"
+            checked={showFavoritesOnly}
+            onCheckedChange={setShowFavoritesOnly}
+            aria-label="Show favorites only"
+          />
+          <Label htmlFor="favorites-filter" className="flex items-center text-sm text-muted-foreground">
+            <Heart className="w-4 h-4 mr-1 text-accent/80" /> Show Favorites Only
+          </Label>
         </div>
       </div>
 
@@ -305,11 +321,11 @@ export default function RecipesPage() {
         <div className="text-center py-10">
             <Info className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground mt-2">
-            {searchTerm || activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0 ? "No recipes found matching your current search and profile filters." : "No recipes available."}
+            {searchTerm || activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0 || showFavoritesOnly ? "No recipes found matching your current search and profile filters." : "No recipes available."}
             </p>
-            {(activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0) && (
+            {(activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0 || showFavoritesOnly) && (
                 <p className="text-sm text-muted-foreground mt-2">
-                    Try adjusting your <Link href="/profile/diet-type" className="underline hover:text-primary">Diet Type</Link> or <Link href="/profile/allergens" className="underline hover:text-primary">Allergens</Link> settings, or broaden your search.
+                    Try adjusting your <Link href="/profile/diet-type" className="underline hover:text-primary">Diet Type</Link>, <Link href="/profile/allergens" className="underline hover:text-primary">Allergens</Link> settings, or the favorites filter.
                 </p>
             )}
         </div>
@@ -392,6 +408,3 @@ export default function RecipesPage() {
     </PageWrapper>
   );
 }
-
-
-    
