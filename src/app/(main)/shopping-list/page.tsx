@@ -7,12 +7,8 @@ import { useAppContext } from '@/context/AppContext';
 import { ShoppingListItemComponent } from '@/components/shopping/ShoppingListItemComponent';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, ShoppingCart, Trash2, Settings2, ListChecks, Utensils } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
+import { AlertCircle, ShoppingCart, Trash2, ListChecks, Utensils } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,18 +21,19 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { PlannedMeal as PlannedMealType, Recipe as RecipeType, ShoppingListItem } from '@/types';
-import { parseIngredientString } from '@/lib/data'; // Assuming parseIngredientString is exported
+import type { ShoppingListItem } from '@/types';
+import { parseIngredientString } from '@/lib/data';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface IngredientForRecipeView {
-  id: string; // Unique key for rendering, e.g., `${plannedMealId}-${ingredientIndex}`
+  id: string; 
   plannedMealId: string;
   recipeId: number;
   originalIngredientString: string;
   parsedName: string;
   parsedQuantity: number;
   parsedUnit: string;
-  shoppingListItemId?: string; // ID from the main shopping list
+  shoppingListItemId?: string; 
   purchased?: boolean;
 }
 
@@ -50,7 +47,6 @@ interface RecipeShoppingGroup {
 export default function ShoppingListPage() {
   const { shoppingList, toggleShoppingListItem, clearAllData, mealPlan, allRecipesCache } = useAppContext();
   const { toast } = useToast();
-  const [isStoreFriendlyMode, setIsStoreFriendlyMode] = useState(false);
   const [activeTab, setActiveTab] = useState<"aisle" | "recipe">("aisle");
 
   const handleClearList = () => {
@@ -83,28 +79,17 @@ export default function ShoppingListPage() {
           const parsedOriginal = parseIngredientString(ingStr);
           const quantityForThisMeal = parsedOriginal.quantity * pm.servings;
           
-          // Try to find matching shopping list item
-          // Normalize name and unit for matching with shopping list item ID format (name|unit)
-          // This needs to be robust and consider base unit conversions if shopping list stores them (e.g., tsp/tbsp)
-          const shoppingListItemKey = `${parsedOriginal.name.toLowerCase().trim()}|${parsedOriginal.unit.toLowerCase().trim()}`;
-          // A more robust match would check against potential base units if shopping list aggregation uses them
-          // For now, this is a direct match which might miss tsp/tbsp combined items.
-          
           let correspondingShoppingListItem = shoppingList.find(sli => 
             sli.name.toLowerCase().trim() === parsedOriginal.name.toLowerCase().trim() &&
-            // This unit comparison needs to be smarter for tsp/tbsp etc.
-            // For now, we do a simple comparison or find one that contains the recipeId
             (sli.unit.toLowerCase() === parsedOriginal.unit.toLowerCase() || sli.recipes.some(r => r.recipeId === pm.recipeId))
           );
           
-          // Fallback if direct match fails, try finding by name and recipe ID association
           if(!correspondingShoppingListItem){
              correspondingShoppingListItem = shoppingList.find(sli => 
                 sli.name.toLowerCase().trim() === parsedOriginal.name.toLowerCase().trim() &&
                 sli.recipes.some(r => r.recipeId === pm.recipeId)
             );
           }
-
 
           ingredientsForRecipeView.push({
             id: `${pm.id}-${recipeDetails.id}-${index}`,
@@ -146,16 +131,6 @@ export default function ShoppingListPage() {
             </CardDescription>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-4 mt-4 sm:mt-0">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="store-friendly-mode"
-                checked={isStoreFriendlyMode}
-                onCheckedChange={setIsStoreFriendlyMode}
-              />
-              <Label htmlFor="store-friendly-mode" className="text-sm text-muted-foreground flex items-center">
-                <Settings2 className="w-4 h-4 mr-1 text-accent/80" /> Store-Friendly Quantities
-              </Label>
-            </div>
             {totalCount > 0 && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -216,7 +191,6 @@ export default function ShoppingListPage() {
                             key={item.id}
                             item={item}
                             onToggle={toggleShoppingListItem}
-                            isStoreFriendlyMode={isStoreFriendlyMode}
                           />
                         ))}
                       </div>
@@ -287,4 +261,3 @@ export default function ShoppingListPage() {
     </PageWrapper>
   );
 }
-
