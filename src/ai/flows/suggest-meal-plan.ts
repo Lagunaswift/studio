@@ -65,7 +65,7 @@ const PlannedRecipeItemSchema = z.object({
   mealSlotName: z.string().describe("The name of the meal slot (e.g., 'Breakfast')."),
   recipeId: z.number().describe("The ID of the chosen recipe."),
   recipeName: z.string().describe("The name of the chosen recipe."),
-  servings: z.number().finite().min(0.01).describe("Number of servings of the recipe to plan for this meal slot (e.g., 1, 1.5, 0.5). Must be greater than 0. Aim for at least 0.25 based on prompt guidance."),
+  servings: z.number().finite().describe("Number of servings of the recipe to plan for this meal slot (e.g., 1, 1.5, 0.5). Must be a positive number, at least 0.25, based on prompt guidance."),
   calculatedMacros: MacroDataSchema.describe("Calculated macros for the chosen recipe and servings for this specific meal."),
 });
 export type PlannedRecipeItem = z.infer<typeof PlannedRecipeItemSchema>;
@@ -174,10 +174,28 @@ const suggestMealPlanFlow = ai.defineFlow(
         // For now, we'll allow it but log a warning.
     }
 
+    // Additional check to ensure servings are positive if the AI somehow missed the prompt.
+    // This is a safeguard. Ideally, the prompt handles this.
+    output.plannedMeals = output.plannedMeals.map(meal => {
+        if (meal.servings <= 0) {
+            console.warn(`AI generated non-positive servings (${meal.servings}) for ${meal.recipeName}. Setting to 0.25.`);
+            // Recalculate macros if servings are changed
+            const originalRecipe = input.availableRecipes.find(r => r.id === meal.recipeId);
+            if (originalRecipe) {
+                meal.calculatedMacros = {
+                    calories: originalRecipe.macrosPerServing.calories * 0.25,
+                    protein: originalRecipe.macrosPerServing.protein * 0.25,
+                    carbs: originalRecipe.macrosPerServing.carbs * 0.25,
+                    fat: originalRecipe.macrosPerServing.fat * 0.25,
+                };
+            }
+            meal.servings = 0.25; // Default to a small positive number
+        }
+        return meal;
+    });
+
+
     return output;
   }
 );
-
-    
-
 
