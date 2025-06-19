@@ -6,11 +6,10 @@ import { useState, useEffect } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, Target, Edit, Star, Loader2 } from 'lucide-react';
+import { Target, Edit, Star, Loader2, CalendarCheck, PlusCircle, UtensilsCrossed } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
-import { useAuth } from '@/context/AuthContext'; // Import useAuth
+import { useAuth } from '@/context/AuthContext';
 import { format, parseISO, isValid } from 'date-fns';
-import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,11 +17,11 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import type { MacroTargets, Macros, Recipe } from '@/types';
+import type { MacroTargets, Macros, Recipe, PlannedMeal } from '@/types';
 import { Progress } from '@/components/ui/progress';
 import { RecipeCard } from '@/components/shared/RecipeCard';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-
+import { Badge } from '@/components/ui/badge';
 
 const macroTargetSchema = z.object({
   calories: z.coerce.number().min(0, "Calories must be positive").default(0),
@@ -42,35 +41,34 @@ export default function HomePage() {
     mealPlan,
     allRecipesCache,
     isRecipeCacheLoading: isAppRecipeCacheLoading,
-    userProfile: appContextUserProfile
+    userProfile: appContextUserProfile,
+    getMealsForDate, // Added this
   } = useAppContext();
   const { toast } = useToast();
 
   const [clientTodayDate, setClientTodayDate] = useState<string>('');
   const [clientTodayMacros, setClientTodayMacros] = useState<Macros>({ calories: 0, protein: 0, carbs: 0, fat: 0 });
+  const [dailyPlannedMeals, setDailyPlannedMeals] = useState<PlannedMeal[]>([]);
   const [showSetTargetsDialog, setShowSetTargetsDialog] = useState(false);
   const [featuredRecipe, setFeaturedRecipe] = useState<Recipe | null>(null);
 
-  const currentMacroTargets = appContextUserProfile?.macroTargets || appContextMacroTargets; // Prioritize AppContext for local user settings
+  const currentMacroTargets = appContextUserProfile?.macroTargets || appContextMacroTargets;
   const welcomeName = appContextUserProfile?.name || appContextUserProfile?.email || authProfile?.name || authProfile?.email || user?.email || 'User';
 
   useEffect(() => {
-    setClientTodayDate(format(new Date(), 'yyyy-MM-dd'));
+    const today = new Date();
+    setClientTodayDate(format(today, 'yyyy-MM-dd'));
   }, []);
 
   useEffect(() => {
     if (clientTodayDate && getDailyMacros) {
       const newMacros = getDailyMacros(clientTodayDate);
-      if (
-        newMacros.calories !== clientTodayMacros.calories ||
-        newMacros.protein !== clientTodayMacros.protein ||
-        newMacros.carbs !== clientTodayMacros.carbs ||
-        newMacros.fat !== clientTodayMacros.fat
-      ) {
-        setClientTodayMacros(newMacros);
-      }
+      setClientTodayMacros(newMacros);
+      const todaysMeals = getMealsForDate(clientTodayDate);
+      setDailyPlannedMeals(todaysMeals);
     }
-  }, [clientTodayDate, getDailyMacros, mealPlan, clientTodayMacros]);
+  }, [clientTodayDate, getDailyMacros, getMealsForDate, mealPlan]);
+
 
   useEffect(() => {
     if (!isAppRecipeCacheLoading && allRecipesCache.length > 0) {
@@ -81,40 +79,6 @@ export default function HomePage() {
     }
   }, [isAppRecipeCacheLoading, allRecipesCache]);
 
-  const features = [
-    {
-      title: 'Browse Recipes',
-      description: 'Discover delicious and healthy recipes.',
-      href: '/recipes',
-      icon: UtensilsCrossed,
-      bgColor: 'bg-primary/10',
-      iconColor: 'text-primary'
-    },
-    {
-      title: 'Plan Your Meals',
-      description: 'Organize your weekly meals and track nutrition.',
-      href: '/meal-plan',
-      icon: CalendarDays,
-      bgColor: 'bg-green-500/10',
-      iconColor: 'text-green-600'
-    },
-    {
-      title: 'AI Meal Suggestions',
-      description: 'Get personalized meal plans from our AI.',
-      href: '/ai-suggestions',
-      icon: Sparkles,
-      bgColor: 'bg-accent/10',
-      iconColor: 'text-accent'
-    },
-    {
-      title: 'Shopping List',
-      description: 'Automated shopping lists based on your meal plan.',
-      href: '/shopping-list',
-      icon: ShoppingBag,
-      bgColor: 'bg-blue-500/10',
-      iconColor: 'text-blue-600'
-    },
-  ];
 
   const macroTargetForm = useForm<MacroTargetFormValues>({
     resolver: zodResolver(macroTargetSchema),
@@ -138,8 +102,7 @@ export default function HomePage() {
         shouldDirty: true
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proteinValue, carbsValue, fatValue]);
+  }, [proteinValue, carbsValue, fatValue, macroTargetForm]);
 
 
   useEffect(() => {
@@ -147,13 +110,11 @@ export default function HomePage() {
       if (currentMacroTargets) {
         macroTargetForm.reset(currentMacroTargets);
       } else {
-        // Recalculate calories based on default P/C/F if no targets exist
         const defaultP = 150, defaultC = 200, defaultF = 60;
         macroTargetForm.reset({ protein: defaultP, carbs: defaultC, fat: defaultF, calories: (defaultP*4 + defaultC*4 + defaultF*9) });
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMacroTargets, showSetTargetsDialog]);
+  }, [currentMacroTargets, showSetTargetsDialog, macroTargetForm]);
 
   const handleSetTargets: SubmitHandler<MacroTargetFormValues> = (data) => {
     setMacroTargets(data);
@@ -166,8 +127,6 @@ export default function HomePage() {
   };
 
   const macroKeys: (keyof MacroTargets)[] = ['calories', 'protein', 'carbs', 'fat'];
-
-  const isSubscribedActive = appContextUserProfile?.subscription_status === 'active'; // Check AppContext for sub status
 
   if (isAuthLoading || (isAppRecipeCacheLoading && !user && !authProfile)) {
     return (
@@ -182,8 +141,6 @@ export default function HomePage() {
 
   return (
     <PageWrapper title={`Welcome, ${welcomeName}!`}>
-      {/* Hero section removed */}
-
       <section className="mb-12">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold font-headline text-primary">
@@ -237,6 +194,49 @@ export default function HomePage() {
           </Card>
         )}
       </section>
+      
+      <section className="mb-12">
+        <Card className="shadow-md">
+          <CardHeader>
+            <CardTitle className="text-xl font-bold font-headline text-primary flex items-center">
+              <CalendarCheck className="mr-2 h-5 w-5 text-accent" /> Today's Menu
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {dailyPlannedMeals.length > 0 ? (
+              <ul className="space-y-3">
+                {dailyPlannedMeals.map(meal => (
+                  <li key={meal.id} className="p-3 bg-muted/30 rounded-md hover:bg-muted/50 transition-colors">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-primary-focus">
+                        <Link href={`/recipes/${meal.recipeId}`} className="hover:underline">
+                          {meal.recipeDetails?.name || 'Recipe Name Missing'}
+                        </Link>
+                      </span>
+                      <Badge variant="outline" className="text-xs">{meal.mealType}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Servings: {meal.servings}</p>
+                    {meal.recipeDetails && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Approx. {(meal.recipeDetails.macrosPerServing.calories * meal.servings).toFixed(0)} kcal
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-muted-foreground mb-3">No meals planned for today yet.</p>
+                <Button asChild variant="outline" size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                  <Link href="/meal-plan">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Go to Meal Planner
+                  </Link>
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
 
       <section className="mb-12">
         <h2 className="text-2xl font-bold font-headline text-primary mb-6 flex items-center">
@@ -265,28 +265,6 @@ export default function HomePage() {
             </AlertDescription>
           </Alert>
         )}
-      </section>
-
-      <section>
-        <h2 className="text-2xl font-bold font-headline text-primary mb-6">Explore Features</h2>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map((feature) => (
-            <Card key={feature.title} className="hover:shadow-xl transition-shadow duration-300 rounded-lg overflow-hidden">
-              <CardHeader className={cn("flex flex-row items-center justify-between space-y-0 pb-2", feature.bgColor)}>
-                <CardTitle className="text-lg font-semibold font-headline">{feature.title}</CardTitle>
-                <feature.icon className={cn("h-6 w-6", feature.iconColor)} />
-              </CardHeader>
-              <CardContent className="pt-4">
-                <CardDescription>{feature.description}</CardDescription>
-                <Button asChild className="mt-4 w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                  <Link href={feature.href}>
-                    Go to {feature.title.split(' ')[0]}
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
       </section>
 
       <Dialog open={showSetTargetsDialog} onOpenChange={setShowSetTargetsDialog}>
