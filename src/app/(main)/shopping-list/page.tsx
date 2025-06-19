@@ -1,17 +1,18 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { useAppContext } from '@/context/AppContext';
 import { ShoppingListItemComponent } from '@/components/shopping/ShoppingListItemComponent';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, ShoppingCart, Trash2, Settings2 } from 'lucide-react';
+import { AlertCircle, ShoppingCart, Trash2, Settings2, ListChecks, Utensils } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,12 +23,35 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { PlannedMeal as PlannedMealType, Recipe as RecipeType, ShoppingListItem } from '@/types';
+import { parseIngredientString } from '@/lib/data'; // Assuming parseIngredientString is exported
+
+interface IngredientForRecipeView {
+  id: string; // Unique key for rendering, e.g., `${plannedMealId}-${ingredientIndex}`
+  plannedMealId: string;
+  recipeId: number;
+  originalIngredientString: string;
+  parsedName: string;
+  parsedQuantity: number;
+  parsedUnit: string;
+  shoppingListItemId?: string; // ID from the main shopping list
+  purchased?: boolean;
+}
+
+interface RecipeShoppingGroup {
+  plannedMealId: string;
+  recipeName: string;
+  recipeId: number;
+  ingredients: IngredientForRecipeView[];
+}
 
 export default function ShoppingListPage() {
-  const { shoppingList, toggleShoppingListItem, clearAllData } = useAppContext();
+  const { shoppingList, toggleShoppingListItem, clearAllData, mealPlan, allRecipesCache } = useAppContext();
   const { toast } = useToast();
   const [isStoreFriendlyMode, setIsStoreFriendlyMode] = useState(false);
+  const [activeTab, setActiveTab] = useState<"aisle" | "recipe">("aisle");
 
   const handleClearList = () => {
     clearAllData(); 
@@ -37,12 +61,73 @@ export default function ShoppingListPage() {
     });
   };
 
-  const groupedList: { [category: string]: typeof shoppingList } = shoppingList.reduce((acc, item) => {
-    (acc[item.category] = acc[item.category] || []).push(item);
-    return acc;
-  }, {} as { [category: string]: typeof shoppingList });
+  const groupedListByAisle: { [category: string]: ShoppingListItem[] } = useMemo(() => {
+    if (activeTab !== 'aisle') return {};
+    return shoppingList.reduce((acc, item) => {
+      (acc[item.category] = acc[item.category] || []).push(item);
+      return acc;
+    }, {} as { [category: string]: ShoppingListItem[] });
+  }, [shoppingList, activeTab]);
 
-  const categories = Object.keys(groupedList).sort();
+  const categoriesByAisle = useMemo(() => Object.keys(groupedListByAisle).sort(), [groupedListByAisle]);
+
+  const recipeShoppingGroups: RecipeShoppingGroup[] = useMemo(() => {
+    if (activeTab !== 'recipe') return [];
+
+    return mealPlan.map(pm => {
+      const recipeDetails = pm.recipeDetails || allRecipesCache.find(r => r.id === pm.recipeId);
+      const ingredientsForRecipeView: IngredientForRecipeView[] = [];
+
+      if (recipeDetails) {
+        recipeDetails.ingredients.forEach((ingStr, index) => {
+          const parsedOriginal = parseIngredientString(ingStr);
+          const quantityForThisMeal = parsedOriginal.quantity * pm.servings;
+          
+          // Try to find matching shopping list item
+          // Normalize name and unit for matching with shopping list item ID format (name|unit)
+          // This needs to be robust and consider base unit conversions if shopping list stores them (e.g., tsp/tbsp)
+          const shoppingListItemKey = `${parsedOriginal.name.toLowerCase().trim()}|${parsedOriginal.unit.toLowerCase().trim()}`;
+          // A more robust match would check against potential base units if shopping list aggregation uses them
+          // For now, this is a direct match which might miss tsp/tbsp combined items.
+          
+          let correspondingShoppingListItem = shoppingList.find(sli => 
+            sli.name.toLowerCase().trim() === parsedOriginal.name.toLowerCase().trim() &&
+            // This unit comparison needs to be smarter for tsp/tbsp etc.
+            // For now, we do a simple comparison or find one that contains the recipeId
+            (sli.unit.toLowerCase() === parsedOriginal.unit.toLowerCase() || sli.recipes.some(r => r.recipeId === pm.recipeId))
+          );
+          
+          // Fallback if direct match fails, try finding by name and recipe ID association
+          if(!correspondingShoppingListItem){
+             correspondingShoppingListItem = shoppingList.find(sli => 
+                sli.name.toLowerCase().trim() === parsedOriginal.name.toLowerCase().trim() &&
+                sli.recipes.some(r => r.recipeId === pm.recipeId)
+            );
+          }
+
+
+          ingredientsForRecipeView.push({
+            id: `${pm.id}-${recipeDetails.id}-${index}`,
+            plannedMealId: pm.id,
+            recipeId: recipeDetails.id,
+            originalIngredientString: ingStr,
+            parsedName: parsedOriginal.name,
+            parsedQuantity: parseFloat(quantityForThisMeal.toFixed(2)),
+            parsedUnit: parsedOriginal.unit,
+            shoppingListItemId: correspondingShoppingListItem?.id,
+            purchased: correspondingShoppingListItem?.purchased || false,
+          });
+        });
+      }
+      return {
+        plannedMealId: pm.id,
+        recipeName: recipeDetails?.name || "Unknown Recipe",
+        recipeId: recipeDetails?.id || -1,
+        ingredients: ingredientsForRecipeView,
+      };
+    }).filter(group => group.ingredients.length > 0);
+  }, [mealPlan, shoppingList, allRecipesCache, activeTab]);
+
 
   const purchasedCount = shoppingList.filter(item => item.purchased).length;
   const totalCount = shoppingList.length;
@@ -97,33 +182,99 @@ export default function ShoppingListPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {totalCount === 0 ? (
-             <div className="text-center py-10 text-muted-foreground">
-                <AlertCircle className="mx-auto h-12 w-12 text-primary/50 mb-4" />
-                <p>No items in your shopping list.</p>
-                <p>Add some recipes to your meal plan to get started!</p>
-             </div>
-          ) : (
-            <div className="space-y-6">
-              {categories.map((category) => (
-                <div key={category}>
-                  <h3 className="text-lg font-semibold text-primary mb-2 capitalize border-b border-border pb-1">
-                    {category}
-                  </h3>
-                  <div className="space-y-2">
-                    {groupedList[category].map((item) => (
-                      <ShoppingListItemComponent
-                        key={item.id}
-                        item={item}
-                        onToggle={toggleShoppingListItem}
-                        isStoreFriendlyMode={isStoreFriendlyMode}
-                      />
-                    ))}
-                  </div>
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "aisle" | "recipe")} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="aisle" className="flex items-center gap-2">
+                <ListChecks className="w-4 h-4" /> By Aisle
+              </TabsTrigger>
+              <TabsTrigger value="recipe" className="flex items-center gap-2">
+                <Utensils className="w-4 h-4" /> By Recipe
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="aisle">
+              {totalCount === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                    <AlertCircle className="mx-auto h-12 w-12 text-primary/50 mb-4" />
+                    <p>No items in your shopping list.</p>
+                    <p>Add some recipes to your meal plan to get started!</p>
                 </div>
-              ))}
-            </div>
-          )}
+              ) : categoriesByAisle.length === 0 && totalCount > 0 ? (
+                 <div className="text-center py-10 text-muted-foreground">
+                    <AlertCircle className="mx-auto h-12 w-12 text-primary/50 mb-4" />
+                    <p>No items match current filters or view.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {categoriesByAisle.map((category) => (
+                    <div key={category}>
+                      <h3 className="text-lg font-semibold text-primary mb-2 capitalize border-b border-border pb-1">
+                        {category} ({groupedListByAisle[category].length})
+                      </h3>
+                      <div className="space-y-2">
+                        {groupedListByAisle[category].map((item) => (
+                          <ShoppingListItemComponent
+                            key={item.id}
+                            item={item}
+                            onToggle={toggleShoppingListItem}
+                            isStoreFriendlyMode={isStoreFriendlyMode}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+            <TabsContent value="recipe">
+              {mealPlan.length === 0 || recipeShoppingGroups.length === 0 ? (
+                 <div className="text-center py-10 text-muted-foreground">
+                    <AlertCircle className="mx-auto h-12 w-12 text-primary/50 mb-4" />
+                    <p>No planned meals to show ingredients for.</p>
+                    <p>Add some recipes to your meal plan first!</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {recipeShoppingGroups.map((group) => (
+                    <div key={group.plannedMealId}>
+                      <h3 className="text-lg font-semibold text-primary mb-2 capitalize border-b border-border pb-1">
+                        {group.recipeName}
+                      </h3>
+                      <div className="space-y-2 pl-4">
+                        {group.ingredients.map((ing) => (
+                          <div key={ing.id} className="flex items-center space-x-3 py-1">
+                            <Checkbox
+                              id={ing.id}
+                              checked={ing.purchased}
+                              onCheckedChange={() => {
+                                if (ing.shoppingListItemId) {
+                                  toggleShoppingListItem(ing.shoppingListItemId);
+                                } else {
+                                  toast({
+                                    title: "Item not on Shopping List",
+                                    description: `${ing.parsedName} might be fully covered by your pantry or is part of an aggregated item. Check 'By Aisle' view.`,
+                                    variant: "default"
+                                  })
+                                }
+                              }}
+                              disabled={!ing.shoppingListItemId}
+                              aria-label={`Mark ${ing.parsedName} as purchased`}
+                            />
+                            <label
+                              htmlFor={ing.id}
+                              className={`text-sm ${ing.purchased && ing.shoppingListItemId ? "line-through text-muted-foreground" : "text-foreground"}`}
+                            >
+                              {ing.parsedQuantity.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {ing.parsedUnit} {ing.parsedName}
+                               <span className="text-xs text-muted-foreground italic ml-2">(Original: {ing.originalIngredientString})</span>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
         {totalCount > 0 && (
           <CardFooter className="border-t pt-4">
@@ -136,3 +287,4 @@ export default function ShoppingListPage() {
     </PageWrapper>
   );
 }
+
