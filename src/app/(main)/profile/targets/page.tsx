@@ -118,10 +118,19 @@ export default function DietaryTargetsPage() {
       setProteinSuggestion(suggestion);
     } catch (error: any) {
       console.error("AI Protein Suggestion Error:", error);
-      setAiError(error.message || "Failed to get protein suggestion.");
+      let detailedMessage = "Failed to get protein suggestion.";
+      if (error.message) {
+        detailedMessage = error.message;
+      }
+      if (error.digest) {
+         detailedMessage += ` Server error digest: ${error.digest}. Check server logs for more details. Ensure your GOOGLE_API_KEY is correctly set up.`;
+      } else {
+        detailedMessage += " This might be a server-side issue. Check server logs for more details and ensure your GOOGLE_API_KEY is correctly set up if using AI features.";
+      }
+      setAiError(detailedMessage);
       toast({
         title: "AI Suggestion Error",
-        description: error.message || "Could not fetch protein suggestion.",
+        description: detailedMessage,
         variant: "destructive",
       });
     } finally {
@@ -342,4 +351,3 @@ export default function DietaryTargetsPage() {
     </PageWrapper>
   );
 }
-

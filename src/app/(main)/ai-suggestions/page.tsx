@@ -13,7 +13,7 @@ import type { Recipe, Macros, MealSlotConfig } from '@/types';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button'; // Added missing import
+import { Button } from '@/components/ui/button';
 import { format, startOfDay, isSameDay } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -116,7 +116,17 @@ export default function AISuggestionsPage() {
       setSuggestion(result);
     } catch (err: any) {
       console.error("AI Suggestion Error:", err);
-      setError(err.message || "Failed to get meal suggestion. Please try again.");
+      let detailedMessage = "Failed to get meal suggestion. Please try again.";
+      if (err.message) {
+        detailedMessage = err.message;
+      }
+      // Add advice for server component errors
+      if (err.digest) { 
+        detailedMessage += ` Server error digest: ${err.digest}. Check server logs for more details. Ensure your GOOGLE_API_KEY is correctly set up.`;
+      } else {
+        detailedMessage += " This might be a server-side issue. Check server logs for more details and ensure your GOOGLE_API_KEY is correctly set up if using AI features.";
+      }
+      setError(detailedMessage);
     } finally {
       setIsGeneratingPlan(false);
     }
