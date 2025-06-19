@@ -3,12 +3,12 @@ import Image from 'next/image';
 import type { Recipe } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, Users, Flame, Info, Heart, PlusCircle } from 'lucide-react'; // Added Heart and PlusCircle
+import { Clock, Users, Flame, Info, Heart, PlusCircle, Beef, Wheat, Droplets } from 'lucide-react'; // Added Beef, Wheat, Droplets
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
-import { useAppContext } from '@/context/AppContext'; // Added useAppContext
+import { useAppContext } from '@/context/AppContext';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -25,7 +25,7 @@ export function RecipeCard({
   showViewDetailsButton = true,
   className
 }: RecipeCardProps) {
-  const { toggleFavoriteRecipe, isRecipeFavorite } = useAppContext(); // Get favorite functions
+  const { toggleFavoriteRecipe, isRecipeFavorite } = useAppContext();
   
   const defaultPlaceholder = `https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipe?.id || 'Unknown'}`;
   const [imageSrc, setImageSrc] = useState(recipe?.image || defaultPlaceholder);
@@ -67,7 +67,7 @@ export function RecipeCard({
     : "food meal";
 
   const handleFavoriteToggle = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent navigation if card is wrapped in Link somewhere else
+    e.preventDefault(); 
     e.stopPropagation();
     toggleFavoriteRecipe(recipe.id);
   };
@@ -98,18 +98,30 @@ export function RecipeCard({
         <CardTitle className="font-headline text-lg md:text-xl text-primary group-hover:text-accent transition-colors">{recipe.name}</CardTitle>
       </CardHeader>
       <CardContent className="flex-grow px-4 py-2">
-        <div className="space-y-1 text-xs md:text-sm text-muted-foreground">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs md:text-sm text-muted-foreground mb-2">
           <div className="flex items-center">
-            <Clock className="w-3 h-3 md:w-4 md:h-4 mr-2 text-accent" />
+            <Clock className="w-3 h-3 md:w-4 md:h-4 mr-1.5 text-accent" />
             <span>Prep: {recipe.prepTime}, Cook: {recipe.cookTime}</span>
           </div>
           <div className="flex items-center">
-            <Users className="w-3 h-3 md:w-4 md:h-4 mr-2 text-accent" />
+            <Users className="w-3 h-3 md:w-4 md:h-4 mr-1.5 text-accent" />
             <span>Serves: {recipe.servings}</span>
           </div>
           <div className="flex items-center">
-            <Flame className="w-3 h-3 md:w-4 md:h-4 mr-2 text-accent" />
+            <Flame className="w-3 h-3 md:w-4 md:h-4 mr-1.5 text-red-500" />
             <span>{recipe.macrosPerServing.calories.toFixed(0)} kcal</span>
+          </div>
+           <div className="flex items-center">
+            <Beef className="w-3 h-3 md:w-4 md:h-4 mr-1.5 text-blue-500" />
+            <span>{recipe.macrosPerServing.protein.toFixed(0)}g P</span>
+          </div>
+          <div className="flex items-center">
+            <Wheat className="w-3 h-3 md:w-4 md:h-4 mr-1.5 text-green-500" />
+            <span>{recipe.macrosPerServing.carbs.toFixed(0)}g C</span>
+          </div>
+          <div className="flex items-center">
+            <Droplets className="w-3 h-3 md:w-4 md:h-4 mr-1.5 text-yellow-500" />
+            <span>{recipe.macrosPerServing.fat.toFixed(0)}g F</span>
           </div>
         </div>
         {recipe.tags && recipe.tags.length > 0 && (
