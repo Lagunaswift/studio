@@ -65,7 +65,7 @@ const PlannedRecipeItemSchema = z.object({
   mealSlotName: z.string().describe("The name of the meal slot (e.g., 'Breakfast')."),
   recipeId: z.number().describe("The ID of the chosen recipe."),
   recipeName: z.string().describe("The name of the chosen recipe."),
-  servings: z.number().finite().positive().describe("Number of servings of the recipe to plan for this meal slot (e.g., 1, 1.5, 0.5). Must be greater than 0. Aim for at least 0.25 based on prompt guidance."),
+  servings: z.number().finite().min(0.01).describe("Number of servings of the recipe to plan for this meal slot (e.g., 1, 1.5, 0.5). Must be greater than 0. Aim for at least 0.25 based on prompt guidance."),
   calculatedMacros: MacroDataSchema.describe("Calculated macros for the chosen recipe and servings for this specific meal."),
 });
 export type PlannedRecipeItem = z.infer<typeof PlannedRecipeItemSchema>;
@@ -179,4 +179,5 @@ const suggestMealPlanFlow = ai.defineFlow(
 );
 
     
+
 
