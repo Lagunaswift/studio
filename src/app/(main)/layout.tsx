@@ -25,7 +25,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { SheetTitle } from '@/components/ui/sheet';
-import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, PanelLeft, Target, Leaf, Ban, ListChecks, UserCog, UserCircle2, BookOpen } from 'lucide-react';
+import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, PanelLeft, Target, Leaf, Ban, ListChecks, UserCog, UserCircle2, BookOpen, Archive } from 'lucide-react'; // Added Archive
 import type { LucideIcon } from 'lucide-react';
 
 interface NavItem {
@@ -41,6 +41,7 @@ const mainNavItems: NavItem[] = [
   { href: '/meal-plan', label: 'Meal Plan', icon: CalendarDays },
   { href: '/ai-suggestions', label: 'AI Suggestions', icon: Sparkles },
   { href: '/shopping-list', label: 'Shopping List', icon: ShoppingBag },
+  { href: '/pantry', label: 'Pantry', icon: Archive }, // Added Pantry
   { href: '/guide', label: 'App Guide', icon: BookOpen },
 ];
 

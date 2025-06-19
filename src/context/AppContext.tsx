@@ -6,6 +6,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo } 
 import type {
   PlannedMeal,
   ShoppingListItem,
+  PantryItem, // Added PantryItem
   Recipe,
   MealType,
   Macros,
@@ -16,18 +17,20 @@ import type {
   ActivityLevel,
   AthleteType,
   PrimaryGoal,
-  SubscriptionStatus
+  SubscriptionStatus,
+  UKSupermarketCategory
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { loadState, saveState } from '@/lib/localStorage';
 // Import getAllRecipes directly, it's now using mock data but keeps async signature
-import { getAllRecipes as getAllRecipesFromData, calculateTotalMacros, generateShoppingList as generateShoppingListUtil } from '@/lib/data';
+import { getAllRecipes as getAllRecipesFromData, calculateTotalMacros, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil } from '@/lib/data';
 
 
 const MEAL_PLAN_KEY = 'macroTealMealPlan';
 const SHOPPING_LIST_KEY = 'macroTealShoppingList';
 const USER_PROFILE_KEY = 'macroTealUserProfile';
 const FAVORITE_RECIPES_KEY = 'macroTealFavoriteRecipes';
+const PANTRY_ITEMS_KEY = 'macroTealPantryItems'; // Key for pantry items
 
 const DEFAULT_MEAL_STRUCTURE: MealSlotConfig[] = [
   { id: 'default-breakfast', name: 'Breakfast', type: 'Breakfast' },
@@ -146,6 +149,7 @@ const calculateTDEE = (
 interface AppContextType {
   mealPlan: PlannedMeal[];
   shoppingList: ShoppingListItem[];
+  pantryItems: PantryItem[]; // Added pantryItems
   userProfile: UserProfileSettings | null;
   allRecipesCache: Recipe[];
   addMealToPlan: (recipe: Recipe, date: string, mealType: MealType, servings: number) => void;
@@ -165,6 +169,11 @@ interface AppContextType {
   favoriteRecipeIds: number[];
   toggleFavoriteRecipe: (recipeId: number) => void;
   isRecipeFavorite: (recipeId: number) => boolean;
+  addPantryItem: (name: string, quantity: number, unit: string, category: UKSupermarketCategory) => void;
+  removePantryItem: (itemId: string) => void;
+  updatePantryItemQuantity: (itemId: string, newQuantity: number) => void;
+  parseIngredient: (ingredientString: string) => { name: string; quantity: number; unit: string };
+  assignIngredientCategory: (ingredientName: string) => UKSupermarketCategory;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -172,6 +181,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [mealPlan, setMealPlan] = useState<PlannedMeal[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
+  const [pantryItems, setPantryItems] = useState<PantryItem[]>([]); // State for pantry items
   const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
   const [allRecipesCache, setAllRecipesCache] = useState<Recipe[]>([]);
   const [isRecipeCacheLoading, setIsRecipeCacheLoading] = useState(true);
@@ -197,6 +207,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let loadedUserProfile = loadState<UserProfileSettings>(USER_PROFILE_KEY);
       const loadedFavoriteRecipeIds = loadState<number[]>(FAVORITE_RECIPES_KEY) || [];
       setFavoriteRecipeIds(loadedFavoriteRecipeIds);
+      const loadedPantryItems = loadState<PantryItem[]>(PANTRY_ITEMS_KEY) || []; // Load pantry items
+      setPantryItems(loadedPantryItems);
 
 
       if (!loadedUserProfile) {
@@ -205,16 +217,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loadedUserProfile = { ...DEFAULT_USER_PROFILE, ...loadedUserProfile };
       }
 
-      // Ensure all fields from DEFAULT_USER_PROFILE are present
       for (const key in DEFAULT_USER_PROFILE) {
         if (loadedUserProfile[key as keyof UserProfileSettings] === undefined) {
           loadedUserProfile[key as keyof UserProfileSettings] = DEFAULT_USER_PROFILE[key as keyof UserProfileSettings];
         }
       }
       
-      // Initial calculation of derived values if necessary
       let initialBFP = loadedUserProfile.bodyFatPercentage;
-      if (initialBFP === null) { // Only calculate if not already set (e.g. manually or by previous calc)
+      if (initialBFP === null) { 
         initialBFP = calculateNavyBodyFatPercentage(
           loadedUserProfile.sex,
           loadedUserProfile.heightCm,
@@ -224,7 +234,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           loadedUserProfile.hipCircumferenceCm
         );
       }
-      loadedUserProfile.bodyFatPercentage = initialBFP; // Will be null if calc failed or not enough data
+      loadedUserProfile.bodyFatPercentage = initialBFP; 
 
       loadedUserProfile.tdee = calculateTDEE(
         loadedUserProfile.weightKg,
@@ -235,7 +245,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       loadedUserProfile.leanBodyMassKg = calculateLBM(
         loadedUserProfile.weightKg,
-        loadedUserProfile.bodyFatPercentage // Use the potentially updated BFP
+        loadedUserProfile.bodyFatPercentage 
       );
       
       setUserProfile(loadedUserProfile);
@@ -246,9 +256,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       setMealPlan(populatedMealPlan);
       
+      // Regenerate shopping list considering pantry items during initialization
       if (loadedShoppingList.length === 0 && populatedMealPlan.length > 0) {
-        setShoppingList(generateShoppingListUtil(populatedMealPlan, recipes));
-      } else {
+        setShoppingList(generateShoppingListUtil(populatedMealPlan, recipes, loadedPantryItems));
+      } else if (populatedMealPlan.length > 0) { // Always regen if there's a meal plan to reflect current pantry
+         setShoppingList(generateShoppingListUtil(populatedMealPlan, recipes, loadedPantryItems));
+      }
+      else {
         setShoppingList(loadedShoppingList);
       }
       setIsInitialized(true);
@@ -273,6 +287,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (madeAChange) {
         setMealPlan(updatedMealPlan);
+        // No need to directly call regenerateShoppingList here, 
+        // as the mealPlan effect below will handle it.
       }
     }
   }, [allRecipesCache, mealPlan, isInitialized]);
@@ -287,8 +303,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (isInitialized) {
       saveState(MEAL_PLAN_KEY, mealPlan.map(({recipeDetails, ...pm}) => pm));
+      // Regenerate shopping list whenever mealPlan changes
+      regenerateShoppingList(mealPlan, pantryItems);
     }
-  }, [mealPlan, isInitialized]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mealPlan, pantryItems, isInitialized]); // Added pantryItems dependency
 
   useEffect(() => {
     if (isInitialized) {
@@ -302,9 +321,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [favoriteRecipeIds, isInitialized]);
 
+  useEffect(() => {
+    if (isInitialized) {
+      saveState(PANTRY_ITEMS_KEY, pantryItems);
+      // Regenerate shopping list whenever pantryItems change
+      regenerateShoppingList(mealPlan, pantryItems);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pantryItems, mealPlan, isInitialized]); // Added mealPlan dependency
 
-  const regenerateShoppingList = useCallback((currentMealPlan: PlannedMeal[]) => {
-    const newShoppingList = generateShoppingListUtil(currentMealPlan, allRecipesCache);
+
+  const regenerateShoppingList = useCallback((currentMealPlan: PlannedMeal[], currentPantryItems: PantryItem[]) => {
+    const newShoppingList = generateShoppingListUtil(currentMealPlan, allRecipesCache, currentPantryItems);
     setShoppingList(newShoppingList);
   }, [allRecipesCache]);
 
@@ -317,30 +345,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       servings,
       recipeDetails: recipe,
     };
-    setMealPlan(prev => {
-      const updatedPlan = [...prev, newPlannedMeal];
-      regenerateShoppingList(updatedPlan);
-      return updatedPlan;
-    });
-  }, [regenerateShoppingList]);
+    setMealPlan(prev => [...prev, newPlannedMeal]);
+    // Shopping list regeneration is handled by the mealPlan useEffect
+  }, []);
 
   const removeMealFromPlan = useCallback((plannedMealId: string) => {
-    setMealPlan(prev => {
-      const updatedPlan = prev.filter(pm => pm.id !== plannedMealId);
-      regenerateShoppingList(updatedPlan);
-      return updatedPlan;
-    });
-  }, [regenerateShoppingList]);
+    setMealPlan(prev => prev.filter(pm => pm.id !== plannedMealId));
+    // Shopping list regeneration is handled by the mealPlan useEffect
+  }, []);
 
   const updatePlannedMealServings = useCallback((plannedMealId: string, newServings: number) => {
-    setMealPlan(prev => {
-      const updatedPlan = prev.map(pm =>
+    setMealPlan(prev => 
+      prev.map(pm =>
         pm.id === plannedMealId ? { ...pm, servings: newServings } : pm
-      );
-      regenerateShoppingList(updatedPlan);
-      return updatedPlan;
-    });
-  }, [regenerateShoppingList]);
+      )
+    );
+    // Shopping list regeneration is handled by the mealPlan useEffect
+  }, []);
 
   const getDailyMacros = useCallback((date: string): Macros => {
     const dailyMeals = mealPlan.filter(pm => pm.date === date);
@@ -363,18 +384,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const clearMealPlanForDate = useCallback((date: string) => {
-    setMealPlan(prev => {
-      const updatedPlan = prev.filter(pm => pm.date !== date);
-      regenerateShoppingList(updatedPlan);
-      return updatedPlan;
-    });
-  }, [regenerateShoppingList]);
+    setMealPlan(prev => prev.filter(pm => pm.date !== date));
+     // Shopping list regeneration is handled by the mealPlan useEffect
+  }, []);
 
   const clearAllData = useCallback(() => {
     setMealPlan([]);
     setShoppingList([]);
     setUserProfile({ ...DEFAULT_USER_PROFILE });
     setFavoriteRecipeIds([]);
+    setPantryItems([]); // Clear pantry items
   }, []);
 
   const updateUserProfileState = useCallback((updates: Partial<UserProfileSettings>) => {
@@ -395,7 +414,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             newProfileData.waistCircumferenceCm,
             newProfileData.hipCircumferenceCm
         );
-        // Only update BFP from Navy calculation if it's a valid number
         if (navyBFP !== null && isFinite(navyBFP)) {
             finalBodyFatPercentage = navyBFP;
         }
@@ -452,9 +470,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return favoriteRecipeIds.includes(recipeId);
   }, [favoriteRecipeIds]);
 
+  // Pantry management functions
+  const addPantryItem = useCallback((name: string, quantity: number, unit: string, category: UKSupermarketCategory) => {
+    const id = `${name.toLowerCase().trim()}|${unit.toLowerCase().trim()}`;
+    setPantryItems(prevItems => {
+      const existingItemIndex = prevItems.findIndex(item => item.id === id);
+      if (existingItemIndex > -1) {
+        const updatedItems = [...prevItems];
+        updatedItems[existingItemIndex].quantity += quantity;
+        if (updatedItems[existingItemIndex].quantity <= 0) {
+          return updatedItems.filter((_, index) => index !== existingItemIndex);
+        }
+        return updatedItems;
+      } else if (quantity > 0) {
+        return [...prevItems, { id, name, quantity, unit, category }];
+      }
+      return prevItems;
+    });
+  }, []);
+
+  const removePantryItem = useCallback((itemId: string) => {
+    setPantryItems(prevItems => prevItems.filter(item => item.id !== itemId));
+  }, []);
+
+  const updatePantryItemQuantity = useCallback((itemId: string, newQuantity: number) => {
+    setPantryItems(prevItems => {
+      if (newQuantity <= 0) {
+        return prevItems.filter(item => item.id !== itemId);
+      }
+      return prevItems.map(item =>
+        item.id === itemId ? { ...item, quantity: newQuantity } : item
+      );
+    });
+  }, []);
+  
+  const parseIngredient = useCallback((ingredientString: string) => {
+    return parseIngredientStringUtil(ingredientString);
+  }, []);
+
+  const assignIngredientCategory = useCallback((ingredientName: string) => {
+    return assignCategoryUtil(ingredientName);
+  }, []);
+
+
   const contextValue = useMemo(() => ({
     mealPlan,
     shoppingList,
+    pantryItems, // Expose pantryItems
     userProfile,
     allRecipesCache,
     addMealToPlan,
@@ -474,18 +536,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     favoriteRecipeIds,
     toggleFavoriteRecipe,
     isRecipeFavorite,
+    addPantryItem, // Expose pantry functions
+    removePantryItem,
+    updatePantryItemQuantity,
+    parseIngredient,
+    assignIngredientCategory,
   }), [
-    mealPlan, shoppingList, userProfile, allRecipesCache, addMealToPlan, removeMealFromPlan,
+    mealPlan, shoppingList, pantryItems, userProfile, allRecipesCache, addMealToPlan, removeMealFromPlan,
     updatePlannedMealServings, getDailyMacros, toggleShoppingListItem,
     clearMealPlanForDate, clearAllData, getMealsForDate, setMacroTargets,
     setDietaryPreferences, setAllergens, setMealStructure, setUserInformation, isRecipeCacheLoading,
-    favoriteRecipeIds, toggleFavoriteRecipe, isRecipeFavorite
+    favoriteRecipeIds, toggleFavoriteRecipe, isRecipeFavorite,
+    addPantryItem, removePantryItem, updatePantryItemQuantity, parseIngredient, assignIngredientCategory
   ]);
 
   if (!isInitialized && !isRecipeCacheLoading) {
-    // Still initializing or recipes are loading but not yet finished, don't render children yet
-    // to prevent them from using a potentially incomplete context.
-    // You might want to show a global loading indicator here or return null.
     return null; 
   }
   
@@ -500,4 +565,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-

@@ -66,6 +66,16 @@ export interface ShoppingListItem {
   recipes: Array<{ recipeId: number; recipeName: string }>;
 }
 
+export interface PantryItem {
+  id: string; // Typically ingredientName.toLowerCase() + unit.toLowerCase()
+  name: string;
+  quantity: number;
+  unit: string;
+  category: UKSupermarketCategory;
+  // lastUpdated?: string; // ISO date string - for future use
+}
+
+
 export interface DailyMacros extends Macros {
   date: string;
 }

@@ -1,5 +1,5 @@
 
-import type { Recipe, Macros, MealType, PlannedMeal, ShoppingListItem, UKSupermarketCategory } from '@/types';
+import type { Recipe, Macros, MealType, PlannedMeal, ShoppingListItem, UKSupermarketCategory, PantryItem } from '@/types';
 import { getAllRecipes as getAllRecipesFromRegistry } from '@/features/recipes/recipeRegistry';
 
 // Helper function to map registry recipes to the full Recipe type
@@ -87,7 +87,7 @@ const categoryKeywords: Record<UKSupermarketCategory, string[]> = {
 };
 
 
-const parseIngredientString = (ingredientString: string): { name: string; quantity: number; unit: string } => {
+export const parseIngredientString = (ingredientString: string): { name: string; quantity: number; unit: string } => {
   const cleanedString = ingredientString.replace(/,/g, '').replace(/\./g, '');
   const regex = /^(\d+\s*\/?\s*\d*|\d*\s?½|\d*\s?¼|\d*\s?¾)\s*([a-zA-Zμ]+(?:cup|tbsp|tsp|g|kg|ml|L|oz|can|cans|bunch|clove|cloves|stalk|stalks|sprig|sprigs|slice|slices|sheet|sheets|fillet|fillets|head)?\.?)\s*(of\s+)?(.*)$/i;
   const match = cleanedString.match(regex);
@@ -143,15 +143,14 @@ const parseIngredientString = (ingredientString: string): { name: string; quanti
   if (name.toLowerCase().startsWith('of ')) {
     name = name.substring(3).trim();
   }
-   // Remove common descriptors that are not part of the core ingredient name for mapping
   name = name.replace(/(?:peeled|chopped|diced|sliced|minced|grated|crushed|trimmed|halved|quartered|rinsed|drained|frozen|fresh|cooked|uncooked|ripe|large|medium|small|thinly|finely|coarsely|skinless|boneless|canned|tinned|pitted|deseeded|shelled|raw|plus extra|plus more|for garnish|to serve|to taste|optional|room temperature|softened|melted|unsalted|unsweetened|light|full fat|reduced fat|lean|extra lean|natural|organic|heaping|rounded-sm|scant|ends trimmed|cut into chunks|cut into pieces|cut into strips|cut into bite-size pieces|white parts only|green part|flesh only|tough bottoms removed|core removed|seeds removed|stems removed|skin removed|skin on|bone-in|in brine|in olive oil|in water|in juice|with liquid|including juices|rehydrated|store bought or homemade|\(or similar.*?\)|e\.g\..*?\b|, diced|, chopped|, sliced|, minced|, grated|, crushed|, peeled|, cored|, pitted|, deseeded|, trimmed|, halved|, quartered|, rinsed|, drained|, frozen|, fresh|, cooked|, uncooked|, ripe|, large|, medium|, small|, thinly|, finely|, coarsely|, skinless|, boneless|, canned|, tinned|\(.*\))$/i, '').trim();
-  name = name.replace(/,$/, '').trim(); // Remove trailing comma
+  name = name.replace(/,$/, '').trim(); 
 
   return { name: name.charAt(0).toUpperCase() + name.slice(1), quantity, unit };
 };
 
 
-const assignCategory = (ingredientName: string): UKSupermarketCategory => {
+export const assignCategory = (ingredientName: string): UKSupermarketCategory => {
   const lowerIngredientName = ingredientName.toLowerCase();
   for (const category in categoryKeywords) {
     const keywords = categoryKeywords[category as UKSupermarketCategory];
@@ -159,47 +158,64 @@ const assignCategory = (ingredientName: string): UKSupermarketCategory => {
       return category as UKSupermarketCategory;
     }
   }
-  // Try a more generic match if no specific keyword found
   if (lowerIngredientName.includes('milk') || lowerIngredientName.includes('cheese') || lowerIngredientName.includes('yogurt') || lowerIngredientName.includes('butter') || lowerIngredientName.includes('cream') || lowerIngredientName.includes('egg')) return "Dairy, Butter & Eggs";
   if (lowerIngredientName.includes('chicken') || lowerIngredientName.includes('beef') || lowerIngredientName.includes('pork') || lowerIngredientName.includes('lamb') || lowerIngredientName.includes('turkey')) return "Meat & Poultry";
   if (lowerIngredientName.includes('salmon') || lowerIngredientName.includes('cod') || lowerIngredientName.includes('tuna') || lowerIngredientName.includes('fish') || lowerIngredientName.includes('prawn')) return "Fish & Seafood";
   if (lowerIngredientName.includes('apple') || lowerIngredientName.includes('banana') || lowerIngredientName.includes('berry') || lowerIngredientName.includes('orange') || lowerIngredientName.includes('tomato') || lowerIngredientName.includes('potato') || lowerIngredientName.includes('onion') || lowerIngredientName.includes('carrot') || lowerIngredientName.includes('broccoli') || lowerIngredientName.includes('spinach') || lowerIngredientName.includes('pepper')) return "Fresh Fruit & Vegetables";
-  if (lowerIngredientName.includes('bread') || lowerIngredientName.includes('pasta') || lowerIngredientName.includes('rice') || lowerIngredientName.includes('flour') || lowerIngredientName.includes('cereal') || lowerIngredientName.includes('oats')) return "Food Cupboard"; // Could also be bakery for fresh
+  if (lowerIngredientName.includes('bread') || lowerIngredientName.includes('pasta') || lowerIngredientName.includes('rice') || lowerIngredientName.includes('flour') || lowerIngredientName.includes('cereal') || lowerIngredientName.includes('oats')) return "Food Cupboard"; 
   return "Other Food Items";
 };
 
 
-export const generateShoppingList = (plannedMeals: PlannedMeal[], recipesSource?: Recipe[]): ShoppingListItem[] => {
+export const generateShoppingList = (plannedMeals: PlannedMeal[], recipesSource?: Recipe[], pantryItems: PantryItem[] = []): ShoppingListItem[] => {
   const ingredientMap = new Map<string, ShoppingListItem>();
   const recipesToUse = recipesSource && recipesSource.length > 0 ? recipesSource : allRegisteredRecipesFull;
+  const pantryMap = new Map<string, PantryItem>(pantryItems.map(item => [item.id, item]));
 
   plannedMeals.forEach(plannedMeal => {
     const recipe = plannedMeal.recipeDetails || recipesToUse.find(r => r.id === plannedMeal.recipeId);
     if (recipe) {
       recipe.ingredients.forEach(ingredientString => {
         const parsed = parseIngredientString(ingredientString);
-        if (!parsed.name) return; // Skip if parsing failed to get a name
+        if (!parsed.name) return; 
 
-        const mapKey = `${parsed.name.toLowerCase()}|${parsed.unit.toLowerCase()}`;
-        const existingItem = ingredientMap.get(mapKey);
-        const category = assignCategory(parsed.name);
-        const quantityToAdd = parsed.quantity * plannedMeal.servings;
+        const requiredQuantityForMeal = parsed.quantity * plannedMeal.servings;
+        const mapKey = `${parsed.name.toLowerCase().trim()}|${parsed.unit.toLowerCase().trim()}`; // This is the ID for pantry and shopping list item
 
-        if (existingItem) {
-          existingItem.quantity += quantityToAdd;
-          if (!existingItem.recipes.find(r => r.recipeId === recipe.id)) {
-            existingItem.recipes.push({ recipeId: recipe.id, recipeName: recipe.name });
+        let quantityToAddToShoppingList = requiredQuantityForMeal;
+
+        const pantryItem = pantryMap.get(mapKey);
+        if (pantryItem && pantryItem.quantity > 0) {
+          if (pantryItem.quantity >= requiredQuantityForMeal) {
+            quantityToAddToShoppingList = 0; // Fully covered by pantry
+          } else {
+            quantityToAddToShoppingList = requiredQuantityForMeal - pantryItem.quantity; // Partially covered
           }
-        } else {
-          ingredientMap.set(mapKey, {
-            id: mapKey,
-            name: parsed.name,
-            quantity: quantityToAdd,
-            unit: parsed.unit,
-            category: category,
-            purchased: false,
-            recipes: [{ recipeId: recipe.id, recipeName: recipe.name }],
-          });
+        }
+        
+        quantityToAddToShoppingList = parseFloat(quantityToAddToShoppingList.toFixed(2)); // Avoid floating point inaccuracies
+
+        if (quantityToAddToShoppingList > 0) {
+          const existingShoppingItem = ingredientMap.get(mapKey);
+          const category = assignCategory(parsed.name);
+
+          if (existingShoppingItem) {
+            existingShoppingItem.quantity += quantityToAddToShoppingList;
+            existingShoppingItem.quantity = parseFloat(existingShoppingItem.quantity.toFixed(2));
+            if (!existingShoppingItem.recipes.find(r => r.recipeId === recipe.id)) {
+              existingShoppingItem.recipes.push({ recipeId: recipe.id, recipeName: recipe.name });
+            }
+          } else {
+            ingredientMap.set(mapKey, {
+              id: mapKey,
+              name: parsed.name,
+              quantity: quantityToAddToShoppingList,
+              unit: parsed.unit,
+              category: category,
+              purchased: false,
+              recipes: [{ recipeId: recipe.id, recipeName: recipe.name }],
+            });
+          }
         }
       });
     }
@@ -210,6 +226,3 @@ export const generateShoppingList = (plannedMeals: PlannedMeal[], recipesSource?
     return a.name.localeCompare(b.name);
   });
 };
-    
-
-    
