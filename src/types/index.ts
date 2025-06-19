@@ -72,6 +72,7 @@ export interface PantryItem {
   quantity: number;
   unit: string;
   category: UKSupermarketCategory;
+  expiryDate?: string; // YYYY-MM-DD format
   // lastUpdated?: string; // ISO date string - for future use
 }
 
@@ -151,3 +152,4 @@ export interface UserProfileSettings {
   subscription_end_date?: string | null;
   subscription_duration?: string | null;
 }
+

@@ -10,13 +10,17 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, MinusCircle, Trash2, Archive, CheckCircle, XCircle } from 'lucide-react';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { PlusCircle, MinusCircle, Trash2, Archive, CheckCircle, XCircle, CalendarIcon, AlertTriangle, Info } from 'lucide-react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { format, addDays, isBefore, isSameDay, parseISO, isValid } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 const UK_SUPERMARKET_CATEGORIES: UKSupermarketCategory[] = [
   "Fresh Fruit & Vegetables", "Bakery", "Meat & Poultry", "Fish & Seafood", 
@@ -32,6 +36,7 @@ const pantryItemSchema = z.object({
   quantity: z.coerce.number().positive({ message: "Quantity must be a positive number." }),
   unit: z.string().min(1, "Unit is required."),
   category: z.enum(UK_SUPERMARKET_CATEGORIES),
+  expiryDate: z.string().optional(), // YYYY-MM-DD format, optional
 });
 
 type PantryItemFormValues = z.infer<typeof pantryItemSchema>;
@@ -41,6 +46,10 @@ export default function PantryPage() {
   const { toast } = useToast();
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingQuantity, setEditingQuantity] = useState<number>(0);
+  const [selectedExpiryDate, setSelectedExpiryDate] = useState<Date | undefined>(undefined);
+
+  const [expiredItems, setExpiredItems] = useState<PantryItem[]>([]);
+  const [expiringSoonItems, setExpiringSoonItems] = useState<PantryItem[]>([]);
 
   const form = useForm<PantryItemFormValues>({
     resolver: zodResolver(pantryItemSchema),
@@ -49,19 +58,47 @@ export default function PantryPage() {
       quantity: 1,
       unit: 'item(s)',
       category: 'Food Cupboard',
+      expiryDate: undefined,
     },
   });
 
+  useEffect(() => {
+    const today = new Date();
+    const sevenDaysFromNow = addDays(today, 7);
+
+    const expired: PantryItem[] = [];
+    const expiringSoon: PantryItem[] = [];
+
+    pantryItems.forEach(item => {
+      if (item.expiryDate) {
+        try {
+          const expiry = parseISO(item.expiryDate); // Converts YYYY-MM-DD string to Date
+          if (isValid(expiry)) {
+            if (isBefore(expiry, today) && !isSameDay(expiry, today)) {
+              expired.push(item);
+            } else if (isBefore(expiry, sevenDaysFromNow) || isSameDay(expiry, today)) {
+              expiringSoon.push(item);
+            }
+          }
+        } catch (e) {
+          console.error("Error parsing expiry date for item:", item.name, item.expiryDate, e);
+        }
+      }
+    });
+    setExpiredItems(expired.sort((a,b) => new Date(a.expiryDate!).getTime() - new Date(b.expiryDate!).getTime()));
+    setExpiringSoonItems(expiringSoon.sort((a,b) => new Date(a.expiryDate!).getTime() - new Date(b.expiryDate!).getTime()));
+  }, [pantryItems]);
+
   const onSubmit: SubmitHandler<PantryItemFormValues> = (data) => {
     try {
-      // Use the explicit category from the form, or try to assign one if needed (though category is required by schema)
       const category = data.category || assignIngredientCategory(data.name);
-      addPantryItem(data.name, data.quantity, data.unit, category);
+      addPantryItem(data.name, data.quantity, data.unit, category, data.expiryDate);
       toast({
         title: "Item Added",
         description: `${data.quantity} ${data.unit} of ${data.name} added to your pantry.`,
       });
       form.reset();
+      setSelectedExpiryDate(undefined); // Reset date picker display
     } catch (error: any) {
       toast({
         title: "Error Adding Item",
@@ -121,6 +158,44 @@ export default function PantryPage() {
 
   return (
     <PageWrapper title="Manage Your Pantry">
+      {(expiredItems.length > 0 || expiringSoonItems.length > 0) && (
+        <div className="mb-8 space-y-4">
+          {expiredItems.length > 0 && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-5 w-5" />
+              <AlertTitle>Expired Items!</AlertTitle>
+              <AlertDescription>
+                The following items in your pantry have expired:
+                <ul className="list-disc pl-5 mt-2">
+                  {expiredItems.map(item => (
+                    <li key={`expired-${item.id}`}>
+                      {item.name} (Expired on: {item.expiryDate ? format(parseISO(item.expiryDate), 'PPP') : 'N/A'})
+                    </li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+          {expiringSoonItems.length > 0 && (
+            <Alert variant="default" className="border-orange-500 text-orange-700 [&>svg]:text-orange-500">
+              <Info className="h-5 w-5" />
+              <AlertTitle>Items Expiring Soon</AlertTitle>
+              <AlertDescription>
+                The following items are expiring within the next 7 days or are expired today:
+                <ul className="list-disc pl-5 mt-2">
+                  {expiringSoonItems.map(item => (
+                    <li key={`expiring-${item.id}`} className={item.expiryDate && isBefore(parseISO(item.expiryDate), new Date()) && !isSameDay(parseISO(item.expiryDate), new Date()) ? "text-red-600 font-semibold" : ""}>
+                      {item.name} (Expires on: {item.expiryDate ? format(parseISO(item.expiryDate), 'PPP') : 'N/A'})
+                       {item.expiryDate && isBefore(parseISO(item.expiryDate), new Date()) && !isSameDay(parseISO(item.expiryDate), new Date()) && " - Already Expired!"}
+                    </li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      )}
+
       <div className="grid md:grid-cols-3 gap-8">
         <div className="md:col-span-1">
           <Card className="shadow-lg">
@@ -208,6 +283,48 @@ export default function PantryPage() {
                       </FormItem>
                     )}
                   />
+                  <FormField
+                    control={form.control}
+                    name="expiryDate"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Expiry Date (Optional)</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {selectedExpiryDate ? (
+                                  format(selectedExpiryDate, "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={selectedExpiryDate}
+                              onSelect={(date) => {
+                                setSelectedExpiryDate(date);
+                                field.onChange(date ? format(date, "yyyy-MM-dd") : undefined);
+                              }}
+                              disabled={(date) => date < new Date(new Date().setHours(0,0,0,0)) } // Disable past dates
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </CardContent>
                 <CardFooter>
                   <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
@@ -274,6 +391,15 @@ export default function PantryPage() {
                                   {item.quantity.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {item.unit}
                                 </div>
                               )}
+                              {item.expiryDate && (
+                                <p className={cn(
+                                  "text-xs",
+                                  isBefore(parseISO(item.expiryDate), new Date()) && !isSameDay(parseISO(item.expiryDate), new Date()) ? "text-destructive font-semibold" : "text-muted-foreground"
+                                )}>
+                                  Expires: {format(parseISO(item.expiryDate), 'PPP')}
+                                  {isBefore(parseISO(item.expiryDate), new Date()) && !isSameDay(parseISO(item.expiryDate), new Date()) && " (EXPIRED)"}
+                                </p>
+                              )}
                             </div>
                             <div className="flex items-center space-x-1">
                               <Button variant="ghost" size="icon" onClick={() => handleQuantityChange(item.id, 1)} className="h-7 w-7">
@@ -301,3 +427,4 @@ export default function PantryPage() {
     </PageWrapper>
   );
 }
+

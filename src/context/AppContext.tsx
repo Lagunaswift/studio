@@ -169,7 +169,7 @@ interface AppContextType {
   favoriteRecipeIds: number[];
   toggleFavoriteRecipe: (recipeId: number) => void;
   isRecipeFavorite: (recipeId: number) => boolean;
-  addPantryItem: (name: string, quantity: number, unit: string, category: UKSupermarketCategory) => void;
+  addPantryItem: (name: string, quantity: number, unit: string, category: UKSupermarketCategory, expiryDate?: string) => void;
   removePantryItem: (itemId: string) => void;
   updatePantryItemQuantity: (itemId: string, newQuantity: number) => void;
   parseIngredient: (ingredientString: string) => { name: string; quantity: number; unit: string };
@@ -471,19 +471,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [favoriteRecipeIds]);
 
   // Pantry management functions
-  const addPantryItem = useCallback((name: string, quantity: number, unit: string, category: UKSupermarketCategory) => {
+  const addPantryItem = useCallback((name: string, quantity: number, unit: string, category: UKSupermarketCategory, expiryDate?: string) => {
     const id = `${name.toLowerCase().trim()}|${unit.toLowerCase().trim()}`;
     setPantryItems(prevItems => {
       const existingItemIndex = prevItems.findIndex(item => item.id === id);
       if (existingItemIndex > -1) {
         const updatedItems = [...prevItems];
         updatedItems[existingItemIndex].quantity += quantity;
+        // Expiry date of existing item is retained, new expiry date is ignored if item merges
         if (updatedItems[existingItemIndex].quantity <= 0) {
           return updatedItems.filter((_, index) => index !== existingItemIndex);
         }
         return updatedItems;
       } else if (quantity > 0) {
-        return [...prevItems, { id, name, quantity, unit, category }];
+        // For new items, set the expiryDate
+        return [...prevItems, { id, name, quantity, unit, category, expiryDate }];
       }
       return prevItems;
     });
@@ -565,3 +567,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
