@@ -128,6 +128,10 @@ export const parseIngredientString = (ingredientString: string): { name: string;
      }
   }
 
+  // Specific cleanups for name before generic ones
+  name = name.replace(/\(\s*\d+\s*g\s*\)|\(\s*\d+\s*ml\s*\)|\(\s*\d+\s*kg\s*\)/gi, '').trim(); // Remove (120g), (50ml) etc.
+  name = name.replace(/,?\s*(pitted|deseeded|without stone)\s*,?/gi, '').trim(); // Remove pitted, without stone, etc.
+
   const unitLower = unit.toLowerCase();
   if (['tbsp', 'tablespoon', 'tablespoons'].includes(unitLower)) unit = 'tbsp';
   else if (['tsp', 'teaspoon', 'teaspoons'].includes(unitLower)) unit = 'tsp';
@@ -140,8 +144,8 @@ export const parseIngredientString = (ingredientString: string): { name: string;
   else if (unitLower === 'can' || unitLower === 'cans') unit = 'can';
   else if (['egg', 'eggs'].includes(unitLower)) {
     unit = 'egg'; // Standardize unit to 'egg'
-    if (name.toLowerCase().includes('egg')) { // If name also contains 'egg' or 'eggs'
-        name = 'egg'; // Standardize name to 'egg'
+    if (name.toLowerCase().includes('egg')) { 
+        name = 'egg'; 
     }
   }
 
@@ -155,7 +159,7 @@ export const parseIngredientString = (ingredientString: string): { name: string;
   }
   
   // Remove common adjectives and preparation instructions from the end of the name
-  name = name.replace(/(?:peeled|chopped|diced|sliced|minced|grated|crushed|trimmed|halved|quartered|rinsed|drained|frozen|fresh|cooked|uncooked|ripe|large|medium|small|thinly|finely|coarsely|skinless|boneless|canned|tinned|pitted|deseeded|shelled|raw|plus extra|plus more|for garnish|to serve|to taste|optional|room temperature|softened|melted|unsalted|unsweetened|light|full fat|reduced fat|lean|extra lean|natural|organic|heaping|rounded-sm|scant|ends trimmed|cut into chunks|cut into pieces|cut into strips|cut into bite-size pieces|white parts only|green part|flesh only|tough bottoms removed|core removed|seeds removed|stems removed|skin removed|skin on|bone-in|in brine|in olive oil|in water|in juice|with liquid|including juices|rehydrated|store bought or homemade|\(.*\))$/i, '').trim();
+  name = name.replace(/(?:peeled|chopped|diced|sliced|minced|grated|crushed|trimmed|halved|quartered|rinsed|drained|frozen|fresh|cooked|uncooked|ripe|large|medium|small|thinly|finely|coarsely|skinless|boneless|canned|tinned|shelled|raw|plus extra|plus more|for garnish|to serve|to taste|optional|room temperature|softened|melted|unsalted|unsweetened|light|full fat|reduced fat|lean|extra lean|natural|organic|heaping|rounded-sm|scant|ends trimmed|cut into chunks|cut into pieces|cut into strips|cut into bite-size pieces|white parts only|green part|flesh only|tough bottoms removed|core removed|seeds removed|stems removed|skin removed|skin on|bone-in|in brine|in olive oil|in water|in juice|with liquid|including juices|rehydrated|store bought or homemade|\(.*\))$/i, '').trim();
   name = name.replace(/,$/, '').trim(); 
   
   // If after all that, name is empty but unit implies name (like 'egg'), use unit as name.
@@ -192,7 +196,7 @@ export const generateShoppingList = (plannedMeals: PlannedMeal[], recipesSource?
   // Create a mutable copy of pantry quantities for this calculation session
   const tempPantryQuantities = new Map<string, number>();
   pantryItems.forEach(item => {
-    tempPantryQuantities.set(item.id, item.quantity);
+    tempPantryQuantities.set(item.id, item.quantity); // item.id is already mapKey format
   });
 
   plannedMeals.forEach(plannedMeal => {
