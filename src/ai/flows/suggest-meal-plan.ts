@@ -65,7 +65,7 @@ const PlannedRecipeItemSchema = z.object({
   mealSlotName: z.string().describe("The name of the meal slot (e.g., 'Breakfast')."),
   recipeId: z.number().describe("The ID of the chosen recipe."),
   recipeName: z.string().describe("The name of the chosen recipe."),
-  servings: z.number().finite().positive().min(0.25).describe("Number of servings of the recipe to plan for this meal slot (e.g., 1, 1.5, 0.5)."),
+  servings: z.number().finite().positive().describe("Number of servings of the recipe to plan for this meal slot (e.g., 1, 1.5, 0.5). Must be greater than 0. Aim for at least 0.25 based on prompt guidance."),
   calculatedMacros: MacroDataSchema.describe("Calculated macros for the chosen recipe and servings for this specific meal."),
 });
 export type PlannedRecipeItem = z.infer<typeof PlannedRecipeItemSchema>;
@@ -112,7 +112,7 @@ Available Recipes Database (Recipe ID, Name, Macros per SINGLE serving, Tags):
 
 Your Task:
 1.  For EACH slot in the 'mealStructure', select ONE recipe from the 'availableRecipes'.
-2.  Determine an appropriate number of servings for EACH selected recipe. Servings can be fractional (e.g., 1.5, 0.75, 0.5) but must be at least 0.25. Adjust servings to help meet overall daily macro targets.
+2.  Determine an appropriate number of servings for EACH selected recipe. Servings can be fractional (e.g., 1.5, 0.75, 0.5) but must be at least 0.25. Adjust servings to help meet overall daily macro targets. Ensure the servings output is a positive number.
 3.  CRITICAL: Ensure your recipe choices and tags align with the user's 'dietaryPreferences' (e.g., if "Vegetarian", only select recipes tagged 'vegetarian' or those that are inherently vegetarian).
 4.  CRITICAL: Ensure your recipe choices strictly AVOID any ingredients implied by the user's 'allergens' (e.g., if "Nuts", avoid recipes that might contain nuts based on their name or typical ingredients, even if not explicitly tagged). Use common sense for allergens.
 5.  For each planned meal, calculate the 'calculatedMacros' based on the recipe's 'macrosPerServing' multiplied by your chosen 'servings'.
@@ -179,3 +179,4 @@ const suggestMealPlanFlow = ai.defineFlow(
 );
 
     
+
