@@ -38,7 +38,7 @@ const MEAL_SLOT_CONFIG: Array<{ type: MealType; displayName: string }> = [
   { type: "Lunch", displayName: "Lunch" },
   { type: "Dinner", displayName: "Dinner" },
   { type: "Snack", displayName: "Snack 1" },
-  { type: "Snack", displayName: "Snack 2" }, 
+  { type: "Snack", displayName: "Snack 2" },
 ];
 
 const FREE_TIER_RECIPE_PICKER_LIMIT = 15;
@@ -57,12 +57,12 @@ const chartConfig = {
 
 
 export default function MealPlanPage() {
-  const { 
+  const {
     userProfile,
-    getDailyMacros, 
-    removeMealFromPlan, 
-    updatePlannedMealServings, 
-    clearMealPlanForDate, 
+    getDailyMacros,
+    removeMealFromPlan,
+    updatePlannedMealServings,
+    clearMealPlanForDate,
     getMealsForDate,
     addMealToPlan,
     allRecipesCache,
@@ -73,20 +73,21 @@ export default function MealPlanPage() {
   const [editingMeal, setEditingMeal] = useState<PlannedMeal | null>(null);
   const [newServings, setNewServings] = useState<number>(1);
   const { toast } = useToast();
-  
+
   const [recipePickerIndices, setRecipePickerIndices] = useState<{[key: string]: number}>(
     MEAL_SLOT_CONFIG.reduce((acc, slot, index) => {
-      acc[`${slot.type}-${index}`] = 0; 
+      acc[`${slot.type}-${index}`] = 0;
       return acc;
     }, {} as {[key: string]: number})
   );
 
-  const isSubscribedActive = true; 
-  const availableRecipesForPicker = allRecipesCache; 
+  const isSubscribedActive = true;
+  const availableRecipesForPicker = allRecipesCache;
 
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
   const dailyMacros = getDailyMacros(formattedDate);
   const currentMacroTargets = userProfile?.macroTargets;
+  const dailyMeals = getMealsForDate(formattedDate); // Defined dailyMeals here
 
 
   const caloriesChartData = currentMacroTargets ? [
@@ -151,7 +152,7 @@ export default function MealPlanPage() {
       });
     }
   };
-  
+
   const getPlannedMealForSlot = (slotType: MealType, slotIndexWithinType: number): PlannedMeal | undefined => {
     const mealsOfThisType = dailyMeals.filter(dm => dm.mealType === slotType);
     return mealsOfThisType[slotIndexWithinType];
@@ -159,7 +160,7 @@ export default function MealPlanPage() {
 
   const todayForCalendar = startOfDay(new Date());
   const tomorrowForCalendar = addDays(todayForCalendar, 1);
-  const disabledCalendarMatcher = undefined; 
+  const disabledCalendarMatcher = undefined;
 
   return (
     <PageWrapper title="Daily Meal Planner">
@@ -168,9 +169,9 @@ export default function MealPlanPage() {
           <Lock className="h-5 w-5 text-accent" />
           <AlertTitle className="text-accent">Limited Access</AlertTitle>
           <AlertDescription>
-            You are on the free plan. Meal planning is restricted to today and tomorrow only. 
-            Recipe selection for planning is limited to {FREE_TIER_RECIPE_PICKER_LIMIT} items. 
-            <Link href="/profile/subscription" className="underline hover:text-primary"> Upgrade your plan </Link> 
+            You are on the free plan. Meal planning is restricted to today and tomorrow only.
+            Recipe selection for planning is limited to {FREE_TIER_RECIPE_PICKER_LIMIT} items.
+            <Link href="/profile/subscription" className="underline hover:text-primary"> Upgrade your plan </Link>
             for full access.
           </AlertDescription>
         </Alert>
@@ -254,7 +255,7 @@ export default function MealPlanPage() {
           </Card>
         </div>
       </div>
-      
+
       <Separator className="my-12"/>
 
       <section className="space-y-10">
@@ -290,7 +291,7 @@ export default function MealPlanPage() {
 
 
         {!isAppRecipeCacheLoading && availableRecipesForPicker.length > 0 && MEAL_SLOT_CONFIG.map((slotConfig, index) => {
-          const slotKey = `${slotConfig.type}-${index}`; 
+          const slotKey = `${slotConfig.type}-${index}`;
           let NthInstanceOfType = 0;
           for(let i=0; i < index; i++){
             if(MEAL_SLOT_CONFIG[i].type === slotConfig.type) {
@@ -303,7 +304,7 @@ export default function MealPlanPage() {
             <div key={slotKey} className="p-4 border rounded-lg shadow-md bg-card">
               <h3 className="text-xl font-semibold font-headline text-primary/90 mb-4">{slotConfig.displayName}</h3>
               {mealToDisplay ? (
-                <div className="w-full max-w-lg mx-auto"> 
+                <div className="w-full max-w-lg mx-auto">
                   <Card className="overflow-hidden shadow-md flex flex-col sm:flex-row">
                     {mealToDisplay.recipeDetails?.image && (
                       <div className="sm:w-1/3 relative h-32 sm:h-auto">
@@ -324,14 +325,14 @@ export default function MealPlanPage() {
                         <CardDescription>Servings: {mealToDisplay.servings}</CardDescription>
                         {mealToDisplay.recipeDetails && (
                           <div className="mt-2">
-                            <MacroDisplay 
+                            <MacroDisplay
                               macros={{
                                 calories: mealToDisplay.recipeDetails.macrosPerServing.calories * mealToDisplay.servings,
                                 protein: mealToDisplay.recipeDetails.macrosPerServing.protein * mealToDisplay.servings,
                                 carbs: mealToDisplay.recipeDetails.macrosPerServing.carbs * mealToDisplay.servings,
                                 fat: mealToDisplay.recipeDetails.macrosPerServing.fat * mealToDisplay.servings,
-                              }} 
-                              title="" 
+                              }}
+                              title=""
                             />
                           </div>
                         )}
@@ -359,11 +360,11 @@ export default function MealPlanPage() {
                     </Button>
                     <div className="flex-grow w-full max-w-md mx-auto">
                       {availableRecipesForPicker.length > 0 && (
-                        <RecipeCard 
-                          recipe={availableRecipesForPicker[recipePickerIndices[slotKey] || 0]} 
+                        <RecipeCard
+                          recipe={availableRecipesForPicker[recipePickerIndices[slotKey] || 0]}
                           showAddToMealPlanButton={false}
                           showViewDetailsButton={true}
-                          className="w-full shadow-none border-0" 
+                          className="w-full shadow-none border-0"
                         />
                       )}
                     </div>
@@ -373,8 +374,8 @@ export default function MealPlanPage() {
                     </Button>
                   </div>
                   {availableRecipesForPicker.length > 0 && (
-                    <Button 
-                      onClick={() => handleAddRecipeFromPicker(slotKey, slotConfig.type)} 
+                    <Button
+                      onClick={() => handleAddRecipeFromPicker(slotKey, slotConfig.type)}
                       className="w-full sm:w-auto mx-auto flex items-center justify-center bg-accent hover:bg-accent/90 text-accent-foreground"
                       disabled={!availableRecipesForPicker[recipePickerIndices[slotKey] || 0]}
                     >
@@ -446,10 +447,10 @@ export default function MealPlanPage() {
             </DialogHeader>
             <div className="py-4">
               <Label htmlFor="servings-edit">New Servings</Label>
-              <Input 
-                id="servings-edit" 
-                type="number" 
-                value={newServings} 
+              <Input
+                id="servings-edit"
+                type="number"
+                value={newServings}
                 onChange={(e) => setNewServings(parseInt(e.target.value, 10))}
                 min="1"
               />
