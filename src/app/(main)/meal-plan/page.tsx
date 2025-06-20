@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Calendar } from '@/components/ui/calendar';
 import { format, addDays, subDays, isValid, startOfDay, isWithinInterval } from 'date-fns';
-import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info, Lock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info, Lock, CalendarDays as CalendarDaysIcon } from 'lucide-react'; // Added CalendarDaysIcon
 import Image from 'next/image';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
@@ -145,7 +145,7 @@ export default function MealPlanPage() {
   const disabledCalendarMatcher = undefined; // TEMPORARILY UNLOCKED: isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
 
   return (
-    <PageWrapper title="Interactive Meal Planner">
+    <PageWrapper title="Daily Meal Planner">
       {false && !isSubscribedActive && ( // TEMPORARILY HIDE THIS WARNING
          <Alert variant="default" className="mb-6 border-accent">
           <Lock className="h-5 w-5 text-accent" />
@@ -158,6 +158,14 @@ export default function MealPlanPage() {
           </AlertDescription>
         </Alert>
       )}
+       <div className="mb-6 flex justify-end">
+        <Button asChild variant="outline">
+          <Link href="/meal-plan/weekly">
+            <CalendarDaysIcon className="mr-2 h-4 w-4" />
+            Switch to Weekly View
+          </Link>
+        </Button>
+      </div>
       <div className="flex flex-col lg:flex-row gap-8 mb-8">
         <div className="w-full lg:w-[380px] lg:flex-shrink-0"> {/* Calendar Card Wrapper */}
           <Card className="shadow-lg">
