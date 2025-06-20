@@ -4,13 +4,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { useAppContext } from '@/context/AppContext';
-import type { PlannedMeal, MealType, Recipe } from '@/types';
+import type { PlannedMeal, MealType, Recipe, Macros } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { MacroDisplay } from '@/components/shared/MacroDisplay';
+// import { MacroDisplay } from '@/components/shared/MacroDisplay'; // Replaced by charts
 import { Calendar } from '@/components/ui/calendar';
 import { format, addDays, subDays, isValid, startOfDay, isWithinInterval } from 'date-fns';
-import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info, Lock, CalendarDays as CalendarDaysIcon } from 'lucide-react'; // Added CalendarDaysIcon
+import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info, Lock, CalendarDays as CalendarDaysIcon } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,17 @@ import { useToast } from '@/hooks/use-toast';
 import { MEAL_TYPES } from '@/lib/data';
 import { RecipeCard } from '@/components/shared/RecipeCard';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { MacroDisplay } from '@/components/shared/MacroDisplay'; // Still used for individual meal macros
+
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig
+} from "@/components/ui/chart";
 
 const MEAL_SLOT_CONFIG: Array<{ type: MealType; displayName: string }> = [
   { type: "Breakfast", displayName: "Breakfast" },
@@ -38,6 +49,12 @@ const FREE_TIER_RECIPE_PICKER_LIMIT = 15;
 //   const tomorrow = addDays(today, 1);
 //   return isWithinInterval(startOfDay(date), { start: today, end: tomorrow });
 // };
+
+const chartConfig = {
+  consumed: { label: "Consumed", color: "hsl(var(--chart-1))" },
+  target: { label: "Target", color: "hsl(var(--chart-2))" },
+} satisfies ChartConfig;
+
 
 export default function MealPlanPage() {
   const { 
@@ -64,23 +81,31 @@ export default function MealPlanPage() {
     }, {} as {[key: string]: number})
   );
 
-  const isSubscribedActive = true; // userProfile?.subscription_status === 'active'; // TEMPORARILY UNLOCKED FOR TESTING
-  const availableRecipesForPicker = allRecipesCache; // TEMPORARILY UNLOCKED: isSubscribedActive ? allRecipesCache : allRecipesCache.slice(0, FREE_TIER_RECIPE_PICKER_LIMIT);
+  const isSubscribedActive = true; 
+  const availableRecipesForPicker = allRecipesCache; 
 
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-  const dailyMeals = getMealsForDate(formattedDate);
   const dailyMacros = getDailyMacros(formattedDate);
+  const currentMacroTargets = userProfile?.macroTargets;
+
+
+  const caloriesChartData = currentMacroTargets ? [
+    { name: "Calories", consumed: dailyMacros.calories || 0, target: currentMacroTargets.calories || 0, unit: 'kcal' },
+  ] : [{ name: "Calories", consumed: dailyMacros.calories || 0, target: 0, unit: 'kcal' }];
+
+  const macrosChartData = currentMacroTargets ? [
+    { name: "Protein", consumed: dailyMacros.protein || 0, target: currentMacroTargets.protein || 0, unit: 'g' },
+    { name: "Carbs", consumed: dailyMacros.carbs || 0, target: currentMacroTargets.carbs || 0, unit: 'g' },
+    { name: "Fat", consumed: dailyMacros.fat || 0, target: currentMacroTargets.fat || 0, unit: 'g' },
+  ] : [
+    { name: "Protein", consumed: dailyMacros.protein || 0, target: 0, unit: 'g' },
+    { name: "Carbs", consumed: dailyMacros.carbs || 0, target: 0, unit: 'g' },
+    { name: "Fat", consumed: dailyMacros.fat || 0, target: 0, unit: 'g' },
+  ];
+
 
   const handleDateChange = (date: Date | undefined) => {
     if (date && isValid(date)) {
-      // if (!isSubscribedActive && !isDateAllowedForFreeTier(date)) { // TEMPORARILY UNLOCKED
-      //   toast({
-      //     title: "Date Restricted",
-      //     description: "Free users can only plan meals for today or tomorrow. Please upgrade for more flexibility.",
-      //     variant: "destructive",
-      //   });
-      //   return;
-      // }
       setSelectedDate(date);
     }
   };
@@ -116,14 +141,6 @@ export default function MealPlanPage() {
 
   const handleAddRecipeFromPicker = (slotKey: string, mealType: MealType) => {
     if (availableRecipesForPicker.length === 0) return;
-    //  if (!isSubscribedActive && !isDateAllowedForFreeTier(selectedDate)) { // TEMPORARILY UNLOCKED
-    //     toast({
-    //       title: "Date Restricted",
-    //       description: "Free users can only plan meals for today or tomorrow. Please upgrade for more flexibility.",
-    //       variant: "destructive",
-    //     });
-    //     return;
-    //   }
     const recipeIndex = recipePickerIndices[slotKey] || 0;
     const recipeToAdd = availableRecipesForPicker[recipeIndex];
     if (recipeToAdd) {
@@ -142,11 +159,11 @@ export default function MealPlanPage() {
 
   const todayForCalendar = startOfDay(new Date());
   const tomorrowForCalendar = addDays(todayForCalendar, 1);
-  const disabledCalendarMatcher = undefined; // TEMPORARILY UNLOCKED: isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
+  const disabledCalendarMatcher = undefined; 
 
   return (
     <PageWrapper title="Daily Meal Planner">
-      {false && !isSubscribedActive && ( // TEMPORARILY HIDE THIS WARNING
+      {false && !isSubscribedActive && (
          <Alert variant="default" className="mb-6 border-accent">
           <Lock className="h-5 w-5 text-accent" />
           <AlertTitle className="text-accent">Limited Access</AlertTitle>
@@ -167,7 +184,7 @@ export default function MealPlanPage() {
         </Button>
       </div>
       <div className="flex flex-col lg:flex-row gap-8 mb-8">
-        <div className="w-full lg:w-[380px] lg:flex-shrink-0"> {/* Calendar Card Wrapper */}
+        <div className="w-full lg:w-[380px] lg:flex-shrink-0">
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle className="font-headline text-primary">Select Date</CardTitle>
@@ -179,9 +196,7 @@ export default function MealPlanPage() {
                 onSelect={handleDateChange}
                 disabled={disabledCalendarMatcher}
                 className="rounded-md border"
-                initialFocus={false} // TEMPORARILY UNLOCKED: !isSubscribedActive
-                // fromDate={!isSubscribedActive ? todayForCalendar : undefined} // TEMPORARILY UNLOCKED
-                // toDate={!isSubscribedActive ? tomorrowForCalendar : undefined} // TEMPORARILY UNLOCKED
+                initialFocus={false}
               />
               <div className="flex justify-between mt-4">
                 <Button variant="outline" onClick={() => handleDateChange(subDays(selectedDate, 1))}>
@@ -194,14 +209,47 @@ export default function MealPlanPage() {
             </CardContent>
           </Card>
         </div>
-        <div className="w-full lg:flex-1"> {/* Daily Totals Card Wrapper */}
+        <div className="w-full lg:flex-1">
            <Card className="shadow-lg h-full">
             <CardHeader>
               <CardTitle className="font-headline text-primary">Daily Totals for {format(selectedDate, 'PPP')}</CardTitle>
-              <CardDescription>Review your macronutrient intake for the selected day.</CardDescription>
+              <CardDescription>
+                {currentMacroTargets ? "Review your macronutrient intake against your targets." : "Review your macronutrient intake. Set targets in profile for comparison."}
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <MacroDisplay macros={dailyMacros} title="" highlightTotal/>
+            <CardContent className="space-y-4">
+              <div>
+                <h3 className="text-md font-semibold mb-1">Calories (kcal)</h3>
+                <div className="h-[200px]">
+                  <ChartContainer config={chartConfig} className="w-full h-full">
+                    <BarChart accessibilityLayer data={caloriesChartData} layout="vertical">
+                      <CartesianGrid horizontal={false} />
+                      <XAxis type="number" dataKey="value" tickFormatter={(value) => `${value}`} />
+                      <YAxis dataKey="name" type="category" tickLine={false} tickMargin={10} axisLine={false} width={60} />
+                      <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                      <Bar dataKey="consumed" fill="var(--color-consumed)" radius={4} barSize={25} name="Consumed" />
+                      {currentMacroTargets && <Bar dataKey="target" fill="var(--color-target)" radius={4} barSize={25} name="Target" />}
+                      <ChartLegend content={<ChartLegendContent />} />
+                    </BarChart>
+                  </ChartContainer>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-md font-semibold mb-1">Macronutrients (grams)</h3>
+                <div className="h-[200px]">
+                  <ChartContainer config={chartConfig} className="w-full h-full">
+                    <BarChart accessibilityLayer data={macrosChartData} layout="vertical">
+                      <CartesianGrid horizontal={false} />
+                      <XAxis type="number" dataKey="value" tickFormatter={(value) => `${value}g`} />
+                      <YAxis dataKey="name" type="category" tickLine={false} tickMargin={10} axisLine={false} width={60}/>
+                      <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                      <Bar dataKey="consumed" fill="var(--color-consumed)" radius={4} barSize={15} name="Consumed" />
+                      {currentMacroTargets && <Bar dataKey="target" fill="var(--color-target)" radius={4} barSize={15} name="Target" />}
+                       <ChartLegend content={<ChartLegendContent />} />
+                    </BarChart>
+                  </ChartContainer>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -328,13 +376,13 @@ export default function MealPlanPage() {
                     <Button 
                       onClick={() => handleAddRecipeFromPicker(slotKey, slotConfig.type)} 
                       className="w-full sm:w-auto mx-auto flex items-center justify-center bg-accent hover:bg-accent/90 text-accent-foreground"
-                      disabled={!availableRecipesForPicker[recipePickerIndices[slotKey] || 0] /*|| (!isSubscribedActive && !isDateAllowedForFreeTier(selectedDate)) TEMPORARILY UNLOCKED */}
+                      disabled={!availableRecipesForPicker[recipePickerIndices[slotKey] || 0]}
                     >
                       <PlusCircle className="mr-2 h-5 w-5" />
                       Add "{availableRecipesForPicker[recipePickerIndices[slotKey] || 0]?.name}" as {slotConfig.displayName}
                     </Button>
                   )}
-                  {false && !isSubscribedActive /*&& !isDateAllowedForFreeTier(selectedDate) TEMPORARILY HIDE */ && (
+                  {false && !isSubscribedActive && (
                      <p className="text-xs text-destructive text-center">Planning for this date is restricted on the free plan.</p>
                   )}
                 </div>

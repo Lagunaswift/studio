@@ -18,10 +18,19 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import type { MacroTargets, Macros, Recipe, PlannedMeal } from '@/types';
-import { Progress } from '@/components/ui/progress';
 import { RecipeCard } from '@/components/shared/RecipeCard';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from '@/components/ui/badge';
+
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig
+} from "@/components/ui/chart";
 
 const macroTargetSchema = z.object({
   calories: z.coerce.number().min(0, "Calories must be positive").default(0),
@@ -31,6 +40,12 @@ const macroTargetSchema = z.object({
 });
 
 type MacroTargetFormValues = z.infer<typeof macroTargetSchema>;
+
+const chartConfig = {
+  consumed: { label: "Consumed", color: "hsl(var(--chart-1))" },
+  target: { label: "Target", color: "hsl(var(--chart-2))" },
+} satisfies ChartConfig;
+
 
 export default function HomePage() {
   const { user, isLoading: isAuthLoading, profile: authProfile } = useAuth();
@@ -42,7 +57,7 @@ export default function HomePage() {
     allRecipesCache,
     isRecipeCacheLoading: isAppRecipeCacheLoading,
     userProfile: appContextUserProfile,
-    getMealsForDate, // Added this
+    getMealsForDate,
   } = useAppContext();
   const { toast } = useToast();
 
@@ -126,7 +141,16 @@ export default function HomePage() {
     macroTargetForm.reset(data);
   };
 
-  const macroKeys: (keyof MacroTargets)[] = ['calories', 'protein', 'carbs', 'fat'];
+  const caloriesChartData = currentMacroTargets ? [
+    { name: "Calories", consumed: clientTodayMacros.calories || 0, target: currentMacroTargets.calories || 0, unit: 'kcal' },
+  ] : [];
+
+  const macrosChartData = currentMacroTargets ? [
+    { name: "Protein", consumed: clientTodayMacros.protein || 0, target: currentMacroTargets.protein || 0, unit: 'g' },
+    { name: "Carbs", consumed: clientTodayMacros.carbs || 0, target: currentMacroTargets.carbs || 0, unit: 'g' },
+    { name: "Fat", consumed: clientTodayMacros.fat || 0, target: currentMacroTargets.fat || 0, unit: 'g' },
+  ] : [];
+
 
   if (isAuthLoading || (isAppRecipeCacheLoading && !user && !authProfile)) {
     return (
@@ -153,34 +177,44 @@ export default function HomePage() {
         </div>
 
         {currentMacroTargets ? (
-          <Card className="shadow-md">
-            <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-              {macroKeys.map(key => {
-                const consumed = clientTodayMacros[key as keyof typeof clientTodayMacros] ?? 0;
-                const target = currentMacroTargets[key] ?? 0;
-                const progress = target > 0 ? Math.min((consumed / target) * 100, 100) : 0;
-                const unit = key === 'calories' ? 'kcal' : 'g';
-                const macroName = key.charAt(0).toUpperCase() + key.slice(1);
-
-                return (
-                  <div key={key}>
-                    <div className="flex justify-between items-baseline mb-1">
-                      <Label htmlFor={`progress-${key}`} className="text-base font-medium text-foreground/90">{macroName}</Label>
-                      <span className="text-sm text-muted-foreground">
-                        {consumed.toFixed(0)} / {target.toFixed(0)} {unit}
-                      </span>
-                    </div>
-                    <Progress id={`progress-${key}`} value={progress} className="w-full h-3" aria-label={`${macroName} progress: ${progress.toFixed(0)}%`} />
-                     {consumed > target && target > 0 && (
-                        <p className="text-xs text-destructive mt-1">
-                          Over by {(consumed - target).toFixed(0)} {unit}
-                        </p>
-                      )}
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <Card className="shadow-md">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">Calories (kcal)</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-2 h-[250px]"> {/* Ensure CardContent has height for chart */}
+                <ChartContainer config={chartConfig} className="w-full h-full">
+                  <BarChart accessibilityLayer data={caloriesChartData} layout="vertical">
+                    <CartesianGrid horizontal={false} />
+                    <XAxis type="number" dataKey="value" tickFormatter={(value) => `${value}`} />
+                    <YAxis dataKey="name" type="category" tickLine={false} tickMargin={10} axisLine={false} width={80} />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                    <Bar dataKey="consumed" fill="var(--color-consumed)" radius={4} barSize={30} name="Consumed" />
+                    <Bar dataKey="target" fill="var(--color-target)" radius={4} barSize={30} name="Target" />
+                    <ChartLegend content={<ChartLegendContent />} />
+                  </BarChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+            <Card className="shadow-md">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">Macronutrients (grams)</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-2 h-[250px]">
+                <ChartContainer config={chartConfig} className="w-full h-full">
+                   <BarChart accessibilityLayer data={macrosChartData} layout="vertical">
+                    <CartesianGrid horizontal={false} />
+                     <XAxis type="number" dataKey="value" tickFormatter={(value) => `${value}g`} />
+                    <YAxis dataKey="name" type="category" tickLine={false} tickMargin={10} axisLine={false} width={80} />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                    <Bar dataKey="consumed" fill="var(--color-consumed)" radius={4} barSize={20} name="Consumed" />
+                    <Bar dataKey="target" fill="var(--color-target)" radius={4} barSize={20} name="Target" />
+                    <ChartLegend content={<ChartLegendContent />} />
+                  </BarChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+          </div>
         ) : (
           <Card className="shadow-md">
             <CardContent className="pt-6 text-center">
@@ -304,4 +338,3 @@ export default function HomePage() {
     </PageWrapper>
   );
 }
-
