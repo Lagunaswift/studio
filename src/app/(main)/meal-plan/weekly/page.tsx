@@ -47,7 +47,7 @@ export default function WeeklyMealPlanPage() {
       });
       setWeeklyMealData(data);
     }
-  }, [weekDays, getMealsForDate, getDailyMacros, isRecipeCacheLoading]);
+  }, [weekDays, getMealsForDate, getDailyMacros, isRecipeCacheLoading, allRecipesCache]); // Added allRecipesCache dependency
 
   const handlePreviousWeek = () => {
     setCurrentDateInWeek(prev => subWeeks(prev, 1));
@@ -57,9 +57,9 @@ export default function WeeklyMealPlanPage() {
     setCurrentDateInWeek(prev => addWeeks(prev, 1));
   };
 
-  if (isRecipeCacheLoading) {
+  if (isRecipeCacheLoading && weeklyMealData.length === 0) { // Only show full page loader if no data yet
     return (
-      <PageWrapper title="Weekly Meal Plan">
+      <PageWrapper title="Weekly Meal Plan" maxWidth="max-w-7xl">
         <div className="flex justify-center items-center min-h-[300px]">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
         </div>
@@ -67,10 +67,10 @@ export default function WeeklyMealPlanPage() {
     );
   }
   
-  const weekOfLabel = weekDays.length > 0 ? format(weekDays[0], 'MMMM do, yyyy') : 'Loading...';
+  const weekOfLabel = weekDays.length > 0 ? `${format(weekDays[0], 'MMM do')} - ${format(weekDays[weekDays.length -1], 'MMM do, yyyy')}` : 'Loading...';
 
   return (
-    <PageWrapper title={`Weekly Meal Plan (Week of ${weekOfLabel})`}>
+    <PageWrapper title={`Weekly Meal Plan: ${weekOfLabel}`} maxWidth="max-w-7xl">
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
         <Button asChild variant="outline">
           <Link href="/meal-plan">
@@ -88,46 +88,55 @@ export default function WeeklyMealPlanPage() {
         </div>
       </div>
 
-      <div className="space-y-8">
+      {isRecipeCacheLoading && weeklyMealData.length > 0 && (
+         <div className="text-center py-4 text-muted-foreground">
+          <Loader2 className="inline-block h-5 w-5 animate-spin mr-2" />
+          Updating meal data...
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {weeklyMealData.map(({ date, formattedDate, meals, macros }) => (
-          <Card key={formattedDate} className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="font-headline text-primary">{format(date, 'EEEE, MMMM do')}</CardTitle>
-              <CardDescription>Macros for the day:</CardDescription>
-              <MacroDisplay macros={macros} title="" />
+          <Card key={formattedDate} className="shadow-md flex flex-col h-full"> {/* Ensure cards can grow */}
+            <CardHeader className="flex-shrink-0 pb-2">
+              <CardTitle className="font-headline text-primary text-md">{format(date, 'EEEE, MMM do')}</CardTitle>
+              <CardDescription className="text-xs mt-1">Daily Macros:</CardDescription>
+              <MacroDisplay macros={macros} title="" className="shadow-none border-none -ml-2 -mr-2" />
             </CardHeader>
-            <CardContent>
-              <h3 className="text-lg font-semibold mb-2 text-secondary-foreground">Planned Meals:</h3>
+            <CardContent className="flex-grow pt-2">
+              <h3 className="text-sm font-semibold mb-1 text-secondary-foreground">Planned Meals:</h3>
               {meals.length > 0 ? (
-                <ul className="space-y-3">
+                <ul className="space-y-1.5 text-xs">
                   {meals.map(meal => {
                     const recipe = meal.recipeDetails || allRecipesCache.find(r => r.id === meal.recipeId);
                     return (
-                      <li key={meal.id} className="p-3 bg-muted/30 rounded-md hover:bg-muted/50 transition-colors">
+                      <li key={meal.id} className="p-1.5 bg-muted/40 rounded-md hover:bg-muted/60 transition-colors">
                         <div className="flex justify-between items-center">
-                          <span className="font-semibold text-primary-focus">
+                          <span className="font-medium text-primary-focus truncate" title={recipe?.name || `Recipe ID: ${meal.recipeId}`}>
                             {recipe ? (
                               <Link href={`/recipes/${recipe.id}`} className="hover:underline">
                                 {recipe.name}
                               </Link>
                             ) : (
-                              `Recipe ID: ${meal.recipeId} (Not Found)`
+                              `Recipe ID: ${meal.recipeId}`
                             )}
                           </span>
-                          <span className="text-xs text-muted-foreground">{meal.mealType}</span>
+                          <span className="text-muted-foreground text-xs shrink-0 ml-1">{meal.mealType}</span>
                         </div>
-                        <p className="text-xs text-muted-foreground">Servings: {meal.servings}</p>
-                         {recipe && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Approx. {(recipe.macrosPerServing.calories * meal.servings).toFixed(0)} kcal
-                          </div>
-                        )}
+                        <div className="flex justify-between items-center text-muted-foreground">
+                            <span>Servings: {meal.servings}</span>
+                            {recipe && (
+                                <span>
+                                    ~{(recipe.macrosPerServing.calories * meal.servings).toFixed(0)} kcal
+                                </span>
+                            )}
+                        </div>
                       </li>
                     );
                   })}
                 </ul>
               ) : (
-                <p className="text-sm text-muted-foreground">No meals planned for this day.</p>
+                <p className="text-xs text-muted-foreground text-center py-4">No meals planned.</p>
               )}
             </CardContent>
           </Card>
