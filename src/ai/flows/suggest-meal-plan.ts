@@ -17,7 +17,7 @@ import type { MealType } from '@/types'; // Ensure MealType is available if MEAL
 import { MEAL_TYPES } from '@/lib/data'; // Assuming MEAL_TYPES is exported from here
 
 // Reusable schema for macronutrient data
-const MacroDataSchema = z.object({
+export const MacroDataSchema = z.object({
   calories: z.number().finite().nonnegative().describe("Total calories"),
   protein: z.number().finite().nonnegative().describe("Total protein in grams"),
   carbs: z.number().finite().nonnegative().describe("Total carbohydrates in grams"),
@@ -198,4 +198,3 @@ const suggestMealPlanFlow = ai.defineFlow(
     return output;
   }
 );
-

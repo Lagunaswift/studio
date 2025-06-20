@@ -10,7 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import type { RecipeForAI as BaseRecipeForAI } from './suggest-meal-plan'; // For reusing macro/tag structure
+import { MacroDataSchema } from './suggest-meal-plan'; // For reusing macro/tag structure
 
 // Schema for recipes as provided to this AI, including full ingredients
 const RecipeWithIngredientsSchema = z.object({
@@ -19,7 +19,7 @@ const RecipeWithIngredientsSchema = z.object({
   ingredients: z.array(z.string()).describe("The full list of ingredients for this recipe. Example: ['1 cup flour', '2 large eggs', '100g sugar']"),
   tags: z.array(z.string()).optional().describe("Tags associated with the recipe, e.g., 'vegetarian', 'gluten-free', 'quick'"),
   // Macros could be useful for the AI to make more informed suggestions about overall meal balance.
-  macrosPerServing: BaseRecipeForAI.shape.macrosPerServing.optional().describe("Macronutrients per single serving of this recipe. Useful for context if available."),
+  macrosPerServing: MacroDataSchema.optional().describe("Macronutrients per single serving of this recipe. Useful for context if available."),
 });
 export type RecipeWithIngredients = z.infer<typeof RecipeWithIngredientsSchema>;
 
