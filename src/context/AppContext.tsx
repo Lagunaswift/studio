@@ -461,7 +461,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           fat: recipeData.fat,
         },
         instructions: recipeData.instructions.map(inst => inst.value),
-        tags: recipeData.tags ? recipeData.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : [],
+        tags: recipeData.tags || [], // Ensure tags is an array
         isCustom: true,
         // Redundant fields, populated from macrosPerServing for consistency
         calories: recipeData.calories,

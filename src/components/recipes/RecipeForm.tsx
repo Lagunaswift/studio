@@ -10,7 +10,14 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Checkbox } from '@/components/ui/checkbox';
 import { PlusCircle, Trash2, Save } from 'lucide-react';
+
+const AVAILABLE_TAGS = [
+  'Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Low Carb', 
+  'High Protein', 'Quick Meal', 'Meal Prep', 'Snack', 
+  'Breakfast', 'Lunch', 'Dinner', 'Contains Nuts'
+];
 
 const recipeFormSchema = z.object({
   name: z.string().min(3, { message: "Recipe name must be at least 3 characters." }),
@@ -26,7 +33,7 @@ const recipeFormSchema = z.object({
   protein: z.coerce.number().min(0, { message: "Protein must be a non-negative number." }),
   carbs: z.coerce.number().min(0, { message: "Carbs must be a non-negative number." }),
   fat: z.coerce.number().min(0, { message: "Fat must be a non-negative number." }),
-  tags: z.string().optional(),
+  tags: z.array(z.string()).optional().default([]),
 });
 
 interface RecipeFormProps {
@@ -37,7 +44,10 @@ interface RecipeFormProps {
 export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
   const form = useForm<RecipeFormData>({
     resolver: zodResolver(recipeFormSchema),
-    defaultValues: initialData || {
+    defaultValues: initialData ? {
+      ...initialData,
+      tags: initialData.tags || [] 
+    } : {
       name: '',
       description: '',
       image: '',
@@ -51,7 +61,7 @@ export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
       protein: 0,
       carbs: 0,
       fat: 0,
-      tags: '',
+      tags: [],
     },
   });
 
@@ -92,7 +102,7 @@ export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
               <FormItem>
                 <FormLabel>Image URL (Optional)</FormLabel>
                 <FormControl><Input placeholder="https://example.com/image.jpg or https://placehold.co/..." {...field} /></FormControl>
-                <FormDescription>If empty, a placeholder will be used.</FormDescription>
+                <FormDescription>Provide a URL to an image hosted on the web. If empty, a placeholder will be used.</FormDescription>
                 <FormMessage />
               </FormItem>
             )} />
@@ -233,14 +243,49 @@ export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
             <CardTitle className="font-headline text-primary">Tags (Optional)</CardTitle>
           </CardHeader>
           <CardContent>
-            <FormField control={form.control} name="tags" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Recipe Tags</FormLabel>
-                <FormControl><Input placeholder="e.g., V, GF, Quick, HP" {...field} /></FormControl>
-                <FormDescription>Comma-separated values (e.g., Vegetarian, Gluten-Free, Quick Meal).</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )} />
+            <FormField
+              control={form.control}
+              name="tags"
+              render={() => (
+                <FormItem>
+                  <FormDescription>Select relevant tags for your recipe.</FormDescription>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-2">
+                    {AVAILABLE_TAGS.map((tag) => (
+                      <FormField
+                        key={tag}
+                        control={form.control}
+                        name="tags"
+                        render={({ field }) => {
+                          return (
+                            <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value?.includes(tag)}
+                                  onCheckedChange={(checked) => {
+                                    const currentTags = Array.isArray(field.value) ? field.value : [];
+                                    return checked
+                                      ? field.onChange([...currentTags, tag])
+                                      : field.onChange(
+                                          currentTags.filter(
+                                            (value) => value !== tag
+                                          )
+                                        );
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="text-sm font-normal">
+                                {tag}
+                              </FormLabel>
+                            </FormItem>
+                          );
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </CardContent>
         </Card>
 

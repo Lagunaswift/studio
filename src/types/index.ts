@@ -1,4 +1,5 @@
 
+
 export interface Ingredient {
   name: string;
   quantity: number;
@@ -167,5 +168,5 @@ export interface RecipeFormData {
   protein: number;
   carbs: number;
   fat: number;
-  tags?: string; // Comma-separated string
+  tags?: string[]; // Changed from string to string[]
 }
