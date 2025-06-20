@@ -3,7 +3,7 @@ import Image from 'next/image';
 import type { Recipe } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, Users, Flame, Info, Heart, PlusCircle, Beef, Wheat, Droplets } from 'lucide-react';
+import { Clock, Users, Flame, Info, Heart, PlusCircle, Beef, Wheat, Droplets, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -16,6 +16,7 @@ interface RecipeCardProps {
   showAddToMealPlanButton?: boolean;
   showViewDetailsButton?: boolean;
   className?: string;
+  pantryMatchStatus?: 'make' | 'almost' | null;
 }
 
 export function RecipeCard({
@@ -23,7 +24,8 @@ export function RecipeCard({
   onAddToMealPlan,
   showAddToMealPlanButton = false,
   showViewDetailsButton = true,
-  className
+  className,
+  pantryMatchStatus = null,
 }: RecipeCardProps) {
   const { toggleFavoriteRecipe, isRecipeFavorite } = useAppContext();
   
@@ -87,12 +89,22 @@ export function RecipeCard({
         <Button 
           variant="ghost" 
           size="icon" 
-          className="absolute top-2 right-2 bg-background/70 hover:bg-background/90 text-primary hover:text-accent"
+          className="absolute top-2 right-2 bg-background/70 hover:bg-background/90 text-primary hover:text-accent p-2 rounded-full shadow-md z-10"
           onClick={handleFavoriteToggle}
           aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
         >
           <Heart className={cn("w-5 h-5", isFavorited ? "fill-accent text-accent" : "text-muted-foreground")} />
         </Button>
+        {pantryMatchStatus === 'make' && (
+            <Badge variant="secondary" className="absolute top-2 left-2 bg-green-100 text-green-800 border-green-300 z-10">
+                <CheckCircle2 className="mr-1 h-3 w-3" /> Can Make
+            </Badge>
+        )}
+        {pantryMatchStatus === 'almost' && (
+            <Badge variant="secondary" className="absolute top-2 left-2 bg-yellow-100 text-yellow-800 border-yellow-300 z-10">
+                <AlertTriangle className="mr-1 h-3 w-3" /> Almost
+            </Badge>
+        )}
       </div>
       <CardHeader className="pb-2 pt-4 px-4">
         <CardTitle className="font-headline text-lg md:text-xl text-primary group-hover:text-accent transition-colors">{recipe.name}</CardTitle>

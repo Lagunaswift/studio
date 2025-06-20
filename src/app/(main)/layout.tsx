@@ -25,7 +25,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { SheetTitle } from '@/components/ui/sheet';
-import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, PanelLeft, Target, Leaf, Ban, ListChecks, UserCog, UserCircle2, BookOpen, Archive } from 'lucide-react'; // Added Archive
+import { UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, PanelLeft, Target, Leaf, Ban, ListChecks, UserCog, UserCircle2, BookOpen, Archive, Bot } from 'lucide-react'; // Added Archive, Bot
 import type { LucideIcon } from 'lucide-react';
 
 interface NavItem {
@@ -39,9 +39,10 @@ const mainNavItems: NavItem[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/recipes', label: 'Recipes', icon: UtensilsCrossed },
   { href: '/meal-plan', label: 'Meal Plan', icon: CalendarDays },
-  { href: '/ai-suggestions', label: 'AI Suggestions', icon: Sparkles },
+  { href: '/ai-suggestions', label: 'AI Meal Planner', icon: Sparkles },
+  { href: '/ai-recipe-finder', label: 'AI Recipe Finder', icon: Bot },
   { href: '/shopping-list', label: 'Shopping List', icon: ShoppingBag },
-  { href: '/pantry', label: 'Pantry', icon: Archive }, // Added Pantry
+  { href: '/pantry', label: 'Pantry', icon: Archive },
   { href: '/guide', label: 'App Guide', icon: BookOpen },
 ];
 

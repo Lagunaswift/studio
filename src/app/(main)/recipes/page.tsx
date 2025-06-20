@@ -1,11 +1,11 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { RecipeCard } from '@/components/shared/RecipeCard';
-import { MEAL_TYPES } from '@/lib/data';
-import type { Recipe, MealType } from '@/types';
+import { MEAL_TYPES, parseIngredientString } from '@/lib/data';
+import type { Recipe, MealType, PantryItem } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -57,7 +57,7 @@ const containsAllergenKeyword = (text: string, keywords: string[]): boolean => {
 };
 
 export default function RecipesPage() {
-  const { userProfile, addMealToPlan, allRecipesCache, isRecipeCacheLoading, isRecipeFavorite } = useAppContext();
+  const { userProfile, addMealToPlan, allRecipesCache, isRecipeCacheLoading, isRecipeFavorite, pantryItems } = useAppContext();
   const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -122,6 +122,28 @@ export default function RecipesPage() {
 
   const totalFilteredRecipesCount = filteredRecipes.length;
   const finalRecipesForDisplay = filteredRecipes;
+  
+  const calculatePantryMatch = useCallback((recipe: Recipe, pantryItems: PantryItem[]) => {
+      if (!pantryItems || pantryItems.length === 0 || !recipe.ingredients) {
+        return { matched: 0, total: recipe.ingredients?.length || 0 };
+      }
+      
+      const pantryIngredientNames = pantryItems.map(p => p.name.toLowerCase().trim());
+      let matchedCount = 0;
+
+      recipe.ingredients.forEach(ingString => {
+          const parsedIngredient = parseIngredientString(ingString);
+          if (!parsedIngredient || !parsedIngredient.name) return;
+          const parsedNameLower = parsedIngredient.name.toLowerCase().trim();
+          
+          if (pantryIngredientNames.some(pName => parsedNameLower === pName || parsedNameLower.includes(pName) || pName.includes(parsedNameLower))) {
+              matchedCount++;
+          }
+      });
+
+      return { matched: matchedCount, total: recipe.ingredients.length };
+  }, []);
+
 
   const handleOpenAddToPlanDialog = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
@@ -230,15 +252,26 @@ export default function RecipesPage() {
         </div>
       ) : finalRecipesForDisplay.length > 0 ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {finalRecipesForDisplay.map((recipe) => (
-            <RecipeCard
-              key={recipe.id}
-              recipe={recipe}
-              onAddToMealPlan={handleOpenAddToPlanDialog}
-              showAddToMealPlanButton={true}
-              showViewDetailsButton={true}
-            />
-          ))}
+          {finalRecipesForDisplay.map((recipe) => {
+            const { matched, total } = calculatePantryMatch(recipe, pantryItems);
+            const matchPercentage = total > 0 ? (matched / total) * 100 : 0;
+            let pantryMatchStatus: 'make' | 'almost' | null = null;
+            if (matchPercentage >= 80) {
+              pantryMatchStatus = 'make';
+            } else if (matchPercentage >= 50) {
+              pantryMatchStatus = 'almost';
+            }
+            return (
+              <RecipeCard
+                key={recipe.id}
+                recipe={recipe}
+                onAddToMealPlan={handleOpenAddToPlanDialog}
+                showAddToMealPlanButton={true}
+                showViewDetailsButton={true}
+                pantryMatchStatus={pantryMatchStatus}
+              />
+            )
+          })}
         </div>
       ) : (
         <div className="text-center py-10">
