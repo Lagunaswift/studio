@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format, startOfDay, addDays, isWithinInterval } from 'date-fns';
-import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2, Info, Lock, Wheat, Milk, Shell, Fish, Egg, Peanut, TreeDeciduous, Drumstick, Heart } from 'lucide-react'; // Added Heart
+import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2, Info, Lock, Wheat, Milk, Shell, Fish, Egg, Peanut, TreeDeciduous, Drumstick, Heart, Plus } from 'lucide-react'; // Added Plus
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -21,11 +21,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Switch } from "@/components/ui/switch"; // Added Switch
+import { Switch } from "@/components/ui/switch";
 
-const FREE_TIER_RECIPE_DISPLAY_LIMIT = 15;
+const FREE_TIER_RECIPE_DISPLAY_LIMIT = 15; // This is effectively unused due to isSubscribedActive = true
 
-const isDateAllowedForFreeTier = (date: Date | undefined): boolean => { // This specific check can remain as it's for adding to calendar
+const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
   if (!date) return false;
   const today = startOfDay(new Date());
   const tomorrow = addDays(today, 1);
@@ -33,13 +33,8 @@ const isDateAllowedForFreeTier = (date: Date | undefined): boolean => { // This 
 };
 
 const DIETARY_PREFERENCE_TO_TAG_MAP: { [key: string]: string } = {
-  "Vegetarian": "V",
-  "Vegan": "VG",
-  "Pescatarian": "P", // Assuming P tag if you have one
-  "Gluten-Free": "GF",
-  "Dairy-Free": "DF",
-  "Low Carb": "LC", // Assuming LC tag
-  "Keto": "KETO", // Assuming KETO tag
+  "Vegetarian": "V", "Vegan": "VG", "Pescatarian": "P", "Gluten-Free": "GF",
+  "Dairy-Free": "DF", "Low Carb": "LC", "Keto": "KETO",
 };
 
 const ALLERGEN_KEYWORD_MAP: { [key: string]: string[] } = {
@@ -47,7 +42,7 @@ const ALLERGEN_KEYWORD_MAP: { [key: string]: string[] } = {
   peanuts: ['peanut'],
   dairy: ['milk', 'cheese', 'butter', 'cream', 'yogurt', 'yoghurt', 'casein', 'lactose', 'whey', 'dairy', 'feta', 'mozzarella', 'parmesan', 'ricotta', 'quark', 'burrata', 'cheddar'],
   eggs: ['egg', 'eggs', 'omelet', 'frittata', 'mayonnaise'],
-  soy: ['soy', 'soya', 'tofu', 'tempeh', 'edamame', 'miso', 'tamari'], // tamari is soy sauce
+  soy: ['soy', 'soya', 'tofu', 'tempeh', 'edamame', 'miso', 'tamari'],
   gluten: ['gluten', 'wheat', 'barley', 'rye', 'flour', 'bread', 'pasta', 'couscous', 'panko', 'breadcrumbs', 'digestive biscuits', 'spelt'],
   fish: ['fish', 'salmon', 'tuna', 'cod', 'haddock', 'trout', 'sardine', 'anchovy', 'sea bass', 'halibut'],
   shellfish: ['shellfish', 'shrimp', 'prawn', 'crab', 'lobster', 'mussel', 'oyster', 'clam', 'calamari'],
@@ -62,52 +57,25 @@ const containsAllergenKeyword = (text: string, keywords: string[]): boolean => {
 };
 
 export default function RecipesPage() {
-  const { userProfile, addMealToPlan, allRecipesCache, isRecipeCacheLoading: isAppRecipeCacheLoading, isRecipeFavorite } = useAppContext(); // Added isRecipeFavorite
+  const { userProfile, addMealToPlan, allRecipesCache, isRecipeCacheLoading, isRecipeFavorite } = useAppContext();
   const { toast } = useToast();
 
-  const [recipesToDisplay, setRecipesToDisplay] = useState<Recipe[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
   const [planDate, setPlanDate] = useState<Date | undefined>(new Date());
   const [planMealType, setPlanMealType] = useState<MealType | undefined>(MEAL_TYPES[0]);
   const [planServings, setPlanServings] = useState<number>(1);
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false); // State for favorite filter
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
-  const isSubscribedActive = true; // userProfile?.subscription_status === 'active'; // TEMPORARILY UNLOCKED FOR TESTING
+  const isSubscribedActive = true; 
 
-  useEffect(() => {
-    console.log("RecipesPage: userProfile updated in AppContext or on mount:", userProfile);
-  }, [userProfile]);
-
-  useEffect(() => {
-    if (!isAppRecipeCacheLoading) {
-      setIsLoading(true);
-      if (allRecipesCache.length > 0) {
-        setRecipesToDisplay(allRecipesCache);
-        setError(null);
-      } else {
-        setError("No recipes found or failed to load recipes from the database.");
-        setRecipesToDisplay([]);
-      }
-      setIsLoading(false);
-    } else {
-      setIsLoading(true);
-    }
-  }, [allRecipesCache, isAppRecipeCacheLoading]);
-
-  const activeDietaryFilters = useMemo(() => {
-    return userProfile?.dietaryPreferences || [];
-  }, [userProfile]); 
-
-  const activeAllergenFilters = useMemo(() => {
-    return userProfile?.allergens || [];
-  }, [userProfile]); 
+  const activeDietaryFilters = useMemo(() => userProfile?.dietaryPreferences || [], [userProfile]);
+  const activeAllergenFilters = useMemo(() => userProfile?.allergens || [], [userProfile]);
 
   const filteredRecipes = useMemo(() => {
-    let recipes = recipesToDisplay;
+    if (isRecipeCacheLoading) return [];
+    let recipes = allRecipesCache;
 
     if (searchTerm.trim()) {
       const lowerSearchTerm = searchTerm.toLowerCase();
@@ -119,123 +87,89 @@ export default function RecipesPage() {
     }
 
     if (activeDietaryFilters.length > 0) {
-      recipes = recipes.filter(recipe => {
-        return activeDietaryFilters.every(preference => {
+      recipes = recipes.filter(recipe =>
+        activeDietaryFilters.every(preference => {
           const targetTag = DIETARY_PREFERENCE_TO_TAG_MAP[preference];
-          if (targetTag) {
-            return recipe.tags && recipe.tags.includes(targetTag);
-          }
-          return true; 
-        });
-      });
+          return targetTag ? recipe.tags && recipe.tags.includes(targetTag) : true;
+        })
+      );
     }
 
     if (activeAllergenFilters.length > 0) {
-      recipes = recipes.filter(recipe => {
-        return !activeAllergenFilters.some(allergen => {
+      recipes = recipes.filter(recipe =>
+        !activeAllergenFilters.some(allergen => {
           const keywords = ALLERGEN_KEYWORD_MAP[allergen.toLowerCase()];
           if (!keywords) return false;
-
           if (containsAllergenKeyword(recipe.name, keywords)) return true;
           if (recipe.ingredients.some(ing => containsAllergenKeyword(ing, keywords))) return true;
           if (allergen.toLowerCase() === 'nuts' && recipe.tags?.includes('N')) return true;
-          
           const isGlutenAllergen = allergen.toLowerCase() === 'gluten';
           const isDietaryGlutenFree = activeDietaryFilters.includes("Gluten-Free");
-
           if (isGlutenAllergen && !isDietaryGlutenFree && !recipe.tags?.includes('GF')) {
              if (containsAllergenKeyword(recipe.name, ALLERGEN_KEYWORD_MAP.gluten)) return true;
              if (recipe.ingredients.some(ing => containsAllergenKeyword(ing, ALLERGEN_KEYWORD_MAP.gluten))) return true;
           }
           return false;
-        });
-      });
+        })
+      );
     }
 
     if (showFavoritesOnly) {
       recipes = recipes.filter(recipe => isRecipeFavorite(recipe.id));
     }
-
     return recipes;
-  }, [recipesToDisplay, searchTerm, activeDietaryFilters, activeAllergenFilters, showFavoritesOnly, isRecipeFavorite]);
+  }, [allRecipesCache, searchTerm, activeDietaryFilters, activeAllergenFilters, showFavoritesOnly, isRecipeFavorite, isRecipeCacheLoading]);
 
   const totalFilteredRecipesCount = filteredRecipes.length;
-  const finalRecipesForDisplay = filteredRecipes; // TEMPORARILY UNLOCKED: isSubscribedActive ? filteredRecipes : filteredRecipes.slice(0, FREE_TIER_RECIPE_DISPLAY_LIMIT);
+  const finalRecipesForDisplay = filteredRecipes;
 
   const handleOpenAddToPlanDialog = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
     setPlanServings(recipe.servings);
-    // For adding to plan, still respect date restrictions if we want to keep that part tight even during testing
     setPlanDate(isDateAllowedForFreeTier(new Date()) ? new Date() : startOfDay(new Date()));
     setShowAddToPlanDialog(true);
   };
 
   const handleAddToMealPlan = () => {
     if (selectedRecipe && planDate && planMealType && planServings > 0) {
-      // if (!isSubscribedActive && !isDateAllowedForFreeTier(planDate)) { // Date check for adding to plan can remain stricter
-      //   toast({
-      //     title: "Date Restricted",
-      //     description: "Free users can only plan meals for today or tomorrow. Please upgrade for more flexibility.",
-      //     variant: 'destructive',
-      //   });
-      //   return;
-      // }
       addMealToPlan(selectedRecipe, format(planDate, 'yyyy-MM-dd'), planMealType, planServings);
       toast({
         title: "Meal Added",
         description: `${selectedRecipe.name} added to your meal plan for ${format(planDate, 'PPP')} (${planMealType}).`,
-        variant: 'default',
       });
       setShowAddToPlanDialog(false);
       setSelectedRecipe(null);
     } else {
-      toast({
-        title: "Error",
-        description: "Please fill all fields to add meal to plan.",
-        variant: 'destructive',
-      });
+      toast({ title: "Error", description: "Please fill all fields.", variant: 'destructive' });
     }
   };
 
   const todayForCalendar = startOfDay(new Date());
   const tomorrowForCalendar = addDays(todayForCalendar, 1);
-  // Calendar for "Add to Meal Plan Dialog" still respects free tier date limits
   const disabledCalendarMatcherForDialog = isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
-
 
   const getIconForPreference = (preference: string) => {
     switch (preference.toLowerCase()) {
-      case 'vegetarian':
-      case 'vegan':
-        return <Wheat className="h-4 w-4 mr-1 text-green-600" />;
-      case 'gluten-free':
-        return <Drumstick className="h-4 w-4 mr-1 text-yellow-600" />;
-      default:
-        return <Filter className="h-4 w-4 mr-1 text-blue-600" />;
+      case 'vegetarian': case 'vegan': return <Wheat className="h-4 w-4 mr-1 text-green-600" />;
+      case 'gluten-free': return <Drumstick className="h-4 w-4 mr-1 text-yellow-600" />;
+      default: return <Filter className="h-4 w-4 mr-1 text-blue-600" />;
     }
   };
 
   const getIconForAllergen = (allergen: string) => {
      switch (allergen.toLowerCase()) {
-      case 'nuts':
-      case 'peanuts':
-        return <TreeDeciduous className="h-4 w-4 mr-1 text-orange-600" />;
-      case 'dairy':
-        return <Milk className="h-4 w-4 mr-1 text-blue-400" />;
-      case 'eggs':
-        return <Egg className="h-4 w-4 mr-1 text-yellow-500" />;
-      case 'fish':
-        return <Fish className="h-4 w-4 mr-1 text-sky-500" />;
-       case 'shellfish':
-        return <Shell className="h-4 w-4 mr-1 text-pink-500" />;
-      default:
-        return <Info className="h-4 w-4 mr-1 text-red-600" />;
+      case 'nuts': case 'peanuts': return <TreeDeciduous className="h-4 w-4 mr-1 text-orange-600" />;
+      case 'dairy': return <Milk className="h-4 w-4 mr-1 text-blue-400" />;
+      case 'eggs': return <Egg className="h-4 w-4 mr-1 text-yellow-500" />;
+      case 'fish': return <Fish className="h-4 w-4 mr-1 text-sky-500" />;
+      case 'shellfish': return <Shell className="h-4 w-4 mr-1 text-pink-500" />;
+      default: return <Info className="h-4 w-4 mr-1 text-red-600" />;
     }
   };
 
   return (
     <PageWrapper title="Discover Recipes">
-      <div className="mb-8 flex flex-col md:flex-row gap-4 items-center">
+      <div className="mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative flex-grow w-full md:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
@@ -246,16 +180,23 @@ export default function RecipesPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex items-center space-x-2 self-start md:self-center">
-          <Switch
-            id="favorites-filter"
-            checked={showFavoritesOnly}
-            onCheckedChange={setShowFavoritesOnly}
-            aria-label="Show favorites only"
-          />
-          <Label htmlFor="favorites-filter" className="flex items-center text-sm text-muted-foreground">
-            <Heart className="w-4 h-4 mr-1 text-accent/80" /> Show Favorites Only
-          </Label>
+        <div className="flex items-center space-x-4 self-start md:self-center">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="favorites-filter"
+              checked={showFavoritesOnly}
+              onCheckedChange={setShowFavoritesOnly}
+              aria-label="Show favorites only"
+            />
+            <Label htmlFor="favorites-filter" className="flex items-center text-sm text-muted-foreground">
+              <Heart className="w-4 h-4 mr-1 text-accent/80" /> Favorites
+            </Label>
+          </div>
+          <Button asChild variant="outline" className="bg-accent hover:bg-accent/90 text-accent-foreground">
+            <Link href="/recipes/add">
+              <Plus className="mr-2 h-4 w-4" /> Add New Recipe
+            </Link>
+          </Button>
         </div>
       </div>
 
@@ -282,29 +223,11 @@ export default function RecipesPage() {
         </Card>
       )}
 
-      {false && !isSubscribedActive && totalFilteredRecipesCount > FREE_TIER_RECIPE_DISPLAY_LIMIT && ( // TEMPORARILY HIDE THIS WARNING
-        <Alert variant="default" className="mb-6 border-accent">
-          <Lock className="h-5 w-5 text-accent" />
-          <AlertTitle className="text-accent">Recipe Limit Reached</AlertTitle>
-          <AlertDescription>
-            You are viewing {FREE_TIER_RECIPE_DISPLAY_LIMIT} of {totalFilteredRecipesCount} recipes matching your filters.
-            <Link href="/profile/subscription" className="underline hover:text-primary font-semibold"> Upgrade your plan </Link>
-            to access all recipes and features. (Currently showing all recipes for testing)
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {isLoading ? (
+      {isRecipeCacheLoading ? (
         <div className="flex justify-center items-center min-h-[200px]">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
           <p className="ml-2 text-muted-foreground">Loading recipes...</p>
         </div>
-      ) : error ? (
-         <Alert variant="destructive">
-            <Info className="h-4 w-4" />
-            <AlertTitle>Error Loading Recipes</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
       ) : finalRecipesForDisplay.length > 0 ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {finalRecipesForDisplay.map((recipe) => (
@@ -321,7 +244,7 @@ export default function RecipesPage() {
         <div className="text-center py-10">
             <Info className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground mt-2">
-            {searchTerm || activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0 || showFavoritesOnly ? "No recipes found matching your current search and profile filters." : "No recipes available."}
+            {searchTerm || activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0 || showFavoritesOnly ? "No recipes found matching your current search and profile filters." : "No recipes available. Try adding some!"}
             </p>
             {(activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0 || showFavoritesOnly) && (
                 <p className="text-sm text-muted-foreground mt-2">
@@ -338,7 +261,6 @@ export default function RecipesPage() {
               <DialogTitle className="font-headline text-primary">Add "{selectedRecipe.name}" to Meal Plan</DialogTitle>
               <DialogDescription>
                 Select the date, meal type, and servings for this recipe.
-                {!isSubscribedActive && " (Full date selection unlocked for testing, usually today/tomorrow only for free tier)"}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -346,23 +268,17 @@ export default function RecipesPage() {
                 <Label htmlFor="date" className="text-right">Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className="col-span-3 justify-start text-left font-normal"
-                    >
+                    <Button variant={"outline"} className="col-span-3 justify-start text-left font-normal">
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {planDate ? format(planDate, "PPP") : <span>Pick a date</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
                     <Calendar
-                      mode="single"
-                      selected={planDate}
-                      onSelect={setPlanDate}
-                      disabled={disabledCalendarMatcherForDialog} // Use specific matcher for dialog
-                      initialFocus={!isSubscribedActive}
-                       fromDate={!isSubscribedActive ? todayForCalendar : undefined} // For dialog, respect original restriction logic
-                       toDate={!isSubscribedActive ? tomorrowForCalendar : undefined} // For dialog, respect original restriction logic
+                      mode="single" selected={planDate} onSelect={setPlanDate}
+                      disabled={disabledCalendarMatcherForDialog} initialFocus={!isSubscribedActive}
+                      fromDate={!isSubscribedActive ? todayForCalendar : undefined}
+                      toDate={!isSubscribedActive ? tomorrowForCalendar : undefined}
                     />
                   </PopoverContent>
                 </Popover>
@@ -374,31 +290,21 @@ export default function RecipesPage() {
                     <SelectValue placeholder="Select meal type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {MEAL_TYPES.map(type => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
-                    ))}
+                    {MEAL_TYPES.map(type => (<SelectItem key={type} value={type}>{type}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="servings" className="text-right">Servings</Label>
-                <Input
-                  id="servings"
-                  type="number"
-                  min="1"
-                  value={planServings}
+                <Input id="servings" type="number" min="1" value={planServings}
                   onChange={(e) => setPlanServings(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                  className="col-span-3"
-                />
+                  className="col-span-3" />
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAddToPlanDialog(false)}>Cancel</Button>
-              <Button
-                onClick={handleAddToMealPlan}
-                className="bg-accent hover:bg-accent/90 text-accent-foreground"
-                disabled={!isSubscribedActive && !isDateAllowedForFreeTier(planDate)} // Keep stricter check here if desired
-              >
+              <Button onClick={handleAddToMealPlan} className="bg-accent hover:bg-accent/90 text-accent-foreground"
+                disabled={!isSubscribedActive && !isDateAllowedForFreeTier(planDate)}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Add to Plan
               </Button>
             </DialogFooter>

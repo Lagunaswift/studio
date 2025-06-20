@@ -26,11 +26,12 @@ export interface Recipe {
   macrosPerServing: Macros;
   instructions: string[];
   tags?: string[];
+  isCustom?: boolean; // Added for user-created recipes
 
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
+  calories: number; // This seems redundant if macrosPerServing is present
+  protein: number;  // This seems redundant
+  carbs: number;    // This seems redundant
+  fat: number;      // This seems redundant
 }
 
 export type MealType = "Breakfast" | "Lunch" | "Dinner" | "Snack";
@@ -73,7 +74,6 @@ export interface PantryItem {
   unit: string;
   category: UKSupermarketCategory;
   expiryDate?: string; // YYYY-MM-DD format
-  // lastUpdated?: string; // ISO date string - for future use
 }
 
 
@@ -141,7 +141,6 @@ export interface UserProfileSettings {
   primaryGoal: PrimaryGoal | null;
   tdee: number | null;
   leanBodyMassKg: number | null;
-  // Navy Body Fat Calculation Inputs
   neckCircumferenceCm?: number | null;
   abdomenCircumferenceCm?: number | null; // Male
   waistCircumferenceCm?: number | null;   // Female
@@ -153,3 +152,20 @@ export interface UserProfileSettings {
   subscription_duration?: string | null;
 }
 
+// This type will be used for the Recipe Form
+export interface RecipeFormData {
+  name: string;
+  description?: string;
+  image?: string; // URL
+  servings: number;
+  prepTime: string;
+  cookTime: string;
+  chillTime?: string;
+  ingredients: { value: string }[]; // For react-hook-form field array
+  instructions: { value: string }[]; // For react-hook-form field array
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  tags?: string; // Comma-separated string
+}
