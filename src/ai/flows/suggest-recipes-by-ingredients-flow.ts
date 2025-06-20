@@ -10,7 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { MacroDataSchema } from './suggest-meal-plan'; // For reusing macro/tag structure
+import { MacroDataSchema } from './schemas'; // For reusing macro/tag structure
 
 // Schema for recipes as provided to this AI, including full ingredients
 const RecipeWithIngredientsSchema = z.object({

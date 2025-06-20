@@ -15,14 +15,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import type { MealType } from '@/types'; // Ensure MealType is available if MEAL_TYPES is not directly from here
 import { MEAL_TYPES } from '@/lib/data'; // Assuming MEAL_TYPES is exported from here
-
-// Reusable schema for macronutrient data
-export const MacroDataSchema = z.object({
-  calories: z.number().finite().nonnegative().describe("Total calories"),
-  protein: z.number().finite().nonnegative().describe("Total protein in grams"),
-  carbs: z.number().finite().nonnegative().describe("Total carbohydrates in grams"),
-  fat: z.number().finite().nonnegative().describe("Total fat in grams"),
-});
+import { MacroDataSchema } from './schemas';
 
 // Schema for recipes as provided to the AI
 const RecipeSchemaForAI = z.object({
