@@ -26,7 +26,7 @@ export type RecipeWithIngredients = z.infer<typeof RecipeWithIngredientsSchema>;
 // Input schema for the recipe suggestion flow
 const SuggestRecipesByIngredientsInputSchema = z.object({
   userIngredients: z.array(z.string()).min(1).describe("List of ingredients the user has on hand (e.g., ['chicken breast', 'broccoli', 'onion', 'soy sauce'])."),
-  availableRecipes: z.array(RecipeWithIngredients).min(1).describe("List of available recipes for the AI to consider, including their full ingredient lists."),
+  availableRecipes: z.array(RecipeWithIngredientsSchema).min(1).describe("List of available recipes for the AI to consider, including their full ingredient lists."),
   dietaryPreferences: z.array(z.string()).optional().describe("User's dietary preferences (e.g., 'Vegetarian', 'Vegan'). AI should strictly adhere to these."),
   allergens: z.array(z.string()).optional().describe("Allergens to avoid (e.g., 'Nuts', 'Dairy'). AI should strictly exclude recipes containing these."),
   maxResults: z.number().optional().default(3).describe("Maximum number of recipe suggestions to return (e.g., 3 to 5)."),
