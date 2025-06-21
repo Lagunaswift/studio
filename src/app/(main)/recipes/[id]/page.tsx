@@ -4,14 +4,14 @@
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { getRecipeById, MEAL_TYPES } from '@/lib/data';
-import type { Recipe as RecipeType, MealType } from '@/types';
+import { getRecipeById, MEAL_TYPES, parseIngredientString } from '@/lib/data';
+import type { Recipe as RecipeType, MealType, Macros } from '@/types';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info, Heart } from 'lucide-react'; // Added Heart
+import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info, Heart, Minus, Plus } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { format, startOfDay, addDays, isWithinInterval } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { cn } from '@/lib/utils'; // Added cn
+import { cn } from '@/lib/utils';
 
 const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
   if (!date) return false;
@@ -41,12 +41,19 @@ export default function RecipeDetailPage() {
   const [recipe, setRecipe] = useState<RecipeType | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null); 
-  const { userProfile, addMealToPlan, toggleFavoriteRecipe, isRecipeFavorite } = useAppContext(); // Added favorite functions
+  const { userProfile, addMealToPlan, toggleFavoriteRecipe, isRecipeFavorite } = useAppContext();
   const { toast } = useToast();
+  
+  // State for the "Add to Plan" dialog
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
   const [planDate, setPlanDate] = useState<Date | undefined>(new Date());
   const [planMealType, setPlanMealType] = useState<MealType | undefined>(MEAL_TYPES[0]);
   const [planServings, setPlanServings] = useState<number>(1);
+
+  // State for recipe scaling
+  const [displayServings, setDisplayServings] = useState<number>(1);
+  const [scaledIngredients, setScaledIngredients] = useState<string[]>([]);
+  const [scaledMacros, setScaledMacros] = useState<Macros>({ calories: 0, protein: 0, carbs: 0, fat: 0 });
 
   const [currentImageSrc, setCurrentImageSrc] = useState<string>('');
   const [imageLoadError, setImageLoadError] = useState(false);
@@ -71,8 +78,12 @@ export default function RecipeDetailPage() {
         const foundRecipe = await getRecipeById(recipeId);
         if (foundRecipe) {
           setRecipe(foundRecipe);
-          setCurrentImageSrc(foundRecipe.image); 
+          setCurrentImageSrc(foundRecipe.image);
+          // Initialize scaling state with recipe defaults
+          setDisplayServings(foundRecipe.servings || 1);
           setPlanServings(foundRecipe.servings || 1);
+          setScaledIngredients(foundRecipe.ingredients);
+          setScaledMacros(foundRecipe.macrosPerServing);
         } else {
           setError(`Recipe with ID ${recipeId} not found.`);
           setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+Not+Found`);
@@ -90,6 +101,47 @@ export default function RecipeDetailPage() {
     fetchRecipe();
   }, [recipeId]);
 
+  // Effect for scaling ingredients and macros
+  useEffect(() => {
+    if (!recipe || isNaN(displayServings) || displayServings <= 0) {
+      return;
+    }
+    
+    const scalingFactor = displayServings / recipe.servings;
+
+    const newMacros = {
+      calories: recipe.macrosPerServing.calories * scalingFactor,
+      protein: recipe.macrosPerServing.protein * scalingFactor,
+      carbs: recipe.macrosPerServing.carbs * scalingFactor,
+      fat: recipe.macrosPerServing.fat * scalingFactor,
+    };
+    setScaledMacros(newMacros);
+
+    const newIngredients = recipe.ingredients.map(ing => {
+      const parsed = parseIngredientString(ing);
+      const originalQtyIsOneAndImplicit = parsed.quantity === 1 && !ing.trim().match(/^(1|1\.0)\s/);
+
+      if (originalQtyIsOneAndImplicit) {
+        return ing; // Don't scale ingredients like "pinch of salt"
+      }
+      
+      const newQuantity = parsed.quantity * scalingFactor;
+      const formattedQuantity = newQuantity.toLocaleString('en-US', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      }).replace(/\.00$/, '');
+
+      if (parsed.unit === 'item(s)') {
+        return `${formattedQuantity} ${parsed.name}`;
+      }
+      
+      return `${formattedQuantity} ${parsed.unit} ${parsed.name}`;
+    });
+    setScaledIngredients(newIngredients);
+
+  }, [displayServings, recipe]);
+
+
   const handleImageError = () => {
     setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipeId}`);
     setImageLoadError(true);
@@ -97,7 +149,7 @@ export default function RecipeDetailPage() {
 
   const handleOpenAddToPlanDialog = () => {
     if (recipe) {
-      setPlanServings(recipe.servings);
+      setPlanServings(displayServings); // Use the currently displayed servings
       setPlanDate(isSubscribedActive ? new Date() : (isDateAllowedForFreeTier(new Date()) ? new Date() : startOfDay(new Date())));
       setShowAddToPlanDialog(true);
     }
@@ -135,6 +187,24 @@ export default function RecipeDetailPage() {
         title: isRecipeFavorite(recipe.id) ? "Recipe Favorited!" : "Recipe Unfavorited",
         description: isRecipeFavorite(recipe.id) ? `${recipe.name} added to your favorites.` : `${recipe.name} removed from your favorites.`,
       });
+    }
+  };
+
+  const handleServingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (val === '') {
+        setDisplayServings(NaN); // Allow empty input while typing
+    } else {
+        const num = parseInt(val, 10);
+        if (!isNaN(num) && num > 0) {
+            setDisplayServings(num);
+        }
+    }
+  };
+
+  const handleServingBlur = () => {
+    if (isNaN(displayServings)) {
+        setDisplayServings(recipe?.servings || 1);
     }
   };
 
@@ -216,23 +286,25 @@ export default function RecipeDetailPage() {
           {imageLoadError && !error && <Alert variant="default" className="mt-2 border-accent"><AlertDescription>Original image not found. Displaying placeholder for Recipe ID {recipe.id}.</AlertDescription></Alert>}
           {error && <Alert variant="destructive" className="mt-2"><AlertDescription>{error} Displaying placeholder.</AlertDescription></Alert>}
           {recipe.description && <p className="text-muted-foreground mt-2">{recipe.description}</p>}
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Badge variant="secondary" className="text-sm">
-              <Clock className="w-4 h-4 mr-1 text-accent" /> Prep: {recipe.prepTime}
-            </Badge>
-            <Badge variant="secondary" className="text-sm">
-              <Clock className="w-4 h-4 mr-1 text-accent" /> Cook: {recipe.cookTime}
-            </Badge>
-            {recipe.chillTime && (
-              <Badge variant="secondary" className="text-sm">
-                <Hourglass className="w-4 h-4 mr-1 text-accent" /> Chill: {recipe.chillTime}
-              </Badge>
-            )}
-            <Badge variant="secondary" className="text-sm">
-              <Users className="w-4 h-4 mr-1 text-accent" /> Serves: {recipe.servings}
-            </Badge>
+          <div className="mt-4 flex flex-wrap gap-4 items-center">
+             <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary" className="text-sm">
+                  <Clock className="w-4 h-4 mr-1 text-accent" /> Prep: {recipe.prepTime}
+                </Badge>
+                <Badge variant="secondary" className="text-sm">
+                  <Clock className="w-4 h-4 mr-1 text-accent" /> Cook: {recipe.cookTime}
+                </Badge>
+                {recipe.chillTime && (
+                  <Badge variant="secondary" className="text-sm">
+                    <Hourglass className="w-4 h-4 mr-1 text-accent" /> Chill: {recipe.chillTime}
+                  </Badge>
+                )}
+                <Badge variant="secondary" className="text-sm">
+                  <Users className="w-4 h-4 mr-1 text-accent" /> Serves: {recipe.servings} (Original)
+                </Badge>
+            </div>
           </div>
-          {recipe.tags && recipe.tags.length > 0 && (
+           {recipe.tags && recipe.tags.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-2">
               {recipe.tags.map(tag => (
                 <Badge key={tag} variant="outline" className="text-accent border-accent">{tag}</Badge>
@@ -241,27 +313,50 @@ export default function RecipeDetailPage() {
           )}
         </CardHeader>
         <CardContent className="p-6">
+          <div className="mb-8 space-y-4">
+            <h3 className="text-2xl font-semibold font-headline text-primary mb-4 flex items-center">
+                <ListChecks className="w-6 h-6 mr-2 text-accent" /> Ingredients for <span className="text-accent ml-2">{displayServings || recipe.servings}</span> serving(s)
+            </h3>
+             <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                <Label htmlFor="servings-scaler" className="text-sm font-medium whitespace-nowrap">Scale Recipe:</Label>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setDisplayServings(s => Math.max(1, (isNaN(s) ? recipe.servings : s) - 1))}>
+                        <Minus className="h-4 w-4" />
+                    </Button>
+                    <Input
+                        id="servings-scaler"
+                        type="number"
+                        value={isNaN(displayServings) ? '' : displayServings}
+                        onChange={handleServingChange}
+                        onBlur={handleServingBlur}
+                        className="w-20 h-8 text-center"
+                        min="1"
+                    />
+                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setDisplayServings(s => (isNaN(s) ? recipe.servings : s) + 1)}>
+                        <Plus className="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
+            <ul className="space-y-2 list-disc list-inside bg-secondary/30 p-4 rounded-md">
+                {scaledIngredients.map((ingredient, index) => (
+                    <li key={index} className="text-foreground/90">
+                    {ingredient}
+                    </li>
+                ))}
+            </ul>
+          </div>
+
           <div className="mb-8">
-            <MacroDisplay macros={recipe.macrosPerServing} title="Macros per Serving" />
+            <MacroDisplay macros={scaledMacros} title={`Macros for ${displayServings || recipe.servings} serving(s)`} />
           </div>
           
           <Button onClick={handleOpenAddToPlanDialog} size="lg" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground mb-8">
             <PlusCircle className="mr-2 h-5 w-5" /> Add to Meal Plan
           </Button>
 
+          <Separator className="my-8" />
+
           <div className="grid md:grid-cols-2 gap-8">
-            <div>
-              <h3 className="text-2xl font-semibold font-headline text-primary mb-4 flex items-center">
-                <ListChecks className="w-6 h-6 mr-2 text-accent" /> Ingredients
-              </h3>
-              <ul className="space-y-2 list-disc list-inside bg-secondary/30 p-4 rounded-md">
-                {recipe.ingredients.map((ingredient, index) => (
-                  <li key={index} className="text-foreground/90">
-                    {ingredient}
-                  </li>
-                ))}
-              </ul>
-            </div>
             <div>
               <h3 className="text-2xl font-semibold font-headline text-primary mb-4 flex items-center">
                 <Utensils className="w-6 h-6 mr-2 text-accent" /> Instructions
@@ -273,6 +368,19 @@ export default function RecipeDetailPage() {
                   </li>
                 ))}
               </ol>
+            </div>
+            {/* Kept original ingredients for reference */}
+             <div>
+              <h3 className="text-xl font-semibold font-headline text-muted-foreground mb-4 flex items-center">
+                Original Ingredients (for {recipe.servings} servings)
+              </h3>
+              <ul className="space-y-2 list-disc list-inside bg-muted/20 p-4 rounded-md text-sm text-muted-foreground">
+                {recipe.ingredients.map((ingredient, index) => (
+                  <li key={index}>
+                    {ingredient}
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </CardContent>
