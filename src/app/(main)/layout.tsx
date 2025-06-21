@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Footer } from '@/components/layout/Footer';
 import { ThemeToggleButton } from '@/components/layout/ThemeToggleButton';
@@ -27,9 +27,12 @@ import { SheetTitle } from '@/components/ui/sheet';
 import { 
   UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, 
   PanelLeft, Target, Leaf, Ban, ListChecks, UserCog, UserCircle2, 
-  BookOpen, Archive, Bot, SlidersHorizontal 
+  BookOpen, Archive, Bot, SlidersHorizontal, Search
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { useState, type FormEvent } from 'react';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface NavItem {
   href: string;
@@ -67,12 +70,74 @@ const bottomLevelNavItems: NavItem[] = [
     { href: '/guide', label: 'App Guide', icon: BookOpen },
 ];
 
+// Search Component for the Sidebar
+function SidebarSearch() {
+  const [search, setSearch] = useState('');
+  const router = useRouter();
+  const { setOpenMobile, isMobile } = useSidebar();
+
+  const handleSearch = (e: FormEvent) => {
+    e.preventDefault();
+    if (!search.trim()) return;
+    router.push(`/recipes?q=${encodeURIComponent(search.trim())}`);
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+    setSearch('');
+  };
+
+  return (
+    <div className="px-3 py-2 group-data-[collapsible=icon]:px-2">
+      <form onSubmit={handleSearch} className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search..."
+                className="w-full pl-8 h-9 bg-sidebar-accent/50 border-sidebar-border group-data-[collapsible=icon]:pl-2 group-data-[collapsible=icon]:text-center"
+              />
+            </TooltipTrigger>
+            <TooltipContent side="right" align="center" className="group-data-[state=expanded]:hidden">
+              Search recipes
+            </TooltipContent>
+          </Tooltip>
+      </form>
+    </div>
+  );
+}
 
 // Inner component to use hooks within SidebarProvider context
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isMobile, state: sidebarState } = useSidebar(); 
 
+  const allNavItems = [
+    ...topLevelNavItems,
+    ...planningNavItems,
+    ...recipesNavItems,
+    ...profileNavItems,
+    ...bottomLevelNavItems
+  ];
+
+  const getCurrentPageTitle = () => {
+    if (pathname === '/') return 'Dashboard';
+    if (pathname.startsWith('/recipes/add')) return 'Add New Recipe';
+    if (pathname.match(/^\/recipes\/\d+$/)) return 'Recipe Details';
+    
+    let bestMatch: NavItem | undefined;
+    for (const item of allNavItems) {
+      if (pathname.startsWith(item.href)) {
+        if (!bestMatch || item.href.length > bestMatch.href.length) {
+          bestMatch = item;
+        }
+      }
+    }
+    return bestMatch ? bestMatch.label : "MealPlannerPro";
+  };
+  
+  const currentPageTitle = getCurrentPageTitle();
   const isPlanningSectionActive = planningNavItems.some(item => pathname.startsWith(item.href));
   const isRecipesSectionActive = recipesNavItems.some(item => pathname.startsWith(item.href));
   const isProfileSectionActive = profileNavItems.some(item => pathname.startsWith(item.href));
@@ -145,6 +210,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           </Link>
         </SidebarHeader>
+        <SidebarSearch />
         <SidebarContent className="flex flex-col justify-between">
           <SidebarMenu>
             {topLevelNavItems.map((item) => {
@@ -191,7 +257,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             </SidebarTrigger>
           </div>
           <h1 className="flex-grow text-center text-xl font-bold font-headline text-primary">
-            MealPlanner<span className="text-accent">Pro</span>
+            {currentPageTitle}
           </h1>
           <div className="w-10"> {/* Container for ThemeToggleButton */}
             <ThemeToggleButton />
@@ -213,10 +279,12 @@ export default function MainLayout({
 }) {
   return (
     <SidebarProvider defaultOpen={true} collapsible="icon">
-      <div className="flex flex-col min-h-screen">
-        <LayoutContent>{children}</LayoutContent>
-        <Footer />
-      </div>
+       <TooltipProvider>
+          <div className="flex flex-col min-h-screen">
+            <LayoutContent>{children}</LayoutContent>
+            <Footer />
+          </div>
+      </TooltipProvider>
     </SidebarProvider>
   );
 }

@@ -1,7 +1,8 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { RecipeCard } from '@/components/shared/RecipeCard';
 import { MEAL_TYPES, parseIngredientString } from '@/lib/data';
@@ -56,11 +57,16 @@ const containsAllergenKeyword = (text: string, keywords: string[]): boolean => {
   return keywords.some(keyword => lowerText.includes(keyword));
 };
 
-export default function RecipesPage() {
+function RecipesPageComponent() {
   const { userProfile, addMealToPlan, allRecipesCache, isRecipeCacheLoading, isRecipeFavorite, pantryItems } = useAppContext();
   const { toast } = useToast();
+  
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchTermFromUrl = searchParams.get('q') || '';
 
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(searchTermFromUrl);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
   const [planDate, setPlanDate] = useState<Date | undefined>(new Date());
@@ -68,10 +74,25 @@ export default function RecipesPage() {
   const [planServings, setPlanServings] = useState<number>(1);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
+  useEffect(() => {
+    setSearchTerm(searchTermFromUrl);
+  }, [searchTermFromUrl]);
+
   const isSubscribedActive = true; 
 
   const activeDietaryFilters = useMemo(() => userProfile?.dietaryPreferences || [], [userProfile]);
   const activeAllergenFilters = useMemo(() => userProfile?.allergens || [], [userProfile]);
+
+  const handleSearchChange = (newSearchTerm: string) => {
+    setSearchTerm(newSearchTerm);
+    const params = new URLSearchParams(searchParams.toString());
+    if (newSearchTerm) {
+      params.set('q', newSearchTerm);
+    } else {
+      params.delete('q');
+    }
+    router.replace(`${pathname}?${params.toString()}`);
+  };
 
   const filteredRecipes = useMemo(() => {
     if (isRecipeCacheLoading) return [];
@@ -120,7 +141,6 @@ export default function RecipesPage() {
     return recipes;
   }, [allRecipesCache, searchTerm, activeDietaryFilters, activeAllergenFilters, showFavoritesOnly, isRecipeFavorite, isRecipeCacheLoading]);
 
-  const totalFilteredRecipesCount = filteredRecipes.length;
   const finalRecipesForDisplay = filteredRecipes;
   
   const calculatePantryMatch = useCallback((recipe: Recipe, pantryItems: PantryItem[]) => {
@@ -190,7 +210,7 @@ export default function RecipesPage() {
   };
 
   return (
-    <PageWrapper title="Discover Recipes">
+    <PageWrapper>
       <div className="mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative flex-grow w-full md:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -199,7 +219,7 @@ export default function RecipesPage() {
             placeholder="Search recipes by name, description, or tag..."
             className="pl-10"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
         <div className="flex items-center space-x-4 self-start md:self-center">
@@ -360,4 +380,12 @@ export default function RecipesPage() {
       )}
     </PageWrapper>
   );
+}
+
+export default function RecipesPage() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <RecipesPageComponent />
+        </Suspense>
+    )
 }
