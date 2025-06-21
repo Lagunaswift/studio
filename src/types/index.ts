@@ -120,6 +120,13 @@ export const PRIMARY_GOAL_OPTIONS: { value: PrimaryGoal; label: string }[] = [
 
 export type SubscriptionStatus = 'active' | 'inactive' | 'none' | null;
 
+export interface DashboardSettings {
+  showMacros: boolean;
+  showMenu: boolean;
+  showFeaturedRecipe: boolean;
+  showQuickRecipes: boolean;
+}
+
 export interface UserProfileSettings {
   name?: string | null;
   email?: string | null;
@@ -141,6 +148,7 @@ export interface UserProfileSettings {
   abdomenCircumferenceCm?: number | null; // Male
   waistCircumferenceCm?: number | null;   // Female
   hipCircumferenceCm?: number | null;     // Female
+  dashboardSettings?: DashboardSettings;
   subscription_status: SubscriptionStatus;
   plan_name?: string | null;
   subscription_start_date?: string | null;

@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -28,7 +27,7 @@ import { SheetTitle } from '@/components/ui/sheet';
 import { 
   UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, 
   PanelLeft, Target, Leaf, Ban, ListChecks, UserCog, UserCircle2, 
-  BookOpen, Archive, Bot 
+  BookOpen, Archive, Bot, SlidersHorizontal 
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -61,6 +60,7 @@ const profileNavItems: NavItem[] = [
   { href: '/profile/diet-type', label: 'Diet Type', icon: Leaf },
   { href: '/profile/allergens', label: 'Allergens', icon: Ban },
   { href: '/profile/meal-structure', label: 'Meal Structure', icon: ListChecks },
+  { href: '/profile/dashboard-settings', label: 'Dashboard', icon: SlidersHorizontal },
 ];
 
 const bottomLevelNavItems: NavItem[] = [

@@ -21,6 +21,7 @@ import type {
   SubscriptionStatus,
   UKSupermarketCategory,
   RecipeFormData, // Added for custom recipe form
+  DashboardSettings,
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { loadState, saveState } from '@/lib/localStorage';
@@ -39,6 +40,13 @@ const DEFAULT_MEAL_STRUCTURE: MealSlotConfig[] = [
   { id: 'default-dinner', name: 'Dinner', type: 'Dinner' },
   { id: 'default-snack1', name: 'Snack', type: 'Snack' },
 ];
+
+const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
+  showMacros: true,
+  showMenu: true,
+  showFeaturedRecipe: true,
+  showQuickRecipes: true,
+};
 
 const DEFAULT_USER_PROFILE: UserProfileSettings = {
   name: null,
@@ -66,6 +74,7 @@ const DEFAULT_USER_PROFILE: UserProfileSettings = {
   subscription_start_date: null,
   subscription_end_date: null,
   subscription_duration: null,
+  dashboardSettings: DEFAULT_DASHBOARD_SETTINGS,
 };
 
 const calculateNavyBodyFatPercentage = (
@@ -150,6 +159,7 @@ interface AppContextType {
   setDietaryPreferences: (preferences: string[]) => void;
   setAllergens: (allergens: string[]) => void;
   setMealStructure: (mealStructure: MealSlotConfig[]) => void;
+  setDashboardSettings: (settings: DashboardSettings) => void;
   setUserInformation: (info: Partial<UserProfileSettings>) => void;
   isRecipeCacheLoading: boolean;
   favoriteRecipeIds: number[];
@@ -222,12 +232,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!loadedUserProfile) {
         loadedUserProfile = { ...DEFAULT_USER_PROFILE };
       } else {
-        loadedUserProfile = { ...DEFAULT_USER_PROFILE, ...loadedUserProfile };
-      }
-      for (const key in DEFAULT_USER_PROFILE) {
-        if (loadedUserProfile[key as keyof UserProfileSettings] === undefined) {
-          loadedUserProfile[key as keyof UserProfileSettings] = DEFAULT_USER_PROFILE[key as keyof UserProfileSettings];
-        }
+        const userDashboardSettings = loadedUserProfile.dashboardSettings || {};
+        const mergedDashboardSettings = { ...DEFAULT_DASHBOARD_SETTINGS, ...userDashboardSettings };
+        loadedUserProfile = { 
+          ...DEFAULT_USER_PROFILE, 
+          ...loadedUserProfile, 
+          dashboardSettings: mergedDashboardSettings 
+        };
       }
       
       let initialBFP = loadedUserProfile.bodyFatPercentage;
@@ -406,6 +417,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setDietaryPreferences = useCallback((preferences: string[]) => updateUserProfileState({ dietaryPreferences: preferences }), [updateUserProfileState]);
   const setAllergens = useCallback((allergens: string[]) => updateUserProfileState({ allergens }), [updateUserProfileState]);
   const setMealStructure = useCallback((mealStructure: MealSlotConfig[]) => updateUserProfileState({ mealStructure }), [updateUserProfileState]);
+  const setDashboardSettings = useCallback((settings: DashboardSettings) => {
+    updateUserProfileState({ dashboardSettings: settings });
+  }, [updateUserProfileState]);
   const setUserInformation = useCallback((info: Partial<UserProfileSettings>) => updateUserProfileState(info), [updateUserProfileState]);
 
   const toggleFavoriteRecipe = useCallback((recipeId: number) => {
@@ -478,6 +492,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUserInformation, isRecipeCacheLoading, favoriteRecipeIds, toggleFavoriteRecipe,
     isRecipeFavorite, addPantryItem, removePantryItem, updatePantryItemQuantity,
     parseIngredient, assignIngredientCategory, addCustomRecipe, userRecipes,
+    setDashboardSettings,
   }), [
     mealPlan, shoppingList, pantryItems, userProfile, allRecipesCache, addMealToPlan, removeMealFromPlan,
     updatePlannedMealServings, getDailyMacros, toggleShoppingListItem,
@@ -485,7 +500,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDietaryPreferences, setAllergens, setMealStructure, setUserInformation, isRecipeCacheLoading,
     favoriteRecipeIds, toggleFavoriteRecipe, isRecipeFavorite,
     addPantryItem, removePantryItem, updatePantryItemQuantity, parseIngredient, assignIngredientCategory,
-    addCustomRecipe, userRecipes
+    addCustomRecipe, userRecipes, setDashboardSettings
   ]);
 
   if (!isInitialized && isRecipeCacheLoading) {

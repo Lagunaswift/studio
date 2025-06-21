@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -6,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Target, Edit, Star, Loader2, CalendarCheck, PlusCircle, UtensilsCrossed, Zap } from 'lucide-react';
+import { Target, Edit, Star, Loader2, CalendarCheck, PlusCircle, UtensilsCrossed, Zap, SlidersHorizontal } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { format, parseISO, isValid } from 'date-fns';
@@ -52,7 +51,6 @@ export default function HomePage() {
   const { user, isLoading: isAuthLoading, profile: authProfile } = useAuth();
   const {
     getDailyMacros,
-    macroTargets: appContextMacroTargets,
     setMacroTargets,
     mealPlan,
     allRecipesCache,
@@ -69,8 +67,15 @@ export default function HomePage() {
   const [featuredRecipe, setFeaturedRecipe] = useState<Recipe | null>(null);
   const [quickRecipes, setQuickRecipes] = useState<Recipe[]>([]);
 
-  const currentMacroTargets = appContextUserProfile?.macroTargets || appContextMacroTargets;
+  const currentMacroTargets = appContextUserProfile?.macroTargets;
   const welcomeName = appContextUserProfile?.name || appContextUserProfile?.email || authProfile?.name || authProfile?.email || user?.email || 'User';
+
+  const {
+    showMacros = true,
+    showMenu = true,
+    showFeaturedRecipe = true,
+    showQuickRecipes = true,
+  } = appContextUserProfile?.dashboardSettings || {};
 
   useEffect(() => {
     const today = new Date();
@@ -171,177 +176,198 @@ export default function HomePage() {
 
   return (
     <PageWrapper title={`Welcome, ${welcomeName}!`}>
-      <section className="mb-12">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold font-headline text-primary">
-            {"Today's Macros"} ({clientTodayDate && isValid(parseISO(clientTodayDate)) ? format(parseISO(clientTodayDate), "MMMM dd, yyyy") : 'Loading...'})
-          </h2>
-          <Button variant="outline" onClick={() => setShowSetTargetsDialog(true)}>
-            {currentMacroTargets ? <Edit className="mr-2 h-4 w-4" /> : <Target className="mr-2 h-4 w-4" />}
-            {currentMacroTargets ? "Update Targets" : "Set Targets"}
-          </Button>
-        </div>
-
-        {currentMacroTargets ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <Card className="shadow-md">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">Calories (kcal)</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-2 h-[250px]">
-                <ChartContainer config={chartConfig} className="w-full h-full">
-                  <BarChart accessibilityLayer data={caloriesChartData} layout="vertical">
-                    <CartesianGrid horizontal={false} />
-                    <XAxis type="number" tickFormatter={(value) => `${value}`} />
-                    <YAxis dataKey="name" type="category" tickLine={false} tickMargin={10} axisLine={false} width={80} />
-                    <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
-                    <Bar dataKey="consumed" fill="var(--color-consumed)" radius={4} barSize={30} name="Consumed" />
-                    <Bar dataKey="target" fill="var(--color-target)" radius={4} barSize={30} name="Target" />
-                    <ChartLegend content={<ChartLegendContent />} />
-                  </BarChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-            <Card className="shadow-md">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">Macronutrients (grams)</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-2 h-[250px]">
-                <ChartContainer config={chartConfig} className="w-full h-full">
-                   <BarChart accessibilityLayer data={macrosChartData} layout="vertical">
-                    <CartesianGrid horizontal={false} />
-                     <XAxis type="number" tickFormatter={(value) => `${value}g`} />
-                    <YAxis dataKey="name" type="category" tickLine={false} tickMargin={10} axisLine={false} width={80} />
-                    <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
-                    <Bar dataKey="consumed" fill="var(--color-consumed)" radius={4} barSize={20} name="Consumed" />
-                    <Bar dataKey="target" fill="var(--color-target)" radius={4} barSize={20} name="Target" />
-                    <ChartLegend content={<ChartLegendContent />} />
-                  </BarChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
+      {showMacros && (
+        <section className="mb-12">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold font-headline text-primary">
+              {"Today's Macros"} ({clientTodayDate && isValid(parseISO(clientTodayDate)) ? format(parseISO(clientTodayDate), "MMMM dd, yyyy") : 'Loading...'})
+            </h2>
+            <Button variant="outline" onClick={() => setShowSetTargetsDialog(true)}>
+              {currentMacroTargets ? <Edit className="mr-2 h-4 w-4" /> : <Target className="mr-2 h-4 w-4" />}
+              {currentMacroTargets ? "Update Targets" : "Set Targets"}
+            </Button>
           </div>
-        ) : (
+
+          {currentMacroTargets ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <Card className="shadow-md">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold">Calories (kcal)</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-2 h-[250px]">
+                  <ChartContainer config={chartConfig} className="w-full h-full">
+                    <BarChart accessibilityLayer data={caloriesChartData} layout="vertical">
+                      <CartesianGrid horizontal={false} />
+                      <XAxis type="number" tickFormatter={(value) => `${value}`} />
+                      <YAxis dataKey="name" type="category" tickLine={false} tickMargin={10} axisLine={false} width={80} />
+                      <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                      <Bar dataKey="consumed" fill="var(--color-consumed)" radius={4} barSize={30} name="Consumed" />
+                      <Bar dataKey="target" fill="var(--color-target)" radius={4} barSize={30} name="Target" />
+                      <ChartLegend content={<ChartLegendContent />} />
+                    </BarChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+              <Card className="shadow-md">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold">Macronutrients (grams)</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-2 h-[250px]">
+                  <ChartContainer config={chartConfig} className="w-full h-full">
+                     <BarChart accessibilityLayer data={macrosChartData} layout="vertical">
+                      <CartesianGrid horizontal={false} />
+                       <XAxis type="number" tickFormatter={(value) => `${value}g`} />
+                      <YAxis dataKey="name" type="category" tickLine={false} tickMargin={10} axisLine={false} width={80} />
+                      <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                      <Bar dataKey="consumed" fill="var(--color-consumed)" radius={4} barSize={20} name="Consumed" />
+                      <Bar dataKey="target" fill="var(--color-target)" radius={4} barSize={20} name="Target" />
+                      <ChartLegend content={<ChartLegendContent />} />
+                    </BarChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <Card className="shadow-md">
+              <CardContent className="pt-6 text-center">
+                <p className="text-foreground/70 mb-4">
+                  Set your daily macro targets to track your progress!
+                </p>
+                <Button onClick={() => setShowSetTargetsDialog(true)} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                  <Target className="mr-2 h-4 w-4" /> Set Targets Now
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </section>
+      )}
+      
+      {showMenu && (
+        <section className="mb-12">
           <Card className="shadow-md">
-            <CardContent className="pt-6 text-center">
-              <p className="text-foreground/70 mb-4">
-                Set your daily macro targets to track your progress!
-              </p>
-              <Button onClick={() => setShowSetTargetsDialog(true)} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                <Target className="mr-2 h-4 w-4" /> Set Targets Now
-              </Button>
+            <CardHeader>
+              <CardTitle className="text-xl font-bold font-headline text-primary flex items-center">
+                <CalendarCheck className="mr-2 h-5 w-5 text-accent" /> Today's Menu
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {dailyPlannedMeals.length > 0 ? (
+                <ul className="space-y-3">
+                  {dailyPlannedMeals.map(meal => (
+                    <li key={meal.id} className="p-3 bg-muted/30 rounded-md hover:bg-muted/50 transition-colors">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-primary-focus">
+                          <Link href={`/recipes/${meal.recipeId}`} className="hover:underline">
+                            {meal.recipeDetails?.name || 'Recipe Name Missing'}
+                          </Link>
+                        </span>
+                        <Badge variant="outline" className="text-xs">{meal.mealType}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Servings: {meal.servings}</p>
+                      {meal.recipeDetails && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Approx. {(meal.recipeDetails.macrosPerServing.calories * meal.servings).toFixed(0)} kcal
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-muted-foreground mb-3">No meals planned for today yet.</p>
+                  <Button asChild variant="default" size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                    <Link href="/meal-plan">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Go to Meal Planner
+                    </Link>
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
-        )}
-      </section>
-      
-      <section className="mb-12">
-        <Card className="shadow-md">
-          <CardHeader>
-            <CardTitle className="text-xl font-bold font-headline text-primary flex items-center">
-              <CalendarCheck className="mr-2 h-5 w-5 text-accent" /> Today's Menu
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {dailyPlannedMeals.length > 0 ? (
-              <ul className="space-y-3">
-                {dailyPlannedMeals.map(meal => (
-                  <li key={meal.id} className="p-3 bg-muted/30 rounded-md hover:bg-muted/50 transition-colors">
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold text-primary-focus">
-                        <Link href={`/recipes/${meal.recipeId}`} className="hover:underline">
-                          {meal.recipeDetails?.name || 'Recipe Name Missing'}
-                        </Link>
-                      </span>
-                      <Badge variant="outline" className="text-xs">{meal.mealType}</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Servings: {meal.servings}</p>
-                    {meal.recipeDetails && (
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Approx. {(meal.recipeDetails.macrosPerServing.calories * meal.servings).toFixed(0)} kcal
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="text-center py-4">
-                <p className="text-muted-foreground mb-3">No meals planned for today yet.</p>
-                <Button asChild variant="default" size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                  <Link href="/meal-plan">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Go to Meal Planner
-                  </Link>
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </section>
+        </section>
+      )}
 
-      <section className="mb-12">
-        <h2 className="text-2xl font-bold font-headline text-primary mb-6 flex items-center">
-          <Zap className="mr-2 h-6 w-6 text-accent" /> Quick &amp; Easy Meals
-        </h2>
-        {isAppRecipeCacheLoading && quickRecipes.length === 0 ? (
-          <div className="flex items-center justify-center h-40">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2 text-muted-foreground">Finding quick recipes...</p>
-          </div>
-        ) : quickRecipes.length > 0 ? (
-          <ScrollArea className="w-full whitespace-nowrap rounded-md">
-            <div className="flex w-max space-x-4 pb-4">
-              {quickRecipes.map(recipe => (
-                <div key={recipe.id} className="w-[300px] md:w-[320px]">
-                  <RecipeCard
-                    recipe={recipe}
-                    showViewDetails={true}
-                    showAddToMealPlanButton={false}
-                    className="h-full"
-                  />
-                </div>
-              ))}
+      {showQuickRecipes && (
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold font-headline text-primary mb-6 flex items-center">
+            <Zap className="mr-2 h-6 w-6 text-accent" /> Quick &amp; Easy Meals
+          </h2>
+          {isAppRecipeCacheLoading && quickRecipes.length === 0 ? (
+            <div className="flex items-center justify-center h-40">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="ml-2 text-muted-foreground">Finding quick recipes...</p>
             </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-        ) : (
-          <Alert>
-            <UtensilsCrossed className="h-4 w-4" />
-            <AlertTitle>No Quick Recipes Found</AlertTitle>
-            <AlertDescription>
-              We couldn't find any recipes tagged as 'Quick'. Try adding some or checking your recipe data.
-            </AlertDescription>
-          </Alert>
-        )}
-      </section>
+          ) : quickRecipes.length > 0 ? (
+            <ScrollArea className="w-full whitespace-nowrap rounded-md">
+              <div className="flex w-max space-x-4 pb-4">
+                {quickRecipes.map(recipe => (
+                  <div key={recipe.id} className="w-[300px] md:w-[320px]">
+                    <RecipeCard
+                      recipe={recipe}
+                      showViewDetails={true}
+                      showAddToMealPlanButton={false}
+                      className="h-full"
+                    />
+                  </div>
+                ))}
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          ) : (
+            <Alert>
+              <UtensilsCrossed className="h-4 w-4" />
+              <AlertTitle>No Quick Recipes Found</AlertTitle>
+              <AlertDescription>
+                We couldn't find any recipes tagged as 'Quick'. Try adding some or checking your recipe data.
+              </AlertDescription>
+            </Alert>
+          )}
+        </section>
+      )}
 
-      <section className="mb-12">
-        <h2 className="text-2xl font-bold font-headline text-primary mb-6 flex items-center">
-          <Star className="mr-2 h-6 w-6 text-accent" /> Featured Recipe
-        </h2>
-        {isAppRecipeCacheLoading && !featuredRecipe ? (
-          <div className="flex items-center justify-center h-40">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2 text-muted-foreground">Loading featured recipe...</p>
-          </div>
-        ) : featuredRecipe ? (
-          <div className="max-w-sm mx-auto md:max-w-md">
-            <RecipeCard
-              recipe={featuredRecipe}
-              showViewDetailsButton={true}
-              showAddToMealPlanButton={false}
-              className="shadow-xl border-2 border-accent/50"
-            />
-          </div>
-        ) : (
-          <Alert>
-            <UtensilsCrossed className="h-4 w-4" />
-            <AlertTitle>No Recipes Available</AlertTitle>
-            <AlertDescription>
-              There are no recipes to feature right now. Try adding some recipes to the app!
-            </AlertDescription>
-          </Alert>
-        )}
-      </section>
+      {showFeaturedRecipe && (
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold font-headline text-primary mb-6 flex items-center">
+            <Star className="mr-2 h-6 w-6 text-accent" /> Featured Recipe
+          </h2>
+          {isAppRecipeCacheLoading && !featuredRecipe ? (
+            <div className="flex items-center justify-center h-40">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="ml-2 text-muted-foreground">Loading featured recipe...</p>
+            </div>
+          ) : featuredRecipe ? (
+            <div className="max-w-sm mx-auto md:max-w-md">
+              <RecipeCard
+                recipe={featuredRecipe}
+                showViewDetailsButton={true}
+                showAddToMealPlanButton={false}
+                className="shadow-xl border-2 border-accent/50"
+              />
+            </div>
+          ) : (
+            <Alert>
+              <UtensilsCrossed className="h-4 w-4" />
+              <AlertTitle>No Recipes Available</AlertTitle>
+              <AlertDescription>
+                There are no recipes to feature right now. Try adding some recipes to the app!
+              </AlertDescription>
+            </Alert>
+          )}
+        </section>
+      )}
+
+      {!showMacros && !showMenu && !showFeaturedRecipe && !showQuickRecipes && (
+        <Alert>
+          <SlidersHorizontal className="h-4 w-4" />
+          <AlertTitle>Dashboard is Empty</AlertTitle>
+          <AlertDescription>
+            You've hidden all dashboard widgets. You can re-enable them in your{" "}
+            <Link href="/profile/dashboard-settings" className="font-semibold underline hover:text-primary">
+              Dashboard Settings
+            </Link>.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Dialog open={showSetTargetsDialog} onOpenChange={setShowSetTargetsDialog}>
         <DialogContent>
