@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import type React from 'react';
@@ -463,11 +464,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         instructions: recipeData.instructions.map(inst => inst.value),
         tags: recipeData.tags || [], // Ensure tags is an array
         isCustom: true,
-        // Redundant fields, populated from macrosPerServing for consistency
-        calories: recipeData.calories,
-        protein: recipeData.protein,
-        carbs: recipeData.carbs,
-        fat: recipeData.fat,
       };
       return [...prevUserRecipes, newRecipe];
     });

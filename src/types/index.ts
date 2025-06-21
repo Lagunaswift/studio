@@ -28,11 +28,6 @@ export interface Recipe {
   instructions: string[];
   tags?: string[];
   isCustom?: boolean; // Added for user-created recipes
-
-  calories: number; // This seems redundant if macrosPerServing is present
-  protein: number;  // This seems redundant
-  carbs: number;    // This seems redundant
-  fat: number;      // This seems redundant
 }
 
 export type MealType = "Breakfast" | "Lunch" | "Dinner" | "Snack";

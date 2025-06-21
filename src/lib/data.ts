@@ -1,4 +1,5 @@
 
+
 import type { Recipe, Macros, MealType, PlannedMeal, ShoppingListItem, UKSupermarketCategory, PantryItem } from '@/types';
 import { getAllRecipes as getAllRecipesFromRegistry } from '@/features/recipes/recipeRegistry';
 
@@ -8,7 +9,7 @@ const mapToFullRecipe = (rawRecipe: any): Recipe => {
   if (typeof rawRecipe.id !== 'number' || !rawRecipe.name || typeof rawRecipe.name !== 'string') {
     console.warn('Skipping invalid raw recipe data:', rawRecipe);
     return {
-        id: -1, name: 'Invalid Recipe Data', calories: 0, protein: 0, carbs: 0, fat: 0,
+        id: -1, name: 'Invalid Recipe Data',
         servings: 0, ingredients: [], instructions: [], prepTime: '', cookTime: '',
         macrosPerServing: { calories: 0, protein: 0, carbs: 0, fat: 0 },
         image: 'https://placehold.co/600x400/007bff/ffffff.png?text=Error', // Blue placeholder for invalid data
@@ -16,14 +17,16 @@ const mapToFullRecipe = (rawRecipe: any): Recipe => {
     } as Recipe;
   }
 
+  const servings = typeof rawRecipe.servings === 'number' && rawRecipe.servings > 0 ? rawRecipe.servings : 1;
+  const totalCalories = typeof rawRecipe.calories === 'number' ? rawRecipe.calories : 0;
+  const totalProtein = typeof rawRecipe.protein === 'number' ? rawRecipe.protein : 0;
+  const totalCarbs = typeof rawRecipe.carbs === 'number' ? rawRecipe.carbs : 0;
+  const totalFat = typeof rawRecipe.fat === 'number' ? rawRecipe.fat : 0;
+
   return {
     id: rawRecipe.id,
     name: rawRecipe.name,
-    calories: typeof rawRecipe.calories === 'number' ? rawRecipe.calories : 0,
-    protein: typeof rawRecipe.protein === 'number' ? rawRecipe.protein : 0,
-    carbs: typeof rawRecipe.carbs === 'number' ? rawRecipe.carbs : 0,
-    fat: typeof rawRecipe.fat === 'number' ? rawRecipe.fat : 0,
-    servings: typeof rawRecipe.servings === 'number' && rawRecipe.servings > 0 ? rawRecipe.servings : 1,
+    servings: servings,
     ingredients: Array.isArray(rawRecipe.ingredients) ? rawRecipe.ingredients : [],
     tags: Array.isArray(rawRecipe.tags) ? rawRecipe.tags : [],
     prepTime: typeof rawRecipe.prepTime === 'string' ? rawRecipe.prepTime : "N/A",
@@ -31,10 +34,10 @@ const mapToFullRecipe = (rawRecipe: any): Recipe => {
     chillTime: typeof rawRecipe.chillTime === 'string' ? rawRecipe.chillTime : undefined,
     instructions: Array.isArray(rawRecipe.instructions) ? rawRecipe.instructions : [],
     macrosPerServing: {
-      calories: typeof rawRecipe.calories === 'number' ? rawRecipe.calories : 0,
-      protein: typeof rawRecipe.protein === 'number' ? rawRecipe.protein : 0,
-      carbs: typeof rawRecipe.carbs === 'number' ? rawRecipe.carbs : 0,
-      fat: typeof rawRecipe.fat === 'number' ? rawRecipe.fat : 0,
+      calories: totalCalories / servings,
+      protein: totalProtein / servings,
+      carbs: totalCarbs / servings,
+      fat: totalFat / servings,
     },
     image: rawRecipe.image || `/images/${rawRecipe.id}.jpg`,
     description: rawRecipe.description || "No description available.",
