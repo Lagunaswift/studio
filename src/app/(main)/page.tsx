@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Target, Edit, Star, Loader2, CalendarCheck, PlusCircle, UtensilsCrossed } from 'lucide-react';
+import { Target, Edit, Star, Loader2, CalendarCheck, PlusCircle, UtensilsCrossed, Zap } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { format, parseISO, isValid } from 'date-fns';
@@ -21,6 +21,7 @@ import type { MacroTargets, Macros, Recipe, PlannedMeal } from '@/types';
 import { RecipeCard } from '@/components/shared/RecipeCard';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import {
@@ -66,6 +67,7 @@ export default function HomePage() {
   const [dailyPlannedMeals, setDailyPlannedMeals] = useState<PlannedMeal[]>([]);
   const [showSetTargetsDialog, setShowSetTargetsDialog] = useState(false);
   const [featuredRecipe, setFeaturedRecipe] = useState<Recipe | null>(null);
+  const [quickRecipes, setQuickRecipes] = useState<Recipe[]>([]);
 
   const currentMacroTargets = appContextUserProfile?.macroTargets || appContextMacroTargets;
   const welcomeName = appContextUserProfile?.name || appContextUserProfile?.email || authProfile?.name || authProfile?.email || user?.email || 'User';
@@ -89,8 +91,12 @@ export default function HomePage() {
     if (!isAppRecipeCacheLoading && allRecipesCache.length > 0) {
       const randomIndex = Math.floor(Math.random() * allRecipesCache.length);
       setFeaturedRecipe(allRecipesCache[randomIndex]);
+
+      const quick = allRecipesCache.filter(r => r.tags?.includes('Q')).slice(0, 10);
+      setQuickRecipes(quick);
     } else {
       setFeaturedRecipe(null);
+      setQuickRecipes([]);
     }
   }, [isAppRecipeCacheLoading, allRecipesCache]);
 
@@ -182,7 +188,7 @@ export default function HomePage() {
               <CardHeader>
                 <CardTitle className="text-lg font-semibold">Calories (kcal)</CardTitle>
               </CardHeader>
-              <CardContent className="pt-2 h-[250px]"> {/* Ensure CardContent has height for chart */}
+              <CardContent className="pt-2 h-[250px]">
                 <ChartContainer config={chartConfig} className="w-full h-full">
                   <BarChart accessibilityLayer data={caloriesChartData} layout="vertical">
                     <CartesianGrid horizontal={false} />
@@ -270,6 +276,42 @@ export default function HomePage() {
             )}
           </CardContent>
         </Card>
+      </section>
+
+      <section className="mb-12">
+        <h2 className="text-2xl font-bold font-headline text-primary mb-6 flex items-center">
+          <Zap className="mr-2 h-6 w-6 text-accent" /> Quick &amp; Easy Meals
+        </h2>
+        {isAppRecipeCacheLoading && quickRecipes.length === 0 ? (
+          <div className="flex items-center justify-center h-40">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="ml-2 text-muted-foreground">Finding quick recipes...</p>
+          </div>
+        ) : quickRecipes.length > 0 ? (
+          <ScrollArea className="w-full whitespace-nowrap rounded-md">
+            <div className="flex w-max space-x-4 pb-4">
+              {quickRecipes.map(recipe => (
+                <div key={recipe.id} className="w-[300px] md:w-[320px]">
+                  <RecipeCard
+                    recipe={recipe}
+                    showViewDetails={true}
+                    showAddToMealPlanButton={false}
+                    className="h-full"
+                  />
+                </div>
+              ))}
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        ) : (
+          <Alert>
+            <UtensilsCrossed className="h-4 w-4" />
+            <AlertTitle>No Quick Recipes Found</AlertTitle>
+            <AlertDescription>
+              We couldn't find any recipes tagged as 'Quick'. Try adding some or checking your recipe data.
+            </AlertDescription>
+          </Alert>
+        )}
       </section>
 
       <section className="mb-12">

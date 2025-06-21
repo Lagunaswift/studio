@@ -8,7 +8,7 @@ interface PageWrapperProps {
   maxWidth?: 'container' | 'max-w-5xl' | 'max-w-6xl' | 'max-w-7xl' | 'max-w-full';
 }
 
-export function PageWrapper({ children, title, className = '', maxWidth = 'container' }: PageWrapperProps) {
+export function PageWrapper({ children, title, className = '', maxWidth = 'max-w-7xl' }: PageWrapperProps) {
   const wrapperClasses = {
     'container': 'container mx-auto',
     'max-w-5xl': 'max-w-5xl mx-auto',
