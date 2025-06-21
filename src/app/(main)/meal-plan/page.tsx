@@ -87,7 +87,7 @@ export default function MealPlanPage() {
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
   const dailyMacros = getDailyMacros(formattedDate);
   const currentMacroTargets = userProfile?.macroTargets;
-  const dailyMeals = getMealsForDate(formattedDate); // Defined dailyMeals here
+  const dailyMeals = getMealsForDate(formattedDate);
 
 
   const caloriesChartData = currentMacroTargets ? [
@@ -225,7 +225,7 @@ export default function MealPlanPage() {
                   <ChartContainer config={chartConfig} className="w-full h-full">
                     <BarChart accessibilityLayer data={caloriesChartData} layout="vertical">
                       <CartesianGrid horizontal={false} />
-                      <XAxis type="number" dataKey="value" tickFormatter={(value) => `${value}`} />
+                      <XAxis type="number" tickFormatter={(value) => `${value}`} />
                       <YAxis dataKey="name" type="category" tickLine={false} tickMargin={10} axisLine={false} width={60} />
                       <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
                       <Bar dataKey="consumed" fill="var(--color-consumed)" radius={4} barSize={25} name="Consumed" />
@@ -241,7 +241,7 @@ export default function MealPlanPage() {
                   <ChartContainer config={chartConfig} className="w-full h-full">
                     <BarChart accessibilityLayer data={macrosChartData} layout="vertical">
                       <CartesianGrid horizontal={false} />
-                      <XAxis type="number" dataKey="value" tickFormatter={(value) => `${value}g`} />
+                      <XAxis type="number" tickFormatter={(value) => `${value}g`} />
                       <YAxis dataKey="name" type="category" tickLine={false} tickMargin={10} axisLine={false} width={60}/>
                       <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
                       <Bar dataKey="consumed" fill="var(--color-consumed)" radius={4} barSize={15} name="Consumed" />
