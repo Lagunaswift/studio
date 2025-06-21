@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Mail, KeyRound, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-// import { supabase } from '@/lib/supabaseClient'; // Supabase client import commented out
+import { supabase } from '@/lib/supabaseClient';
 import { useState, useEffect } from 'react';
 
 const resetPasswordSchema = z.object({
@@ -39,48 +39,34 @@ export default function ResetPasswordPage() {
     form.clearErrors();
     if (!isClient) return;
 
-    console.log("Password reset attempt (local testing - Supabase disabled):", data.email);
-    toast({
-      title: "Password Reset Simulated (Local Testing)",
-      description: `Supabase authentication is temporarily disabled. If an account existed for ${data.email}, a reset link would be sent.`,
-    });
-    form.reset();
+    try {
+      const origin = window.location.origin.trim();
+      const redirectTo = `${origin}/update-password`;
 
-    // try {
-    //   const origin = window.location.origin.trim();
-    //   const redirectTo = `${origin}/auth/update-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
+        redirectTo: redirectTo,
+      });
 
-    //   console.log("======================================================================");
-    //   console.log("DEBUG: Reset Password Page - Attempting to send reset email.");
-    //   console.log("DEBUG: The 'redirectTo' URL being sent to Supabase is:");
-    //   console.log(`DEBUG: >>> ${redirectTo} <<<`);
-    //   console.log("DEBUG: Please ensure this EXACT string (including https:// and no trailing slash) is in your Supabase Project's 'Additional Redirect URLs' list (Authentication -> URL Configuration).");
-    //   console.log("======================================================================");
-
-    //   const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-    //     redirectTo: redirectTo,
-    //   });
-
-    //   if (error) {
-    //     toast({
-    //       title: "Password Reset Failed",
-    //       description: error.message,
-    //       variant: "destructive",
-    //     });
-    //   } else {
-    //     toast({
-    //       title: "Password Reset Email Sent",
-    //       description: `If an account exists for ${data.email}, a password reset link has been sent. Please check your inbox.`,
-    //     });
-    //     form.reset();
-    //   }
-    // } catch (e: any) {
-    //   toast({
-    //     title: "Password Reset Error",
-    //     description: e.message || "An unexpected error occurred.",
-    //     variant: "destructive",
-    //   });
-    // }
+      if (error) {
+        toast({
+          title: "Password Reset Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Password Reset Email Sent",
+          description: `If an account exists for ${data.email}, a password reset link has been sent. Please check your inbox.`,
+        });
+        form.reset();
+      }
+    } catch (e: any) {
+      toast({
+        title: "Password Reset Error",
+        description: e.message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -89,7 +75,7 @@ export default function ResetPasswordPage() {
         <CardTitle className="text-2xl font-headline text-primary flex items-center justify-center">
           <KeyRound className="mr-2 h-6 w-6" /> Reset Password
         </CardTitle>
-        <CardDescription>Enter your email to receive a password reset link. (Supabase Auth Temporarily Disabled)</CardDescription>
+        <CardDescription>Enter your email to receive a password reset link.</CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -110,7 +96,7 @@ export default function ResetPasswordPage() {
           </CardContent>
           <CardFooter className="flex flex-col items-center space-y-4">
             <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={form.formState.isSubmitting || !isClient}>
-              {form.formState.isSubmitting ? "Sending..." : "Send Reset Link (Local Test)"}
+              {form.formState.isSubmitting ? "Sending..." : "Send Reset Link"}
             </Button>
             <div className="text-sm text-center w-full">
               <Link href="/login" className="font-medium text-primary hover:underline flex items-center justify-center">

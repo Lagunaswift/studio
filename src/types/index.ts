@@ -27,13 +27,14 @@ export interface Recipe {
   macrosPerServing: Macros;
   instructions: string[];
   tags?: string[];
-  isCustom?: boolean; // Added for user-created recipes
+  isCustom?: boolean;
+  user_id?: string | null; // For custom recipes
 }
 
 export type MealType = "Breakfast" | "Lunch" | "Dinner" | "Snack";
 
 export interface PlannedMeal {
-  id: string;
+  id: string; // Corresponds to id in meal_plan_entries table
   recipeId: number;
   date: string; // YYYY-MM-DD
   mealType: MealType;
@@ -64,7 +65,7 @@ export interface ShoppingListItem {
 }
 
 export interface PantryItem {
-  id: string; // Typically ingredientName.toLowerCase() + unit.toLowerCase()
+  id: string; // Corresponds to id in pantry_items table
   name: string;
   quantity: number;
   unit: string;
@@ -149,6 +150,7 @@ export interface UserProfileSettings {
   waistCircumferenceCm?: number | null;   // Female
   hipCircumferenceCm?: number | null;     // Female
   dashboardSettings?: DashboardSettings;
+  favorite_recipe_ids?: number[];
   subscription_status: SubscriptionStatus;
   plan_name?: string | null;
   subscription_start_date?: string | null;
@@ -171,5 +173,5 @@ export interface RecipeFormData {
   protein: number;
   carbs: number;
   fat: number;
-  tags?: string[]; // Changed from string to string[]
+  tags?: string[];
 }
