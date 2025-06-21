@@ -168,11 +168,16 @@ export default function ShoppingListPage() {
             </TabsList>
             <TabsContent value="aisle">
               {totalCount === 0 ? (
-                <div className="text-center py-10 text-muted-foreground">
-                    <AlertCircle className="mx-auto h-12 w-12 text-primary/50 mb-4" />
-                    <p>No items in your shopping list.</p>
-                    <p>Add some recipes to your meal plan to get started!</p>
-                </div>
+                 <Card className="text-center py-10 shadow-none border-dashed">
+                    <CardHeader>
+                        <CardTitle className="text-xl font-semibold text-muted-foreground flex justify-center items-center">
+                            <ShoppingCart className="h-8 w-8 text-primary/50 mr-4"/> Your List is Empty
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-muted-foreground">Add meals to your plan to auto-generate a shopping list.</p>
+                    </CardContent>
+                 </Card>
               ) : categoriesByAisle.length === 0 && totalCount > 0 ? (
                  <div className="text-center py-10 text-muted-foreground">
                     <AlertCircle className="mx-auto h-12 w-12 text-primary/50 mb-4" />
@@ -201,11 +206,16 @@ export default function ShoppingListPage() {
             </TabsContent>
             <TabsContent value="recipe">
               {mealPlan.length === 0 || recipeShoppingGroups.length === 0 ? (
-                 <div className="text-center py-10 text-muted-foreground">
-                    <AlertCircle className="mx-auto h-12 w-12 text-primary/50 mb-4" />
-                    <p>No planned meals to show ingredients for.</p>
-                    <p>Add some recipes to your meal plan first!</p>
-                </div>
+                 <Card className="text-center py-10 shadow-none border-dashed">
+                    <CardHeader>
+                        <CardTitle className="text-xl font-semibold text-muted-foreground flex justify-center items-center">
+                            <ShoppingCart className="h-8 w-8 text-primary/50 mr-4"/> No Planned Meals
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-muted-foreground">Add some recipes to your meal plan first to see the ingredients here.</p>
+                    </CardContent>
+                 </Card>
               ) : (
                 <div className="space-y-6">
                   {recipeShoppingGroups.map((group) => (

@@ -261,7 +261,7 @@ export default function HomePage() {
             ) : (
               <div className="text-center py-4">
                 <p className="text-muted-foreground mb-3">No meals planned for today yet.</p>
-                <Button asChild variant="outline" size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                <Button asChild variant="default" size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground">
                   <Link href="/meal-plan">
                     <PlusCircle className="mr-2 h-4 w-4" /> Go to Meal Planner
                   </Link>

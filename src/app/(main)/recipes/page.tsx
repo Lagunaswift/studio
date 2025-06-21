@@ -20,7 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from "@/components/ui/switch";
 
 const FREE_TIER_RECIPE_DISPLAY_LIMIT = 15; // This is effectively unused due to isSubscribedActive = true
@@ -214,7 +214,7 @@ export default function RecipesPage() {
               <Heart className="w-4 h-4 mr-1 text-accent/80" /> Favorites
             </Label>
           </div>
-          <Button asChild variant="outline" className="bg-accent hover:bg-accent/90 text-accent-foreground">
+          <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
             <Link href="/recipes/add">
               <Plus className="mr-2 h-4 w-4" /> Add New Recipe
             </Link>
@@ -224,9 +224,9 @@ export default function RecipesPage() {
 
       {(activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0) && (
         <Card className="mb-6 bg-secondary/30 border-accent/30">
-          <CardContent className="pt-4">
-            <p className="text-sm text-accent font-semibold mb-2">Filters from your profile are active:</p>
-            <div className="flex flex-wrap gap-2">
+          <CardHeader className="p-4">
+            <CardTitle className="text-sm text-accent font-semibold mb-2">Filters from your profile are active:</CardTitle>
+            <CardDescription className="flex flex-wrap gap-2">
               {activeDietaryFilters.map(pref => (
                 <Badge key={pref} variant="outline" className="border-green-600 text-green-700 bg-green-100">
                   {getIconForPreference(pref)} {pref}
@@ -237,11 +237,11 @@ export default function RecipesPage() {
                   {getIconForAllergen(allergen)} Avoiding: {allergen}
                 </Badge>
               ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              To change these filters, visit your <Link href="/profile/diet-type" className="underline">Diet Type</Link> or <Link href="/profile/allergens" className="underline">Allergens</Link> settings.
+            </CardDescription>
+             <p className="text-xs text-muted-foreground pt-2">
+              To change these filters, visit your <Link href="/profile/diet-type" className="underline hover:text-primary">Diet Type</Link> or <Link href="/profile/allergens" className="underline hover:text-primary">Allergens</Link> settings.
             </p>
-          </CardContent>
+          </CardHeader>
         </Card>
       )}
 
@@ -274,17 +274,31 @@ export default function RecipesPage() {
           })}
         </div>
       ) : (
-        <div className="text-center py-10">
-            <Info className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground mt-2">
-            {searchTerm || activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0 || showFavoritesOnly ? "No recipes found matching your current search and profile filters." : "No recipes available. Try adding some!"}
+         <Card className="text-center py-10 shadow-none border-dashed">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-muted-foreground flex justify-center items-center">
+              <Info className="h-8 w-8 text-primary/50 mr-4" /> No Recipes Found
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">
+              {searchTerm || activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0 || showFavoritesOnly 
+                ? "No recipes match your current search and profile filters." 
+                : "Your recipe book is empty. Let's add your first one!"
+              }
             </p>
             {(activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0 || showFavoritesOnly) && (
-                <p className="text-sm text-muted-foreground mt-2">
-                    Try adjusting your <Link href="/profile/diet-type" className="underline hover:text-primary">Diet Type</Link>, <Link href="/profile/allergens" className="underline hover:text-primary">Allergens</Link> settings, or the favorites filter.
-                </p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Try adjusting your <Link href="/profile/diet-type" className="underline hover:text-primary">Diet Type</Link>, <Link href="/profile/allergens" className="underline hover:text-primary">Allergens</Link> settings, or the favorites filter.
+              </p>
             )}
-        </div>
+             <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
+              <Link href="/recipes/add">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add a New Recipe
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {selectedRecipe && (

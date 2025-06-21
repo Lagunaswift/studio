@@ -222,13 +222,13 @@ export default function AISuggestionsPage() {
                        <li>Configured your <Link href="/profile/diet-type" className="underline hover:text-accent">Diet Type</Link> and <Link href="/profile/allergens" className="underline hover:text-accent">Allergens</Link>.</li>
                     ) : null}
                   </ul>
-                   <Button onClick={handleGeneratePlan} disabled={isGeneratingPlan || isAppRecipeCacheLoading || recipesForAI.length === 0} className="w-full mt-4 bg-primary hover:bg-primary/90">
+                   <Button onClick={handleGeneratePlan} disabled={isGeneratingPlan || isAppRecipeCacheLoading || recipesForAI.length === 0} className="w-full mt-4 bg-accent hover:bg-accent/90 text-accent-foreground">
                       {isGeneratingPlan || isAppRecipeCacheLoading ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
                         <Send className="mr-2 h-4 w-4" />
                       )}
-                      Generate Plan Anyway (might be less optimal)
+                      Generate Plan Anyway
                   </Button>
                 </AlertDescription>
               </Alert>
@@ -347,8 +347,8 @@ export default function AISuggestionsPage() {
               )}
             </CardContent>
             <CardFooter>
-              <Button onClick={() => handleAddPlanToCalendar(new Date())} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                <PlusCircle className="mr-2 h-5 w-5" /> Add This Plan to My Calendar (Full flexibility unlocked for testing)
+              <Button onClick={() => handleAddPlanToCalendar(new Date())} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                <PlusCircle className="mr-2 h-5 w-5" /> Add This Plan to My Calendar
               </Button>
             </CardFooter>
           </Card>
