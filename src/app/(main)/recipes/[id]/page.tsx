@@ -5,13 +5,13 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { getRecipeById, MEAL_TYPES, parseIngredientString } from '@/lib/data';
-import type { Recipe as RecipeType, MealType, Macros } from '@/types';
+import type { Recipe as RecipeType, MealType, Macros, RecipeFormData } from '@/types';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info, Heart, Minus, Plus } from 'lucide-react';
+import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info, Heart, Minus, Plus, Bot, Sparkles, Save } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
@@ -21,9 +21,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { format, startOfDay, addDays, isWithinInterval } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from '@/lib/utils';
+import { suggestRecipeModification, type SuggestRecipeModificationInput, type SuggestRecipeModificationOutput } from '@/ai/flows/suggest-recipe-modification-flow';
+
 
 const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
   if (!date) return false;
@@ -41,7 +44,7 @@ export default function RecipeDetailPage() {
   const [recipe, setRecipe] = useState<RecipeType | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null); 
-  const { userProfile, addMealToPlan, toggleFavoriteRecipe, isRecipeFavorite } = useAppContext();
+  const { userProfile, addMealToPlan, toggleFavoriteRecipe, isRecipeFavorite, addCustomRecipe } = useAppContext();
   const { toast } = useToast();
   
   // State for the "Add to Plan" dialog
@@ -54,6 +57,13 @@ export default function RecipeDetailPage() {
   const [displayServings, setDisplayServings] = useState<number>(1);
   const [scaledIngredients, setScaledIngredients] = useState<string[]>([]);
   const [scaledMacros, setScaledMacros] = useState<Macros>({ calories: 0, protein: 0, carbs: 0, fat: 0 });
+
+  // State for AI tweaker
+  const [tweakRequest, setTweakRequest] = useState('');
+  const [isTweaking, setIsTweaking] = useState(false);
+  const [tweakError, setTweakError] = useState<string | null>(null);
+  const [tweakSuggestion, setTweakSuggestion] = useState<SuggestRecipeModificationOutput | null>(null);
+
 
   const [currentImageSrc, setCurrentImageSrc] = useState<string>('');
   const [imageLoadError, setImageLoadError] = useState(false);
@@ -207,6 +217,80 @@ export default function RecipeDetailPage() {
         setDisplayServings(recipe?.servings || 1);
     }
   };
+  
+  const handleTweakRecipe = async () => {
+    if (!recipe || !tweakRequest.trim()) return;
+
+    setIsTweaking(true);
+    setTweakError(null);
+    setTweakSuggestion(null);
+
+    try {
+      const input: SuggestRecipeModificationInput = {
+        recipeToModify: {
+          name: recipe.name,
+          description: recipe.description,
+          ingredients: recipe.ingredients,
+          instructions: recipe.instructions,
+          tags: recipe.tags,
+        },
+        userRequest: tweakRequest,
+      };
+      const result = await suggestRecipeModification(input);
+      setTweakSuggestion(result);
+    } catch (err: any) {
+      console.error("AI Tweak Error:", err);
+      let detailedMessage = "Failed to get recipe modification.";
+      if (err.message) {
+        detailedMessage = err.message;
+      }
+      if (err.digest) { 
+        detailedMessage += ` Server error digest: ${err.digest}.`;
+      }
+      setTweakError(detailedMessage);
+    } finally {
+      setIsTweaking(false);
+    }
+  };
+  
+  const handleSaveTweak = () => {
+    if (!tweakSuggestion || !recipe) return;
+
+    const recipeFormData: RecipeFormData = {
+        name: tweakSuggestion.newName,
+        description: tweakSuggestion.newDescription,
+        image: recipe.image, // Use original image as a default
+        servings: recipe.servings, // Use original
+        prepTime: recipe.prepTime, // Use original
+        cookTime: recipe.cookTime, // Use original
+        chillTime: recipe.chillTime, // Use original
+        ingredients: tweakSuggestion.newIngredients.map(value => ({ value })),
+        instructions: tweakSuggestion.newInstructions.map(value => ({ value })),
+        // IMPORTANT: Use original macros and prompt user to verify
+        calories: recipe.macrosPerServing.calories,
+        protein: recipe.macrosPerServing.protein,
+        carbs: recipe.macrosPerServing.carbs,
+        fat: recipe.macrosPerServing.fat,
+        tags: [...(recipe.tags || []).filter(t => t !== 'AI-Tweaked'), 'AI-Tweaked'], // Copy original tags and add a new one
+    };
+
+    try {
+        addCustomRecipe(recipeFormData);
+        toast({
+            title: "New Recipe Saved!",
+            description: `"${tweakSuggestion.newName}" has been added to your recipes.`,
+        });
+        router.push('/recipes');
+    } catch (error: any) {
+        console.error("Error saving tweaked recipe:", error);
+        toast({
+            title: "Error Saving Recipe",
+            description: error.message || "Could not save the new recipe.",
+            variant: "destructive",
+        });
+    }
+  };
+
 
   const todayForCalendar = startOfDay(new Date());
   const tomorrowForCalendar = addDays(todayForCalendar, 1);
@@ -385,6 +469,90 @@ export default function RecipeDetailPage() {
           </div>
         </CardContent>
       </Card>
+      
+      <Separator className="my-12" />
+
+      {/* AI Recipe Tweaker */}
+      <Card className="shadow-lg mt-8">
+        <CardHeader>
+          <CardTitle className="font-headline text-primary flex items-center">
+            <Bot className="w-6 h-6 mr-2 text-accent" />
+            AI Recipe Tweaker
+          </CardTitle>
+          <CardDescription>
+            Want to change something? Ask the AI to modify this recipe for you.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Textarea
+            placeholder="e.g., Make this vegetarian, replace mushrooms, suggest a low-carb side dish..."
+            rows={3}
+            value={tweakRequest}
+            onChange={(e) => setTweakRequest(e.target.value)}
+            disabled={isTweaking}
+          />
+          <Button onClick={handleTweakRecipe} disabled={isTweaking || !tweakRequest.trim()} className="bg-primary hover:bg-primary/90">
+            {isTweaking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+            Tweak Recipe
+          </Button>
+        </CardContent>
+      </Card>
+      
+      {isTweaking && (
+        <div className="flex flex-col items-center justify-center h-60 text-muted-foreground mt-4">
+            <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
+            <p className="text-lg">AI is tweaking the recipe...</p>
+        </div>
+      )}
+
+      {tweakError && (
+        <Alert variant="destructive" className="mt-4">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Error Modifying Recipe</AlertTitle>
+          <AlertDescription>{tweakError}</AlertDescription>
+        </Alert>
+      )}
+
+      {tweakSuggestion && !isTweaking && (
+         <Card className="shadow-xl mt-4 border-accent">
+            <CardHeader>
+                <CardTitle className="font-headline text-primary flex items-center">
+                    <Sparkles className="w-6 h-6 mr-2 text-accent" />
+                    AI's Modified Recipe: {tweakSuggestion.newName}
+                </CardTitle>
+                <CardDescription>{tweakSuggestion.newDescription}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div>
+                    <h4 className="text-lg font-semibold mb-2 text-primary-focus">AI's Justification:</h4>
+                    <p className="text-sm text-foreground/80 bg-secondary/50 p-3 rounded-md italic">"{tweakSuggestion.aiJustification}"</p>
+                </div>
+                
+                <Separator/>
+
+                <div className="grid md:grid-cols-2 gap-8">
+                    <div>
+                        <h4 className="text-lg font-semibold mb-2 text-primary-focus">New Ingredients</h4>
+                        <ul className="space-y-2 list-disc list-inside bg-secondary/30 p-4 rounded-md text-sm">
+                            {tweakSuggestion.newIngredients.map((ing, i) => <li key={i}>{ing}</li>)}
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 className="text-lg font-semibold mb-2 text-primary-focus">New Instructions</h4>
+                        <ol className="space-y-3 list-decimal list-inside text-sm">
+                            {tweakSuggestion.newInstructions.map((step, i) => <li key={i}>{step}</li>)}
+                        </ol>
+                    </div>
+                </div>
+            </CardContent>
+            <CardFooter>
+                 <Button onClick={handleSaveTweak} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                    <Save className="mr-2 h-4 w-4" /> Save as New Recipe
+                </Button>
+            </CardFooter>
+         </Card>
+      )}
+
 
       <Dialog open={showAddToPlanDialog} onOpenChange={setShowAddToPlanDialog}>
         <DialogContent className="sm:max-w-[425px]">
