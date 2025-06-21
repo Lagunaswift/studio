@@ -19,7 +19,7 @@ import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { format, addDays, isBefore, isSameDay, parseISO, isValid } from 'date-fns';
+import { format, addDays, isBefore, isSameDay, parseISO, isValid, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 const UK_SUPERMARKET_CATEGORIES: UKSupermarketCategory[] = [
@@ -63,7 +63,7 @@ export default function PantryPage() {
   });
 
   useEffect(() => {
-    const today = new Date();
+    const today = startOfDay(new Date());
     const sevenDaysFromNow = addDays(today, 7);
 
     const expired: PantryItem[] = [];
@@ -74,7 +74,7 @@ export default function PantryPage() {
         try {
           const expiry = parseISO(item.expiryDate); // Converts YYYY-MM-DD string to Date
           if (isValid(expiry)) {
-            if (isBefore(expiry, today) && !isSameDay(expiry, today)) {
+            if (isBefore(expiry, today)) {
               expired.push(item);
             } else if (isBefore(expiry, sevenDaysFromNow) || isSameDay(expiry, today)) {
               expiringSoon.push(item);
@@ -322,7 +322,7 @@ export default function PantryPage() {
                                 setSelectedExpiryDate(date);
                                 field.onChange(date ? format(date, "yyyy-MM-dd") : undefined);
                               }}
-                              disabled={(date) => date < new Date(new Date().setHours(0,0,0,0)) } // Disable past dates
+                              disabled={(date) => date < startOfDay(new Date()) }
                               initialFocus
                             />
                           </PopoverContent>
@@ -400,10 +400,10 @@ export default function PantryPage() {
                               {item.expiryDate && (
                                 <p className={cn(
                                   "text-xs",
-                                  isBefore(parseISO(item.expiryDate), new Date()) && !isSameDay(parseISO(item.expiryDate), new Date()) ? "text-destructive font-semibold" : "text-muted-foreground"
+                                  isValid(parseISO(item.expiryDate)) && isBefore(parseISO(item.expiryDate), startOfDay(new Date())) ? "text-destructive font-semibold" : "text-muted-foreground"
                                 )}>
                                   Expires: {format(parseISO(item.expiryDate), 'dd MMMM yyyy')}
-                                  {isBefore(parseISO(item.expiryDate), new Date()) && !isSameDay(parseISO(item.expiryDate), new Date()) && " (EXPIRED)"}
+                                  {isValid(parseISO(item.expiryDate)) && isBefore(parseISO(item.expiryDate), startOfDay(new Date())) && " (EXPIRED)"}
                                 </p>
                               )}
                             </div>
