@@ -27,12 +27,13 @@ import { SheetTitle } from '@/components/ui/sheet';
 import { 
   UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, 
   PanelLeft, Target, Leaf, Ban, ListChecks, UserCog, UserCircle2, 
-  BookOpen, Archive, Bot, SlidersHorizontal, Search
+  BookOpen, Archive, Bot, SlidersHorizontal, Search, LogOut
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useState, type FormEvent } from 'react';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useAuth } from '@/context/AuthContext';
 
 interface NavItem {
   href: string;
@@ -105,6 +106,25 @@ function SidebarSearch() {
           </Tooltip>
       </form>
     </div>
+  );
+}
+
+function LogoutButton() {
+  const { signOut } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await signOut();
+    router.push('/login');
+  };
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton onClick={handleLogout} tooltip={{ children: "Log Out", side: 'right', align: 'center' }}>
+        <LogOut />
+        <span className="group-data-[collapsible=icon]:hidden">Log Out</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 }
 
@@ -246,6 +266,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                   </SidebarMenuItem>
                 );
               })}
+              <LogoutButton />
           </SidebarMenu>
         </SidebarContent>
       </Sidebar>
