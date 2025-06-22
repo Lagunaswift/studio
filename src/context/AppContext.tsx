@@ -167,28 +167,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return uniqueRecipes;
   }, [staticRecipes, userRecipes]);
 
-  // Refetch all user data when user changes
-  useEffect(() => {
-    if (user && !isRecipeCacheLoading) {
-      console.log("User detected, fetching app data...");
-      setIsAppDataLoading(true);
-      fetchAllUserData(user.id).finally(() => {
-        setIsAppDataLoading(false);
-        console.log("App data fetch complete.");
-      });
-    } else if (!user) {
-      // Clear data on logout
-      setMealPlan([]);
-      setShoppingList([]);
-      setPantryItems([]);
-      setUserProfile(null);
-      setUserRecipes([]);
-      setFavoriteRecipeIds([]);
-      setIsAppDataLoading(false);
-    }
-  }, [user, isRecipeCacheLoading]);
-  
-  const fetchAllUserData = async (userId: string) => {
+  const fetchAllUserData = useCallback(async (userId: string) => {
     const { data: profileRes, error: profileError } = await supabase
       .from('profiles')
       .select('*')
@@ -282,7 +261,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (pantryRes.data) setPantryItems(pantryRes.data.map((p:any) => ({...p, expiryDate: p.expiry_date})));
     else console.error("Pantry fetch error:", pantryRes.error?.message);
-  };
+  }, [user, allRecipesCache]);
+
+  // Refetch all user data when user changes
+  useEffect(() => {
+    if (user && !isRecipeCacheLoading) {
+      console.log("User detected, fetching app data...");
+      setIsAppDataLoading(true);
+      fetchAllUserData(user.id).finally(() => {
+        setIsAppDataLoading(false);
+        console.log("App data fetch complete.");
+      });
+    } else if (!user) {
+      // Clear data on logout
+      setMealPlan([]);
+      setShoppingList([]);
+      setPantryItems([]);
+      setUserProfile(null);
+      setUserRecipes([]);
+      setFavoriteRecipeIds([]);
+      setIsAppDataLoading(false);
+    }
+  }, [user, isRecipeCacheLoading, fetchAllUserData]);
   
   // Recalculate shopping list whenever meal plan or pantry changes
   useEffect(() => {
@@ -357,38 +357,70 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setAllergens = useCallback((allergens: string[]) => updateUserProfileInDb({ allergens }), [updateUserProfileInDb]);
   const setMealStructure = useCallback((mealStructure: MealSlotConfig[]) => updateUserProfileInDb({ mealStructure }), [updateUserProfileInDb]);
   const setDashboardSettings = useCallback((settings: DashboardSettings) => updateUserProfileInDb({ dashboardSettings: settings }), [updateUserProfileInDb]);
+  
   const setUserInformation = useCallback(async (info: Partial<UserProfileSettings>) => {
-     if (!user) return;
-      let newProfileData = { ...userProfile, ...info };
+      if (!user) return;
+      
+      const newProfileData = { ...(userProfile || {}), ...info };
+
       let finalBodyFatPercentage = newProfileData.bodyFatPercentage;
-      if (info.bodyFatPercentage !== undefined) finalBodyFatPercentage = info.bodyFatPercentage;
-      else if (finalBodyFatPercentage === null) {
-        finalBodyFatPercentage = calculateNavyBodyFatPercentage(
-            newProfileData.sex, newProfileData.height_cm, newProfileData.neckCircumferenceCm,
-            newProfileData.abdomenCircumferenceCm, newProfileData.waistCircumferenceCm, newProfileData.hipCircumferenceCm
-        );
+      
+      if (info.bodyFatPercentage === undefined || info.bodyFatPercentage === null) {
+          const calculatedBfp = calculateNavyBodyFatPercentage(
+              newProfileData.sex, 
+              newProfileData.heightCm, 
+              newProfileData.neckCircumferenceCm,
+              newProfileData.abdomenCircumferenceCm, 
+              newProfileData.waistCircumferenceCm, 
+              newProfileData.hipCircumferenceCm
+          );
+          if (calculatedBfp !== null) {
+              finalBodyFatPercentage = calculatedBfp;
+          }
       }
       
-      const updatesForDb: any = {
-          ...info,
+      const finalLbm = calculateLBM(newProfileData.weightKg, finalBodyFatPercentage);
+      const finalTdee = calculateTDEE(newProfileData.weightKg, newProfileData.heightCm, newProfileData.age, newProfileData.sex, newProfileData.activityLevel);
+
+      const updatesForDb: { [key: string]: any } = {
+          ...info, 
           body_fat_percentage: finalBodyFatPercentage,
-          lean_body_mass_kg: calculateLBM(info.weightKg || userProfile?.weightKg, finalBodyFatPercentage),
-          tdee: calculateTDEE(info.weightKg || userProfile?.weightKg, info.heightCm || userProfile?.heightCm, info.age || userProfile?.age, info.sex || userProfile?.sex, info.activityLevel || userProfile?.activityLevel)
+          lean_body_mass_kg: finalLbm,
+          tdee: finalTdee
       };
       
-      // Clean up fields to match DB column names
-      if(updatesForDb.heightCm) { updatesForDb.height_cm = updatesForDb.heightCm; delete updatesForDb.heightCm; }
-      if(updatesForDb.weightKg) { updatesForDb.weight_kg = updatesForDb.weightKg; delete updatesForDb.weightKg; }
-      if(updatesForDb.activityLevel) { updatesForDb.activity_level = updatesForDb.activityLevel; delete updatesForDb.activityLevel; }
-      if(updatesForDb.primaryGoal) { updatesForDb.primary_goal = updatesForDb.primaryGoal; delete updatesForDb.primaryGoal; }
-      if(updatesForDb.athleteType) { updatesForDb.athlete_type = updatesForDb.athleteType; delete updatesForDb.athleteType; }
-      if(updatesForDb.bodyFatPercentage) { updatesForDb.body_fat_percentage = updatesForDb.bodyFatPercentage; delete updatesForDb.bodyFatPercentage; }
-      if(updatesForDb.leanBodyMassKg) { updatesForDb.lean_body_mass_kg = updatesForDb.leanBodyMassKg; delete updatesForDb.leanBodyMassKg; }
+      const keyMappings: { [key: string]: string } = {
+          heightCm: 'height_cm',
+          weightKg: 'weight_kg',
+          activityLevel: 'activity_level',
+          bodyFatPercentage: 'body_fat_percentage',
+          primaryGoal: 'primary_goal',
+          athleteType: 'athlete_type',
+          neckCircumferenceCm: 'neck_circumference_cm',
+          abdomenCircumferenceCm: 'abdomen_circumference_cm',
+          waistCircumferenceCm: 'waist_circumference_cm',
+          hipCircumferenceCm: 'hip_circumference_cm',
+          leanBodyMassKg: 'lean_body_mass_kg',
+          macroTargets: 'macro_targets',
+          dietaryPreferences: 'dietary_preferences',
+          mealStructure: 'meal_structure',
+          dashboardSettings: 'dashboard_settings',
+          hasAcceptedTerms: 'has_accepted_terms',
+      };
 
-      await supabase.from('profiles').update(updatesForDb).eq('id', user.id);
-      // Refetch to ensure all calculated fields are updated in state
+      for (const key in keyMappings) {
+          if (updatesForDb[key] !== undefined) {
+              updatesForDb[keyMappings[key]] = updatesForDb[key];
+              delete updatesForDb[key];
+          }
+      }
+      
+      if (Object.keys(updatesForDb).length > 0) {
+        await supabase.from('profiles').update(updatesForDb).eq('id', user.id);
+      }
+
       await fetchAllUserData(user.id);
-  }, [user, userProfile]);
+  }, [user, userProfile, fetchAllUserData]);
   
   const toggleFavoriteRecipe = useCallback(async (recipeId: number) => {
     if (!user) return;
@@ -412,10 +444,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (error) console.error("Error adding pantry item:", error);
     else if (data) {
-        // This is complex because upsert might insert or update. Easiest is to refetch.
         await fetchAllUserData(user.id);
     }
-  }, [user]);
+  }, [user, fetchAllUserData]);
 
   const removePantryItem = useCallback(async (itemId: string) => {
     if(!user) return;
@@ -480,7 +511,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }).eq('id', user.id)
     ]);
     await fetchAllUserData(user.id);
-  }, [user]);
+  }, [user, fetchAllUserData]);
 
   const getDailyMacros = useCallback((date: string): Macros => calculateTotalMacrosUtil(mealPlan.filter(pm => pm.date === date), allRecipesCache), [mealPlan, allRecipesCache]);
   const getMealsForDate = useCallback((date: string): PlannedMeal[] => mealPlan.filter(pm => pm.date === date), [mealPlan]);
@@ -504,7 +535,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDietaryPreferences, setAllergens, setMealStructure, setUserInformation, isRecipeCacheLoading,
     isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe, isRecipeFavorite,
     addPantryItem, removePantryItem, updatePantryItemQuantity, parseIngredient, assignIngredientCategory,
-    addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms
+    addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms, fetchAllUserData
   ]);
 
   if (isAppDataLoading && user) {

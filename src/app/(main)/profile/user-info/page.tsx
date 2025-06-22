@@ -525,24 +525,18 @@ export default function UserInfoPage() {
               <p className="text-2xl font-bold text-primary">
                 {tdee ? `${tdee.toLocaleString()} kcal/day` : 'N/A'}
               </p>
-              {!tdee && <p className="text-xs text-muted-foreground">Requires height, weight, age, sex, and activity level.</p>}
+              {!tdee && <p className="text-xs text-muted-foreground mt-1">Requires height, weight, age, sex, and activity level.</p>}
             </div>
             <div>
               <h3 className="text-sm font-medium text-muted-foreground">Estimated Lean Body Mass (LBM)</h3>
               <p className="text-2xl font-bold text-primary">
                 {leanBodyMassKg ? `${leanBodyMassKg.toFixed(1)} kg` : 'N/A'}
               </p>
-              {!leanBodyMassKg && <p className="text-xs text-muted-foreground">Requires weight and body fat %.</p>}
+              {!leanBodyMassKg && <p className="text-xs text-muted-foreground mt-1">Requires weight and body fat %.</p>}
             </div>
-             {(!tdee || !leanBodyMassKg) && userProfile &&
-              (userProfile.heightCm && userProfile.weightKg && userProfile.age && userProfile.sex && userProfile.activityLevel && (userProfile.bodyFatPercentage !==null || leanBodyMassKg === null )) &&
-                <p className="text-xs text-muted-foreground pt-4">Make sure all required fields (Height, Weight, Age, Sex, Activity Level, and Body Fat % or measurements for calculation) are filled to see estimates.</p>
-            }
           </CardContent>
         </Card>
       </div>
     </PageWrapper>
   );
 }
-
-    
