@@ -30,23 +30,19 @@ export function RecipeCard({
   const { toggleFavoriteRecipe, isRecipeFavorite } = useAppContext();
   
   const defaultPlaceholder = `https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipe?.id || 'Unknown'}`;
-  const [imageSrc, setImageSrc] = useState(recipe?.image || defaultPlaceholder);
-  const [imageError, setImageError] = useState(!recipe?.image); 
+  
+  // State to track image loading errors specifically.
+  const [imageError, setImageError] = useState(false);
+
+  // When the recipe prop changes, reset the image error state.
+  // This gives the new image a chance to load.
+  useEffect(() => {
+    setImageError(!recipe?.image);
+  }, [recipe]);
+
+  const imageSrc = imageError ? defaultPlaceholder : (recipe?.image || defaultPlaceholder);
 
   const isFavorited = recipe ? isRecipeFavorite(recipe.id) : false;
-
-  useEffect(() => {
-    if (recipe && recipe.image) {
-      setImageSrc(recipe.image);
-      setImageError(false); 
-    } else if (recipe) {
-      setImageSrc(defaultPlaceholder);
-      setImageError(true);
-    } else {
-      setImageSrc(`https://placehold.co/600x400.png`); // General placeholder if no recipe
-      setImageError(true);
-    }
-  }, [recipe, defaultPlaceholder]);
 
 
   if (!recipe) {
@@ -60,7 +56,6 @@ export function RecipeCard({
   }
   
   const handleImageError = () => {
-    setImageSrc(defaultPlaceholder);
     setImageError(true);
   };
   
