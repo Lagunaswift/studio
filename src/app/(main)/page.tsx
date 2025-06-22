@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -93,22 +94,32 @@ export default function HomePage() {
 
 
   useEffect(() => {
+    // This effect runs when the recipe data is loaded.
+    // It picks a random recipe ONCE and prevents re-picking on subsequent renders
+    // to avoid the "cycling" effect.
     if (!isAppRecipeCacheLoading && allRecipesCache.length > 0) {
-      const randomIndex = Math.floor(Math.random() * allRecipesCache.length);
-      setFeaturedRecipe(allRecipesCache[randomIndex]);
-
-      const quickRecipesList = allRecipesCache.filter(r => r.tags?.includes('Q'));
-      if (quickRecipesList.length > 0) {
-        const randomQuickIndex = Math.floor(Math.random() * quickRecipesList.length);
-        setQuickRecipe(quickRecipesList[randomQuickIndex]);
-      } else {
-        setQuickRecipe(null);
+      // Only set featured recipe if it's not already set
+      if (!featuredRecipe) {
+        const randomIndex = Math.floor(Math.random() * allRecipesCache.length);
+        setFeaturedRecipe(allRecipesCache[randomIndex]);
+      }
+      
+      // Only set quick recipe if it's not already set
+      if (!quickRecipe) {
+        const quickRecipesList = allRecipesCache.filter(r => r.tags?.includes('Q'));
+        if (quickRecipesList.length > 0) {
+          const randomQuickIndex = Math.floor(Math.random() * quickRecipesList.length);
+          setQuickRecipe(quickRecipesList[randomQuickIndex]);
+        } else {
+          setQuickRecipe(null);
+        }
       }
     } else {
+      // Clear recipes if the cache is loading or empty
       setFeaturedRecipe(null);
       setQuickRecipe(null);
     }
-  }, [isAppRecipeCacheLoading, allRecipesCache]);
+  }, [isAppRecipeCacheLoading, allRecipesCache, featuredRecipe, quickRecipe]);
 
 
   const macroTargetForm = useForm<MacroTargetFormValues>({
