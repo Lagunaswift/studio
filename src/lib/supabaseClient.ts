@@ -6,8 +6,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 // I am using the values you provided directly for now.
 // Please consider moving these to environment variables as soon as possible.
 
-const supabaseUrl = "YOUR_SUPABASE_URL"; // <-- PASTE YOUR SUPABASE URL HERE
-const supabaseAnonKey = "YOUR_SUPABASE_ANON_KEY"; // <-- PASTE YOUR SUPABASE ANON KEY HERE
+const supabaseUrl = 'https://ruubwghugzcypxzqkfkx.supabase.co'; // <-- PASTE YOUR SUPABASE URL HERE
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1dWJ3Z2h1Z3pjeXB4enFrZmt4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1NzI2MTEsImV4cCI6MjA2NjE0ODYxMX0.wBteNInm_ra2D8rQhK8Qe0kEPPZxf1L-8yTDlfXY-Ak'; // <-- PASTE YOUR SUPABASE ANON KEY HERE
 
 if (!supabaseUrl) {
   console.error("Supabase URL is missing! Check src/lib/supabaseClient.ts");
