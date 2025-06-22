@@ -18,8 +18,6 @@ import { format, startOfDay, isSameDay } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-const FREE_TIER_RECIPE_LIMIT_FOR_AI = 15;
-
 export default function AISuggestionsPage() {
   const {
     addMealToPlan,
@@ -42,21 +40,18 @@ export default function AISuggestionsPage() {
   useEffect(() => {
     if (!isAppRecipeCacheLoading) {
       if (allRecipesCache.length > 0) {
-        let transformedForAI = allRecipesCache.map(r => ({
+        const transformedForAI = allRecipesCache.map(r => ({
           id: r.id,
           name: r.name,
           macrosPerServing: r.macrosPerServing,
           tags: r.tags || [],
         }));
-        if (!isSubscribedActive) {
-          transformedForAI = transformedForAI.slice(0, FREE_TIER_RECIPE_LIMIT_FOR_AI);
-        }
         setRecipesForAI(transformedForAI);
       } else {
         setRecipesForAI([]);
       }
     }
-  }, [allRecipesCache, isAppRecipeCacheLoading, isSubscribedActive]);
+  }, [allRecipesCache, isAppRecipeCacheLoading]);
 
   const handleGeneratePlan = async () => {
     if (!userSettingsToUse) {
@@ -236,9 +231,6 @@ export default function AISuggestionsPage() {
             {isAppRecipeCacheLoading && <p className="text-sm text-muted-foreground mt-2 text-center">Loading recipe data for AI...</p>}
             {!isAppRecipeCacheLoading && recipesForAI.length === 0 && !isGeneratingPlan && (
                  <p className="text-sm text-muted-foreground mt-2 text-center">No recipes found in the database. Add recipes to enable AI planning.</p>
-            )}
-            {!isAppRecipeCacheLoading && !isSubscribedActive && (
-                 <p className="text-sm text-muted-foreground mt-2 text-center">AI considerations limited to {FREE_TIER_RECIPE_LIMIT_FOR_AI} recipes on the free tier.</p>
             )}
           </CardContent>
         </Card>

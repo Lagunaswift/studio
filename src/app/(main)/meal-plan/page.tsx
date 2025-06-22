@@ -39,8 +39,6 @@ const MEAL_SLOT_CONFIG: Array<{ type: MealType; displayName: string }> = [
   { type: "Snack", displayName: "Snack 2" },
 ];
 
-const FREE_TIER_RECIPE_PICKER_LIMIT = 15;
-
 const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
   if (!date) return false;
   const today = startOfDay(new Date());
@@ -80,7 +78,7 @@ export default function MealPlanPage() {
   );
   
   const isSubscribedActive = userProfile?.subscription_status === 'active';
-  const availableRecipesForPicker = isSubscribedActive ? allRecipesCache : allRecipesCache.slice(0, FREE_TIER_RECIPE_PICKER_LIMIT);
+  const availableRecipesForPicker = allRecipesCache;
   const mealStructureToUse = userProfile?.mealStructure || MEAL_SLOT_CONFIG;
 
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
@@ -173,9 +171,8 @@ export default function MealPlanPage() {
           <Lock className="h-5 w-5 text-accent" />
           <AlertTitle className="text-accent">Limited Access</AlertTitle>
           <AlertDescription>
-            You are on the free plan. Meal planning is restricted to today and tomorrow only.
-            Recipe selection for planning is limited to {FREE_TIER_RECIPE_PICKER_LIMIT} items.
-            <Link href="/profile/subscription" className="underline hover:text-primary"> Upgrade your plan </Link>
+            You are on the free plan. Meal planning is restricted to today and tomorrow only, and the recipe picker is limited to a subset of recipes.
+            <Link href="/profile/subscription" className="underline hover:text-primary ml-1"> Upgrade your plan </Link>
             for full access.
           </AlertDescription>
         </Alert>
@@ -288,7 +285,7 @@ export default function MealPlanPage() {
                 <Info className="h-4 w-4" />
                 <AlertTitle>Recipe Limit Note</AlertTitle>
                 <AlertDescription>
-                The free tier recipe picker is limited. If the first {FREE_TIER_RECIPE_PICKER_LIMIT} recipes in the database don't load correctly, the picker might appear empty.
+                The free tier recipe picker is limited. If the first 15 recipes in the database don't load correctly, the picker might appear empty.
                 </AlertDescription>
             </Alert>
         )}

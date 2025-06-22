@@ -19,6 +19,7 @@ import type {
   ActivityLevel,
   RecipeFormData,
   DashboardSettings,
+  UKSupermarketCategory,
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil } from '@/lib/data';
@@ -36,6 +37,8 @@ const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
   showFeaturedRecipe: true,
   showQuickRecipes: true,
 };
+
+const FREE_TIER_RECIPE_DISPLAY_LIMIT = 15;
 
 // ... (calculation functions remain the same)
 const calculateNavyBodyFatPercentage = (
@@ -162,8 +165,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const allRecipesCache = useMemo(() => {
     const combined = [...staticRecipes, ...userRecipes];
     const uniqueRecipes = Array.from(new Map(combined.map(recipe => [recipe.id, recipe])).values());
-    return uniqueRecipes;
-  }, [staticRecipes, userRecipes]);
+
+    if (userProfile?.subscription_status === 'active') {
+      return uniqueRecipes;
+    } else {
+      // For free-tier users, return a limited subset.
+      return uniqueRecipes.slice(0, FREE_TIER_RECIPE_DISPLAY_LIMIT);
+    }
+  }, [staticRecipes, userRecipes, userProfile]);
 
   // Refetch all user data when user changes
   useEffect(() => {

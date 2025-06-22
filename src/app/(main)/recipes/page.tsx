@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from "@/components/ui/switch";
 
-const FREE_TIER_RECIPE_DISPLAY_LIMIT = 15; // This is effectively unused due to isSubscribedActive = true
+const FREE_TIER_RECIPE_DISPLAY_LIMIT = 15;
 
 const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
   if (!date) return false;
@@ -78,7 +78,7 @@ function RecipesPageComponent() {
     setSearchTerm(searchTermFromUrl);
   }, [searchTermFromUrl]);
 
-  const isSubscribedActive = true; 
+  const isSubscribedActive = userProfile?.subscription_status === 'active'; 
 
   const activeDietaryFilters = useMemo(() => userProfile?.dietaryPreferences || [], [userProfile]);
   const activeAllergenFilters = useMemo(() => userProfile?.allergens || [], [userProfile]);
@@ -241,6 +241,17 @@ function RecipesPageComponent() {
           </Button>
         </div>
       </div>
+
+       {!isSubscribedActive && (
+         <Alert variant="default" className="mb-6 border-accent">
+          <Lock className="h-5 w-5 text-accent" />
+          <AlertTitle className="text-accent">Free Plan Limitation</AlertTitle>
+          <AlertDescription>
+            You are on the free plan. Full recipe access is a premium feature. Your view is limited to the first {FREE_TIER_RECIPE_DISPLAY_LIMIT} recipes.
+            <Link href="/profile/subscription" className="underline hover:text-primary font-semibold ml-1">Upgrade your plan</Link> for unlimited access.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {(activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0) && (
         <Card className="mb-6 bg-secondary/30 border-accent/30">
