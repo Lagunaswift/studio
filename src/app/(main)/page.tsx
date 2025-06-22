@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -66,7 +65,7 @@ export default function HomePage() {
   const [dailyPlannedMeals, setDailyPlannedMeals] = useState<PlannedMeal[]>([]);
   const [showSetTargetsDialog, setShowSetTargetsDialog] = useState(false);
   const [featuredRecipe, setFeaturedRecipe] = useState<Recipe | null>(null);
-  const [quickRecipes, setQuickRecipes] = useState<Recipe[]>([]);
+  const [quickRecipe, setQuickRecipe] = useState<Recipe | null>(null);
 
   const currentMacroTargets = appContextUserProfile?.macroTargets;
   const welcomeName = appContextUserProfile?.name || appContextUserProfile?.email || authProfile?.name || authProfile?.email || user?.email || 'User';
@@ -98,11 +97,16 @@ export default function HomePage() {
       const randomIndex = Math.floor(Math.random() * allRecipesCache.length);
       setFeaturedRecipe(allRecipesCache[randomIndex]);
 
-      const quick = allRecipesCache.filter(r => r.tags?.includes('Q')).slice(0, 10);
-      setQuickRecipes(quick);
+      const quickRecipesList = allRecipesCache.filter(r => r.tags?.includes('Q'));
+      if (quickRecipesList.length > 0) {
+        const randomQuickIndex = Math.floor(Math.random() * quickRecipesList.length);
+        setQuickRecipe(quickRecipesList[randomQuickIndex]);
+      } else {
+        setQuickRecipe(null);
+      }
     } else {
       setFeaturedRecipe(null);
-      setQuickRecipes([]);
+      setQuickRecipe(null);
     }
   }, [isAppRecipeCacheLoading, allRecipesCache]);
 
@@ -291,29 +295,22 @@ export default function HomePage() {
       {showQuickRecipes && (
         <section className="mb-12">
           <h2 className="text-2xl font-bold font-headline text-primary mb-6 flex items-center">
-            <Zap className="mr-2 h-6 w-6 text-accent" /> Quick &amp; Easy Meals
+            <Zap className="mr-2 h-6 w-6 text-accent" /> Quick &amp; Easy Meal
           </h2>
-          {isAppRecipeCacheLoading && quickRecipes.length === 0 ? (
+          {isAppRecipeCacheLoading && !quickRecipe ? (
             <div className="flex items-center justify-center h-40">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="ml-2 text-muted-foreground">Finding quick recipes...</p>
+              <p className="ml-2 text-muted-foreground">Finding a quick recipe...</p>
             </div>
-          ) : quickRecipes.length > 0 ? (
-            <ScrollArea className="w-full whitespace-nowrap rounded-md">
-              <div className="flex w-max space-x-4 pb-4">
-                {quickRecipes.map(recipe => (
-                  <div key={recipe.id} className="w-[280px] sm:w-[300px] flex-shrink-0">
-                    <RecipeCard
-                      recipe={recipe}
-                      showViewDetails={true}
-                      showAddToMealPlanButton={false}
-                      className="h-full"
-                    />
-                  </div>
-                ))}
-              </div>
-              <ScrollBar orientation="horizontal" />
-            </ScrollArea>
+          ) : quickRecipe ? (
+            <div className="max-w-sm mx-auto md:max-w-md">
+              <RecipeCard
+                recipe={quickRecipe}
+                showViewDetails={true}
+                showAddToMealPlanButton={false}
+                className="shadow-lg"
+              />
+            </div>
           ) : (
             <Alert>
               <UtensilsCrossed className="h-4 w-4" />
