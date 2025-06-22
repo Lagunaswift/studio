@@ -103,9 +103,15 @@ serve(async (req: Request) => {
       .eq('email', userEmail)
       .single()
 
-    if (profileError || !profileData) {
-        console.error(`Error or profile not found for ${userEmail}:`, profileError?.message || 'Not found')
-        return new Response(`User profile not found for email: ${userEmail}`, { status: 404 })
+    if (profileError) {
+      console.error(`DATABASE LOOKUP ERROR for email ${userEmail}:`, profileError.message);
+      // Don't reveal specific DB errors to the outside world for security.
+      return new Response('Internal Server Error while finding profile', { status: 500 });
+    }
+
+    if (!profileData) {
+      console.warn(`Profile not found for email: ${userEmail}. The user may need to sign up in the app first.`);
+      return new Response(`User profile not found for email: ${userEmail}`, { status: 404 });
     }
 
     const userId = profileData.id
