@@ -1,10 +1,8 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-// Import Supabase client creator
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2' // Deno will redirect to the latest v2.x
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // Define the expected structure of the request body from Wix
-// This is now a FLAT structure based on your screenshot
 interface WixWebhookPayload {
   secretKey?: string;
   userEmail?: string;
@@ -16,16 +14,21 @@ interface WixWebhookPayload {
 
 // Define the structure for data to update in your Supabase table
 interface ProfileUpdateData {
-  subscription_status: 'active' | 'inactive' | 'none'; // Use specific statuses
+  subscription_status: 'active' | 'inactive' | 'none';
   plan_name?: string | null;
-  subscription_end_date?: string | null; // ISO string format (set to null for now)
-  subscription_start_date?: string | null; // Optional: store start date
-  subscription_duration?: string | null; // Optional: store duration
+  subscription_end_date?: string | null;
+  subscription_start_date?: string | null;
+  subscription_duration?: string | null;
   updated_at: string;
 }
 
-
 console.log("Wix Webhook Handler function starting up...")
+
+// Define CORS headers
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 // Retrieve secrets stored via `supabase secrets set`
 const WIX_EXPECTED_SECRET = Deno.env.get('WIX_SHARED_SECRET')
@@ -33,56 +36,61 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
 serve(async (req: Request) => {
-  console.log('--- wix-webhook-handler invoked ---');
-
-  // 1. Check HTTP Method
-  if (req.method !== 'POST') {
-    console.log(`Received non-POST request: ${req.method}`)
-    return new Response('Method Not Allowed', { status: 405 })
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
 
-  // 2. Parse Request Body
-  let requestBody: WixWebhookPayload | null = null;
   try {
-    requestBody = await req.json()
-    console.log("Received webhook body:", JSON.stringify(requestBody, null, 2))
-  } catch (e) {
-    console.error("Failed to parse request body:", e)
-    return new Response("Bad Request: Cannot parse JSON", { status: 400 })
-  }
+    console.log('--- wix-webhook-handler invoked ---');
 
-  // 3. Verify Secret Key
-  const receivedSecret = requestBody?.secretKey
-  const expectedSecret = WIX_EXPECTED_SECRET;
+    // 1. Check HTTP Method
+    if (req.method !== 'POST') {
+      console.log(`Received non-POST request: ${req.method}`)
+      return new Response('Method Not Allowed', { status: 405, headers: corsHeaders })
+    }
 
-  console.log(`DEBUG: Comparing Received Secret ('${receivedSecret ? receivedSecret.substring(0,5)+'...' : 'None'}') with Expected Secret ('${expectedSecret ? expectedSecret.substring(0,5)+'...' : 'None/Not Set'}')`);
+    // 2. Parse Request Body
+    let requestBody: WixWebhookPayload | null = null;
+    try {
+      requestBody = await req.json()
+      console.log("Received webhook body:", JSON.stringify(requestBody, null, 2))
+    } catch (e) {
+      console.error("Failed to parse request body:", e)
+      return new Response("Bad Request: Cannot parse JSON", { status: 400, headers: corsHeaders })
+    }
 
-  if (!expectedSecret) {
-    console.error("CRITICAL: WIX_SHARED_SECRET environment variable not set in Supabase Function secrets!")
-    return new Response("Internal Server Error: Configuration missing", { status: 500 })
-  }
+    // 3. Verify Secret Key
+    const receivedSecret = requestBody?.secretKey
+    const expectedSecret = WIX_EXPECTED_SECRET;
 
-  if (receivedSecret !== expectedSecret) {
-    console.warn(`Webhook verification failed: Invalid secret received.`)
-    return new Response("Unauthorized: Invalid secret", { status: 401 })
-  }
+    console.log(`DEBUG: Comparing Received Secret ('${receivedSecret ? receivedSecret.substring(0,5)+'...' : 'None'}') with Expected Secret ('${expectedSecret ? expectedSecret.substring(0,5)+'...' : 'None/Not Set'}')`);
 
-  console.log("Webhook secret verified successfully!")
+    if (!expectedSecret) {
+      console.error("CRITICAL: WIX_SHARED_SECRET environment variable not set in Supabase Function secrets!")
+      return new Response("Internal Server Error: Configuration missing", { status: 500, headers: corsHeaders })
+    }
 
-  // 4. Extract Data from Wix Payload (from the top-level object)
-  const userEmail = requestBody?.userEmail
-  const planName = requestBody?.planName
-  const eventType = requestBody?.eventType
-  const startDateRaw = requestBody?.startDate;
-  const duration = requestBody?.duration;
+    if (receivedSecret !== expectedSecret) {
+      console.warn(`Webhook verification failed: Invalid secret received.`)
+      return new Response("Unauthorized: Invalid secret", { status: 401, headers: corsHeaders })
+    }
 
-  if (!userEmail) {
-      console.error("Missing userEmail in webhook payload")
-      return new Response("Bad Request: Missing userEmail", { status: 400 })
-  }
+    console.log("Webhook secret verified successfully!")
 
-  // 5. --- Implement Supabase Database Update Logic ---
-  try {
+    // 4. Extract Data from Wix Payload
+    const userEmail = requestBody?.userEmail
+    const planName = requestBody?.planName
+    const eventType = requestBody?.eventType
+    const startDateRaw = requestBody?.startDate;
+    const duration = requestBody?.duration;
+
+    if (!userEmail) {
+        console.error("Missing userEmail in webhook payload")
+        return new Response("Bad Request: Missing userEmail", { status: 400, headers: corsHeaders })
+    }
+
+    // 5. --- Implement Supabase Database Update Logic ---
     // Check if Supabase credentials are set
     if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
       throw new Error('Supabase URL or Service Role Key environment variable not set.')
@@ -105,13 +113,12 @@ serve(async (req: Request) => {
 
     if (profileError) {
       console.error(`DATABASE LOOKUP ERROR for email ${userEmail}:`, profileError.message);
-      // Don't reveal specific DB errors to the outside world for security.
-      return new Response('Internal Server Error while finding profile', { status: 500 });
+      return new Response('Internal Server Error while finding profile', { status: 500, headers: corsHeaders });
     }
 
     if (!profileData) {
       console.warn(`Profile not found for email: ${userEmail}. The user may need to sign up in the app first.`);
-      return new Response(`User profile not found for email: ${userEmail}`, { status: 404 });
+      return new Response(`User profile not found for email: ${userEmail}`, { status: 404, headers: corsHeaders });
     }
 
     const userId = profileData.id
@@ -168,19 +175,18 @@ serve(async (req: Request) => {
 
     console.log(`Successfully updated subscription status for user ${userId} (${userEmail}) to ${updateData.subscription_status}`)
 
-  } catch (dbError) {
-    console.error("Error during database operation:", dbError)
-    let errorMessage = 'Unknown DB error';
-    if (dbError instanceof Error) {
-        errorMessage = dbError.message;
-    }
-    return new Response(`Internal Server Error: ${errorMessage}`, { status: 500 })
-  }
-  // --- End DB Update Logic ---
+    // 6. Return Success Response to Wix
+    return new Response(JSON.stringify({ received: true }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    })
 
-  // 6. Return Success Response to Wix
-  return new Response(JSON.stringify({ received: true }), {
-    headers: { 'Content-Type': 'application/json' },
-    status: 200,
-  })
+  } catch (error) {
+    console.error("General error in function execution:", error)
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500
+    });
+  }
 })
