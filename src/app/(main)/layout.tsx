@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -5,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Footer } from '@/components/layout/Footer';
 import { ThemeToggleButton } from '@/components/layout/ThemeToggleButton';
+import { TermsAcceptanceModal } from '@/components/legal/TermsAcceptanceModal'; // Import the new modal
 import {
   Accordion,
   AccordionContent,
@@ -27,13 +29,14 @@ import { SheetTitle } from '@/components/ui/sheet';
 import { 
   UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, 
   PanelLeft, Target, Leaf, Ban, ListChecks, UserCog, UserCircle2, 
-  BookOpen, Archive, Bot, SlidersHorizontal, Search, LogOut
+  BookOpen, Archive, Bot, SlidersHorizontal, Search, LogOut, FileText, Shield // Added icons
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useState, type FormEvent } from 'react';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/context/AuthContext';
+import { useAppContext } from '@/context/AppContext'; // Import AppContext
 
 interface NavItem {
   href: string;
@@ -69,6 +72,8 @@ const profileNavItems: NavItem[] = [
 
 const bottomLevelNavItems: NavItem[] = [
     { href: '/guide', label: 'App Guide', icon: BookOpen },
+    { href: '/terms', label: 'Terms of Service', icon: FileText },
+    { href: '/privacy', label: 'Privacy Policy', icon: Shield },
 ];
 
 // Search Component for the Sidebar
@@ -132,6 +137,7 @@ function LogoutButton() {
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isMobile, state: sidebarState } = useSidebar(); 
+  const { userProfile, acceptTerms, isAppDataLoading } = useAppContext();
 
   const allNavItems = [
     ...topLevelNavItems,
@@ -288,6 +294,10 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </SidebarInset>
+      <TermsAcceptanceModal
+        isOpen={!isAppDataLoading && !!userProfile && !userProfile.hasAcceptedTerms}
+        onAccept={acceptTerms}
+      />
     </div>
   );
 }

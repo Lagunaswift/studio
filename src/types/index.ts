@@ -156,6 +156,7 @@ export interface UserProfileSettings {
   subscription_start_date?: string | null;
   subscription_end_date?: string | null;
   subscription_duration?: string | null;
+  hasAcceptedTerms?: boolean;
 }
 
 // This type will be used for the Recipe Form

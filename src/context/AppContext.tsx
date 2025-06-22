@@ -135,6 +135,7 @@ interface AppContextType {
   assignIngredientCategory: (ingredientName: string) => UKSupermarketCategory;
   addCustomRecipe: (recipeData: RecipeFormData) => Promise<void>;
   userRecipes: Recipe[];
+  acceptTerms: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -188,60 +189,99 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [user, isRecipeCacheLoading]);
   
   const fetchAllUserData = async (userId: string) => {
-    const [profileRes, recipesRes, mealPlanRes, pantryRes] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', userId).single(),
+    const { data: profileRes, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (profileError && profileError.code !== 'PGRST116') { // Ignore 'exact one row' error for new users
+        console.error("Profile fetch error:", profileError.message);
+    }
+
+    if (profileRes) {
+        const dbProfile = profileRes;
+        const calculatedProfile: UserProfileSettings = {
+            name: dbProfile.name,
+            email: dbProfile.email,
+            macroTargets: dbProfile.macro_targets,
+            dietaryPreferences: dbProfile.dietary_preferences || [],
+            allergens: dbProfile.allergens || [],
+            mealStructure: dbProfile.meal_structure || DEFAULT_MEAL_STRUCTURE,
+            heightCm: dbProfile.height_cm,
+            weightKg: dbProfile.weight_kg,
+            age: dbProfile.age,
+            sex: dbProfile.sex,
+            activityLevel: dbProfile.activity_level,
+            bodyFatPercentage: dbProfile.body_fat_percentage,
+            athleteType: dbProfile.athlete_type,
+            primaryGoal: dbProfile.primary_goal,
+            tdee: calculateTDEE(dbProfile.weight_kg, dbProfile.height_cm, dbProfile.age, dbProfile.sex, dbProfile.activity_level),
+            leanBodyMassKg: calculateLBM(dbProfile.weight_kg, dbProfile.body_fat_percentage),
+            neckCircumferenceCm: dbProfile.neck_circumference_cm,
+            abdomenCircumferenceCm: dbProfile.abdomen_circumference_cm,
+            waistCircumferenceCm: dbProfile.waist_circumference_cm,
+            hipCircumferenceCm: dbProfile.hip_circumference_cm,
+            dashboardSettings: { ...DEFAULT_DASHBOARD_SETTINGS, ...(dbProfile.dashboard_settings || {}) },
+            favorite_recipe_ids: dbProfile.favorite_recipe_ids || [],
+            subscription_status: dbProfile.subscription_status || 'inactive',
+            plan_name: dbProfile.plan_name,
+            subscription_start_date: dbProfile.subscription_start_date,
+            subscription_end_date: dbProfile.subscription_end_date,
+            subscription_duration: dbProfile.subscription_duration,
+            hasAcceptedTerms: dbProfile.has_accepted_terms || false,
+        };
+        setUserProfile(calculatedProfile);
+        setFavoriteRecipeIds(dbProfile.favorite_recipe_ids || []);
+    } else if (user) {
+        // Create profile for new user
+        const { data: newProfile, error: creationError } = await supabase
+            .from('profiles')
+            .insert({ id: user.id, email: user.email, has_accepted_terms: false })
+            .select()
+            .single();
+
+        if (creationError) {
+            console.error('Error creating profile:', creationError.message);
+        } else if (newProfile) {
+            setUserProfile({
+                ...newProfile,
+                macroTargets: null,
+                dietaryPreferences: [],
+                allergens: [],
+                mealStructure: DEFAULT_MEAL_STRUCTURE,
+                heightCm: null, weightKg: null, age: null, sex: null, activityLevel: null,
+                bodyFatPercentage: null, athleteType: null, primaryGoal: null,
+                tdee: null, leanBodyMassKg: null,
+                dashboardSettings: DEFAULT_DASHBOARD_SETTINGS,
+                hasAcceptedTerms: false,
+                subscription_status: 'inactive',
+            });
+            setFavoriteRecipeIds([]);
+        }
+    }
+
+
+    const [recipesRes, mealPlanRes, pantryRes] = await Promise.all([
       supabase.from('recipes').select('*').eq('user_id', userId),
       supabase.from('meal_plan_entries').select('*').eq('user_id', userId),
       supabase.from('pantry_items').select('*').eq('user_id', userId),
     ]);
 
-    // Process Profile
-    if (profileRes.data) {
-      const dbProfile = profileRes.data;
-      const calculatedProfile = {
-          ...dbProfile,
-          dashboardSettings: { ...DEFAULT_DASHBOARD_SETTINGS, ...(dbProfile.dashboard_settings || {}) },
-          mealStructure: dbProfile.meal_structure || DEFAULT_MEAL_STRUCTURE,
-          tdee: calculateTDEE(dbProfile.weight_kg, dbProfile.height_cm, dbProfile.age, dbProfile.sex, dbProfile.activity_level),
-          leanBodyMassKg: calculateLBM(dbProfile.weight_kg, dbProfile.body_fat_percentage),
-      };
-      setUserProfile(calculatedProfile);
-      setFavoriteRecipeIds(dbProfile.favorite_recipe_ids || []);
-    } else {
-       console.error("Profile fetch error:", profileRes.error?.message);
-    }
+    if (recipesRes.data) setUserRecipes(recipesRes.data.map((r: any) => ({...r, isCustom: true, macrosPerServing: r.macros_per_serving})));
+    else console.error("User recipes fetch error:", recipesRes.error?.message);
 
-    // Process User Recipes
-    if (recipesRes.data) {
-        setUserRecipes(recipesRes.data.map((r: any) => ({...r, isCustom: true, macrosPerServing: r.macros_per_serving})));
-    } else {
-        console.error("User recipes fetch error:", recipesRes.error?.message);
-    }
-
-    // Process Meal Plan
     if (mealPlanRes.data) {
-        const populatedMealPlan = mealPlanRes.data.map(pm => {
-            const recipeDetails = allRecipesCache.find(r => r.id === pm.recipe_id);
-            return {
-                id: pm.id,
-                recipeId: pm.recipe_id,
-                date: pm.meal_date,
-                mealType: pm.meal_type,
-                servings: pm.servings,
-                recipeDetails: recipeDetails || undefined,
-            };
-        });
+        const populatedMealPlan = mealPlanRes.data.map(pm => ({
+            id: pm.id, recipeId: pm.recipe_id, date: pm.meal_date,
+            mealType: pm.meal_type, servings: pm.servings,
+            recipeDetails: allRecipesCache.find(r => r.id === pm.recipe_id) || undefined,
+        }));
         setMealPlan(populatedMealPlan);
-    } else {
-        console.error("Meal plan fetch error:", mealPlanRes.error?.message);
-    }
+    } else console.error("Meal plan fetch error:", mealPlanRes.error?.message);
 
-    // Process Pantry
-    if (pantryRes.data) {
-        setPantryItems(pantryRes.data.map((p:any) => ({...p, expiryDate: p.expiry_date})));
-    } else {
-        console.error("Pantry fetch error:", pantryRes.error?.message);
-    }
+    if (pantryRes.data) setPantryItems(pantryRes.data.map((p:any) => ({...p, expiryDate: p.expiry_date})));
+    else console.error("Pantry fetch error:", pantryRes.error?.message);
   };
   
   // Recalculate shopping list whenever meal plan or pantry changes
@@ -294,10 +334,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   const updateUserProfileInDb = useCallback(async (updates: Partial<UserProfileSettings>) => {
     if (!user) return;
-    const { error } = await supabase.from('profiles').update(updates).eq('id', user.id);
+    
+    const dbUpdates: { [key: string]: any } = {};
+    if (updates.macroTargets !== undefined) dbUpdates.macro_targets = updates.macroTargets;
+    if (updates.dietaryPreferences !== undefined) dbUpdates.dietary_preferences = updates.dietaryPreferences;
+    if (updates.allergens !== undefined) dbUpdates.allergens = updates.allergens;
+    if (updates.mealStructure !== undefined) dbUpdates.meal_structure = updates.mealStructure;
+    if (updates.dashboardSettings !== undefined) dbUpdates.dashboard_settings = updates.dashboardSettings;
+    if (updates.hasAcceptedTerms !== undefined) dbUpdates.has_accepted_terms = updates.hasAcceptedTerms;
+
+    const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', user.id);
     if (error) console.error("Error updating user profile:", error);
     else setUserProfile(prev => prev ? { ...prev, ...updates } : null); // Optimistic UI update
   }, [user]);
+
+  const acceptTerms = useCallback(async () => {
+    await updateUserProfileInDb({ hasAcceptedTerms: true });
+  }, [updateUserProfileInDb]);
 
   const setMacroTargets = useCallback((targets: MacroTargets) => updateUserProfileInDb({ macroTargets: targets }), [updateUserProfileInDb]);
   const setDietaryPreferences = useCallback((preferences: string[]) => updateUserProfileInDb({ dietaryPreferences: preferences }), [updateUserProfileInDb]);
@@ -332,10 +385,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if(updatesForDb.bodyFatPercentage) { updatesForDb.body_fat_percentage = updatesForDb.bodyFatPercentage; delete updatesForDb.bodyFatPercentage; }
       if(updatesForDb.leanBodyMassKg) { updatesForDb.lean_body_mass_kg = updatesForDb.leanBodyMassKg; delete updatesForDb.leanBodyMassKg; }
 
-      await updateUserProfileInDb(updatesForDb);
+      await supabase.from('profiles').update(updatesForDb).eq('id', user.id);
       // Refetch to ensure all calculated fields are updated in state
       await fetchAllUserData(user.id);
-  }, [user, userProfile, updateUserProfileInDb]);
+  }, [user, userProfile]);
   
   const toggleFavoriteRecipe = useCallback(async (recipeId: number) => {
     if (!user) return;
@@ -418,8 +471,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         supabase.from('meal_plan_entries').delete().eq('user_id', user.id),
         supabase.from('pantry_items').delete().eq('user_id', user.id),
         supabase.from('recipes').delete().eq('user_id', user.id),
-        // Don't delete shopping list, as it's derived.
-        // Reset profile to default state
         supabase.from('profiles').update({
             macro_targets: null,
             dietary_preferences: [],
@@ -445,6 +496,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUserInformation, isRecipeCacheLoading, isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe,
     isRecipeFavorite, addPantryItem, removePantryItem, updatePantryItemQuantity,
     parseIngredient, assignIngredientCategory, addCustomRecipe, userRecipes, setDashboardSettings,
+    acceptTerms,
   }), [
     mealPlan, shoppingList, pantryItems, userProfile, allRecipesCache, addMealToPlan, removeMealFromPlan,
     updatePlannedMealServings, getDailyMacros, toggleShoppingListItem,
@@ -452,7 +504,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDietaryPreferences, setAllergens, setMealStructure, setUserInformation, isRecipeCacheLoading,
     isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe, isRecipeFavorite,
     addPantryItem, removePantryItem, updatePantryItemQuantity, parseIngredient, assignIngredientCategory,
-    addCustomRecipe, userRecipes, setDashboardSettings
+    addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms
   ]);
 
   if (isAppDataLoading && user) {
