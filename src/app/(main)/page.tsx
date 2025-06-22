@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -301,7 +302,7 @@ export default function HomePage() {
             <ScrollArea className="w-full whitespace-nowrap rounded-md">
               <div className="flex w-max space-x-4 pb-4">
                 {quickRecipes.map(recipe => (
-                  <div key={recipe.id} className="w-[300px] md:w-[320px]">
+                  <div key={recipe.id} className="w-[280px] sm:w-[300px] flex-shrink-0">
                     <RecipeCard
                       recipe={recipe}
                       showViewDetails={true}
