@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -64,7 +63,8 @@ serve(async (req: Request) => {
     const receivedSecret = requestBody?.secretKey
     const expectedSecret = WIX_EXPECTED_SECRET;
 
-    console.log(`DEBUG: Comparing Received Secret ('${receivedSecret ? receivedSecret.substring(0,5)+'...' : 'None'}') with Expected Secret ('${expectedSecret ? expectedSecret.substring(0,5)+'...' : 'None/Not Set'}')`);
+    console.log(`DEBUG: Received Secret ('${receivedSecret ? String(receivedSecret).substring(0,5)+'...' : 'None'}', type: ${typeof receivedSecret})`);
+    console.log(`DEBUG: Expected Secret ('${expectedSecret ? String(expectedSecret).substring(0,5)+'...' : 'None/Not Set'}', type: ${typeof expectedSecret})`);
 
     if (!expectedSecret) {
       console.error("CRITICAL: WIX_SHARED_SECRET environment variable not set in Supabase Function secrets!")
@@ -72,7 +72,7 @@ serve(async (req: Request) => {
     }
 
     if (receivedSecret !== expectedSecret) {
-      console.warn(`Webhook verification failed: Invalid secret received.`)
+      console.warn(`Webhook verification failed: Invalid secret received. Secrets do not match.`);
       return new Response("Unauthorized: Invalid secret", { status: 401, headers: corsHeaders })
     }
 
@@ -153,9 +153,9 @@ serve(async (req: Request) => {
     }
 
     if (duration) {
-        updateData.subscription_duration = duration;
+      updateData.subscription_duration = duration;
     } else {
-        updateData.subscription_duration = null;
+      updateData.subscription_duration = null;
     }
 
     updateData.subscription_end_date = null;
