@@ -7,7 +7,6 @@ import { useAppContext } from '@/context/AppContext';
 import type { PlannedMeal, MealType, Recipe, Macros } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-// import { MacroDisplay } from '@/components/shared/MacroDisplay'; // Replaced by charts
 import { Calendar } from '@/components/ui/calendar';
 import { format, addDays, subDays, isValid, startOfDay, isWithinInterval } from 'date-fns';
 import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info, Lock, CalendarDays as CalendarDaysIcon } from 'lucide-react';
@@ -18,10 +17,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { MEAL_TYPES } from '@/lib/data';
 import { RecipeCard } from '@/components/shared/RecipeCard';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { MacroDisplay } from '@/components/shared/MacroDisplay'; // Still used for individual meal macros
+import { MacroDisplay } from '@/components/shared/MacroDisplay';
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import {
@@ -43,12 +41,12 @@ const MEAL_SLOT_CONFIG: Array<{ type: MealType; displayName: string }> = [
 
 const FREE_TIER_RECIPE_PICKER_LIMIT = 15;
 
-// const isDateAllowedForFreeTier = (date: Date | undefined): boolean => { // TEMPORARILY UNLOCKED
-//   if (!date) return false;
-//   const today = startOfDay(new Date());
-//   const tomorrow = addDays(today, 1);
-//   return isWithinInterval(startOfDay(date), { start: today, end: tomorrow });
-// };
+const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
+  if (!date) return false;
+  const today = startOfDay(new Date());
+  const tomorrow = addDays(today, 1);
+  return isWithinInterval(startOfDay(date), { start: today, end: tomorrow });
+};
 
 const chartConfig = {
   consumed: { label: "Consumed", color: "hsl(var(--chart-1))" },
@@ -75,14 +73,15 @@ export default function MealPlanPage() {
   const { toast } = useToast();
 
   const [recipePickerIndices, setRecipePickerIndices] = useState<{[key: string]: number}>(
-    MEAL_SLOT_CONFIG.reduce((acc, slot, index) => {
+    (userProfile?.mealStructure || MEAL_SLOT_CONFIG).reduce((acc, slot, index) => {
       acc[`${slot.type}-${index}`] = 0;
       return acc;
     }, {} as {[key: string]: number})
   );
-
-  const isSubscribedActive = true;
-  const availableRecipesForPicker = allRecipesCache;
+  
+  const isSubscribedActive = userProfile?.subscription_status === 'active';
+  const availableRecipesForPicker = isSubscribedActive ? allRecipesCache : allRecipesCache.slice(0, FREE_TIER_RECIPE_PICKER_LIMIT);
+  const mealStructureToUse = userProfile?.mealStructure || MEAL_SLOT_CONFIG;
 
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
   const dailyMacros = getDailyMacros(formattedDate);
@@ -97,7 +96,7 @@ export default function MealPlanPage() {
   const macrosChartData = currentMacroTargets ? [
     { name: "Protein", consumed: dailyMacros.protein || 0, target: currentMacroTargets.protein || 0, unit: 'g' },
     { name: "Carbs", consumed: dailyMacros.carbs || 0, target: currentMacroTargets.carbs || 0, unit: 'g' },
-    { name: "Fat", consumed: dailyMacros.fat || 0, target: currentMacroTargets.fat || 0, unit: 'g' },
+    { name: "Fat", consumed: dailyMacros.fat || 0, target: 0, unit: 'g' },
   ] : [
     { name: "Protein", consumed: dailyMacros.protein || 0, target: 0, unit: 'g' },
     { name: "Carbs", consumed: dailyMacros.carbs || 0, target: 0, unit: 'g' },
@@ -107,6 +106,10 @@ export default function MealPlanPage() {
 
   const handleDateChange = (date: Date | undefined) => {
     if (date && isValid(date)) {
+      if (!isSubscribedActive && !isDateAllowedForFreeTier(date)) {
+        toast({ title: "Date Restricted", description: "Free users can only plan for today and tomorrow.", variant: "destructive" });
+        return;
+      }
       setSelectedDate(date);
     }
   };
@@ -160,11 +163,12 @@ export default function MealPlanPage() {
 
   const todayForCalendar = startOfDay(new Date());
   const tomorrowForCalendar = addDays(todayForCalendar, 1);
-  const disabledCalendarMatcher = undefined;
+  const disabledCalendarMatcher = isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
+
 
   return (
     <PageWrapper title="Daily Meal Planner">
-      {false && !isSubscribedActive && (
+      {!isSubscribedActive && (
          <Alert variant="default" className="mb-6 border-accent">
           <Lock className="h-5 w-5 text-accent" />
           <AlertTitle className="text-accent">Limited Access</AlertTitle>
@@ -284,17 +288,17 @@ export default function MealPlanPage() {
                 <Info className="h-4 w-4" />
                 <AlertTitle>Recipe Limit Note</AlertTitle>
                 <AlertDescription>
-                The free tier recipe picker is limited. If the first {FREE_TIER_RECIPE_PICKER_LIMIT} recipes in the database don't load correctly, the picker might appear empty. (Full picker unlocked for testing)
+                The free tier recipe picker is limited. If the first {FREE_TIER_RECIPE_PICKER_LIMIT} recipes in the database don't load correctly, the picker might appear empty.
                 </AlertDescription>
             </Alert>
         )}
 
 
-        {!isAppRecipeCacheLoading && availableRecipesForPicker.length > 0 && MEAL_SLOT_CONFIG.map((slotConfig, index) => {
+        {!isAppRecipeCacheLoading && availableRecipesForPicker.length > 0 && mealStructureToUse.map((slotConfig, index) => {
           const slotKey = `${slotConfig.type}-${index}`;
           let NthInstanceOfType = 0;
           for(let i=0; i < index; i++){
-            if(MEAL_SLOT_CONFIG[i].type === slotConfig.type) {
+            if(mealStructureToUse[i].type === slotConfig.type) {
                 NthInstanceOfType++;
             }
           }
@@ -302,7 +306,7 @@ export default function MealPlanPage() {
 
           return (
             <div key={slotKey} className="p-4 border rounded-lg shadow-md bg-card">
-              <h3 className="text-xl font-semibold font-headline text-primary/90 mb-4">{slotConfig.displayName}</h3>
+              <h3 className="text-xl font-semibold font-headline text-primary/90 mb-4">{slotConfig.name}</h3>
               {mealToDisplay ? (
                 <div className="w-full max-w-lg mx-auto">
                   <Card className="overflow-hidden shadow-md flex flex-col sm:flex-row">
@@ -380,10 +384,10 @@ export default function MealPlanPage() {
                       disabled={!availableRecipesForPicker[recipePickerIndices[slotKey] || 0]}
                     >
                       <PlusCircle className="mr-2 h-5 w-5" />
-                      Add "{availableRecipesForPicker[recipePickerIndices[slotKey] || 0]?.name}" as {slotConfig.displayName}
+                      Add "{availableRecipesForPicker[recipePickerIndices[slotKey] || 0]?.name}" as {slotConfig.name}
                     </Button>
                   )}
-                  {false && !isSubscribedActive && (
+                  {!isSubscribedActive && !isDateAllowedForFreeTier(selectedDate) && (
                      <p className="text-xs text-destructive text-center">Planning for this date is restricted on the free plan.</p>
                   )}
                 </div>

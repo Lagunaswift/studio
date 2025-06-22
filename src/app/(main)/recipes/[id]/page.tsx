@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info, Heart, Minus, Plus, Bot, Sparkles, Save } from 'lucide-react';
+import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info, Heart, Minus, Plus, Bot, Sparkles, Save, Lock } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
@@ -47,18 +47,15 @@ export default function RecipeDetailPage() {
   const { userProfile, addMealToPlan, toggleFavoriteRecipe, isRecipeFavorite, addCustomRecipe } = useAppContext();
   const { toast } = useToast();
   
-  // State for the "Add to Plan" dialog
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
   const [planDate, setPlanDate] = useState<Date | undefined>(new Date());
   const [planMealType, setPlanMealType] = useState<MealType | undefined>(MEAL_TYPES[0]);
   const [planServings, setPlanServings] = useState<number>(1);
 
-  // State for recipe scaling
   const [displayServings, setDisplayServings] = useState<number>(1);
   const [scaledIngredients, setScaledIngredients] = useState<string[]>([]);
   const [scaledMacros, setScaledMacros] = useState<Macros>({ calories: 0, protein: 0, carbs: 0, fat: 0 });
 
-  // State for AI tweaker
   const [tweakRequest, setTweakRequest] = useState('');
   const [isTweaking, setIsTweaking] = useState(false);
   const [tweakError, setTweakError] = useState<string | null>(null);
@@ -89,7 +86,6 @@ export default function RecipeDetailPage() {
         if (foundRecipe) {
           setRecipe(foundRecipe);
           setCurrentImageSrc(foundRecipe.image);
-          // Initialize scaling state with recipe defaults
           setDisplayServings(foundRecipe.servings || 1);
           setPlanServings(foundRecipe.servings || 1);
           setScaledIngredients(foundRecipe.ingredients);
@@ -111,7 +107,6 @@ export default function RecipeDetailPage() {
     fetchRecipe();
   }, [recipeId]);
 
-  // Effect for scaling ingredients and macros
   useEffect(() => {
     if (!recipe || isNaN(displayServings) || displayServings <= 0) {
       return;
@@ -132,7 +127,7 @@ export default function RecipeDetailPage() {
       const originalQtyIsOneAndImplicit = parsed.quantity === 1 && !ing.trim().match(/^(1|1\.0)\s/);
 
       if (originalQtyIsOneAndImplicit) {
-        return ing; // Don't scale ingredients like "pinch of salt"
+        return ing;
       }
       
       const newQuantity = parsed.quantity * scalingFactor;
@@ -159,7 +154,7 @@ export default function RecipeDetailPage() {
 
   const handleOpenAddToPlanDialog = () => {
     if (recipe) {
-      setPlanServings(displayServings); // Use the currently displayed servings
+      setPlanServings(displayServings);
       setPlanDate(isSubscribedActive ? new Date() : (isDateAllowedForFreeTier(new Date()) ? new Date() : startOfDay(new Date())));
       setShowAddToPlanDialog(true);
     }
@@ -190,12 +185,13 @@ export default function RecipeDetailPage() {
     }
   };
   
-  const handleFavoriteToggle = () => {
+  const handleFavoriteToggle = (e: React.MouseEvent) => {
+    e.preventDefault();
     if (recipe) {
       toggleFavoriteRecipe(recipe.id);
       toast({
-        title: isRecipeFavorite(recipe.id) ? "Recipe Favorited!" : "Recipe Unfavorited",
-        description: isRecipeFavorite(recipe.id) ? `${recipe.name} added to your favorites.` : `${recipe.name} removed from your favorites.`,
+        title: !isFavorited ? "Recipe Favorited!" : "Recipe Unfavorited",
+        description: !isFavorited ? `${recipe.name} added to your favorites.` : `${recipe.name} removed from your favorites.`,
       });
     }
   };
@@ -203,7 +199,7 @@ export default function RecipeDetailPage() {
   const handleServingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     if (val === '') {
-        setDisplayServings(NaN); // Allow empty input while typing
+        setDisplayServings(NaN);
     } else {
         const num = parseInt(val, 10);
         if (!isNaN(num) && num > 0) {
@@ -220,6 +216,11 @@ export default function RecipeDetailPage() {
   
   const handleTweakRecipe = async () => {
     if (!recipe || !tweakRequest.trim()) return;
+
+    if (!isSubscribedActive) {
+      setTweakError("AI Recipe Tweaker is a premium feature. Please upgrade your plan to use it.");
+      return;
+    }
 
     setIsTweaking(true);
     setTweakError(null);
@@ -259,19 +260,18 @@ export default function RecipeDetailPage() {
     const recipeFormData: RecipeFormData = {
         name: tweakSuggestion.newName,
         description: tweakSuggestion.newDescription,
-        image: recipe.image, // Use original image as a default
-        servings: recipe.servings, // Use original
-        prepTime: recipe.prepTime, // Use original
-        cookTime: recipe.cookTime, // Use original
-        chillTime: recipe.chillTime, // Use original
+        image: recipe.image,
+        servings: recipe.servings,
+        prepTime: recipe.prepTime,
+        cookTime: recipe.cookTime,
+        chillTime: recipe.chillTime,
         ingredients: tweakSuggestion.newIngredients.map(value => ({ value })),
         instructions: tweakSuggestion.newInstructions.map(value => ({ value })),
-        // IMPORTANT: Use original macros and prompt user to verify
         calories: recipe.macrosPerServing.calories,
         protein: recipe.macrosPerServing.protein,
         carbs: recipe.macrosPerServing.carbs,
         fat: recipe.macrosPerServing.fat,
-        tags: [...(recipe.tags || []).filter(t => t !== 'AI-Tweaked'), 'AI-Tweaked'], // Copy original tags and add a new one
+        tags: [...(recipe.tags || []).filter(t => t !== 'AI-Tweaked'), 'AI-Tweaked'],
     };
 
     try {
@@ -453,8 +453,7 @@ export default function RecipeDetailPage() {
                 ))}
               </ol>
             </div>
-            {/* Kept original ingredients for reference */}
-             <div>
+            <div>
               <h3 className="text-xl font-semibold font-headline text-muted-foreground mb-4 flex items-center">
                 Original Ingredients (for {recipe.servings} servings)
               </h3>
@@ -472,31 +471,41 @@ export default function RecipeDetailPage() {
       
       <Separator className="my-12" />
 
-      {/* AI Recipe Tweaker */}
-      <Card className="shadow-lg mt-8">
-        <CardHeader>
-          <CardTitle className="font-headline text-primary flex items-center">
-            <Bot className="w-6 h-6 mr-2 text-accent" />
-            AI Recipe Tweaker
-          </CardTitle>
-          <CardDescription>
-            Want to change something? Ask the AI to modify this recipe for you.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea
-            placeholder="e.g., Make this vegetarian, replace mushrooms, suggest a low-carb side dish..."
-            rows={3}
-            value={tweakRequest}
-            onChange={(e) => setTweakRequest(e.target.value)}
-            disabled={isTweaking}
-          />
-          <Button onClick={handleTweakRecipe} disabled={isTweaking || !tweakRequest.trim()} className="bg-primary hover:bg-primary/90">
-            {isTweaking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-            Tweak Recipe
-          </Button>
-        </CardContent>
-      </Card>
+      {isSubscribedActive ? (
+        <Card className="shadow-lg mt-8">
+          <CardHeader>
+            <CardTitle className="font-headline text-primary flex items-center">
+              <Bot className="w-6 h-6 mr-2 text-accent" />
+              AI Recipe Tweaker
+            </CardTitle>
+            <CardDescription>
+              Want to change something? Ask the AI to modify this recipe for you.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Textarea
+              placeholder="e.g., Make this vegetarian, replace mushrooms, suggest a low-carb side dish..."
+              rows={3}
+              value={tweakRequest}
+              onChange={(e) => setTweakRequest(e.target.value)}
+              disabled={isTweaking}
+            />
+            <Button onClick={handleTweakRecipe} disabled={isTweaking || !tweakRequest.trim()} className="bg-primary hover:bg-primary/90">
+              {isTweaking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              Tweak Recipe
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <Alert variant="default" className="border-accent mt-8">
+          <Lock className="h-5 w-5 text-accent" />
+          <AlertTitle className="text-accent font-headline">Premium Feature Locked</AlertTitle>
+          <AlertDescription>
+            The AI Recipe Tweaker is available for subscribed users.
+            <Link href="/profile/subscription" className="underline hover:text-primary font-semibold ml-1">Upgrade your plan</Link> to unlock this feature.
+          </AlertDescription>
+        </Alert>
+      )}
       
       {isTweaking && (
         <div className="flex flex-col items-center justify-center h-60 text-muted-foreground mt-4">

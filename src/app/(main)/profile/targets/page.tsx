@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { suggestProteinIntake, type SuggestProteinIntakeInput, type SuggestProteinIntakeOutput } from '@/ai/flows/suggest-protein-intake-flow';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Sparkles, Loader2, Info, Lightbulb, Droplets } from "lucide-react";
+import { Sparkles, Loader2, Info, Lightbulb, Droplets, Lock } from "lucide-react";
 import Link from 'next/link';
 
 const macroTargetSchema = z.object({
@@ -42,6 +42,7 @@ export default function DietaryTargetsPage() {
   const [fatSuggestion, setFatSuggestion] = useState<FatSuggestion | null>(null);
   const [fatSuggestionError, setFatSuggestionError] = useState<string | null>(null);
 
+  const isSubscribedActive = userProfile?.subscription_status === 'active';
 
   const macroForm = useForm<MacroTargetFormValues>({
     resolver: zodResolver(macroTargetSchema),
@@ -85,6 +86,10 @@ export default function DietaryTargetsPage() {
   };
 
   const handleGetProteinSuggestion = async () => {
+    if (!isSubscribedActive) {
+        toast({ title: "Premium Feature", description: "AI suggestions require an active subscription.", variant: "destructive"});
+        return;
+    }
     if (!userProfile || !userProfile.leanBodyMassKg) {
       setAiError("Please complete your User Information (especially weight and body fat %) to calculate Lean Body Mass for an accurate protein suggestion.");
       toast({
@@ -216,8 +221,8 @@ export default function DietaryTargetsPage() {
                   <FormItem>
                     <div className="flex justify-between items-center">
                       <FormLabel>Protein (g)</FormLabel>
-                      <Button type="button" variant="outline" size="sm" onClick={handleGetProteinSuggestion} disabled={isAISuggesting}>
-                        {isAISuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4 text-accent" />}
+                      <Button type="button" variant="outline" size="sm" onClick={handleGetProteinSuggestion} disabled={isAISuggesting || !isSubscribedActive} title={!isSubscribedActive ? "Premium Feature" : "Get AI Suggestion"}>
+                        {!isSubscribedActive ? <Lock className="mr-2 h-4 w-4" /> : isAISuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4 text-accent" />}
                         Suggest Protein
                       </Button>
                     </div>
@@ -285,6 +290,7 @@ export default function DietaryTargetsPage() {
                           size="sm" 
                           onClick={handleGetFatSuggestion}
                           disabled={!userProfile || !userProfile.tdee || userProfile.sex !== 'female'}
+                          title={!userProfile || !userProfile.tdee || userProfile.sex !== 'female' ? "Requires user info (TDEE & Sex='female')" : "Get Suggestion"}
                         >
                          <Droplets className="mr-2 h-4 w-4 text-accent" />
                          Suggest Fat (Women)

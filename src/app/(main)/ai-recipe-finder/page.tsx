@@ -6,7 +6,7 @@ import { PageWrapper } from '@/components/layout/PageWrapper';
 import { suggestRecipesByIngredients, type SuggestRecipesByIngredientsInput, type SuggestRecipesByIngredientsOutput, type RecipeWithIngredients } from '@/ai/flows/suggest-recipes-by-ingredients-flow';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Bot, Info, CookingPot, BadgePercent, CheckCircle2, AlertTriangle, Search } from 'lucide-react';
+import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Bot, Info, CookingPot, BadgePercent, CheckCircle2, AlertTriangle, Search, Lock } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,13 @@ export default function AIRecipeFinderPage() {
   const [suggestion, setSuggestion] = useState<SuggestRecipesByIngredientsOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const isSubscribedActive = userProfile?.subscription_status === 'active';
+
   const handleGenerateSuggestions = async () => {
+    if (!isSubscribedActive) {
+        setError("AI Recipe Finder is a premium feature. Please upgrade your subscription to use it.");
+        return;
+    }
     if (!ingredients.trim()) {
       setError("Please enter at least one ingredient.");
       return;
@@ -96,6 +102,16 @@ export default function AIRecipeFinderPage() {
 
   return (
     <PageWrapper title="AI Recipe Finder">
+        {!isSubscribedActive && (
+         <Alert variant="default" className="mb-6 border-accent">
+          <Lock className="h-5 w-5 text-accent" />
+          <AlertTitle className="text-accent font-headline">Premium Feature Locked</AlertTitle>
+          <AlertDescription>
+            The AI Recipe Finder is available for subscribed users.
+            Please <Link href="/profile/subscription" className="underline hover:text-primary font-semibold">upgrade your plan</Link> to unlock this feature.
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="space-y-8">
         <Card className="shadow-lg">
           <CardHeader>
@@ -113,9 +129,9 @@ export default function AIRecipeFinderPage() {
               rows={4}
               value={ingredients}
               onChange={(e) => setIngredients(e.target.value)}
-              disabled={isGenerating}
+              disabled={isGenerating || !isSubscribedActive}
             />
-            <Button onClick={handleGenerateSuggestions} disabled={isGenerating || isRecipeCacheLoading} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+            <Button onClick={handleGenerateSuggestions} disabled={isGenerating || isRecipeCacheLoading || !isSubscribedActive} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
               {isGenerating ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
