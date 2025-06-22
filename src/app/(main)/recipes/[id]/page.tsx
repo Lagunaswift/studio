@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info, Heart, Minus, Plus, Bot, Sparkles, Save, Lock } from 'lucide-react';
+import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info, Heart, Minus, Plus, Bot, Sparkles, Save, Lock, AlertTriangle } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
@@ -428,6 +428,13 @@ export default function RecipeDetailPage() {
                     </li>
                 ))}
             </ul>
+             <Alert variant="default" className="mt-4 border-destructive/20 text-destructive dark:text-orange-300 dark:border-orange-300/30">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Health & Safety Note</AlertTitle>
+                <AlertDescription className="text-xs">
+                    Recipe tags and ingredients are for informational purposes. Always verify product labels to ensure they are free from your specific allergens before purchasing or consuming.
+                </AlertDescription>
+            </Alert>
           </div>
 
           <div className="mb-8">

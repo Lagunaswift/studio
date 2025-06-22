@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ShoppingListItem } from '@/types';
 import { parseIngredientString } from '@/lib/data';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 interface IngredientForRecipeView {
   id: string; 
@@ -268,6 +269,13 @@ export default function ShoppingListPage() {
           </CardFooter>
         )}
       </Card>
+      <Alert className="mt-8 border-accent">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle className="font-semibold text-accent">Safety Reminder</AlertTitle>
+        <AlertDescription>
+          Brands and ingredients can vary by location and change over time. Please double-check all product labels carefully for allergens before you buy.
+        </AlertDescription>
+      </Alert>
     </PageWrapper>
   );
 }
