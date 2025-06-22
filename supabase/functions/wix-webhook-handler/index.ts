@@ -4,19 +4,14 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2' // Deno will redirect to the latest v2.x
 
 // Define the expected structure of the request body from Wix
-// UPDATED based on sending eventType, startDate, duration
+// This is now a FLAT structure based on your screenshot
 interface WixWebhookPayload {
-  data?: { // The actual payload seems nested within 'data'
-    secretKey?: string;
-    userEmail?: string;
-    planName?: string;
-    // Removed: status?: string;
-    eventType?: string; // Added: e.g., 'plan.started', 'plan.ended'
-    // Removed: endDate?: string | number | Date;
-    startDate?: string | number | Date; // Added: Plan start date
-    duration?: string; // Added: Plan duration (e.g., "1 year", "30 days")
-    // Add other fields Wix might send inside 'data'
-  };
+  secretKey?: string;
+  userEmail?: string;
+  planName?: string;
+  eventType?: string;
+  startDate?: string | number | Date;
+  duration?: string;
 }
 
 // Define the structure for data to update in your Supabase table
@@ -27,7 +22,6 @@ interface ProfileUpdateData {
   subscription_start_date?: string | null; // Optional: store start date
   subscription_duration?: string | null; // Optional: store duration
   updated_at: string;
-  // Add other fields from your 'profiles' table if needed
 }
 
 
@@ -58,10 +52,9 @@ serve(async (req: Request) => {
   }
 
   // 3. Verify Secret Key
-  const receivedSecret = requestBody?.data?.secretKey
+  const receivedSecret = requestBody?.secretKey
   const expectedSecret = WIX_EXPECTED_SECRET;
 
-  // Debug log
   console.log(`DEBUG: Comparing Received Secret ('${receivedSecret ? receivedSecret.substring(0,5)+'...' : 'None'}') with Expected Secret ('${expectedSecret ? expectedSecret.substring(0,5)+'...' : 'None/Not Set'}')`);
 
   if (!expectedSecret) {
@@ -70,23 +63,21 @@ serve(async (req: Request) => {
   }
 
   if (receivedSecret !== expectedSecret) {
-    console.warn(`Webhook verification failed: Invalid secret received. Expected starts with '${expectedSecret.substring(0,5)}...' but received '${receivedSecret ? receivedSecret.substring(0,5)+'...' : 'None'}'`)
+    console.warn(`Webhook verification failed: Invalid secret received.`)
     return new Response("Unauthorized: Invalid secret", { status: 401 })
   }
 
   console.log("Webhook secret verified successfully!")
 
-  // 4. Extract Data from Wix Payload (Using new fields)
-  const userEmail = requestBody?.data?.userEmail
-  const planName = requestBody?.data?.planName
-  const eventType = requestBody?.data?.eventType      // <<< Get eventType
-  // Removed: const status = requestBody?.data?.status
-  const startDateRaw = requestBody?.data?.startDate;    // <<< Get startDate
-  const duration = requestBody?.data?.duration;        // <<< Get duration
-  // Removed: const subscriptionEndDateRaw = requestBody?.data?.endDate;
+  // 4. Extract Data from Wix Payload (from the top-level object)
+  const userEmail = requestBody?.userEmail
+  const planName = requestBody?.planName
+  const eventType = requestBody?.eventType
+  const startDateRaw = requestBody?.startDate;
+  const duration = requestBody?.duration;
 
   if (!userEmail) {
-      console.error("Missing userEmail in webhook payload data")
+      console.error("Missing userEmail in webhook payload")
       return new Response("Bad Request: Missing userEmail", { status: 400 })
   }
 
@@ -107,14 +98,13 @@ serve(async (req: Request) => {
     // a. Find the user's ID in Supabase based on the email from Wix
     console.log(`Looking up profile for email: ${userEmail}`)
     const { data: profileData, error: profileError } = await supabaseAdmin
-      .from('profiles') // <<< YOUR PROFILES TABLE NAME
-      .select('id')     // <<< YOUR COLUMN STORING THE AUTH USER ID
-      .eq('email', userEmail) // <<< YOUR COLUMN STORING THE EMAIL (ensure this is correct!)
+      .from('profiles')
+      .select('id')
+      .eq('email', userEmail)
       .single()
 
     if (profileError || !profileData) {
         console.error(`Error or profile not found for ${userEmail}:`, profileError?.message || 'Not found')
-        // Decide if 404 or 500 is appropriate if profile not found
         return new Response(`User profile not found for email: ${userEmail}`, { status: 404 })
     }
 
@@ -122,16 +112,14 @@ serve(async (req: Request) => {
     console.log(`Found user ID: ${userId} for email: ${userEmail}`)
 
     // b. Prepare data to update based on Wix eventType
-    //    IMPORTANT: Adapt this logic based on the actual eventType values you send
-    let determinedStatus: ProfileUpdateData['subscription_status'] = 'inactive'; // Sensible default? Or 'none'?
-    if (eventType === 'plan.started') { // Check the eventType from the webhook
+    let determinedStatus: ProfileUpdateData['subscription_status'] = 'inactive';
+    if (eventType === 'plan.started') {
         determinedStatus = 'active';
-    } else if (eventType === 'plan.ended' || eventType === 'plan.canceled') { // Anticipate other events
+    } else if (eventType === 'plan.ended' || eventType === 'plan.canceled') {
         determinedStatus = 'inactive';
     }
-    // Add more conditions based on other eventTypes you might send
 
-    const updateData: Partial<ProfileUpdateData> = { // Use Partial if some fields are optional
+    const updateData: Partial<ProfileUpdateData> = {
       subscription_status: determinedStatus,
       updated_at: new Date().toISOString(),
     };
@@ -140,7 +128,6 @@ serve(async (req: Request) => {
       updateData.plan_name = planName;
     }
 
-    // Optionally store start date (ensure column exists in Supabase profiles table)
     if (startDateRaw) {
         try {
             updateData.subscription_start_date = new Date(startDateRaw).toISOString();
@@ -152,23 +139,21 @@ serve(async (req: Request) => {
         updateData.subscription_start_date = null;
     }
 
-    // Optionally store duration (ensure column exists in Supabase profiles table)
     if (duration) {
         updateData.subscription_duration = duration;
     } else {
         updateData.subscription_duration = null;
     }
 
-    // Set end date to null for now, calculation is complex/unreliable without more info
     updateData.subscription_end_date = null;
 
     console.log(`Prepared update data for user ${userId}:`, updateData);
 
     // c. Update the user's profile
     const { error: updateError } = await supabaseAdmin
-      .from('profiles') // <<< YOUR PROFILES/SUBSCRIPTIONS TABLE NAME
+      .from('profiles')
       .update(updateData)
-      .eq('id', userId) // <<< Match the user ID column
+      .eq('id', userId)
 
     if (updateError) {
       console.error(`Database update error for user ${userId}:`, updateError)
