@@ -1,20 +1,10 @@
 
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle } from 'lucide-react';
 
 export default function PrivacyPolicyPage() {
   return (
     <PageWrapper title="Privacy Policy">
-        <Alert variant="destructive" className="mb-8">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Example Only - Not Legal Advice</AlertTitle>
-            <AlertDescription>
-                This text is for informational and educational purposes only. It is a simplified illustration and NOT a substitute for professional legal advice from a qualified solicitor.
-            </AlertDescription>
-        </Alert>
-
       <div className="space-y-6 text-foreground/90 leading-relaxed">
         <Card>
           <CardHeader>
@@ -22,7 +12,7 @@ export default function PrivacyPolicyPage() {
           </CardHeader>
           <CardContent>
             <p>
-              This Privacy Policy explains how [Your Company Name Ltd.] ("we," "us," or "our") collects, uses, and discloses your information when you use our Macro Teal Meal Planner application (the "Service"). This policy is designed to comply with UK GDPR.
+              This Privacy Policy explains how MealPlannerPro Ltd. ("we," "us," or "our") collects, uses, and discloses your information when you use our MealPlannerPro application (the "Service"). This policy is designed to comply with UK GDPR.
             </p>
           </CardContent>
         </Card>
