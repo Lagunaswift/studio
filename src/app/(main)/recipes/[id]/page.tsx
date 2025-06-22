@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info, Heart, Minus, Plus, Bot, Sparkles, Save, Lock, AlertTriangle } from 'lucide-react';
+import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info, Heart, Minus, Plus, Bot, Sparkles, Save, AlertTriangle } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
@@ -22,18 +22,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { format, startOfDay, addDays, isWithinInterval } from 'date-fns';
+import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from '@/lib/utils';
 import { suggestRecipeModification, type SuggestRecipeModificationInput, type SuggestRecipeModificationOutput } from '@/ai/flows/suggest-recipe-modification-flow';
 
-
-const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
-  if (!date) return false;
-  const today = startOfDay(new Date());
-  const tomorrow = addDays(today, 1);
-  return isWithinInterval(startOfDay(date), { start: today, end: tomorrow });
-};
 
 export default function RecipeDetailPage() {
   const params = useParams();
@@ -44,7 +37,7 @@ export default function RecipeDetailPage() {
   const [recipe, setRecipe] = useState<RecipeType | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null); 
-  const { userProfile, addMealToPlan, toggleFavoriteRecipe, isRecipeFavorite, addCustomRecipe } = useAppContext();
+  const { addMealToPlan, toggleFavoriteRecipe, isRecipeFavorite, addCustomRecipe } = useAppContext();
   const { toast } = useToast();
   
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
@@ -65,7 +58,6 @@ export default function RecipeDetailPage() {
   const [currentImageSrc, setCurrentImageSrc] = useState<string>('');
   const [imageLoadError, setImageLoadError] = useState(false);
 
-  const isSubscribedActive = userProfile?.subscription_status === 'active';
   const isFavorited = recipe ? isRecipeFavorite(recipe.id) : false;
 
   useEffect(() => {
@@ -155,21 +147,13 @@ export default function RecipeDetailPage() {
   const handleOpenAddToPlanDialog = () => {
     if (recipe) {
       setPlanServings(displayServings);
-      setPlanDate(isSubscribedActive ? new Date() : (isDateAllowedForFreeTier(new Date()) ? new Date() : startOfDay(new Date())));
+      setPlanDate(new Date());
       setShowAddToPlanDialog(true);
     }
   };
 
   const handleAddToMealPlan = () => {
     if (recipe && planDate && planMealType && planServings > 0) {
-       if (!isSubscribedActive && !isDateAllowedForFreeTier(planDate)) {
-        toast({
-          title: "Date Restricted",
-          description: "Free users can only plan meals for today or tomorrow. Please upgrade for more flexibility.",
-          variant: 'destructive',
-        });
-        return;
-      }
       addMealToPlan(recipe, format(planDate, 'yyyy-MM-dd'), planMealType, planServings);
       toast({
         title: "Meal Added",
@@ -216,11 +200,6 @@ export default function RecipeDetailPage() {
   
   const handleTweakRecipe = async () => {
     if (!recipe || !tweakRequest.trim()) return;
-
-    if (!isSubscribedActive) {
-      setTweakError("AI Recipe Tweaker is a premium feature. Please upgrade your plan to use it.");
-      return;
-    }
 
     setIsTweaking(true);
     setTweakError(null);
@@ -290,11 +269,6 @@ export default function RecipeDetailPage() {
         });
     }
   };
-
-
-  const todayForCalendar = startOfDay(new Date());
-  const tomorrowForCalendar = addDays(todayForCalendar, 1);
-  const disabledCalendarMatcher = isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
 
   const aiHint = recipe && recipe.tags && recipe.tags.length > 0 ? recipe.tags.slice(0, 2).join(' ') : "food meal";
 
@@ -478,41 +452,30 @@ export default function RecipeDetailPage() {
       
       <Separator className="my-12" />
 
-      {isSubscribedActive ? (
-        <Card className="shadow-lg mt-8">
-          <CardHeader>
-            <CardTitle className="font-headline text-primary flex items-center">
-              <Bot className="w-6 h-6 mr-2 text-accent" />
-              AI Recipe Tweaker
-            </CardTitle>
-            <CardDescription>
-              Want to change something? Ask the AI to modify this recipe for you.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Textarea
-              placeholder="e.g., Make this vegetarian, replace mushrooms, suggest a low-carb side dish..."
-              rows={3}
-              value={tweakRequest}
-              onChange={(e) => setTweakRequest(e.target.value)}
-              disabled={isTweaking}
-            />
-            <Button onClick={handleTweakRecipe} disabled={isTweaking || !tweakRequest.trim()} className="bg-primary hover:bg-primary/90">
-              {isTweaking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-              Tweak Recipe
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <Alert variant="default" className="border-accent mt-8">
-          <Lock className="h-5 w-5 text-accent" />
-          <AlertTitle className="text-accent font-headline">Premium Feature Locked</AlertTitle>
-          <AlertDescription>
-            The AI Recipe Tweaker is available for subscribed users.
-            <Link href="/profile/subscription" className="underline hover:text-primary font-semibold ml-1">Upgrade your plan</Link> to unlock this feature.
-          </AlertDescription>
-        </Alert>
-      )}
+      <Card className="shadow-lg mt-8">
+        <CardHeader>
+          <CardTitle className="font-headline text-primary flex items-center">
+            <Bot className="w-6 h-6 mr-2 text-accent" />
+            AI Recipe Tweaker
+          </CardTitle>
+          <CardDescription>
+            Want to change something? Ask the AI to modify this recipe for you.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Textarea
+            placeholder="e.g., Make this vegetarian, replace mushrooms, suggest a low-carb side dish..."
+            rows={3}
+            value={tweakRequest}
+            onChange={(e) => setTweakRequest(e.target.value)}
+            disabled={isTweaking}
+          />
+          <Button onClick={handleTweakRecipe} disabled={isTweaking || !tweakRequest.trim()} className="bg-primary hover:bg-primary/90">
+            {isTweaking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+            Tweak Recipe
+          </Button>
+        </CardContent>
+      </Card>
       
       {isTweaking && (
         <div className="flex flex-col items-center justify-center h-60 text-muted-foreground mt-4">
@@ -576,7 +539,6 @@ export default function RecipeDetailPage() {
             <DialogTitle className="font-headline text-primary">Add "{recipe.name}" to Meal Plan</DialogTitle>
             <DialogDescription>
               Select the date, meal type, and servings for this recipe.
-              {!isSubscribedActive && " Free users can plan for today or tomorrow only."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -597,10 +559,8 @@ export default function RecipeDetailPage() {
                     mode="single"
                     selected={planDate}
                     onSelect={setPlanDate}
-                    disabled={disabledCalendarMatcher}
-                    initialFocus={!isSubscribedActive}
-                    fromDate={!isSubscribedActive ? todayForCalendar : undefined}
-                    toDate={!isSubscribedActive ? tomorrowForCalendar : undefined}
+                    disabled={undefined}
+                    initialFocus
                   />
                 </PopoverContent>
               </Popover>
@@ -635,7 +595,6 @@ export default function RecipeDetailPage() {
             <Button 
               onClick={handleAddToMealPlan} 
               className="bg-accent hover:bg-accent/90 text-accent-foreground"
-              disabled={!isSubscribedActive && !isDateAllowedForFreeTier(planDate)}
             >
               <PlusCircle className="mr-2 h-4 w-4" /> Add to Plan
             </Button>

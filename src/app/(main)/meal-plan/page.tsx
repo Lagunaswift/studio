@@ -8,8 +8,8 @@ import type { PlannedMeal, MealType, Recipe, Macros } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
-import { format, addDays, subDays, isValid, startOfDay, isWithinInterval } from 'date-fns';
-import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info, Lock, CalendarDays as CalendarDaysIcon } from 'lucide-react';
+import { format, addDays, subDays, isValid } from 'date-fns';
+import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info, CalendarDays as CalendarDaysIcon } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
@@ -38,13 +38,6 @@ const MEAL_SLOT_CONFIG: Array<{ type: MealType; displayName: string }> = [
   { type: "Snack", displayName: "Snack 1" },
   { type: "Snack", displayName: "Snack 2" },
 ];
-
-const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
-  if (!date) return false;
-  const today = startOfDay(new Date());
-  const tomorrow = addDays(today, 1);
-  return isWithinInterval(startOfDay(date), { start: today, end: tomorrow });
-};
 
 const chartConfig = {
   consumed: { label: "Consumed", color: "hsl(var(--chart-1))" },
@@ -77,7 +70,6 @@ export default function MealPlanPage() {
     }, {} as {[key: string]: number})
   );
   
-  const isSubscribedActive = userProfile?.subscription_status === 'active';
   const availableRecipesForPicker = allRecipesCache;
   const mealStructureToUse = userProfile?.mealStructure || MEAL_SLOT_CONFIG;
 
@@ -104,10 +96,6 @@ export default function MealPlanPage() {
 
   const handleDateChange = (date: Date | undefined) => {
     if (date && isValid(date)) {
-      if (!isSubscribedActive && !isDateAllowedForFreeTier(date)) {
-        toast({ title: "Date Restricted", description: "Free users can only plan for today and tomorrow.", variant: "destructive" });
-        return;
-      }
       setSelectedDate(date);
     }
   };
@@ -159,24 +147,8 @@ export default function MealPlanPage() {
     return mealsOfThisType[slotIndexWithinType];
   };
 
-  const todayForCalendar = startOfDay(new Date());
-  const tomorrowForCalendar = addDays(todayForCalendar, 1);
-  const disabledCalendarMatcher = isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
-
-
   return (
     <PageWrapper title="Daily Meal Planner">
-      {!isSubscribedActive && (
-         <Alert variant="default" className="mb-6 border-accent">
-          <Lock className="h-5 w-5 text-accent" />
-          <AlertTitle className="text-accent">Limited Access</AlertTitle>
-          <AlertDescription>
-            You are on the free plan. Meal planning is restricted to today and tomorrow only, and the recipe picker is limited to a subset of recipes.
-            <Link href="/profile/subscription" className="underline hover:text-primary ml-1"> Upgrade your plan </Link>
-            for full access.
-          </AlertDescription>
-        </Alert>
-      )}
        <div className="mb-6 flex justify-end">
         <Button asChild variant="outline">
           <Link href="/meal-plan/weekly">
@@ -196,7 +168,7 @@ export default function MealPlanPage() {
                 mode="single"
                 selected={selectedDate}
                 onSelect={handleDateChange}
-                disabled={disabledCalendarMatcher}
+                disabled={undefined}
                 className="rounded-md border"
                 initialFocus={false}
               />
@@ -280,7 +252,7 @@ export default function MealPlanPage() {
             </AlertDescription>
           </Alert>
         )}
-         {!isAppRecipeCacheLoading && !isSubscribedActive && allRecipesCache.length > 0 && availableRecipesForPicker.length === 0 && (
+         {!isAppRecipeCacheLoading && allRecipesCache.length > 0 && availableRecipesForPicker.length === 0 && (
              <Alert variant="default" className="border-info">
                 <Info className="h-4 w-4" />
                 <AlertTitle>Recipe Limit Note</AlertTitle>
@@ -383,9 +355,6 @@ export default function MealPlanPage() {
                       <PlusCircle className="mr-2 h-5 w-5" />
                       Add "{availableRecipesForPicker[recipePickerIndices[slotKey] || 0]?.name}" as {slotConfig.name}
                     </Button>
-                  )}
-                  {!isSubscribedActive && !isDateAllowedForFreeTier(selectedDate) && (
-                     <p className="text-xs text-destructive text-center">Planning for this date is restricted on the free plan.</p>
                   )}
                 </div>
               )}

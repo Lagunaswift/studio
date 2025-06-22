@@ -38,8 +38,6 @@ const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
   showQuickRecipes: true,
 };
 
-const FREE_TIER_RECIPE_DISPLAY_LIMIT = 15;
-
 // ... (calculation functions remain the same)
 const calculateNavyBodyFatPercentage = (
   sex: Sex | null,
@@ -165,14 +163,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const allRecipesCache = useMemo(() => {
     const combined = [...staticRecipes, ...userRecipes];
     const uniqueRecipes = Array.from(new Map(combined.map(recipe => [recipe.id, recipe])).values());
-
-    if (userProfile?.subscription_status === 'active') {
-      return uniqueRecipes;
-    } else {
-      // For free-tier users, return a limited subset.
-      return uniqueRecipes.slice(0, FREE_TIER_RECIPE_DISPLAY_LIMIT);
-    }
-  }, [staticRecipes, userRecipes, userProfile]);
+    return uniqueRecipes;
+  }, [staticRecipes, userRecipes]);
 
   // Refetch all user data when user changes
   useEffect(() => {

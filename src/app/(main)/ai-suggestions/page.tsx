@@ -6,7 +6,7 @@ import { PageWrapper } from '@/components/layout/PageWrapper';
 import { suggestMealPlan, type SuggestMealPlanInput, type SuggestMealPlanOutput, type RecipeForAI, type MealSlotForAI } from '@/ai/flows/suggest-meal-plan';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Settings, Info, PlusCircle, Lock } from 'lucide-react';
+import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Settings, Info, PlusCircle } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import type { Recipe, Macros, MealSlotConfig } from '@/types';
@@ -14,7 +14,7 @@ import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { format, startOfDay, isSameDay } from 'date-fns';
+import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -35,7 +35,6 @@ export default function AISuggestionsPage() {
   const [recipesForAI, setRecipesForAI] = useState<RecipeForAI[]>([]);
 
   const userSettingsToUse = userProfile;
-  const isSubscribedActive = userProfile?.subscription_status === 'active';
 
   useEffect(() => {
     if (!isAppRecipeCacheLoading) {
@@ -56,11 +55,6 @@ export default function AISuggestionsPage() {
   const handleGeneratePlan = async () => {
     if (!userSettingsToUse) {
       setError("User profile not loaded from AppContext. Please wait or try refreshing.");
-      return;
-    }
-    
-    if (!isSubscribedActive) {
-      setError("AI Meal Plan generation is a premium feature. Please upgrade your subscription to use it.");
       return;
     }
 
@@ -122,15 +116,6 @@ export default function AISuggestionsPage() {
   const handleAddPlanToCalendar = (date: Date) => {
     if (!suggestion || !suggestion.plannedMeals || allRecipesCache.length === 0 || !userSettingsToUse) return;
 
-    if (!isSubscribedActive && !isSameDay(date, startOfDay(new Date()))) {
-        toast({
-            title: "Plan Addition Restricted",
-            description: "Free users can only add AI-generated plans for today. Please upgrade for more flexibility.",
-            variant: "destructive",
-        });
-        return;
-    }
-
     suggestion.plannedMeals.forEach(plannedMealItem => {
       const fullRecipe = allRecipesCache.find(r => r.id === plannedMealItem.recipeId);
       if (fullRecipe) {
@@ -156,21 +141,6 @@ export default function AISuggestionsPage() {
           <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
           <p className="text-lg">Loading AI Planner...</p>
         </div>
-      </PageWrapper>
-    );
-  }
-
-  if (!isSubscribedActive) {
-    return (
-      <PageWrapper title="Automated AI Meal Planner">
-        <Alert variant="default" className="border-accent mt-6">
-          <Lock className="h-5 w-5 text-accent" />
-          <AlertTitle className="text-accent font-headline">Premium Feature Locked</AlertTitle>
-          <AlertDescription>
-            AI-powered meal plan generation is available for subscribed users.
-            Please <Link href="/profile/subscription" className="underline hover:text-primary font-semibold">upgrade your plan</Link> to unlock this feature and more.
-          </AlertDescription>
-        </Alert>
       </PageWrapper>
     );
   }

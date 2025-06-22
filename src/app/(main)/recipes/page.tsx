@@ -13,8 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format, startOfDay, addDays, isWithinInterval } from 'date-fns';
-import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2, Info, Lock, Wheat, Milk, Shell, Fish, Egg, Peanut, TreeDeciduous, Drumstick, Heart, Plus } from 'lucide-react'; // Added Plus
+import { format } from 'date-fns';
+import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2, Info, Wheat, Milk, Shell, Fish, Egg, Peanut, TreeDeciduous, Drumstick, Heart, Plus } from 'lucide-react'; // Added Plus
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -23,15 +23,6 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from "@/components/ui/switch";
-
-const FREE_TIER_RECIPE_DISPLAY_LIMIT = 15;
-
-const isDateAllowedForFreeTier = (date: Date | undefined): boolean => {
-  if (!date) return false;
-  const today = startOfDay(new Date());
-  const tomorrow = addDays(today, 1);
-  return isWithinInterval(startOfDay(date), { start: today, end: tomorrow });
-};
 
 const DIETARY_PREFERENCE_TO_TAG_MAP: { [key: string]: string } = {
   "Vegetarian": "V", "Vegan": "VG", "Pescatarian": "P", "Gluten-Free": "GF",
@@ -77,8 +68,6 @@ function RecipesPageComponent() {
   useEffect(() => {
     setSearchTerm(searchTermFromUrl);
   }, [searchTermFromUrl]);
-
-  const isSubscribedActive = userProfile?.subscription_status === 'active'; 
 
   const activeDietaryFilters = useMemo(() => userProfile?.dietaryPreferences || [], [userProfile]);
   const activeAllergenFilters = useMemo(() => userProfile?.allergens || [], [userProfile]);
@@ -168,7 +157,7 @@ function RecipesPageComponent() {
   const handleOpenAddToPlanDialog = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
     setPlanServings(recipe.servings);
-    setPlanDate(isDateAllowedForFreeTier(new Date()) ? new Date() : startOfDay(new Date()));
+    setPlanDate(new Date());
     setShowAddToPlanDialog(true);
   };
 
@@ -185,10 +174,6 @@ function RecipesPageComponent() {
       toast({ title: "Error", description: "Please fill all fields.", variant: 'destructive' });
     }
   };
-
-  const todayForCalendar = startOfDay(new Date());
-  const tomorrowForCalendar = addDays(todayForCalendar, 1);
-  const disabledCalendarMatcherForDialog = isSubscribedActive ? undefined : (date: Date) => !isWithinInterval(startOfDay(date), {start: todayForCalendar, end: tomorrowForCalendar});
 
   const getIconForPreference = (preference: string) => {
     switch (preference.toLowerCase()) {
@@ -241,17 +226,6 @@ function RecipesPageComponent() {
           </Button>
         </div>
       </div>
-
-       {!isSubscribedActive && (
-         <Alert variant="default" className="mb-6 border-accent">
-          <Lock className="h-5 w-5 text-accent" />
-          <AlertTitle className="text-accent">Free Plan Limitation</AlertTitle>
-          <AlertDescription>
-            You are on the free plan. Full recipe access is a premium feature. Your view is limited to the first {FREE_TIER_RECIPE_DISPLAY_LIMIT} recipes.
-            <Link href="/profile/subscription" className="underline hover:text-primary font-semibold ml-1">Upgrade your plan</Link> for unlimited access.
-          </AlertDescription>
-        </Alert>
-      )}
 
       {(activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0) && (
         <Card className="mb-6 bg-secondary/30 border-accent/30">
@@ -354,9 +328,7 @@ function RecipesPageComponent() {
                   <PopoverContent className="w-auto p-0">
                     <Calendar
                       mode="single" selected={planDate} onSelect={setPlanDate}
-                      disabled={disabledCalendarMatcherForDialog} initialFocus={!isSubscribedActive}
-                      fromDate={!isSubscribedActive ? todayForCalendar : undefined}
-                      toDate={!isSubscribedActive ? tomorrowForCalendar : undefined}
+                      disabled={undefined} initialFocus
                     />
                   </PopoverContent>
                 </Popover>
@@ -381,8 +353,7 @@ function RecipesPageComponent() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAddToPlanDialog(false)}>Cancel</Button>
-              <Button onClick={handleAddToMealPlan} className="bg-accent hover:bg-accent/90 text-accent-foreground"
-                disabled={!isSubscribedActive && !isDateAllowedForFreeTier(planDate)}>
+              <Button onClick={handleAddToMealPlan} className="bg-accent hover:bg-accent/90 text-accent-foreground">
                 <PlusCircle className="mr-2 h-4 w-4" /> Add to Plan
               </Button>
             </DialogFooter>

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval } from 'date-fns';
-import { ChevronLeft, ChevronRight, Loader2, CalendarDays as CalendarDaysIcon, Lock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, CalendarDays as CalendarDaysIcon } from 'lucide-react';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -29,8 +29,6 @@ export default function WeeklyMealPlanPage() {
     Array<{ date: Date; formattedDate: string; meals: PlannedMeal[]; macros: ReturnType<typeof getDailyMacros> }>
   >([]);
   
-  const isSubscribedActive = userProfile?.subscription_status === 'active';
-
   useEffect(() => {
     const weekStart = startOfWeek(currentDateInWeek, { weekStartsOn: 1 }); // Monday
     const weekEnd = endOfWeek(currentDateInWeek, { weekStartsOn: 1 });
@@ -71,29 +69,6 @@ export default function WeeklyMealPlanPage() {
     );
   }
 
-  if (!isSubscribedActive) {
-      return (
-        <PageWrapper title="Weekly Meal Plan">
-           <div className="mb-6 flex justify-end">
-                <Button asChild variant="outline">
-                <Link href="/meal-plan">
-                    <CalendarDaysIcon className="mr-2 h-4 w-4" />
-                    Switch to Daily View
-                </Link>
-                </Button>
-            </div>
-            <Alert variant="default" className="border-accent mt-6">
-                <Lock className="h-5 w-5 text-accent" />
-                <AlertTitle className="text-accent font-headline">Premium Feature Locked</AlertTitle>
-                <AlertDescription>
-                    The Weekly Meal Plan view is available for subscribed users.
-                    Please <Link href="/profile/subscription" className="underline hover:text-primary font-semibold">upgrade your plan</Link> to unlock this feature.
-                </AlertDescription>
-            </Alert>
-        </PageWrapper>
-      )
-  }
-  
   const weekOfLabel = weekDays.length > 0 ? `${format(weekDays[0], 'MMM do')} - ${format(weekDays[weekDays.length -1], 'MMM do, yyyy')}` : 'Loading...';
 
   return (
