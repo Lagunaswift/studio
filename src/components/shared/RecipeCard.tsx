@@ -110,15 +110,9 @@ export function RecipeCard({
         <CardTitle className="font-headline text-lg md:text-xl text-primary group-hover:text-accent transition-colors">{recipe.name}</CardTitle>
       </CardHeader>
       <CardContent className="flex-grow px-4 py-2">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs md:text-sm text-muted-foreground mb-2">
-          <div className="flex items-center">
+        <div className="flex items-center text-xs md:text-sm text-muted-foreground mb-2">
             <Clock className="w-3 h-3 md:w-4 md:h-4 mr-1.5 text-accent" />
             <span>Prep: {recipe.prepTime}, Cook: {recipe.cookTime}</span>
-          </div>
-          <div className="flex items-center">
-            <Users className="w-3 h-3 md:w-4 md:h-4 mr-1.5 text-accent" />
-            <span>Serves: {recipe.servings}</span>
-          </div>
         </div>
         <div className="flex flex-wrap justify-start items-center gap-x-3 gap-y-1 text-xs md:text-sm text-muted-foreground mb-2">
           <div className="flex items-center">
