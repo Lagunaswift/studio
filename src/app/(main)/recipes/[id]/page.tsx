@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useParams, useRouter } from 'next/navigation';
@@ -26,6 +25,7 @@ import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from '@/lib/utils';
 import { suggestRecipeModification, type SuggestRecipeModificationInput, type SuggestRecipeModificationOutput } from '@/ai/flows/suggest-recipe-modification-flow';
+import Link from 'next/link';
 
 
 export default function RecipeDetailPage() {
