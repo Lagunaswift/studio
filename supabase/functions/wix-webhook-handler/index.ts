@@ -63,8 +63,9 @@ serve(async (req: Request) => {
     const receivedSecret = requestBody?.secretKey
     const expectedSecret = WIX_EXPECTED_SECRET;
 
-    console.log(`DEBUG: Received Secret ('${receivedSecret ? String(receivedSecret).substring(0,5)+'...' : 'None'}', type: ${typeof receivedSecret})`);
-    console.log(`DEBUG: Expected Secret ('${expectedSecret ? String(expectedSecret).substring(0,5)+'...' : 'None/Not Set'}', type: ${typeof expectedSecret})`);
+    // TEMPORARY LOGGING FOR DEBUGGING - REMOVE IN PRODUCTION
+    console.log(`[SECURITY-DEBUG] Received Secret: ${receivedSecret}`)
+    console.log(`[SECURITY-DEBUG] Expected Secret from env: ${expectedSecret}`)
 
     if (!expectedSecret) {
       console.error("CRITICAL: WIX_SHARED_SECRET environment variable not set in Supabase Function secrets!")
@@ -72,7 +73,9 @@ serve(async (req: Request) => {
     }
 
     if (receivedSecret !== expectedSecret) {
-      console.warn(`Webhook verification failed: Invalid secret received. Secrets do not match.`);
+      console.warn(`Webhook verification failed: Invalid secret received.`);
+      // Add more detail for debugging
+      console.warn(`Type of received: ${typeof receivedSecret}, Type of expected: ${typeof expectedSecret}`);
       return new Response("Unauthorized: Invalid secret", { status: 401, headers: corsHeaders })
     }
 
