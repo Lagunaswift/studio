@@ -134,10 +134,9 @@ export function RecipeCard({
         </div>
         {recipe.tags && recipe.tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
-            {recipe.tags.slice(0, 3).map(tag => (
+            {recipe.tags.map(tag => (
               <Badge key={tag} variant="secondary" className="text-xs px-1.5 py-0.5">{tag}</Badge>
             ))}
-            {recipe.tags.length > 3 && <Badge variant="outline" className="text-xs px-1.5 py-0.5">+{recipe.tags.length - 3}</Badge>}
           </div>
         )}
       </CardContent>
