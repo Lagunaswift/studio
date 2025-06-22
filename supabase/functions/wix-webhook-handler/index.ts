@@ -64,18 +64,16 @@ serve(async (req: Request) => {
     const expectedSecret = WIX_EXPECTED_SECRET;
 
     // TEMPORARY LOGGING FOR DEBUGGING - REMOVE IN PRODUCTION
-    console.log(`[SECURITY-DEBUG] Received Secret: ${receivedSecret}`)
-    console.log(`[SECURITY-DEBUG] Expected Secret from env: ${expectedSecret}`)
+    console.log(`[SECURITY-DEBUG] Received Secret: '${receivedSecret}' (Type: ${typeof receivedSecret})`)
+    console.log(`[SECURITY-DEBUG] Expected Secret from env: '${expectedSecret}' (Type: ${typeof expectedSecret})`)
 
     if (!expectedSecret) {
       console.error("CRITICAL: WIX_SHARED_SECRET environment variable not set in Supabase Function secrets!")
       return new Response("Internal Server Error: Configuration missing", { status: 500, headers: corsHeaders })
     }
 
-    if (receivedSecret !== expectedSecret) {
+    if (!receivedSecret || !expectedSecret || receivedSecret.trim() !== expectedSecret.trim()) {
       console.warn(`Webhook verification failed: Invalid secret received.`);
-      // Add more detail for debugging
-      console.warn(`Type of received: ${typeof receivedSecret}, Type of expected: ${typeof expectedSecret}`);
       return new Response("Unauthorized: Invalid secret", { status: 401, headers: corsHeaders })
     }
 
