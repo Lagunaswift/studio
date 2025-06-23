@@ -94,15 +94,30 @@ Use these general protein factor ranges in **g/lb of LBM**:
 
 **YOUR TASK:**
 
-1.  Based on the user's inputs, select the correct set of guidelines (Part 1 or Part 2).
-2.  Determine the appropriate protein factor range (min and max) in **g/lb LBM**.
-3.  Calculate LBM in pounds: \`LBM_lbs = leanBodyMassKg * ${KG_TO_LB}\`.
-4.  Calculate the suggested daily protein intake range in GRAMS PER DAY: \`minGrams = minFactor_g_per_lb * LBM_lbs\`, \`maxGrams = maxFactor_g_per_lb * LBM_lbs\`. Set these as \`minProteinGramsPerDay\` and \`maxProteinGramsPerDay\`.
-5.  For the output fields \`minProteinFactor\` and \`maxProteinFactor\`:
-    *   If 'unitPreference' is 'g/lbLBM', these factors should be the direct g/lb LBM values you used.
-    *   If 'unitPreference' is 'g/kgLBM', CONVERT the g/lb LBM factors to g/kg LBM by multiplying by ${KG_TO_LB}.
-6.  Set the 'displayUnit' output field to match 'unitPreference'.
-7.  Provide a concise 'justification' (2-4 sentences) explaining your reasoning, referencing the specific guidelines and user inputs used.
+1.  **CRITICAL FIRST STEP: Convert LBM to Pounds.**
+    The user's LBM is provided in kg. All your calculations MUST use pounds.
+    \`LBM_lbs = leanBodyMassKg * ${KG_TO_LB}\`.
+    Example: If leanBodyMassKg is 50, then LBM_lbs is 50 * 2.20462 = 110.23 lbs.
+
+2.  **Determine Protein Factor Range in g/lb LBM.**
+    Based on the user's inputs, select the correct set of guidelines (Part 1 for females with body fat %, Part 2 for others).
+    This gives you a min and max factor in **g/lb LBM**.
+
+3.  **Calculate Daily Protein Intake in Grams.**
+    Use the LBM in pounds from Step 1 and the factors from Step 2.
+    \`minProteinGramsPerDay = minFactor_g_per_lb * LBM_lbs\`
+    \`maxProteinGramsPerDay = maxFactor_g_per_lb * LBM_lbs\`
+
+4.  **Prepare Output Factors for Display.**
+    The output fields \`minProteinFactor\` and \`maxProteinFactor\` depend on the user's 'unitPreference'.
+    *   If 'unitPreference' is 'g/lbLBM', use the original factors from Step 2.
+    *   If 'unitPreference' is 'g/kgLBM', you MUST CONVERT the factors from Step 2.
+        \`outputMinFactor_g_per_kg = minFactor_g_per_lb * ${KG_TO_LB}\`
+        \`outputMaxFactor_g_per_kg = maxFactor_g_per_lb * ${KG_TO_LB}\`
+    Set the 'displayUnit' output field to match 'unitPreference'.
+
+5.  **Provide Justification.**
+    Provide a concise 'justification' (2-4 sentences) explaining your reasoning, referencing the specific guidelines and user inputs used.
 
 Output the entire response as a single, valid JSON object that conforms EXACTLY to the 'SuggestProteinIntakeOutputSchema'. Do NOT include any text or formatting outside of this JSON object.
 Ensure all numerical outputs are numbers, not strings.
