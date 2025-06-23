@@ -76,7 +76,7 @@ const sections: GuideSection[] = [
     content: [
       "While our filters offer a convenient way to browse for lifestyle choices, we strongly recommend using the <strong>search bar and tag system</strong> for the most control over managing serious allergies, intolerances, or medical conditions.",
       "You can search for recipes that <em>do</em> contain an ingredient to exclude them, or review the specific #tags on each recipe. This, combined with carefully reading all ingredient labels on the final products, is the safest way to manage your specific needs.",
-      "<strong>Disclaimer:</strong> This app is an informational tool, not a substitute for medical advice. You are fully responsible for managing your own dietary needs. Always double-check product labels."
+      "<strong>Disclaimer:</strong> This app is an informational tool, not a substitute for medical advice. AI-generated suggestions and recipe filters may not be perfectly accurate. You are fully responsible for managing your own dietary needs. Always double-check product labels."
     ]
   },
   {
