@@ -130,6 +130,7 @@ const SidebarProvider = React.forwardRef<
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH,
+                "--sidebar-width-mobile": SIDEBAR_WIDTH_MOBILE,
                 "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
                 ...style,
               } as React.CSSProperties
@@ -193,12 +194,7 @@ const Sidebar = React.forwardRef<
             data-sidebar="sidebar"
             data-mobile="true"
             // Removed aria-labelledby="sidebar-title"
-            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground"
-            style={
-              {
-                "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
-              } as React.CSSProperties
-            }
+            className="w-[--sidebar-width-mobile] bg-sidebar p-0 text-sidebar-foreground"
             side={side}
           >
             <div className="flex h-full w-full flex-col">{children}</div>
