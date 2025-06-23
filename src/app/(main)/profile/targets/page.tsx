@@ -1,4 +1,3 @@
-
 "use client";
 
 import { PageWrapper } from '@/components/layout/PageWrapper';
@@ -19,6 +18,7 @@ import { Sparkles, Loader2, Info, Lightbulb, Droplets, AlertTriangle, HelpCircle
 import Link from 'next/link';
 import { Slider } from '@/components/ui/slider';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Label } from '@/components/ui/label';
 
 
 const macroTargetSchema = z.object({
