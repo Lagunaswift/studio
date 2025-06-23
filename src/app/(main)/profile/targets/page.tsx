@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { suggestProteinIntake, type SuggestProteinIntakeInput, type SuggestProteinIntakeOutput } from '@/ai/flows/suggest-protein-intake-flow';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Sparkles, Loader2, Info, Lightbulb, Droplets } from "lucide-react";
+import { Sparkles, Loader2, Info, Lightbulb, Droplets, AlertTriangle } from "lucide-react";
 import Link from 'next/link';
 
 const macroTargetSchema = z.object({
@@ -42,6 +42,11 @@ export default function DietaryTargetsPage() {
   const [fatSuggestion, setFatSuggestion] = useState<FatSuggestion | null>(null);
   const [fatSuggestionError, setFatSuggestionError] = useState<string | null>(null);
 
+  // NEW states for warnings
+  const [weightLossWarning, setWeightLossWarning] = useState<string | null>(null);
+  const [energyAvailabilityWarning, setEnergyAvailabilityWarning] = useState<string | null>(null);
+
+
   const macroForm = useForm<MacroTargetFormValues>({
     resolver: zodResolver(macroTargetSchema),
     defaultValues: userProfile?.macroTargets || { calories: 0, protein: 150, carbs: 200, fat: 60 },
@@ -58,6 +63,7 @@ export default function DietaryTargetsPage() {
   const proteinValue = macroForm.watch("protein");
   const carbsValue = macroForm.watch("carbs");
   const fatValue = macroForm.watch("fat");
+  const caloriesValue = macroForm.watch("calories");
 
   useEffect(() => {
     const protein = parseFloat(proteinValue as any) || 0;
@@ -73,6 +79,49 @@ export default function DietaryTargetsPage() {
       });
     }
   }, [proteinValue, carbsValue, fatValue, macroForm]);
+
+  // NEW useEffect for warnings
+  useEffect(() => {
+    if (!userProfile || !caloriesValue || isNaN(caloriesValue) || caloriesValue <= 0) {
+        setWeightLossWarning(null);
+        setEnergyAvailabilityWarning(null);
+        return;
+    }
+
+    const { tdee, weightKg, sex, leanBodyMassKg } = userProfile;
+
+    // Weight loss check
+    if (tdee && weightKg && tdee > caloriesValue) {
+        const deficit = tdee - caloriesValue;
+        const weeklyKgLoss = (deficit * 7) / 7700; // 7700 kcal per kg of fat
+        const weeklyPercentageLoss = (weeklyKgLoss / weightKg) * 100;
+
+        if (weeklyPercentageLoss > 1) {
+            setWeightLossWarning(
+                `A target of ${Math.round(caloriesValue)} kcal may lead to a weekly weight loss of over 1% of your body mass. Rapid weight loss can be unsustainable and may risk muscle loss. A daily deficit of around ${Math.round((weightKg * 0.01 * 7700) / 7)} kcal is generally a safer upper limit.`
+            );
+        } else {
+            setWeightLossWarning(null);
+        }
+    } else {
+        setWeightLossWarning(null);
+    }
+
+    // Low Energy Availability check for females
+    if (sex === 'female' && leanBodyMassKg) {
+        const energyPerLbm = caloriesValue / leanBodyMassKg;
+        if (energyPerLbm < 30) {
+            setEnergyAvailabilityWarning(
+                `For females, an intake below 30-45 kcal per kg of lean body mass can increase health risks, including impacts on metabolic rate and menstrual function. Please consult a healthcare professional if you have concerns.`
+            );
+        } else {
+            setEnergyAvailabilityWarning(null);
+        }
+    } else {
+        setEnergyAvailabilityWarning(null);
+    }
+  }, [caloriesValue, userProfile]);
+
 
   const handleMacroSubmit: SubmitHandler<MacroTargetFormValues> = (data) => {
     setMacroTargets(data);
@@ -342,6 +391,25 @@ export default function DietaryTargetsPage() {
                   </FormItem>
                 )}
               />
+
+              {(weightLossWarning || energyAvailabilityWarning) && (
+                <div className="space-y-4 pt-4">
+                  {weightLossWarning && (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Potential for Rapid Weight Loss</AlertTitle>
+                      <AlertDescription>{weightLossWarning}</AlertDescription>
+                    </Alert>
+                  )}
+                  {energyAvailabilityWarning && (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Low Energy Availability Warning</AlertTitle>
+                      <AlertDescription>{energyAvailabilityWarning}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              )}
             </CardContent>
             <CardFooter>
               <Button type="submit" disabled={macroForm.formState.isSubmitting || !macroForm.formState.isDirty} className="bg-accent hover:bg-accent/90 text-accent-foreground">
@@ -354,3 +422,4 @@ export default function DietaryTargetsPage() {
     </PageWrapper>
   );
 }
+
