@@ -300,7 +300,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setFavoriteRecipeIds([]);
         setIsAppDataLoading(false);
     }
-  }, [user, isRecipeCacheLoading, fetchAllUserData, userProfile]);
+  }, [user, isRecipeCacheLoading, fetchAllUserData]);
 
   // Save state to local storage whenever it changes
   useEffect(() => {
