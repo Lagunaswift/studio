@@ -17,7 +17,16 @@ export function TermsAcceptanceModal({ isOpen, onAccept }: TermsAcceptanceModalP
 
   return (
     <Dialog open={isOpen}>
-      <DialogContent className="sm:max-w-md" hideCloseButton>
+      <DialogContent 
+        className="sm:max-w-md" 
+        hideCloseButton
+        onInteractOutside={(e) => {
+          e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          e.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="text-2xl font-headline text-primary">Welcome to Macro Teal Meal Planner!</DialogTitle>
           <DialogDescription className="pt-2">
