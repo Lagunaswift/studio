@@ -149,41 +149,33 @@ export default function DietaryTargetsPage() {
   };
 
   const handleGetFatSuggestion = () => {
-    setProteinSuggestion(null); 
-    setAiError(null); 
+    setProteinSuggestion(null);
+    setAiError(null);
     setFatSuggestion(null);
     setFatSuggestionError(null);
 
     if (!userProfile) {
-      setFatSuggestionError("User profile not loaded. Please try refreshing.");
-      return;
+        setFatSuggestionError("User profile not loaded. Please try refreshing.");
+        return;
     }
     if (!userProfile.tdee) {
-      setFatSuggestionError(
-        "TDEE (Total Daily Energy Expenditure) is not calculated. Please complete your User Info (height, weight, age, sex, activity level) on the User Info page."
-      );
-       toast({
-        title: "TDEE Needed for Fat Suggestion",
-        description: (
-          <span>
-            Complete your <Link href="/profile/user-info" className="underline">User Information</Link> to calculate TDEE.
-          </span>
-        ),
-        variant: "destructive",
-      });
-      return;
-    }
-    if (userProfile.sex !== 'female') {
-      setFatSuggestionError(
-        "This specific fat suggestion (around 33% of TDEE) is tailored for female profiles based on common guidelines. Your profile sex is not set to 'female'."
-      );
-      return;
+        setFatSuggestionError("TDEE (Total Daily Energy Expenditure) is not calculated. Please complete your User Info (height, weight, age, sex, activity level) on the User Info page.");
+        toast({
+            title: "TDEE Needed for Fat Suggestion",
+            description: (
+                <span>
+                    Complete your <Link href="/profile/user-info" className="underline">User Information</Link> to calculate TDEE.
+                </span>
+            ),
+            variant: "destructive",
+        });
+        return;
     }
 
-    const suggestedFatGrams = (userProfile.tdee * 0.33) / 9;
+    const suggestedFatGrams = (userProfile.tdee * 0.30) / 9; // Using a general 30% rule
     setFatSuggestion({
-      suggestedFatGrams: Math.round(suggestedFatGrams),
-      justification: `General guidelines suggest dietary fat can make up 20-35% of total daily calories. For women, aiming towards 33% of TDEE (your TDEE is ~${userProfile.tdee.toFixed(0)} kcal) can be beneficial for hormone health and satiety. This suggests approximately ${Math.round(suggestedFatGrams)}g of fat per day.`,
+        suggestedFatGrams: Math.round(suggestedFatGrams),
+        justification: `A balanced starting point for dietary fat is 20-35% of total daily calories. Based on your estimated TDEE of ~${userProfile.tdee.toFixed(0)} kcal, a target of 30% suggests approximately ${Math.round(suggestedFatGrams)}g of fat per day. This provides essential fatty acids and supports hormone function.`,
     });
   };
 
@@ -200,6 +192,17 @@ export default function DietaryTargetsPage() {
 
   return (
     <PageWrapper title="Dietary Targets">
+       <Alert className="mb-8 border-accent">
+        <Lightbulb className="h-4 w-4" />
+        <AlertTitle className="font-semibold text-accent">How to Set Your Targets for Fat Loss or Muscle Gain</AlertTitle>
+        <AlertDescription>
+          <ul className="list-disc pl-5 mt-2 space-y-1 text-sm">
+            <li>First, complete your <Link href="/profile/user-info" className="underline hover:text-primary">User Info</Link> page to calculate your TDEE (Total Daily Energy Expenditure).</li>
+            <li>Use the 'Suggest Protein' and 'Suggest Fat' buttons below to get AI-powered and calculated starting points for these macros.</li>
+            <li>Finally, adjust your 'Carbohydrates' input to set your total daily calories. For **fat loss**, aim for your total calories to be below your TDEE. For **muscle gain**, aim for a slight surplus above your TDEE.</li>
+          </ul>
+        </AlertDescription>
+      </Alert>
       <Card className="max-w-xl mx-auto">
         <CardHeader>
           <CardTitle>Caloric & Macro Targets</CardTitle>
@@ -283,11 +286,11 @@ export default function DietaryTargetsPage() {
                           variant="outline" 
                           size="sm" 
                           onClick={handleGetFatSuggestion}
-                          disabled={!userProfile || !userProfile.tdee || userProfile.sex !== 'female'}
-                          title={!userProfile || !userProfile.tdee || userProfile.sex !== 'female' ? "Requires user info (TDEE & Sex='female')" : "Get Suggestion"}
+                          disabled={!userProfile || !userProfile.tdee}
+                          title={!userProfile || !userProfile.tdee ? "Requires user info to calculate TDEE" : "Get Suggestion"}
                         >
                          <Droplets className="mr-2 h-4 w-4 text-accent" />
-                         Suggest Fat (Women)
+                         Suggest Fat
                        </Button>
                     </div>
                     <FormControl>
@@ -301,7 +304,7 @@ export default function DietaryTargetsPage() {
               {fatSuggestionError && (
                 <Alert variant="destructive">
                   <Info className="h-4 w-4" />
-                  <AlertTitle>Fat Suggestion Info</AlertTitle>
+                  <AlertTitle>Suggestion Info</AlertTitle>
                   <AlertDescription>{fatSuggestionError} <Link href="/profile/user-info" className="underline">Update User Info here.</Link></AlertDescription>
                 </Alert>
               )}
