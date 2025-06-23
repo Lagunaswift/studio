@@ -53,7 +53,6 @@ export default function HomePage() {
   const {
     getDailyMacros,
     setMacroTargets,
-    mealPlan,
     allRecipesCache,
     isRecipeCacheLoading: isAppRecipeCacheLoading,
     userProfile: appContextUserProfile,
@@ -62,8 +61,6 @@ export default function HomePage() {
   const { toast } = useToast();
 
   const [clientTodayDate, setClientTodayDate] = useState<string>('');
-  const [clientTodayMacros, setClientTodayMacros] = useState<Macros>({ calories: 0, protein: 0, carbs: 0, fat: 0 });
-  const [dailyPlannedMeals, setDailyPlannedMeals] = useState<PlannedMeal[]>([]);
   const [showSetTargetsDialog, setShowSetTargetsDialog] = useState(false);
   const [featuredRecipe, setFeaturedRecipe] = useState<Recipe | null>(null);
   const [quickRecipe, setQuickRecipe] = useState<Recipe | null>(null);
@@ -83,15 +80,9 @@ export default function HomePage() {
     setClientTodayDate(format(today, 'yyyy-MM-dd'));
   }, []);
 
-  useEffect(() => {
-    if (clientTodayDate && getDailyMacros) {
-      const newMacros = getDailyMacros(clientTodayDate);
-      setClientTodayMacros(newMacros);
-      const todaysMeals = getMealsForDate(clientTodayDate);
-      setDailyPlannedMeals(todaysMeals);
-    }
-  }, [clientTodayDate, getDailyMacros, getMealsForDate, mealPlan]);
-
+  // Directly calculate derived state from context instead of syncing to local state
+  const clientTodayMacros = clientTodayDate && getDailyMacros ? getDailyMacros(clientTodayDate) : { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  const dailyPlannedMeals = clientTodayDate && getMealsForDate ? getMealsForDate(clientTodayDate) : [];
 
   useEffect(() => {
     // This effect runs when the recipe data is loaded.
