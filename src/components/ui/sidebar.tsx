@@ -189,11 +189,10 @@ const Sidebar = React.forwardRef<
 
     if (isMobile) {
       return (
-        <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+        <Sheet open={openMobile} onOpenChange={setOpenMobile}>
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
-            // Removed aria-labelledby="sidebar-title"
             className="w-[--sidebar-width-mobile] bg-sidebar p-0 text-sidebar-foreground"
             side={side}
           >
