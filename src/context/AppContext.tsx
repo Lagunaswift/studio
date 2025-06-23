@@ -252,17 +252,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     else console.error("User recipes fetch error:", recipesRes.error?.message);
 
     if (mealPlanRes.data) {
-        const populatedMealPlan = mealPlanRes.data.map(pm => ({
-            id: pm.id, recipeId: pm.recipe_id, date: pm.meal_date,
-            mealType: pm.meal_type, servings: pm.servings,
-            recipeDetails: allRecipesCache.find(r => r.id === pm.recipe_id) || undefined,
+        const rawMealPlan = mealPlanRes.data.map((pm: any) => ({
+            id: pm.id,
+            recipeId: pm.recipe_id,
+            date: pm.meal_date,
+            mealType: pm.meal_type,
+            servings: pm.servings,
         }));
-        setMealPlan(populatedMealPlan);
+        setMealPlan(rawMealPlan);
     } else console.error("Meal plan fetch error:", mealPlanRes.error?.message);
 
     if (pantryRes.data) setPantryItems(pantryRes.data.map((p:any) => ({...p, expiryDate: p.expiry_date})));
     else console.error("Pantry fetch error:", pantryRes.error?.message);
-  }, [user, allRecipesCache]);
+  }, [user]);
 
   // Refetch all user data when user changes
   useEffect(() => {
@@ -287,8 +289,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setIsAppDataLoading(false);
             console.log("Supabase data fetch complete.");
         });
-    } else if (!user) {
-        // Clear data on logout
+    } else if (!user && userProfile !== null) {
+        // Clear data on logout, only if there's a profile to clear
+        console.log("User logged out, clearing data...");
         setMealPlan([]);
         setShoppingList([]);
         setPantryItems([]);
@@ -297,7 +300,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setFavoriteRecipeIds([]);
         setIsAppDataLoading(false);
     }
-  }, [user, isRecipeCacheLoading, fetchAllUserData]);
+  }, [user, isRecipeCacheLoading, fetchAllUserData, userProfile]);
 
   // Save state to local storage whenever it changes
   useEffect(() => {
@@ -332,7 +335,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     if (error) console.error("Error adding meal to plan:", error);
     else if (data) {
-      const newPlannedMeal: PlannedMeal = { id: data.id, recipeId: data.recipe_id, date: data.meal_date, mealType: data.meal_type, servings: data.servings, recipeDetails: recipe };
+      const newPlannedMeal: PlannedMeal = { id: data.id, recipeId: data.recipe_id, date: data.meal_date, mealType: data.meal_type, servings: data.servings };
       setMealPlan(prev => [...prev, newPlannedMeal]);
     }
   }, [user]);
@@ -547,7 +550,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [user, fetchAllUserData]);
 
   const getDailyMacros = useCallback((date: string): Macros => calculateTotalMacrosUtil(mealPlan.filter(pm => pm.date === date), allRecipesCache), [mealPlan, allRecipesCache]);
-  const getMealsForDate = useCallback((date: string): PlannedMeal[] => mealPlan.filter(pm => pm.date === date), [mealPlan]);
+  
+  const getMealsForDate = useCallback((date: string): PlannedMeal[] => {
+    return mealPlan
+      .filter(pm => pm.date === date)
+      .map(pm => ({
+        ...pm,
+        recipeDetails: allRecipesCache.find(r => r.id === pm.recipeId),
+      }));
+  }, [mealPlan, allRecipesCache]);
+
   const parseIngredient = useCallback((ingredientString: string) => parseIngredientStringUtil(ingredientString), []);
   const assignIngredientCategory = useCallback((ingredientName: string) => assignCategoryUtil(ingredientName), []);
   const toggleShoppingListItem = useCallback(async (itemId: string) => { /* This is complex now - shopping list is derived. Might need a different approach. For now, it is a no-op */ }, []);
@@ -585,3 +597,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
