@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useParams, useRouter } from 'next/navigation';
@@ -340,7 +341,7 @@ export default function RecipeDetailPage() {
             </Button>
         </div>
         <CardHeader className="p-6">
-          <CardTitle className="text-3xl md:text-4xl font-bold font-headline text-primary">{recipe.name}</CardTitle>
+          <CardTitle className="text-3xl md:text-4xl font-bold font-headline text-primary break-words">{recipe.name}</CardTitle>
           {imageLoadError && !error && <Alert variant="default" className="mt-2 border-accent"><AlertDescription>Original image not found. Displaying placeholder for Recipe ID {recipe.id}.</AlertDescription></Alert>}
           {error && <Alert variant="destructive" className="mt-2"><AlertDescription>{error} Displaying placeholder.</AlertDescription></Alert>}
           {recipe.description && <p className="text-muted-foreground mt-2">{recipe.description}</p>}

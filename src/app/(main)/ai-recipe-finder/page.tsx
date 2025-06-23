@@ -169,9 +169,9 @@ export default function AIRecipeFinderPage() {
                   {suggestion.suggestedRecipes.map((item) => (
                     <Card key={item.recipeId} className="bg-card/70 border border-border hover:shadow-md transition-shadow">
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-lg text-accent flex items-center">
-                          <CookingPot className="w-5 h-5 mr-2"/>
-                          <Link href={`/recipes/${item.recipeId}`} className="hover:underline text-primary">{item.recipeName}</Link>
+                        <CardTitle className="text-lg text-accent flex items-center overflow-hidden">
+                          <CookingPot className="w-5 h-5 mr-2 shrink-0"/>
+                          <Link href={`/recipes/${item.recipeId}`} className="hover:underline text-primary truncate" title={item.recipeName}>{item.recipeName}</Link>
                         </CardTitle>
                         <div className="flex items-center gap-x-4 text-sm text-muted-foreground pt-1">
                           <div className="flex items-center" title="How well your ingredients are used in this recipe.">

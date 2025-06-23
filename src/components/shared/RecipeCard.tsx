@@ -1,4 +1,6 @@
 
+"use client";
+
 import Image from 'next/image';
 import type { Recipe } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -102,7 +104,9 @@ export function RecipeCard({
         )}
       </div>
       <CardHeader className="pb-2 pt-4 px-4">
-        <CardTitle className="font-headline text-lg md:text-xl text-primary group-hover:text-accent transition-colors">{recipe.name}</CardTitle>
+        <CardTitle className="font-headline text-lg md:text-xl text-primary group-hover:text-accent transition-colors truncate" title={recipe.name}>
+            {recipe.name}
+        </CardTitle>
       </CardHeader>
       <CardContent className="flex-grow px-4 py-2">
         <div className="flex items-center text-xs md:text-sm text-muted-foreground mb-2">
@@ -129,9 +133,12 @@ export function RecipeCard({
         </div>
         {recipe.tags && recipe.tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
-            {recipe.tags.map(tag => (
+            {recipe.tags.slice(0, 3).map(tag => (
               <Badge key={tag} variant="secondary" className="text-xs px-1.5 py-0.5">{tag}</Badge>
             ))}
+            {recipe.tags.length > 3 && (
+                <Badge variant="outline" className="text-xs px-1.5 py-0.5">+{recipe.tags.length - 3}</Badge>
+            )}
           </div>
         )}
       </CardContent>
