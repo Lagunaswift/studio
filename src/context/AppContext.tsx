@@ -142,7 +142,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [mealPlan, setMealPlan] = useState<PlannedMeal[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
@@ -268,39 +268,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Refetch all user data when user changes
   useEffect(() => {
-    if (user && !isRecipeCacheLoading) {
-        console.log("User detected, loading user data...");
-        setIsAppDataLoading(true);
-
-        // Load from cache first for instant UI
-        const cachedProfile = loadState<UserProfileSettings>(`userProfile_${user.id}`);
-        if (cachedProfile) setUserProfile(cachedProfile);
-        const cachedMealPlan = loadState<PlannedMeal[]>(`mealPlan_${user.id}`);
-        if (cachedMealPlan) setMealPlan(cachedMealPlan);
-        const cachedPantry = loadState<PantryItem[]>(`pantryItems_${user.id}`);
-        if (cachedPantry) setPantryItems(cachedPantry);
-        const cachedUserRecipes = loadState<Recipe[]>(`userRecipes_${user.id}`);
-        if (cachedUserRecipes) setUserRecipes(cachedUserRecipes);
-        const cachedFavorites = loadState<number[]>(`favoriteRecipeIds_${user.id}`);
-        if (cachedFavorites) setFavoriteRecipeIds(cachedFavorites);
-
-        // Now fetch from Supabase to get the latest data
-        fetchAllUserData(user.id).finally(() => {
-            setIsAppDataLoading(false);
-            console.log("Supabase data fetch complete.");
-        });
-    } else if (!user && userProfile !== null) {
-        // Clear data on logout, only if there's a profile to clear
-        console.log("User logged out, clearing data...");
-        setMealPlan([]);
-        setShoppingList([]);
-        setPantryItems([]);
-        setUserProfile(null);
-        setUserRecipes([]);
-        setFavoriteRecipeIds([]);
-        setIsAppDataLoading(false);
+    // Don't do anything until auth state and static recipes are settled
+    if (isAuthLoading || isRecipeCacheLoading) {
+      return; 
     }
-  }, [user, isRecipeCacheLoading, fetchAllUserData]);
+
+    if (user) {
+      // All prerequisites met, and we have a user. Fetch their data.
+      console.log("Auth and recipe cache ready. User detected, loading user data...");
+      setIsAppDataLoading(true);
+      fetchAllUserData(user.id).finally(() => {
+        setIsAppDataLoading(false);
+        console.log("Supabase data fetch complete.");
+      });
+    } else {
+      // All prerequisites met, but no user is logged in. Clear state and finish loading.
+      console.log("Auth and recipe cache ready. No user logged in. Clearing data.");
+      setMealPlan([]);
+      setPantryItems([]);
+      setUserProfile(null);
+      setUserRecipes([]);
+      setFavoriteRecipeIds([]);
+      setIsAppDataLoading(false);
+    }
+  }, [user, isAuthLoading, isRecipeCacheLoading, fetchAllUserData]);
 
   // Save state to local storage whenever it changes
   useEffect(() => {
@@ -591,8 +582,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms,
   ]);
 
-  if (isAppDataLoading && user) {
-     return <div className="flex h-screen items-center justify-center bg-background text-foreground">Loading your data...</div>;
+  // Show a loading screen while auth or app data is loading
+  if (isAuthLoading || (isAppDataLoading && user)) {
+    return <div className="flex h-screen items-center justify-center bg-background text-foreground">Loading...</div>;
   }
   
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
