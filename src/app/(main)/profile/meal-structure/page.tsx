@@ -87,7 +87,7 @@ export default function MealStructurePage() {
         <CardHeader>
           <CardTitle>Define Meal Slots</CardTitle>
           <CardDescription>
-            Set up the meals you typically have throughout the day. This will affect how your meal plan is organized.
+            Set up your daily meal structure. The "Slot Name" is your custom label (e.g., "Post-Workout Meal"), while the "Base Meal Type" tells the AI what kind of meal to suggest (e.g., a light snack or a full dinner).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -123,6 +123,9 @@ export default function MealStructurePage() {
                         ))}
                       </SelectContent>
                     </Select>
+                     <p className="text-[0.8rem] text-muted-foreground pt-2">
+                        Helps the AI choose appropriate recipes for this slot.
+                    </p>
                   </div>
                 </div>
                 <Button 
