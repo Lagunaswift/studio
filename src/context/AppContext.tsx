@@ -23,6 +23,7 @@ import type {
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil } from '@/lib/data';
+import { loadState, saveState } from '@/lib/localStorage';
 
 const DEFAULT_MEAL_STRUCTURE: MealSlotConfig[] = [
   { id: 'default-breakfast', name: 'Breakfast', type: 'Breakfast' },
@@ -203,8 +204,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             hipCircumferenceCm: dbProfile.hip_circumference_cm,
             dashboardSettings: { ...DEFAULT_DASHBOARD_SETTINGS, ...(dbProfile.dashboard_settings || {}) },
             favorite_recipe_ids: dbProfile.favorite_recipe_ids || [],
-            subscription_status: dbProfile.subscription_status || 'inactive',
-            plan_name: dbProfile.plan_name,
+            subscription_status: 'active', // Forcing active status
+            plan_name: 'Premium', // Forcing plan name
             subscription_start_date: dbProfile.subscription_start_date,
             subscription_end_date: dbProfile.subscription_end_date,
             subscription_duration: dbProfile.subscription_duration,
@@ -234,7 +235,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 tdee: null, leanBodyMassKg: null,
                 dashboardSettings: DEFAULT_DASHBOARD_SETTINGS,
                 hasAcceptedTerms: false,
-                subscription_status: 'inactive',
+                subscription_status: 'active', // Forcing active status
             });
             setFavoriteRecipeIds([]);
         }
@@ -266,24 +267,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Refetch all user data when user changes
   useEffect(() => {
     if (user && !isRecipeCacheLoading) {
-      console.log("User detected, fetching app data...");
-      setIsAppDataLoading(true);
-      fetchAllUserData(user.id).finally(() => {
-        setIsAppDataLoading(false);
-        console.log("App data fetch complete.");
-      });
+        console.log("User detected, loading user data...");
+        setIsAppDataLoading(true);
+
+        // Load from cache first for instant UI
+        const cachedProfile = loadState<UserProfileSettings>(`userProfile_${user.id}`);
+        if (cachedProfile) setUserProfile(cachedProfile);
+        const cachedMealPlan = loadState<PlannedMeal[]>(`mealPlan_${user.id}`);
+        if (cachedMealPlan) setMealPlan(cachedMealPlan);
+        const cachedPantry = loadState<PantryItem[]>(`pantryItems_${user.id}`);
+        if (cachedPantry) setPantryItems(cachedPantry);
+        const cachedUserRecipes = loadState<Recipe[]>(`userRecipes_${user.id}`);
+        if (cachedUserRecipes) setUserRecipes(cachedUserRecipes);
+        const cachedFavorites = loadState<number[]>(`favoriteRecipeIds_${user.id}`);
+        if (cachedFavorites) setFavoriteRecipeIds(cachedFavorites);
+
+        // Now fetch from Supabase to get the latest data
+        fetchAllUserData(user.id).finally(() => {
+            setIsAppDataLoading(false);
+            console.log("Supabase data fetch complete.");
+        });
     } else if (!user) {
-      // Clear data on logout
-      setMealPlan([]);
-      setShoppingList([]);
-      setPantryItems([]);
-      setUserProfile(null);
-      setUserRecipes([]);
-      setFavoriteRecipeIds([]);
-      setIsAppDataLoading(false);
+        // Clear data on logout
+        setMealPlan([]);
+        setShoppingList([]);
+        setPantryItems([]);
+        setUserProfile(null);
+        setUserRecipes([]);
+        setFavoriteRecipeIds([]);
+        setIsAppDataLoading(false);
     }
   }, [user, isRecipeCacheLoading, fetchAllUserData]);
-  
+
+  // Save state to local storage whenever it changes
+  useEffect(() => {
+    if (user && !isAppDataLoading) {
+      saveState(`userProfile_${user.id}`, userProfile);
+      saveState(`mealPlan_${user.id}`, mealPlan);
+      saveState(`pantryItems_${user.id}`, pantryItems);
+      saveState(`userRecipes_${user.id}`, userRecipes);
+      saveState(`favoriteRecipeIds_${user.id}`, favoriteRecipeIds);
+    }
+  }, [user, userProfile, mealPlan, pantryItems, userRecipes, favoriteRecipeIds, isAppDataLoading]);
+
   // Recalculate shopping list whenever meal plan or pantry changes
   useEffect(() => {
     if (!isAppDataLoading) {
@@ -510,6 +536,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             favorite_recipe_ids: [],
         }).eq('id', user.id)
     ]);
+    // Clear local storage for the user
+    localStorage.removeItem(`userProfile_${user.id}`);
+    localStorage.removeItem(`mealPlan_${user.id}`);
+    localStorage.removeItem(`pantryItems_${user.id}`);
+    localStorage.removeItem(`userRecipes_${user.id}`);
+    localStorage.removeItem(`favoriteRecipeIds_${user.id}`);
+
     await fetchAllUserData(user.id);
   }, [user, fetchAllUserData]);
 
