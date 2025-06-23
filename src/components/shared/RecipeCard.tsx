@@ -100,7 +100,7 @@ export function RecipeCard({
         )}
       </div>
       <CardHeader className="pb-2 pt-4 px-4">
-        <CardTitle className="font-headline text-lg md:text-xl text-primary group-hover:text-accent transition-colors h-[3.5rem] line-clamp-2" title={recipe.name}>
+        <CardTitle className="font-headline text-lg md:text-xl text-primary group-hover:text-accent transition-colors h-[3.5rem] line-clamp-2 break-words" title={recipe.name}>
             {recipe.name}
         </CardTitle>
       </CardHeader>
