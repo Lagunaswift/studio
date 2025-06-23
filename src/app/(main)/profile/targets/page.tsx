@@ -143,6 +143,19 @@ export default function DietaryTargetsPage() {
       return;
     }
 
+    if (userProfile.sex === 'female' && !userProfile.bodyFatPercentage) {
+       setAiError("For female-specific protein targets, please provide your Body Fat % on the User Info page. The AI will use general guidelines otherwise.");
+       toast({
+        title: "Body Fat % Recommended",
+        description: (
+          <span>
+            For the most accurate female-specific protein targets, add your Body Fat % on the <Link href="/profile/user-info" className="underline">User Info</Link> page.
+          </span>
+        ),
+        variant: "default",
+      });
+    }
+
     setIsAISuggesting(true);
     setProteinSuggestion(null);
     setAiError(null);
@@ -153,6 +166,7 @@ export default function DietaryTargetsPage() {
     try {
       const input: SuggestProteinIntakeInput = {
         leanBodyMassKg: userProfile.leanBodyMassKg,
+        bodyFatPercentage: userProfile.bodyFatPercentage,
         athleteType: userProfile.athleteType || 'notSpecified',
         primaryGoal: userProfile.primaryGoal || 'notSpecified',
         sex: userProfile.sex || 'notSpecified',
