@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -301,7 +300,7 @@ export default function MealPlanPage() {
                     )}
                     <div className="sm:w-2/3 p-4 flex flex-col justify-between">
                       <div>
-                        <CardTitle className="text-lg font-headline text-primary truncate" title={mealToDisplay.recipeDetails?.name}>
+                        <CardTitle className="text-lg font-headline text-primary h-[3.5rem] line-clamp-2" title={mealToDisplay.recipeDetails?.name ?? ''}>
                           <Link href={`/recipes/${mealToDisplay.recipeId}`} className="hover:underline">{mealToDisplay.recipeDetails?.name}</Link>
                         </CardTitle>
                         <CardDescription>Servings: {mealToDisplay.servings}</CardDescription>

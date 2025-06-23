@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -251,8 +250,11 @@ export default function AISuggestionsPage() {
                   return (
                     <Card key={item.mealSlotId} className="bg-card/70 border border-border hover:shadow-md transition-shadow">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-lg text-accent flex items-center">
-                          <ChefHat className="w-5 h-5 mr-2"/> {item.mealSlotName}: <Link href={`/recipes/${item.recipeId}`} className="ml-1 hover:underline text-primary">{item.recipeName}</Link>
+                        <CardTitle className="text-lg text-accent flex items-start h-[3.5rem] overflow-hidden">
+                          <ChefHat className="w-5 h-5 mr-2 shrink-0 mt-1"/>
+                          <div className="line-clamp-2">
+                            <span className="font-semibold">{item.mealSlotName}:</span> <Link href={`/recipes/${item.recipeId}`} className="ml-1 hover:underline text-primary">{item.recipeName}</Link>
+                          </div>
                         </CardTitle>
                         <CardDescription>Servings: {item.servings}</CardDescription>
                       </CardHeader>

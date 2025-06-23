@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -263,12 +262,12 @@ export default function HomePage() {
                   {dailyPlannedMeals.map(meal => (
                     <li key={meal.id} className="p-3 bg-muted/30 rounded-md hover:bg-muted/50 transition-colors">
                       <div className="flex justify-between items-center">
-                        <span className="font-semibold text-primary-focus">
-                          <Link href={`/recipes/${meal.recipeId}`} className="hover:underline">
+                        <span className="font-semibold text-primary-focus flex-grow min-w-0">
+                          <Link href={`/recipes/${meal.recipeId}`} className="hover:underline line-clamp-2 break-words">
                             {meal.recipeDetails?.name || 'Recipe Name Missing'}
                           </Link>
                         </span>
-                        <Badge variant="outline" className="text-xs">{meal.mealType}</Badge>
+                        <Badge variant="outline" className="text-xs ml-2 flex-shrink-0">{meal.mealType}</Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">Servings: {meal.servings}</p>
                       {meal.recipeDetails && (

@@ -1,4 +1,3 @@
-
 "use client";
 
 import Image from 'next/image';
@@ -31,13 +30,10 @@ export function RecipeCard({
 }: RecipeCardProps) {
   const { toggleFavoriteRecipe, isRecipeFavorite } = useAppContext();
   
-  const defaultPlaceholder = `https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipe?.id || 'Unknown'}`;
+  const defaultPlaceholder = `https://placehold.co/600x400.png?text=Recipe+ID+${recipe?.id || 'Unknown'}`;
   
-  // State to track image loading errors specifically.
   const [imageError, setImageError] = useState(false);
 
-  // When the recipe prop changes, reset the image error state.
-  // This gives the new image a chance to load.
   useEffect(() => {
     setImageError(!recipe?.image);
   }, [recipe]);
@@ -104,7 +100,7 @@ export function RecipeCard({
         )}
       </div>
       <CardHeader className="pb-2 pt-4 px-4">
-        <CardTitle className="font-headline text-lg md:text-xl text-primary group-hover:text-accent transition-colors truncate" title={recipe.name}>
+        <CardTitle className="font-headline text-lg md:text-xl text-primary group-hover:text-accent transition-colors h-[3.5rem] line-clamp-2" title={recipe.name}>
             {recipe.name}
         </CardTitle>
       </CardHeader>
