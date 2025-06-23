@@ -11,12 +11,15 @@ import * as z from 'zod';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import type { MacroTargets } from '@/types';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { suggestProteinIntake, type SuggestProteinIntakeInput, type SuggestProteinIntakeOutput } from '@/ai/flows/suggest-protein-intake-flow';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Sparkles, Loader2, Info, Lightbulb, Droplets, AlertTriangle } from "lucide-react";
+import { Sparkles, Loader2, Info, Lightbulb, Droplets, AlertTriangle, HelpCircle, Calculator } from "lucide-react";
 import Link from 'next/link';
+import { Slider } from '@/components/ui/slider';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
 
 const macroTargetSchema = z.object({
   calories: z.coerce.number().min(0, "Calories must be positive").default(0),
@@ -44,6 +47,8 @@ export default function DietaryTargetsPage() {
 
   const [weightLossWarning, setWeightLossWarning] = useState<string | null>(null);
   const [energyAvailabilityWarning, setEnergyAvailabilityWarning] = useState<string | null>(null);
+  
+  const [lossPercentage, setLossPercentage] = useState<number>(0.75);
 
 
   const macroForm = useForm<MacroTargetFormValues>({
@@ -117,6 +122,44 @@ export default function DietaryTargetsPage() {
         setEnergyAvailabilityWarning(null);
     }
   }, [caloriesValue, userProfile]);
+  
+  const fatLossCalculation = useMemo(() => {
+    if (!userProfile?.weightKg || !userProfile.tdee) {
+        return { weeklyLossKg: 0, calorieTarget: 0, enabled: false };
+    }
+    const weeklyLossKg = userProfile.weightKg * (lossPercentage / 100);
+    const dailyDeficit = (weeklyLossKg * 7700) / 7;
+    const calorieTarget = Math.round(userProfile.tdee - dailyDeficit);
+
+    return { weeklyLossKg, calorieTarget, enabled: true };
+  }, [userProfile?.weightKg, userProfile?.tdee, lossPercentage]);
+
+  const handleApplyFatLossTarget = () => {
+    const { calorieTarget } = fatLossCalculation;
+    const proteinGrams = macroForm.getValues("protein") || 0;
+    const fatGrams = macroForm.getValues("fat") || 0;
+
+    const caloriesFromProteinAndFat = (proteinGrams * 4) + (fatGrams * 9);
+    const remainingCaloriesForCarbs = calorieTarget - caloriesFromProteinAndFat;
+
+    if (remainingCaloriesForCarbs < 0) {
+        toast({
+            title: "Warning: High Protein/Fat",
+            description: "Your protein and fat targets already exceed the calculated calorie goal. Please adjust them before applying this target.",
+            variant: "destructive"
+        });
+        return;
+    }
+
+    const suggestedCarbs = Math.round(remainingCaloriesForCarbs / 4);
+    macroForm.setValue("carbs", suggestedCarbs, { shouldDirty: true });
+    
+    // The useEffect will automatically update the calories field now
+    toast({
+        title: "Calorie Target Applied",
+        description: `Carbs have been set to ${suggestedCarbs}g to meet your new calorie goal. You can now save your profile.`
+    });
+  };
 
 
   const handleMacroSubmit: SubmitHandler<MacroTargetFormValues> = (data) => {
@@ -235,14 +278,13 @@ export default function DietaryTargetsPage() {
     let rangeText: string;
 
     if (userProfile.sex === 'female') {
-        percentage = 0.34; // Midpoint of 33-35%
+        percentage = 0.34;
         rangeText = "33-35%";
     } else if (userProfile.sex === 'male') {
-        percentage = 0.25; // Midpoint of 20-30%
+        percentage = 0.25;
         rangeText = "20-30%";
     } else {
-        // Fallback for when sex is not specified
-        percentage = 0.275; // Middle of the road 20-35%
+        percentage = 0.275;
         rangeText = "20-35%";
     }
 
@@ -268,184 +310,257 @@ export default function DietaryTargetsPage() {
 
   return (
     <PageWrapper title="Dietary Targets">
-       <Alert className="mb-8 border-accent">
-        <Lightbulb className="h-4 w-4" />
-        <AlertTitle className="font-semibold text-accent">How to Set Your Targets for Fat Loss or Muscle Gain</AlertTitle>
-        <AlertDescription>
-          <ul className="list-disc pl-5 mt-2 space-y-1 text-sm">
-            <li>First, complete your <Link href="/profile/user-info" className="underline hover:text-primary">User Info</Link> page to calculate your TDEE (Total Daily Energy Expenditure).</li>
-            <li>Use the 'Suggest Protein' and 'Suggest Fat' buttons below to get AI-powered and calculated starting points for these macros.</li>
-            <li>Finally, adjust your 'Carbohydrates' input to set your total daily calories. For **fat loss**, aim for your total calories to be below your TDEE. For **muscle gain**, aim for a slight surplus above your TDEE.</li>
-          </ul>
-        </AlertDescription>
-      </Alert>
-      <Card className="max-w-xl mx-auto">
-        <CardHeader>
-          <CardTitle>Caloric & Macro Targets</CardTitle>
-          <CardDescription>Set your daily nutritional goals. Calories are auto-calculated based on protein, carbs, and fat.</CardDescription>
-        </CardHeader>
-        <Form {...macroForm}>
-          <form onSubmit={macroForm.handleSubmit(handleMacroSubmit)}>
-            <CardContent className="space-y-4">
-              <FormField
-                control={macroForm.control}
-                name="protein"
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="flex justify-between items-center">
-                      <FormLabel>Protein (g)</FormLabel>
-                      <Button type="button" variant="outline" size="sm" onClick={handleGetProteinSuggestion} disabled={isAISuggesting}>
-                        {isAISuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4 text-accent" />}
-                        Suggest Protein
-                      </Button>
-                    </div>
-                    <FormControl>
-                      <Input type="number" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {aiError && (
-                <Alert variant="destructive">
-                  <Info className="h-4 w-4" />
-                  <AlertTitle>AI Suggestion Error</AlertTitle>
-                  <AlertDescription>{aiError}</AlertDescription>
-                </Alert>
-              )}
-
-              {proteinSuggestion && !isAISuggesting && (
-                <Card className="bg-secondary/50 p-4">
-                  <CardHeader className="p-0 pb-2">
-                    <CardTitle className="text-md flex items-center text-primary">
-                      <Lightbulb className="w-5 h-5 mr-2 text-accent" /> AI Protein Suggestion
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0 text-sm space-y-2">
-                    <p>
-                      Suggested Range: <strong>{proteinSuggestion.minProteinGramsPerDay.toFixed(0)}g - {proteinSuggestion.maxProteinGramsPerDay.toFixed(0)}g per day</strong>
-                    </p>
-                    <p>
-                      (Factors: {proteinSuggestion.minProteinFactor.toFixed(2)} - {proteinSuggestion.maxProteinFactor.toFixed(2)} {proteinSuggestion.displayUnit})
-                    </p>
-                    <p className="text-xs text-muted-foreground italic">Justification: {proteinSuggestion.justification}</p>
-                    <Button type="button" size="sm" onClick={applyProteinSuggestion} className="mt-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-                      Apply Suggestion (Average: {Math.round((proteinSuggestion.minProteinGramsPerDay + proteinSuggestion.maxProteinGramsPerDay) / 2)}g)
+       <div className="grid md:grid-cols-2 gap-8">
+        <div className="space-y-8">
+            <Card>
+                <CardHeader>
+                <CardTitle>Caloric & Macro Targets</CardTitle>
+                <CardDescription>Set your nutritional goals. Use the helper tools below to get suggestions for protein, fat, and calories for weight loss.</CardDescription>
+                </CardHeader>
+                <Form {...macroForm}>
+                <form onSubmit={macroForm.handleSubmit(handleMacroSubmit)}>
+                    <CardContent className="space-y-4">
+                    <FormField
+                        control={macroForm.control}
+                        name="protein"
+                        render={({ field }) => (
+                        <FormItem>
+                            <div className="flex justify-between items-center">
+                            <FormLabel>Protein (g)</FormLabel>
+                            <Button type="button" variant="outline" size="sm" onClick={handleGetProteinSuggestion} disabled={isAISuggesting}>
+                                {isAISuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4 text-accent" />}
+                                Suggest Protein
+                            </Button>
+                            </div>
+                            <FormControl>
+                            <Input type="number" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                    {proteinSuggestion && !isAISuggesting && (
+                        <Card className="bg-secondary/50 p-4">
+                        <CardHeader className="p-0 pb-2">
+                            <CardTitle className="text-md flex items-center text-primary">
+                            <Lightbulb className="w-5 h-5 mr-2 text-accent" /> AI Protein Suggestion
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0 text-sm space-y-2">
+                            <p>
+                            Suggested Range: <strong>{proteinSuggestion.minProteinGramsPerDay.toFixed(0)}g - {proteinSuggestion.maxProteinGramsPerDay.toFixed(0)}g per day</strong>
+                            </p>
+                            <p>
+                            (Factors: {proteinSuggestion.minProteinFactor.toFixed(2)} - {proteinSuggestion.maxProteinFactor.toFixed(2)} {proteinSuggestion.displayUnit})
+                            </p>
+                            <p className="text-xs text-muted-foreground italic">Justification: {proteinSuggestion.justification}</p>
+                            <Button type="button" size="sm" onClick={applyProteinSuggestion} className="mt-2 bg-accent hover:bg-accent/90 text-accent-foreground">
+                            Apply Suggestion (Average: {Math.round((proteinSuggestion.minProteinGramsPerDay + proteinSuggestion.maxProteinGramsPerDay) / 2)}g)
+                            </Button>
+                        </CardContent>
+                        </Card>
+                    )}
+                    <FormField
+                        control={macroForm.control}
+                        name="fat"
+                        render={({ field }) => (
+                        <FormItem>
+                            <div className="flex justify-between items-center">
+                            <FormLabel>Fat (g)</FormLabel>
+                            <Button 
+                                type="button" 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={handleGetFatSuggestion}
+                                disabled={!userProfile || !userProfile.tdee}
+                                title={!userProfile || !userProfile.tdee ? "Requires user info to calculate TDEE" : "Get Suggestion"}
+                                >
+                                <Droplets className="mr-2 h-4 w-4 text-accent" />
+                                Suggest Fat
+                            </Button>
+                            </div>
+                            <FormControl>
+                            <Input type="number" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                    {fatSuggestion && !fatSuggestionError && (
+                        <Card className="bg-secondary/50 p-4">
+                        <CardHeader className="p-0 pb-2">
+                            <CardTitle className="text-md flex items-center text-primary">
+                            <Lightbulb className="w-5 h-5 mr-2 text-accent" /> Fat Intake Suggestion
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0 text-sm space-y-2">
+                            <p>
+                            Suggested Fat: <strong>~{fatSuggestion.suggestedFatGrams}g per day</strong>
+                            </p>
+                            <p className="text-xs text-muted-foreground italic">{fatSuggestion.justification}</p>
+                            <Button type="button" size="sm" onClick={applyFatSuggestion} className="mt-2 bg-accent hover:bg-accent/90 text-accent-foreground">
+                            Apply Suggestion ({fatSuggestion.suggestedFatGrams}g)
+                            </Button>
+                        </CardContent>
+                        </Card>
+                    )}
+                    <FormField
+                        control={macroForm.control}
+                        name="carbs"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Carbohydrates (g)</FormLabel>
+                            <FormControl>
+                            <Input type="number" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={macroForm.control}
+                        name="calories"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Calculated Calories (kcal)</FormLabel>
+                            <FormControl>
+                            <Input type="number" {...field} readOnly className="bg-muted/50 cursor-not-allowed" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                    {(weightLossWarning || energyAvailabilityWarning) && (
+                        <div className="space-y-4 pt-4">
+                        {weightLossWarning && (
+                            <Alert variant="destructive">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Potential for Rapid Weight Loss</AlertTitle>
+                            <AlertDescription>{weightLossWarning}</AlertDescription>
+                            </Alert>
+                        )}
+                        {energyAvailabilityWarning && (
+                            <Alert variant="destructive">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Low Energy Availability Warning</AlertTitle>
+                            <AlertDescription>{energyAvailabilityWarning}</AlertDescription>
+                            </Alert>
+                        )}
+                        </div>
+                    )}
+                    </CardContent>
+                    <CardFooter>
+                    <Button type="submit" disabled={macroForm.formState.isSubmitting || !macroForm.formState.isDirty} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                        {macroForm.formState.isSubmitting ? "Saving..." : "Save Macro Targets"}
                     </Button>
-                  </CardContent>
-                </Card>
-              )}
-
-              <FormField
-                control={macroForm.control}
-                name="carbs"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Carbohydrates (g)</FormLabel>
-                    <FormControl>
-                      <Input type="number" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={macroForm.control}
-                name="fat"
-                render={({ field }) => (
-                   <FormItem>
-                    <div className="flex justify-between items-center">
-                      <FormLabel>Fat (g)</FormLabel>
-                       <Button 
-                          type="button" 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={handleGetFatSuggestion}
-                          disabled={!userProfile || !userProfile.tdee}
-                          title={!userProfile || !userProfile.tdee ? "Requires user info to calculate TDEE" : "Get Suggestion"}
-                        >
-                         <Droplets className="mr-2 h-4 w-4 text-accent" />
-                         Suggest Fat
-                       </Button>
-                    </div>
-                    <FormControl>
-                      <Input type="number" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {fatSuggestionError && (
+                    </CardFooter>
+                </form>
+                </Form>
+            </Card>
+            {aiError && (
+                <Alert variant="destructive">
+                <Info className="h-4 w-4" />
+                <AlertTitle>AI Suggestion Error</AlertTitle>
+                <AlertDescription>{aiError}</AlertDescription>
+                </Alert>
+            )}
+             {fatSuggestionError && (
                 <Alert variant="destructive">
                   <Info className="h-4 w-4" />
                   <AlertTitle>Suggestion Info</AlertTitle>
                   <AlertDescription>{fatSuggestionError} <Link href="/profile/user-info" className="underline">Update User Info here.</Link></AlertDescription>
                 </Alert>
-              )}
+            )}
+        </div>
 
-              {fatSuggestion && !fatSuggestionError && (
-                <Card className="bg-secondary/50 p-4">
-                  <CardHeader className="p-0 pb-2">
-                    <CardTitle className="text-md flex items-center text-primary">
-                      <Lightbulb className="w-5 h-5 mr-2 text-accent" /> Fat Intake Suggestion
+        <div className="space-y-8">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center">
+                        <Calculator className="mr-2 h-5 w-5 text-accent"/>
+                        Fat Loss Calorie Target Calculator
                     </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0 text-sm space-y-2">
-                    <p>
-                      Suggested Fat: <strong>~{fatSuggestion.suggestedFatGrams}g per day</strong>
-                    </p>
-                    <p className="text-xs text-muted-foreground italic">{fatSuggestion.justification}</p>
-                    <Button type="button" size="sm" onClick={applyFatSuggestion} className="mt-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-                      Apply Suggestion ({fatSuggestion.suggestedFatGrams}g)
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
-
-
-              <FormField
-                control={macroForm.control}
-                name="calories"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Calculated Calories (kcal)</FormLabel>
-                    <FormControl>
-                      <Input type="number" {...field} readOnly className="bg-muted/50 cursor-not-allowed" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {(weightLossWarning || energyAvailabilityWarning) && (
-                <div className="space-y-4 pt-4">
-                  {weightLossWarning && (
-                    <Alert variant="destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Potential for Rapid Weight Loss</AlertTitle>
-                      <AlertDescription>{weightLossWarning}</AlertDescription>
-                    </Alert>
-                  )}
-                  {energyAvailabilityWarning && (
-                    <Alert variant="destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Low Energy Availability Warning</AlertTitle>
-                      <AlertDescription>{energyAvailabilityWarning}</AlertDescription>
-                    </Alert>
-                  )}
-                </div>
-              )}
-            </CardContent>
-            <CardFooter>
-              <Button type="submit" disabled={macroForm.formState.isSubmitting || !macroForm.formState.isDirty} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                {macroForm.formState.isSubmitting ? "Saving..." : "Save Macro Targets"}
-              </Button>
-            </CardFooter>
-          </form>
-        </Form>
-      </Card>
+                    <CardDescription>
+                        Use this tool to set a calorie target based on your desired weekly weight loss goal.
+                        Complete your User Info page for an accurate TDEE.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {!fatLossCalculation.enabled ? (
+                        <Alert variant="destructive">
+                            <Info className="h-4 w-4" />
+                            <AlertTitle>Missing Information</AlertTitle>
+                            <AlertDescription>
+                                Please complete your <Link href="/profile/user-info" className="underline">User Info</Link> (Weight, Height, Age, Activity Level) to use this calculator.
+                            </AlertDescription>
+                        </Alert>
+                    ) : (
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <Label htmlFor="loss-slider" className="flex items-center gap-2">
+                                    Select Your Weekly Weight Loss Goal
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-pointer" />
+                                            </TooltipTrigger>
+                                            <TooltipContent className="max-w-xs">
+                                                <p className="font-bold">Making Your Choice:</p>
+                                                <ul className="list-disc pl-5 mt-1 space-y-1 text-xs">
+                                                    <li><span className="font-semibold">0.5%/week (Slower):</span> Recommended for leaner individuals or those who want to maximize muscle retention.</li>
+                                                    <li><span className="font-semibold">1.0%/week (Faster):</span> A more aggressive goal suitable for individuals with a higher body fat percentage.</li>
+                                                    <li>A slower rate is often more sustainable long-term. Choosing a rate that is too fast can lead to muscle loss and fatigue.</li>
+                                                </ul>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                </Label>
+                                <Slider
+                                    id="loss-slider"
+                                    min={0.5}
+                                    max={1.0}
+                                    step={0.05}
+                                    value={[lossPercentage]}
+                                    onValueChange={(value) => setLossPercentage(value[0])}
+                                />
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>Slower (0.5%)</span>
+                                    <span>Faster (1.0%)</span>
+                                </div>
+                            </div>
+                            <Alert>
+                                <AlertTitle>Your Calculated Target</AlertTitle>
+                                <AlertDescription>
+                                    A <span className="font-bold text-primary">{lossPercentage.toFixed(2)}%</span> goal means a loss of <span className="font-bold text-primary">{fatLossCalculation.weeklyLossKg.toFixed(2)} kg</span> per week.
+                                    <br />
+                                    Your resulting daily calorie target is <span className="font-bold text-accent">{fatLossCalculation.calorieTarget} kcal</span>.
+                                </AlertDescription>
+                            </Alert>
+                            <Button 
+                                type="button" 
+                                onClick={handleApplyFatLossTarget}
+                                className="w-full"
+                            >
+                                Apply This Calorie Target (by adjusting Carbs)
+                            </Button>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+            <Alert className="border-accent">
+                <Lightbulb className="h-4 w-4" />
+                <AlertTitle className="font-semibold text-accent">How to Set Your Targets</AlertTitle>
+                <AlertDescription>
+                <ul className="list-disc pl-5 mt-2 space-y-1 text-sm">
+                    <li>First, complete your <Link href="/profile/user-info" className="underline hover:text-primary">User Info</Link> page to calculate your TDEE (Total Daily Energy Expenditure).</li>
+                    <li>Use the 'Suggest Protein' and 'Suggest Fat' buttons to get AI-powered and calculated starting points for these macros.</li>
+                    <li>Use the 'Fat Loss Calculator' to find a calorie target for your goal, and apply it. This will adjust your 'Carbohydrates' to meet the target.</li>
+                    <li>For **muscle gain**, manually adjust your 'Carbohydrates' so your total calories are slightly above your TDEE.</li>
+                </ul>
+                </AlertDescription>
+            </Alert>
+        </div>
+       </div>
     </PageWrapper>
   );
 }
