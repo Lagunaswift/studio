@@ -61,7 +61,7 @@ User Inputs:
 
 **GUIDELINES:**
 
-**Part 1: Female-Specific Guidelines (Use if sex is 'female' and bodyFatPercentage is provided)**
+**Part 1: Female-Specific Guidelines (ONLY use if sex is 'female' and bodyFatPercentage is provided)**
 
 1.  First, determine the Body Fat Category for the female user:
     *   **Category 1:** Body Fat < 22%
@@ -81,7 +81,7 @@ User Inputs:
 
 *   Note: For the 'Gaining/Max' column ('primaryGoal' is 'muscleGain'), the range applies to all activity types.
 
-**Part 2: General Guidelines (Use if sex is 'male', or 'female' without bodyFatPercentage, or 'notSpecified')**
+**Part 2: Male and General Guidelines (Use if sex is 'male', or 'female' without bodyFatPercentage, or 'notSpecified')**
 
 Use these general protein factor ranges in **g/lb of LBM**:
 *   **Endurance Athletes**: 0.8-1.0 g/lb LBM.
@@ -92,31 +92,35 @@ Use these general protein factor ranges in **g/lb of LBM**:
 
 ---
 
-**YOUR TASK:**
+**YOUR TASK - Follow these steps precisely:**
 
-1.  **CRITICAL FIRST STEP: Convert LBM to Pounds.**
-    The user's LBM is provided in kg. All your calculations MUST use pounds.
-    \`LBM_lbs = leanBodyMassKg * ${KG_TO_LB}\`.
-    Example: If leanBodyMassKg is 50, then LBM_lbs is 50 * 2.20462 = 110.23 lbs.
+1.  **Select Guidelines.**
+    *   If the user's \`sex\` is 'female' AND they provided a \`bodyFatPercentage\`, you MUST use the guidelines in **Part 1**.
+    *   For ALL OTHER users (male, or female without body fat %), you MUST use the guidelines in **Part 2**.
 
 2.  **Determine Protein Factor Range in g/lb LBM.**
-    Based on the user's inputs, select the correct set of guidelines (Part 1 for females with body fat %, Part 2 for others).
-    This gives you a min and max factor in **g/lb LBM**.
+    Using the selected guidelines from Step 1, find the appropriate protein factor range. This gives you \`minFactor_g_per_lb\` and \`maxFactor_g_per_lb\`. These factors are in **grams per POUND of LBM**.
 
-3.  **Calculate Daily Protein Intake in Grams.**
-    Use the LBM in pounds from Step 1 and the factors from Step 2.
+3.  **Convert User's LBM to Pounds.**
+    The user's LBM is provided in kg. You MUST convert this to pounds for the calculation.
+    \`LBM_lbs = leanBodyMassKg * ${KG_TO_LB}\`.
+    Example: If leanBodyMassKg is 75, then LBM_lbs is 75 * 2.20462 = 165.35 lbs.
+
+4.  **Calculate Daily Protein Intake in Grams.**
+    Use the LBM in pounds from Step 3 and the factors from Step 2.
     \`minProteinGramsPerDay = minFactor_g_per_lb * LBM_lbs\`
     \`maxProteinGramsPerDay = maxFactor_g_per_lb * LBM_lbs\`
+    This calculation is CRITICAL. DO NOT multiply kg by g/lb factors, or lbs by g/kg factors.
 
-4.  **Prepare Output Factors for Display.**
+5.  **Prepare Output Factors for Display.**
     The output fields \`minProteinFactor\` and \`maxProteinFactor\` depend on the user's 'unitPreference'.
-    *   If 'unitPreference' is 'g/lbLBM', use the original factors from Step 2.
+    *   If 'unitPreference' is 'g/lbLBM', use the factors from Step 2.
     *   If 'unitPreference' is 'g/kgLBM', you MUST CONVERT the factors from Step 2.
         \`outputMinFactor_g_per_kg = minFactor_g_per_lb * ${KG_TO_LB}\`
         \`outputMaxFactor_g_per_kg = maxFactor_g_per_lb * ${KG_TO_LB}\`
     Set the 'displayUnit' output field to match 'unitPreference'.
 
-5.  **Provide Justification.**
+6.  **Provide Justification.**
     Provide a concise 'justification' (2-4 sentences) explaining your reasoning, referencing the specific guidelines and user inputs used.
 
 Output the entire response as a single, valid JSON object that conforms EXACTLY to the 'SuggestProteinIntakeOutputSchema'. Do NOT include any text or formatting outside of this JSON object.
