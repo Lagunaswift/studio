@@ -42,7 +42,6 @@ export default function DietaryTargetsPage() {
   const [fatSuggestion, setFatSuggestion] = useState<FatSuggestion | null>(null);
   const [fatSuggestionError, setFatSuggestionError] = useState<string | null>(null);
 
-  // NEW states for warnings
   const [weightLossWarning, setWeightLossWarning] = useState<string | null>(null);
   const [energyAvailabilityWarning, setEnergyAvailabilityWarning] = useState<string | null>(null);
 
@@ -80,7 +79,6 @@ export default function DietaryTargetsPage() {
     }
   }, [proteinValue, carbsValue, fatValue, macroForm]);
 
-  // NEW useEffect for warnings
   useEffect(() => {
     if (!userProfile || !caloriesValue || isNaN(caloriesValue) || caloriesValue <= 0) {
         setWeightLossWarning(null);
@@ -90,10 +88,9 @@ export default function DietaryTargetsPage() {
 
     const { tdee, weightKg, sex, leanBodyMassKg } = userProfile;
 
-    // Weight loss check
     if (tdee && weightKg && tdee > caloriesValue) {
         const deficit = tdee - caloriesValue;
-        const weeklyKgLoss = (deficit * 7) / 7700; // 7700 kcal per kg of fat
+        const weeklyKgLoss = (deficit * 7) / 7700; 
         const weeklyPercentageLoss = (weeklyKgLoss / weightKg) * 100;
 
         if (weeklyPercentageLoss > 1) {
@@ -107,7 +104,6 @@ export default function DietaryTargetsPage() {
         setWeightLossWarning(null);
     }
 
-    // Low Energy Availability check for females
     if (sex === 'female' && leanBodyMassKg) {
         const energyPerLbm = caloriesValue / leanBodyMassKg;
         if (energyPerLbm < 30) {
@@ -221,10 +217,27 @@ export default function DietaryTargetsPage() {
         return;
     }
 
-    const suggestedFatGrams = (userProfile.tdee * 0.30) / 9; // Using a general 30% rule
+    let percentage: number;
+    let rangeText: string;
+
+    if (userProfile.sex === 'female') {
+        percentage = 0.34; // Midpoint of 33-35%
+        rangeText = "33-35%";
+    } else if (userProfile.sex === 'male') {
+        percentage = 0.25; // Midpoint of 20-30%
+        rangeText = "20-30%";
+    } else {
+        // Fallback for when sex is not specified
+        percentage = 0.275; // Middle of the road 20-35%
+        rangeText = "20-35%";
+    }
+
+    const suggestedFatGrams = (userProfile.tdee * percentage) / 9;
+    const justificationText = `For a ${userProfile.sex || 'user'}, a balanced starting point for dietary fat is ${rangeText} of total daily calories. Based on your estimated TDEE of ~${userProfile.tdee.toFixed(0)} kcal, a target of ${Math.round(percentage * 100)}% suggests approximately ${Math.round(suggestedFatGrams)}g of fat per day. This provides essential fatty acids and supports hormone function.`;
+
     setFatSuggestion({
         suggestedFatGrams: Math.round(suggestedFatGrams),
-        justification: `A balanced starting point for dietary fat is 20-35% of total daily calories. Based on your estimated TDEE of ~${userProfile.tdee.toFixed(0)} kcal, a target of 30% suggests approximately ${Math.round(suggestedFatGrams)}g of fat per day. This provides essential fatty acids and supports hormone function.`,
+        justification: justificationText,
     });
   };
 
@@ -422,4 +435,3 @@ export default function DietaryTargetsPage() {
     </PageWrapper>
   );
 }
-
