@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const AVAILABLE_ALLERGENS = [
   "Nuts", "Peanuts", "Dairy", "Eggs", "Soy", "Gluten", "Fish", "Shellfish", "Sesame", "Mustard"
@@ -83,6 +84,13 @@ export default function AllergensPage() {
         <Form {...allergensForm}>
           <form onSubmit={allergensForm.handleSubmit(onFormSubmit)}>
             <CardContent className="space-y-4">
+               <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Important Health & Safety Notice</AlertTitle>
+                <AlertDescription>
+                  This allergen filter helps hide recipes containing common keywords, but it is NOT a substitute for medical advice or carefully reading ingredient labels. AI-suggested recipes may not always be perfectly filtered. You are responsible for verifying all ingredients before consumption, especially if you have a serious allergy.
+                </AlertDescription>
+              </Alert>
                <FormField
                 control={allergensForm.control}
                 name="allergens"
@@ -145,11 +153,11 @@ export default function AllergensPage() {
               Health & Safety Warning
             </AlertDialogTitle>
             <AlertDialogDescription>
-              You have selected a filter for a potential allergen. This filter works by checking for common ingredients but is NOT a substitute for medical advice or reading ingredient labels.
+              You have selected a filter for a potential allergen. This filter works by checking for common ingredients but is NOT a substitute for medical advice or reading ingredient labels. AI-suggested recipes may also not be perfectly filtered.
               <br/><br/>
               Recipes and product ingredients can change. For your safety, you MUST verify all ingredients yourself before purchasing or consuming any food.
               <br/><br/>
-              By clicking 'Accept', you acknowledge that you are fully responsible for managing your own dietary needs and that Macro Teal Meal Planner is not liable for any adverse reactions.
+              By clicking 'Accept', you acknowledge that you are fully responsible for managing your own dietary needs and that MealPlannerPro is not liable for any adverse reactions.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
