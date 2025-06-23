@@ -129,16 +129,25 @@ export default function MealPlanPage() {
     });
   };
 
-  const handleAddRecipeFromPicker = (slotKey: string, mealType: MealType) => {
+  const handleAddRecipeFromPicker = async (slotKey: string, mealType: MealType) => {
     if (availableRecipesForPicker.length === 0) return;
     const recipeIndex = recipePickerIndices[slotKey] || 0;
     const recipeToAdd = availableRecipesForPicker[recipeIndex];
     if (recipeToAdd) {
-      addMealToPlan(recipeToAdd, formattedDate, mealType, recipeToAdd.servings);
-      toast({
-        title: "Meal Added",
-        description: `${recipeToAdd.name} added as ${mealType} for ${format(selectedDate, 'PPP')}.`,
-      });
+      try {
+        await addMealToPlan(recipeToAdd, formattedDate, mealType, recipeToAdd.servings);
+        toast({
+          title: "Meal Added",
+          description: `${recipeToAdd.name} added as ${mealType} for ${format(selectedDate, 'PPP')}.`,
+        });
+      } catch (e: any) {
+        console.error("Error adding meal from picker:", e);
+        toast({
+          title: "Failed to Add Meal",
+          description: e.message || "An error occurred while saving the meal.",
+          variant: "destructive"
+        });
+      }
     }
   };
 

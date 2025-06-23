@@ -324,7 +324,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- ASYNC DATA MODIFICATION FUNCTIONS ---
   
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
-    if (!user) return;
+    if (!user) {
+        throw new Error("User not authenticated. Cannot add meal to plan.");
+    }
     const { data, error } = await supabase.from('meal_plan_entries').insert({
       user_id: user.id,
       recipe_id: recipe.id,
@@ -333,10 +335,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       servings: servings,
     }).select().single();
     
-    if (error) console.error("Error adding meal to plan:", error);
-    else if (data) {
+    if (error) {
+      console.error("Error adding meal to plan:", error);
+      throw new Error(`Failed to add meal to the database: ${error.message}`);
+    } 
+    
+    if (data) {
       const newPlannedMeal: PlannedMeal = { id: data.id, recipeId: data.recipe_id, date: data.meal_date, mealType: data.meal_type, servings: data.servings };
       setMealPlan(prev => [...prev, newPlannedMeal]);
+    } else {
+        throw new Error("Failed to add meal: No data returned from database.");
     }
   }, [user]);
 
@@ -580,7 +588,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDietaryPreferences, setAllergens, setMealStructure, setUserInformation, isRecipeCacheLoading,
     isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe, isRecipeFavorite,
     addPantryItem, removePantryItem, updatePantryItemQuantity, parseIngredient, assignIngredientCategory,
-    addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms, fetchAllUserData
+    addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms,
   ]);
 
   if (isAppDataLoading && user) {
