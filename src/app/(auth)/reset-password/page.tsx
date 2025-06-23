@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Mail, KeyRound, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabaseClient';
+// import { supabase } from '@/lib/supabaseClient';
 import { useState, useEffect } from 'react';
 
 const resetPasswordSchema = z.object({
@@ -36,46 +36,52 @@ export default function ResetPasswordPage() {
   });
 
   const onSubmit: SubmitHandler<ResetPasswordFormValues> = async (data) => {
-    form.clearErrors();
-    if (!isClient) return;
+    // Supabase logic commented out for local mode
+    // form.clearErrors();
+    // if (!isClient) return;
 
-    try {
-      const origin = window.location.origin.trim();
-      const redirectTo = `${origin}/update-password`;
+    // try {
+    //   const origin = window.location.origin.trim();
+    //   const redirectTo = `${origin}/update-password`;
 
-      const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-        redirectTo: redirectTo,
-      });
+    //   const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
+    //     redirectTo: redirectTo,
+    //   });
 
-      if (error) {
-        toast({
-          title: "Password Reset Failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Password Reset Email Sent",
-          description: `If an account exists for ${data.email}, a password reset link has been sent. Please check your inbox.`,
-        });
-        form.reset();
-      }
-    } catch (e: any) {
-      toast({
-        title: "Password Reset Error",
-        description: e.message || "An unexpected error occurred.",
+    //   if (error) {
+    //     toast({
+    //       title: "Password Reset Failed",
+    //       description: error.message,
+    //       variant: "destructive",
+    //     });
+    //   } else {
+    //     toast({
+    //       title: "Password Reset Email Sent",
+    //       description: `If an account exists for ${data.email}, a password reset link has been sent. Please check your inbox.`,
+    //     });
+    //     form.reset();
+    //   }
+    // } catch (e: any) {
+    //   toast({
+    //     title: "Password Reset Error",
+    //     description: e.message || "An unexpected error occurred.",
+    //     variant: "destructive",
+    //   });
+    // }
+     toast({
+        title: "Local Mode Active",
+        description: "Password reset is disabled.",
         variant: "destructive",
-      });
-    }
+    });
   };
 
   return (
     <Card className="shadow-2xl">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-headline text-primary flex items-center justify-center">
-          <KeyRound className="mr-2 h-6 w-6" /> Reset Password
+          <KeyRound className="mr-2 h-6 w-6" /> Reset Password (Disabled)
         </CardTitle>
-        <CardDescription>Enter your email to receive a password reset link.</CardDescription>
+        <CardDescription>This feature is disabled in local storage mode.</CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -87,7 +93,7 @@ export default function ResetPasswordPage() {
                 <FormItem>
                   <FormLabel className="flex items-center"><Mail className="mr-2 h-4 w-4 text-muted-foreground" />Email</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="you@example.com" {...field} />
+                    <Input type="email" placeholder="you@example.com" {...field} disabled />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -95,8 +101,8 @@ export default function ResetPasswordPage() {
             />
           </CardContent>
           <CardFooter className="flex flex-col items-center space-y-4">
-            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={form.formState.isSubmitting || !isClient}>
-              {form.formState.isSubmitting ? "Sending..." : "Send Reset Link"}
+            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled>
+              Send Reset Link
             </Button>
             <div className="text-sm text-center w-full">
               <Link href="/login" className="font-medium text-primary hover:underline flex items-center justify-center">
