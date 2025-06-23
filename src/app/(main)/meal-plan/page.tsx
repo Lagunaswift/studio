@@ -300,7 +300,7 @@ export default function MealPlanPage() {
                     )}
                     <div className="sm:w-2/3 p-4 flex flex-col justify-between">
                       <div>
-                        <CardTitle className="text-lg font-headline text-primary h-[3.5rem] line-clamp-2" title={mealToDisplay.recipeDetails?.name ?? ''}>
+                        <CardTitle className="text-lg font-headline text-primary h-[3.5rem] line-clamp-2 break-words" title={mealToDisplay.recipeDetails?.name ?? ''}>
                           <Link href={`/recipes/${mealToDisplay.recipeId}`} className="hover:underline">{mealToDisplay.recipeDetails?.name}</Link>
                         </CardTitle>
                         <CardDescription>Servings: {mealToDisplay.servings}</CardDescription>
@@ -357,11 +357,11 @@ export default function MealPlanPage() {
                   {availableRecipesForPicker.length > 0 && (
                     <Button
                       onClick={() => handleAddRecipeFromPicker(slotKey, slotConfig.type)}
-                      className="w-full sm:w-auto mx-auto flex items-center justify-center bg-accent hover:bg-accent/90 text-accent-foreground"
+                      className="w-full sm:w-auto mx-auto flex items-center justify-center bg-accent hover:bg-accent/90 text-accent-foreground whitespace-normal h-auto py-2"
                       disabled={!availableRecipesForPicker[recipePickerIndices[slotKey] || 0]}
                     >
-                      <PlusCircle className="mr-2 h-5 w-5" />
-                      Add "{availableRecipesForPicker[recipePickerIndices[slotKey] || 0]?.name}" as {slotConfig.name}
+                      <PlusCircle className="mr-2 h-5 w-5 shrink-0" />
+                      <span className="text-left">Add "{availableRecipesForPicker[recipePickerIndices[slotKey] || 0]?.name}" as {slotConfig.name}</span>
                     </Button>
                   )}
                 </div>
@@ -374,7 +374,7 @@ export default function MealPlanPage() {
       <Separator className="my-12"/>
 
       <section>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-6 flex-wrap gap-2">
           <h2 className="text-2xl font-bold font-headline text-primary">
             Summary for: {format(selectedDate, 'PPP')}
           </h2>
@@ -407,7 +407,7 @@ export default function MealPlanPage() {
                 };
                 return (
                     <Card key={`summary-${meal.id}`} className="shadow-sm p-3">
-                        <CardTitle className="text-md font-semibold">{recipe.name} ({meal.mealType}) - {meal.servings} servings</CardTitle>
+                        <CardTitle className="text-md font-semibold break-words">{recipe.name} ({meal.mealType}) - {meal.servings} servings</CardTitle>
                         <MacroDisplay macros={plannedServingsMacros} title=""/>
                     </Card>
                 );
