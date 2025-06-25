@@ -1,4 +1,5 @@
 
+
 export interface Ingredient {
   name: string;
   quantity: number;
@@ -131,6 +132,7 @@ export interface DashboardSettings {
 export interface DailyWeightLog {
   date: string; // YYYY-MM-DD
   weightKg: number;
+  trendWeightKg?: number;
 }
 
 export interface UserProfileSettings {

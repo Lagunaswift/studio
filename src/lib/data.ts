@@ -1,6 +1,6 @@
 
 
-import type { Recipe, Macros, MealType, PlannedMeal, ShoppingListItem, UKSupermarketCategory, PantryItem } from '@/types';
+import type { Recipe, Macros, MealType, PlannedMeal, ShoppingListItem, UKSupermarketCategory, PantryItem, DailyWeightLog } from '@/types';
 import { getAllRecipes as getAllRecipesFromRegistry } from '@/features/recipes/recipeRegistry';
 
 // Helper function to map registry recipes to the full Recipe type
@@ -365,4 +365,34 @@ export const generateShoppingList = (plannedMeals: PlannedMeal[], recipesSource?
     if (a.category > b.category) return 1;
     return a.name.localeCompare(b.name);
   });
+};
+
+export const calculateTrendWeight = (dailyWeightLog: DailyWeightLog[]): DailyWeightLog[] => {
+  if (!dailyWeightLog || dailyWeightLog.length < 7) {
+    // Not enough data for a centered moving average, return original log
+    return dailyWeightLog.map(log => ({...log, trendWeightKg: undefined}));
+  }
+
+  // Sort logs by date just in case they are not ordered
+  const sortedLogs = [...dailyWeightLog].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const trendWeightData: DailyWeightLog[] = sortedLogs.map((log, index, arr) => {
+    // Use a 7-day centered moving average
+    const start = Math.max(0, index - 3);
+    const end = Math.min(arr.length, index + 4);
+    
+    // Need at least 4 data points for a meaningful average
+    if (end - start < 4) {
+      return { ...log, trendWeightKg: undefined };
+    }
+
+    const window = arr.slice(start, end);
+    const sum = window.reduce((acc, current) => acc + current.weightKg, 0);
+    const trendWeight = sum / window.length;
+
+    return { ...log, trendWeightKg: parseFloat(trendWeight.toFixed(2)) };
+  });
+
+  // Return sorted descending to match expected order in AppContext
+  return trendWeightData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };

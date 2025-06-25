@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import type React from 'react';
@@ -23,7 +24,7 @@ import type {
   DailyWeightLog,
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
-import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil } from '@/lib/data';
+import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
 import { loadState, saveState } from '@/lib/localStorage';
 
 // Default user profile for a fresh start in local mode
@@ -58,41 +59,6 @@ const DEFAULT_USER_PROFILE: UserProfileSettings = {
     },
     hasAcceptedTerms: true, // Assume accepted for local dev
     subscription_status: 'active',
-};
-
-const calculateNavyBodyFatPercentage = (
-  sex: Sex | null,
-  heightCm: number | null,
-  neckCm: number | null,
-  abdomenCm?: number | null,
-  waistCm?: number | null,
-  hipCm?: number | null
-): number | null => {
-  if (!sex || !heightCm || heightCm <= 0 || !neckCm || neckCm <= 0) {
-    return null;
-  }
-  try {
-    let bf: number;
-    if (sex === 'male') {
-      if (!abdomenCm || abdomenCm <= 0 || neckCm <= 0 || abdomenCm <= neckCm) return null;
-      const logTerm = abdomenCm - neckCm;
-      if (logTerm <= 0 || heightCm <= 0) return null;
-      bf = 86.010 * Math.log10(logTerm) - 70.041 * Math.log10(heightCm) + 36.76;
-    } else if (sex === 'female') {
-      if (!waistCm || waistCm <= 0 || !hipCm || hipCm <= 0 || neckCm <= 0) return null;
-      const logTerm = waistCm + hipCm - neckCm;
-      if (logTerm <= 0 || heightCm <= 0) return null;
-      bf = 163.205 * Math.log10(logTerm) - 97.684 * Math.log10(heightCm) - 78.387;
-    } else {
-      return null;
-    }
-    if (isNaN(bf) || !isFinite(bf)) return null;
-    const resultBFP = parseFloat(bf.toFixed(1));
-    return isNaN(resultBFP) || !isFinite(resultBFP) ? null : Math.max(1, Math.min(100, resultBFP));
-  } catch (error) {
-    console.error("Error calculating Navy Body Fat %:", error);
-    return null;
-  }
 };
 
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
@@ -161,6 +127,7 @@ interface AppContextType {
   addCustomRecipe: (recipeData: RecipeFormData) => Promise<void>;
   userRecipes: Recipe[];
   acceptTerms: () => Promise<void>;
+  runWeeklyCheckin: () => Promise<{ success: boolean; message: string; newTDEE?: number; }>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -400,8 +367,85 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updatedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     // Update the profile state
-    updateUserProfileInDb({ dailyWeightLog: updatedLogs });
+    updateUserProfileInDb({ dailyWeightLog: updatedLogs, weightKg });
   }, [user, userProfile, updateUserProfileInDb]);
+  
+  const runWeeklyCheckin = useCallback(async () => {
+    if (!userProfile || !userProfile.dailyWeightLog || userProfile.dailyWeightLog.length < 14) {
+      const message = "At least 14 days of weight and calorie data are needed for an accurate calculation.";
+      console.log(message);
+      return { success: false, message };
+    }
+
+    // Trend weight is calculated on a sorted-ascending array and returned sorted-descending
+    const logsWithTrend = calculateTrendWeight(userProfile.dailyWeightLog);
+    
+    // Filter for logs that have a trend weight after calculation
+    const validTrendLogs = logsWithTrend.filter(log => log.trendWeightKg !== undefined);
+    
+    if (validTrendLogs.length < 7) {
+        const message = "Not enough consistent data to establish a weight trend. Keep logging daily!";
+        console.log(message);
+        return { success: false, message };
+    }
+
+    // Use last 21 days of data if available, otherwise minimum 14
+    const daysToAnalyze = Math.min(21, validTrendLogs.length);
+    const recentLogs = validTrendLogs.slice(0, daysToAnalyze);
+
+    // Calculate average calorie intake over the period
+    let totalCalories = 0;
+    let daysWithCalorieData = 0;
+    
+    const dateSet = new Set(recentLogs.map(l => l.date));
+    const relevantMeals = mealPlan.filter(m => dateSet.has(m.date) && m.status === 'eaten');
+
+    recentLogs.forEach(log => {
+      const macros = calculateTotalMacrosUtil(relevantMeals.filter(m => m.date === log.date), allRecipesCache);
+      if (macros.calories > 0) {
+        totalCalories += macros.calories;
+        daysWithCalorieData++;
+      }
+    });
+    
+    if (daysWithCalorieData < 7) {
+         const message = `Need at least 7 days of calorie logs in the last ${daysToAnalyze} days.`;
+         console.log(message);
+         return { success: false, message };
+    }
+    const averageDailyCalories = totalCalories / daysWithCalorieData;
+
+    // Calculate weight change from trend
+    const latestTrendWeight = recentLogs[0].trendWeightKg!;
+    const oldestTrendWeight = recentLogs[recentLogs.length - 1].trendWeightKg!;
+    const weightChangeKg = latestTrendWeight - oldestTrendWeight;
+    const durationDays = (new Date(recentLogs[0].date).getTime() - new Date(recentLogs[recentLogs.length - 1].date).getTime()) / (1000 * 3600 * 24);
+
+    if (durationDays < 7) {
+        const message = "Trend data available for less than 7 days.";
+        console.log(message);
+        return { success: false, message };
+    }
+
+    // Energy balance: 1 kg of body weight ≈ 7700 kcal
+    const caloriesFromWeightChange = weightChangeKg * 7700;
+    const averageDailyDeficitOrSurplus = caloriesFromWeightChange / durationDays;
+
+    const newDynamicTDEE = Math.round(averageDailyCalories - averageDailyDeficitOrSurplus);
+
+    if (isNaN(newDynamicTDEE) || newDynamicTDEE <= 0) {
+        const message = "Calculation resulted in an invalid TDEE. Check your logged data for consistency.";
+        console.log(message);
+        return { success: false, message };
+    }
+    
+    console.log(`[Dynamic TDEE] Old: ${userProfile.tdee}, New: ${newDynamicTDEE}. Based on ${durationDays} days of data.`);
+    // Update the profile with the new, more accurate TDEE
+    await setUserInformation({ tdee: newDynamicTDEE });
+
+    const message = `Your TDEE has been updated to ${newDynamicTDEE} kcal/day based on your recent progress.`;
+    return { success: true, newTDEE: newDynamicTDEE, message };
+}, [userProfile, mealPlan, allRecipesCache, setUserInformation]);
 
 
   const contextValue = useMemo(() => ({
@@ -412,7 +456,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUserInformation, isRecipeCacheLoading, isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe,
     isRecipeFavorite, addPantryItem, removePantryItem, updatePantryItemQuantity,
     parseIngredient, assignIngredientCategory, addCustomRecipe, userRecipes, setDashboardSettings,
-    acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate,
+    acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin,
   }), [
     mealPlan, shoppingList, pantryItems, userProfile, allRecipesCache, addMealToPlan, removeMealFromPlan,
     updatePlannedMealServings, getConsumedMacrosForDate, toggleShoppingListItem,
@@ -420,7 +464,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDietaryPreferences, setAllergens, setMealStructure, setUserInformation, isRecipeCacheLoading,
     isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe, isRecipeFavorite,
     addPantryItem, removePantryItem, updatePantryItemQuantity, parseIngredient, assignIngredientCategory,
-    addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate,
+    addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin
   ]);
   
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
