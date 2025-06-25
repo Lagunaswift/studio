@@ -1,3 +1,4 @@
+
 "use client";
 
 import { PageWrapper } from '@/components/layout/PageWrapper';
@@ -19,6 +20,7 @@ import Link from 'next/link';
 import { Slider } from '@/components/ui/slider';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
 const macroTargetSchema = z.object({
@@ -49,6 +51,7 @@ export default function DietaryTargetsPage() {
   const [energyAvailabilityWarning, setEnergyAvailabilityWarning] = useState<string | null>(null);
   
   const [lossPercentage, setLossPercentage] = useState<number>(0.75);
+  const [surplusCalories, setSurplusCalories] = useState<number>(300);
 
 
   const macroForm = useForm<MacroTargetFormValues>({
@@ -133,9 +136,18 @@ export default function DietaryTargetsPage() {
 
     return { weeklyLossKg, calorieTarget, enabled: true };
   }, [userProfile?.weightKg, userProfile?.tdee, lossPercentage]);
+  
+  const muscleGainCalculation = useMemo(() => {
+    if (!userProfile?.tdee) {
+      return { weeklyGainKg: 0, calorieTarget: 0, enabled: false };
+    }
+    const weeklyGainKg = (surplusCalories * 7) / 7700;
+    const calorieTarget = Math.round(userProfile.tdee + surplusCalories);
+    return { weeklyGainKg, calorieTarget, enabled: true };
+  }, [userProfile?.tdee, surplusCalories]);
 
-  const handleApplyFatLossTarget = () => {
-    const { calorieTarget } = fatLossCalculation;
+
+  const handleApplyCalorieTarget = (calorieTarget: number) => {
     const proteinGrams = macroForm.getValues("protein") || 0;
     const fatGrams = macroForm.getValues("fat") || 0;
 
@@ -478,11 +490,10 @@ export default function DietaryTargetsPage() {
                 <CardHeader>
                     <CardTitle className="flex items-center">
                         <Calculator className="mr-2 h-5 w-5 text-accent"/>
-                        Fat Loss Calorie Target Calculator
+                        Goal Calculator
                     </CardTitle>
                     <CardDescription>
-                        Use this tool to set a calorie target based on your desired weekly weight loss goal.
-                        Complete your User Info page for an accurate TDEE.
+                        Use these tools to set a calorie target for your specific goal. The calculator uses your TDEE as a baseline.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -495,55 +506,113 @@ export default function DietaryTargetsPage() {
                             </AlertDescription>
                         </Alert>
                     ) : (
-                        <div className="space-y-6">
-                            <div className="space-y-2">
-                                <Label htmlFor="loss-slider" className="flex items-center gap-2">
-                                    Select Your Weekly Weight Loss Goal
-                                    <TooltipProvider>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-pointer" />
-                                            </TooltipTrigger>
-                                            <TooltipContent className="max-w-xs">
-                                                <p className="font-bold">Making Your Choice:</p>
-                                                <ul className="list-disc pl-5 mt-1 space-y-1 text-xs">
-                                                    <li><span className="font-semibold">0.5%/week (Slower):</span> Recommended for leaner individuals or those who want to maximize muscle retention.</li>
-                                                    <li><span className="font-semibold">1.0%/week (Faster):</span> A more aggressive goal suitable for individuals with a higher body fat percentage.</li>
-                                                    <li>A slower rate is often more sustainable long-term. Choosing a rate that is too fast can lead to muscle loss and fatigue.</li>
-                                                </ul>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-                                </Label>
-                                <Slider
-                                    id="loss-slider"
-                                    min={0.5}
-                                    max={1.0}
-                                    step={0.05}
-                                    value={[lossPercentage]}
-                                    onValueChange={(value) => setLossPercentage(value[0])}
-                                />
-                                <div className="flex justify-between text-xs text-muted-foreground">
-                                    <span>Slower (0.5%)</span>
-                                    <span>Faster (1.0%)</span>
+                        <Tabs defaultValue={userProfile?.primaryGoal === 'muscleGain' ? 'gain' : 'loss'} className="w-full">
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="loss">Fat Loss</TabsTrigger>
+                                <TabsTrigger value="gain">Muscle Gain</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="loss" className="pt-4">
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="loss-slider" className="flex items-center gap-2">
+                                            Select Your Weekly Weight Loss Goal
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <HelpCircle className="h-4 w-4 text-muted-foreground cursor-pointer" />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="max-w-xs">
+                                                        <p className="font-bold">Making Your Choice:</p>
+                                                        <ul className="list-disc pl-5 mt-1 space-y-1 text-xs">
+                                                            <li><span className="font-semibold">0.5%/week (Slower):</span> Recommended for leaner individuals or those who want to maximize muscle retention.</li>
+                                                            <li><span className="font-semibold">1.0%/week (Faster):</span> A more aggressive goal suitable for individuals with a higher body fat percentage.</li>
+                                                            <li>A slower rate is often more sustainable long-term. Choosing a rate that is too fast can lead to muscle loss and fatigue.</li>
+                                                        </ul>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </Label>
+                                        <Slider
+                                            id="loss-slider"
+                                            min={0.5}
+                                            max={1.0}
+                                            step={0.05}
+                                            value={[lossPercentage]}
+                                            onValueChange={(value) => setLossPercentage(value[0])}
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground">
+                                            <span>Slower (0.5%)</span>
+                                            <span>Faster (1.0%)</span>
+                                        </div>
+                                    </div>
+                                    <Alert>
+                                        <AlertTitle>Your Calculated Target</AlertTitle>
+                                        <AlertDescription>
+                                            A <span className="font-bold text-primary">{lossPercentage.toFixed(2)}%</span> goal means a loss of <span className="font-bold text-primary">{fatLossCalculation.weeklyLossKg.toFixed(2)} kg</span> per week.
+                                            <br />
+                                            Your resulting daily calorie target is <span className="font-bold text-accent">{fatLossCalculation.calorieTarget} kcal</span>.
+                                        </AlertDescription>
+                                    </Alert>
+                                    <Button 
+                                        type="button" 
+                                        onClick={() => handleApplyCalorieTarget(fatLossCalculation.calorieTarget)}
+                                        className="w-full"
+                                    >
+                                        Apply This Calorie Target (by adjusting Carbs)
+                                    </Button>
                                 </div>
-                            </div>
-                            <Alert>
-                                <AlertTitle>Your Calculated Target</AlertTitle>
-                                <AlertDescription>
-                                    A <span className="font-bold text-primary">{lossPercentage.toFixed(2)}%</span> goal means a loss of <span className="font-bold text-primary">{fatLossCalculation.weeklyLossKg.toFixed(2)} kg</span> per week.
-                                    <br />
-                                    Your resulting daily calorie target is <span className="font-bold text-accent">{fatLossCalculation.calorieTarget} kcal</span>.
-                                </AlertDescription>
-                            </Alert>
-                            <Button 
-                                type="button" 
-                                onClick={handleApplyFatLossTarget}
-                                className="w-full"
-                            >
-                                Apply This Calorie Target (by adjusting Carbs)
-                            </Button>
-                        </div>
+                            </TabsContent>
+                             <TabsContent value="gain" className="pt-4">
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="gain-slider" className="flex items-center gap-2">
+                                            Select Your Daily Calorie Surplus
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <HelpCircle className="h-4 w-4 text-muted-foreground cursor-pointer" />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="max-w-xs">
+                                                        <p className="font-bold">Making Your Choice:</p>
+                                                         <ul className="list-disc pl-5 mt-1 space-y-1 text-xs">
+                                                            <li>A small, consistent surplus is best for lean muscle gain while minimizing fat gain.</li>
+                                                            <li>Aiming for a surplus of 250-500 kcal/day is a common recommendation.</li>
+                                                        </ul>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </Label>
+                                        <Slider
+                                            id="gain-slider"
+                                            min={200}
+                                            max={500}
+                                            step={25}
+                                            value={[surplusCalories]}
+                                            onValueChange={(value) => setSurplusCalories(value[0])}
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground">
+                                            <span>Leaner Gain (+200 kcal)</span>
+                                            <span>Faster Gain (+500 kcal)</span>
+                                        </div>
+                                    </div>
+                                    <Alert>
+                                        <AlertTitle>Your Calculated Target</AlertTitle>
+                                        <AlertDescription>
+                                            A <span className="font-bold text-primary">+{surplusCalories} kcal</span> surplus aims for a gain of <span className="font-bold text-primary">{muscleGainCalculation.weeklyGainKg.toFixed(2)} kg</span> per week.
+                                            <br />
+                                            Your resulting daily calorie target is <span className="font-bold text-accent">{muscleGainCalculation.calorieTarget} kcal</span>.
+                                        </AlertDescription>
+                                    </Alert>
+                                    <Button 
+                                        type="button" 
+                                        onClick={() => handleApplyCalorieTarget(muscleGainCalculation.calorieTarget)}
+                                        className="w-full"
+                                    >
+                                        Apply This Calorie Target (by adjusting Carbs)
+                                    </Button>
+                                </div>
+                            </TabsContent>
+                        </Tabs>
                     )}
                 </CardContent>
             </Card>
@@ -554,8 +623,8 @@ export default function DietaryTargetsPage() {
                 <ul className="list-disc pl-5 mt-2 space-y-1 text-sm">
                     <li>First, complete your <Link href="/profile/user-info" className="underline hover:text-primary">User Info</Link> page to calculate your TDEE (Total Daily Energy Expenditure).</li>
                     <li>Use the 'Suggest Protein' and 'Suggest Fat' buttons to get AI-powered and calculated starting points for these macros.</li>
-                    <li>Use the 'Fat Loss Calculator' to find a calorie target for your goal, and apply it. This will adjust your 'Carbohydrates' to meet the target.</li>
-                    <li>For **muscle gain**, manually adjust your 'Carbohydrates' so your total calories are slightly above your TDEE.</li>
+                    <li>Use the 'Goal Calculator' to find a calorie target for your goal, and apply it. This will adjust your 'Carbohydrates' to meet the target.</li>
+                    <li>For **muscle gain**, use the 'Muscle Gain' tab. For **fat loss**, use the 'Fat Loss' tab.</li>
                 </ul>
                 </AlertDescription>
             </Alert>
@@ -563,4 +632,5 @@ export default function DietaryTargetsPage() {
        </div>
     </PageWrapper>
   );
-}
+
+    
