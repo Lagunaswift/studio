@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -83,7 +84,7 @@ export default function AIRecipeFinderPage() {
 
   if (isRecipeCacheLoading) {
     return (
-      <PageWrapper title="AI Recipe Finder">
+      <PageWrapper title="Pantry Chef">
         <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
           <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
           <p className="text-lg">Loading recipes for AI analysis...</p>
@@ -94,13 +95,13 @@ export default function AIRecipeFinderPage() {
 
 
   return (
-    <PageWrapper title="AI Recipe Finder">
+    <PageWrapper title="Pantry Chef">
       <div className="space-y-8">
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="font-headline text-primary flex items-center">
-              <Bot className="w-6 h-6 mr-2 text-accent" />
-              Find Recipes With Your Ingredients
+              <ChefHat className="w-6 h-6 mr-2 text-accent" />
+              What Can I Make?
             </CardTitle>
             <CardDescription>
               Enter the ingredients you have on hand, separated by commas. The AI will find the best recipes you can make from your collection.

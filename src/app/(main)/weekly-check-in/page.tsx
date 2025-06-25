@@ -52,7 +52,7 @@ export default function WeeklyCheckinPage() {
 
   if (isAppDataLoading) {
      return (
-      <PageWrapper title="Weekly Check-in">
+      <PageWrapper title="Adaptive Coach Check-in">
         <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
           <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
           <p className="text-lg">Loading your data...</p>
@@ -62,7 +62,7 @@ export default function WeeklyCheckinPage() {
   }
 
   return (
-    <PageWrapper title="Weekly Check-in & TDEE Calibration">
+    <PageWrapper title="Adaptive Coach Check-in">
       <div className="space-y-8">
         <Card className="shadow-lg">
           <CardHeader>
