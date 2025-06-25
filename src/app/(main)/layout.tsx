@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Footer } from '@/components/layout/Footer';
 import { ThemeToggleButton } from '@/components/layout/ThemeToggleButton';
-import { TermsAcceptanceModal } from '@/components/legal/TermsAcceptanceModal'; // Import the new modal
+import { TermsAcceptanceModal } from '@/components/legal/TermsAcceptanceModal';
 import {
   Accordion,
   AccordionContent,
@@ -28,15 +28,15 @@ import {
 import { SheetTitle } from '@/components/ui/sheet';
 import { 
   UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, 
-  PanelLeft, Target, Leaf, Ban, ListChecks, UserCog, UserCircle2, 
-  BookOpen, Archive, Bot, SlidersHorizontal, Search, LogOut, FileText, Shield, CheckSquare
+  PanelLeft, Target, Leaf, ListChecks, UserCog, UserCircle2, 
+  BookOpen, Archive, Bot, SlidersHorizontal, Search, LogOut, FileText, Shield, CheckSquare, TrendingUp, Settings
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useState, type FormEvent } from 'react';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/context/AuthContext';
-import { useAppContext } from '@/context/AppContext'; // Import AppContext
+import { useAppContext } from '@/context/AppContext';
 
 interface NavItem {
   href: string;
@@ -50,26 +50,29 @@ const topLevelNavItems: NavItem[] = [
 ];
 
 const planningNavItems: NavItem[] = [
-    { href: '/meal-plan', label: 'Daily Planner', icon: CalendarDays },
-    { href: '/weekly-check-in', label: 'Weekly Check-in', icon: CheckSquare },
     { href: '/ai-suggestions', label: 'AI Meal Planner', icon: Sparkles },
+    { href: '/meal-plan', label: 'Daily/Weekly View', icon: CalendarDays },
     { href: '/shopping-list', label: 'Shopping List', icon: ShoppingBag },
     { href: '/pantry', label: 'Pantry', icon: Archive },
 ];
 
 const recipesNavItems: NavItem[] = [
-    { href: '/recipes', label: 'All Recipes', icon: UtensilsCrossed },
     { href: '/ai-recipe-finder', label: 'AI Recipe Finder', icon: Bot },
+    { href: '/recipes', label: 'My Saved Recipes', icon: UtensilsCrossed },
 ];
 
-const profileNavItems: NavItem[] = [
-  { href: '/profile/user-info', label: 'User Info', icon: UserCircle2 },
-  { href: '/profile/targets', label: 'Targets', icon: Target },
-  { href: '/profile/diet-type', label: 'Diet Type', icon: Leaf },
-  { href: '/profile/allergens', label: 'Allergens', icon: Ban },
-  { href: '/profile/meal-structure', label: 'Meal Structure', icon: ListChecks },
-  { href: '/profile/dashboard-settings', label: 'Dashboard', icon: SlidersHorizontal },
+const progressNavItems: NavItem[] = [
+    { href: '/profile/targets', label: 'My Goals & Targets', icon: Target },
+    { href: '/weekly-check-in', label: 'Weekly Check-in', icon: CheckSquare },
 ];
+
+const settingsNavItems: NavItem[] = [
+  { href: '/profile/user-info', label: 'My Profile', icon: UserCircle2 },
+  { href: '/profile/diet-type', label: 'Diet & Allergens', icon: Leaf },
+  { href: '/profile/meal-structure', label: 'Meal Structure', icon: ListChecks },
+  { href: '/profile/dashboard-settings', label: 'Customize Dashboard', icon: SlidersHorizontal },
+];
+
 
 const bottomLevelNavItems: NavItem[] = [
     { href: '/guide', label: 'App Guide', icon: BookOpen },
@@ -140,12 +143,24 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const { isMobile, state: sidebarState } = useSidebar(); 
   const { userProfile, acceptTerms, isAppDataLoading } = useAppContext();
 
+  // Re-creating the old `profileNavItems` just for the page title logic
+  const originalProfileItemsForTitle = [
+    { href: '/profile/user-info', label: 'User Info' },
+    { href: '/profile/targets', label: 'Targets' },
+    { href: '/profile/diet-type', label: 'Diet Type' },
+    { href: '/profile/allergens', label: 'Allergens' },
+    { href: '/profile/meal-structure', label: 'Meal Structure' },
+    { href: '/profile/dashboard-settings', label: 'Dashboard Settings' },
+  ];
+
   const allNavItems = [
     ...topLevelNavItems,
     ...planningNavItems,
     ...recipesNavItems,
-    ...profileNavItems,
-    ...bottomLevelNavItems
+    ...progressNavItems,
+    ...settingsNavItems,
+    ...bottomLevelNavItems,
+    ...originalProfileItemsForTitle,
   ];
 
   const getCurrentPageTitle = () => {
@@ -153,7 +168,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     if (pathname.startsWith('/recipes/add')) return 'Add New Recipe';
     if (pathname.match(/^\/recipes\/\d+$/)) return 'Recipe Details';
     
-    let bestMatch: NavItem | undefined;
+    let bestMatch: { href: string; label: string; } | undefined;
     for (const item of allNavItems) {
       if (pathname.startsWith(item.href)) {
         if (!bestMatch || item.href.length > bestMatch.href.length) {
@@ -167,7 +182,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const currentPageTitle = getCurrentPageTitle();
   const isPlanningSectionActive = planningNavItems.some(item => pathname.startsWith(item.href));
   const isRecipesSectionActive = recipesNavItems.some(item => pathname.startsWith(item.href));
-  const isProfileSectionActive = profileNavItems.some(item => pathname.startsWith(item.href));
+  const isProgressSectionActive = progressNavItems.some(item => pathname.startsWith(item.href));
+  const isSettingsSectionActive = settingsNavItems.some(item => pathname.startsWith(item.href));
 
   const renderAccordion = (
     sectionId: string,
@@ -254,9 +270,10 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
               );
             })}
             
-            {renderAccordion("planning-section", "Planning", CalendarDays, planningNavItems, isPlanningSectionActive)}
+            {renderAccordion("planning-section", "Plan", CalendarDays, planningNavItems, isPlanningSectionActive)}
             {renderAccordion("recipes-section", "Recipes", UtensilsCrossed, recipesNavItems, isRecipesSectionActive)}
-            {renderAccordion("profile-section", "Profile Settings", UserCog, profileNavItems, isProfileSectionActive)}
+            {renderAccordion("progress-section", "Progress", TrendingUp, progressNavItems, isProgressSectionActive)}
+            {renderAccordion("settings-section", "Settings", Settings, settingsNavItems, isSettingsSectionActive)}
           </SidebarMenu>
           
           <SidebarMenu className="mt-auto">
