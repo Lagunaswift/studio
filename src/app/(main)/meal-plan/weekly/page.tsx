@@ -17,7 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 export default function WeeklyMealPlanPage() {
   const {
     getMealsForDate,
-    getDailyMacros,
+    getPlannedMacrosForDate,
     allRecipesCache,
     isRecipeCacheLoading,
     userProfile,
@@ -26,7 +26,7 @@ export default function WeeklyMealPlanPage() {
   const [currentDateInWeek, setCurrentDateInWeek] = useState<Date>(new Date());
   const [weekDays, setWeekDays] = useState<Date[]>([]);
   const [weeklyMealData, setWeeklyMealData] = useState<
-    Array<{ date: Date; formattedDate: string; meals: PlannedMeal[]; macros: ReturnType<typeof getDailyMacros> }>
+    Array<{ date: Date; formattedDate: string; meals: PlannedMeal[]; macros: ReturnType<typeof getPlannedMacrosForDate> }>
   >([]);
   
   useEffect(() => {
@@ -44,12 +44,12 @@ export default function WeeklyMealPlanPage() {
           date: day,
           formattedDate: formatted,
           meals: getMealsForDate(formatted),
-          macros: getDailyMacros(formatted),
+          macros: getPlannedMacrosForDate(formatted),
         };
       });
       setWeeklyMealData(data);
     }
-  }, [weekDays, getMealsForDate, getDailyMacros, isRecipeCacheLoading, allRecipesCache]);
+  }, [weekDays, getMealsForDate, getPlannedMacrosForDate, isRecipeCacheLoading, allRecipesCache]);
 
   const handlePreviousWeek = () => {
     setCurrentDateInWeek(prev => subWeeks(prev, 1));
