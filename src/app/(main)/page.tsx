@@ -120,15 +120,16 @@ export default function HomePage() {
   const weightLogForm = useForm<WeightLogFormValues>({
     resolver: zodResolver(weightLogSchema),
     defaultValues: {
-        weightKg: appContextUserProfile?.weightKg || undefined
+        weightKg: appContextUserProfile?.weightKg || ''
     }
   });
 
   useEffect(() => {
-    if (appContextUserProfile?.weightKg) {
-        weightLogForm.setValue('weightKg', appContextUserProfile.weightKg);
+    if (appContextUserProfile) {
+      weightLogForm.reset({ weightKg: appContextUserProfile.weightKg || '' });
     }
-  }, [appContextUserProfile?.weightKg, weightLogForm]);
+  }, [appContextUserProfile, weightLogForm.reset]);
+
 
   const proteinValue = macroTargetForm.watch("protein");
   const carbsValue = macroTargetForm.watch("carbs");
@@ -337,7 +338,7 @@ export default function HomePage() {
                                     <FormItem>
                                         <FormLabel>Today's Weight (kg)</FormLabel>
                                         <FormControl>
-                                            <Input type="number" step="0.1" placeholder="e.g., 70.5" {...field} />
+                                            <Input type="number" step="0.1" placeholder="e.g., 70.5" {...field} value={field.value ?? ''} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
