@@ -208,7 +208,7 @@ export default function DietaryTargetsPage() {
     macroForm.reset(data); 
   };
 
-  const handleGetProteinSuggestion = async () => {
+  const handleGetProteinSuggestion = async (recommendationType: 'average' | 'safe' | 'flexible') => {
     if (!userProfile || !userProfile.leanBodyMassKg) {
       setAiError("Please complete your User Information (especially weight and body fat %) to calculate Lean Body Mass for an accurate protein suggestion.");
       toast({
@@ -223,19 +223,6 @@ export default function DietaryTargetsPage() {
       return;
     }
 
-    if (userProfile.sex === 'female' && !userProfile.bodyFatPercentage) {
-       setAiError("For female-specific protein targets, please provide your Body Fat % on the User Info page. The AI will use general guidelines otherwise.");
-       toast({
-        title: "Body Fat % Recommended",
-        description: (
-          <span>
-            For the most accurate female-specific protein targets, add your Body Fat % on the <Link href="/profile/user-info" className="underline">User Info</Link> page.
-          </span>
-        ),
-        variant: "default",
-      });
-    }
-
     setIsAISuggesting(true);
     setProteinSuggestion(null);
     setAiError(null);
@@ -246,11 +233,12 @@ export default function DietaryTargetsPage() {
     try {
       const input: SuggestProteinIntakeInput = {
         leanBodyMassKg: userProfile.leanBodyMassKg,
-        bodyFatPercentage: userProfile.bodyFatPercentage,
+        sex: userProfile.sex || 'notSpecified',
+        recommendationType: recommendationType,
+        unitPreference: 'g/kgLBM',
         athleteType: userProfile.athleteType || 'notSpecified',
         primaryGoal: userProfile.primaryGoal || 'notSpecified',
-        sex: userProfile.sex || 'notSpecified',
-        unitPreference: 'g/kgLBM', 
+        bodyFatPercentage: userProfile.bodyFatPercentage,
       };
       const suggestion = await suggestProteinIntake(input);
       setProteinSuggestion(suggestion);
@@ -362,17 +350,35 @@ export default function DietaryTargetsPage() {
                         name="protein"
                         render={({ field }) => (
                         <FormItem>
-                            <div className="flex justify-between items-center">
                             <FormLabel>Protein (g)</FormLabel>
-                            <Button type="button" variant="outline" size="sm" onClick={handleGetProteinSuggestion} disabled={isAISuggesting}>
-                                {isAISuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4 text-accent" />}
-                                Suggest Protein
-                            </Button>
-                            </div>
                             <FormControl>
                             <Input type="number" {...field} />
                             </FormControl>
                             <FormMessage />
+                            <Card className="bg-muted/50 mt-4">
+                                <CardHeader className="p-4">
+                                    <CardTitle className="text-base flex items-center">
+                                        <Sparkles className="mr-2 h-4 w-4 text-accent" />
+                                        AI Protein Suggestion
+                                    </CardTitle>
+                                    <CardDescription className="text-xs">
+                                        Get a protein target based on your Lean Body Mass (LBM). Select your preferred target type.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-4 pt-0">
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button type="button" size="sm" variant="outline" onClick={() => handleGetProteinSuggestion('average')} disabled={isAISuggesting}>
+                                            {isAISuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Average"}
+                                        </Button>
+                                        <Button type="button" size="sm" variant="outline" onClick={() => handleGetProteinSuggestion('safe')} disabled={isAISuggesting}>
+                                            {isAISuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Safe"}
+                                        </Button>
+                                        <Button type="button" size="sm" variant="outline" onClick={() => handleGetProteinSuggestion('flexible')} disabled={isAISuggesting}>
+                                            {isAISuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Flexible"}
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
                         </FormItem>
                         )}
                     />
