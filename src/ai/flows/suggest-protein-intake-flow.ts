@@ -83,44 +83,45 @@ User Inputs:
 
 **Part 2: Male and General Guidelines (Use if sex is 'male', or 'female' without bodyFatPercentage, or 'notSpecified')**
 
-Use these general protein factor ranges in **g/lb of LBM**:
-*   **Endurance Athletes**: 0.8-1.0 g/lb LBM.
-*   **Strength/Power Athletes**: 1.0-1.2 g/lb LBM.
-*   **General Fitness / Not Specified**: 0.7-1.0 g/lb LBM.
-*   **Fat Loss (Dieting) for Strength/Power Athletes**: Can go as high as 1.4-1.5 g/lb LBM.
+Use these general protein factor ranges. The user's input is in **kilograms (kg)**, so you can use the g/kg LBM values for direct calculation.
+
+| Athlete Type & Goal              | Factor Range (g/lb LBM) | Factor Range (g/kg LBM) |
+|----------------------------------|-------------------------|-------------------------|
+| Endurance Athletes               | 0.8 - 1.0 g/lb LBM      | 1.7 - 2.2 g/kg LBM      |
+| Strength/Power Athletes          | 1.0 - 1.2 g/lb LBM      | 2.2 - 2.6 g/kg LBM      |
+| General Fitness / Not Specified  | 0.7 - 1.0 g/lb LBM      | 1.5 - 2.2 g/kg LBM      |
+| Fat Loss (Strength/Power)        | 1.4 - 1.5 g/lb LBM      | 3.1 - 3.3 g/kg LBM      |
+
 *   **Considerations**: Lean towards the higher end of the range for fat loss goals.
 
 ---
 
 **YOUR TASK - Follow these steps precisely:**
 
-1.  **Select Guidelines.**
-    *   If the user's \`sex\` is 'female' AND they provided a \`bodyFatPercentage\`, you MUST use the guidelines in **Part 1**.
-    *   For ALL OTHER users (male, or female without body fat %), you MUST use the guidelines in **Part 2**.
+1.  **Select Guidelines and Determine Calculation Factors.**
+    *   If the user's \`sex\` is 'female' AND they provided a \`bodyFatPercentage\`, you MUST use the guidelines in **Part 1**. This part gives you factors in **g/lb LBM**. You will need to convert the user's LBM to pounds for the calculation.
+    *   For ALL OTHER users (male, or female without body fat %), you MUST use the guidelines in **Part 2**. Use the **g/kg LBM** factors from this table for direct calculation with the user's \`leanBodyMassKg\` input.
 
-2.  **Determine Protein Factor Range in g/lb LBM.**
-    Using the selected guidelines from Step 1, find the appropriate protein factor range. This gives you \`minFactor_g_per_lb\` and \`maxFactor_g_per_lb\`. These factors are in **grams per POUND of LBM**.
+2.  **Calculate Daily Protein Intake in Grams.**
+    *   **For Female-Specific (Part 1):**
+        a. Convert LBM to Pounds: \`LBM_lbs = leanBodyMassKg * ${KG_TO_LB}\`.
+        b. Get \`minFactor_g_per_lb\` and \`maxFactor_g_per_lb\` from Part 1 table.
+        c. Calculate: \`minProteinGramsPerDay = minFactor_g_per_lb * LBM_lbs\` and \`maxProteinGramsPerDay = maxFactor_g_per_lb * LBM_lbs\`.
+    *   **For Male/General (Part 2):**
+        a. Get \`minFactor_g_per_kg\` and \`maxFactor_g_per_kg\` from the **g/kg LBM column** in the Part 2 table.
+        b. Calculate: \`minProteinGramsPerDay = minFactor_g_per_kg * leanBodyMassKg\` and \`maxProteinGramsPerDay = maxFactor_g_per_kg * leanBodyMassKg\`.
+    *   This is the MOST critical step. Ensure you are using the correct units for your multiplication.
 
-3.  **Convert User's LBM to Pounds.**
-    The user's LBM is provided in kg. You MUST convert this to pounds for the calculation.
-    \`LBM_lbs = leanBodyMassKg * ${KG_TO_LB}\`.
-    Example: If leanBodyMassKg is 75, then LBM_lbs is 75 * 2.20462 = 165.35 lbs.
+3.  **Prepare Output Factors for Display.**
+    The output fields \`minProteinFactor\` and \`maxProteinFactor\` depend on the user's 'unitPreference'. The 'displayUnit' output field MUST match the user's 'unitPreference'.
+    *   **If 'unitPreference' is 'g/kgLBM'**:
+        *   For Female-Specific (Part 1): Convert your chosen \`g/lb\` factors to \`g/kg\` by multiplying by \`${KG_TO_LB}\`.
+        *   For Male/General (Part 2): Use the \`g/kg LBM\` factors you already used for calculation.
+    *   **If 'unitPreference' is 'g/lbLBM'**:
+        *   For Female-Specific (Part 1): Use the \`g/lb LBM\` factors you already used for calculation.
+        *   For Male/General (Part 2): Use the \`g/lb LBM\` factors from the Part 2 table.
 
-4.  **Calculate Daily Protein Intake in Grams.**
-    Use the LBM in pounds from Step 3 and the factors from Step 2.
-    \`minProteinGramsPerDay = minFactor_g_per_lb * LBM_lbs\`
-    \`maxProteinGramsPerDay = maxFactor_g_per_lb * LBM_lbs\`
-    This calculation is CRITICAL. DO NOT multiply kg by g/lb factors, or lbs by g/kg factors.
-
-5.  **Prepare Output Factors for Display.**
-    The output fields \`minProteinFactor\` and \`maxProteinFactor\` depend on the user's 'unitPreference'.
-    *   If 'unitPreference' is 'g/lbLBM', use the factors from Step 2.
-    *   If 'unitPreference' is 'g/kgLBM', you MUST CONVERT the factors from Step 2.
-        \`outputMinFactor_g_per_kg = minFactor_g_per_lb * ${KG_TO_LB}\`
-        \`outputMaxFactor_g_per_kg = maxFactor_g_per_lb * ${KG_TO_LB}\`
-    Set the 'displayUnit' output field to match 'unitPreference'.
-
-6.  **Provide Justification.**
+4.  **Provide Justification.**
     Provide a concise 'justification' (2-4 sentences) explaining your reasoning, referencing the specific guidelines and user inputs used.
 
 Output the entire response as a single, valid JSON object that conforms EXACTLY to the 'SuggestProteinIntakeOutputSchema'. Do NOT include any text or formatting outside of this JSON object.
@@ -156,3 +157,4 @@ const suggestProteinIntakeFlow = ai.defineFlow(
     return output;
   }
 );
+
