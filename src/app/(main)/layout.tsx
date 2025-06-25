@@ -29,7 +29,7 @@ import { SheetTitle } from '@/components/ui/sheet';
 import { 
   UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, 
   PanelLeft, Target, Leaf, Ban, ListChecks, UserCog, UserCircle2, 
-  BookOpen, Archive, Bot, SlidersHorizontal, Search, LogOut, FileText, Shield // Added icons
+  BookOpen, Archive, Bot, SlidersHorizontal, Search, LogOut, FileText, Shield, CheckSquare
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -51,6 +51,7 @@ const topLevelNavItems: NavItem[] = [
 
 const planningNavItems: NavItem[] = [
     { href: '/meal-plan', label: 'Daily Planner', icon: CalendarDays },
+    { href: '/weekly-check-in', label: 'Weekly Check-in', icon: CheckSquare },
     { href: '/ai-suggestions', label: 'AI Meal Planner', icon: Sparkles },
     { href: '/shopping-list', label: 'Shopping List', icon: ShoppingBag },
     { href: '/pantry', label: 'Pantry', icon: Archive },

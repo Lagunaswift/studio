@@ -175,6 +175,8 @@ export interface UserProfileSettings {
   subscription_end_date?: string | null;
   subscription_duration?: string | null;
   hasAcceptedTerms?: boolean;
+  lastCheckInDate?: string | null; // YYYY-MM-DD
+  targetWeightChangeRateKg?: number | null; // e.g., -0.5 for loss, 0.25 for gain
 }
 
 // This type will be used for the Recipe Form
