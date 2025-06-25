@@ -63,39 +63,43 @@ User Inputs:
 
 Your primary task is to select a protein factor based on the user's 'recommendationType'. All calculations should use the provided 'leanBodyMassKg'.
 
-| Recommendation Type | Target Group             | Factor (g/kg LBM) | Factor (g/lb LBM) | Justification Notes                               |
-|---------------------|--------------------------|-------------------|-------------------|---------------------------------------------------|
-| **average** | All individuals          | 2.35              | 1.07              | The average amount to maximize muscle growth.     |
-| **safe** | All individuals          | 2.75              | 1.25              | A "better safe than sorry" target for confidence. |
-| **flexible** | Women                    | 1.95              | 0.88              | A lower-intake equivalent of ~1.75g/kg total weight. |
-| **flexible** | Men / Not Specified      | 2.20              | 1.00              | A lower-intake equivalent of ~2.0g/kg total weight.  |
-
-* **Note on 'flexible'**: The 'flexible' target is an LBM-based estimate derived from a total-body-weight recommendation. Mention this nuance in the justification.
+| Recommendation Type | Target Group             | Factor (g/kg LBM) | Factor (g/lb LBM) |
+|---------------------|--------------------------|-------------------|-------------------|
+| **average**         | All individuals          | 2.35              | 1.07              |
+| **safe**            | All individuals          | 2.75              | 1.25              |
+| **flexible**        | Women                    | 1.95              | 0.88              |
+| **flexible**        | Men / Not Specified      | 2.20              | 1.00              |
 
 ---
 
 **YOUR TASK - Follow these steps precisely:**
 
-1.  **Select Protein Factor.** Based on the user's \`recommendationType\` and \`sex\`, choose the single, most appropriate protein factor from the GUIDELINES table. You will use the **g/kg LBM** value for your calculation.
+1.  **Select Protein Factor.** Based on the user's 'recommendationType' and 'sex', choose the single, most appropriate protein factor from the GUIDELINES table. You will use the **g/kg LBM** value for your calculation.
 
 2.  **Calculate Daily Protein Intake in Grams.**
-    * Let's say your chosen factor is \`factor_g_per_kg\`.
-    * Calculate: \`dailyProteinGrams = factor_g_per_kg * leanBodyMassKg\`.
-    * Set both \`minProteinGramsPerDay\` and \`maxProteinGramsPerDay\` to this calculated value.
+    *   Let's say your chosen factor is 'factor_g_per_kg'.
+    *   Calculate: 'dailyProteinGrams = factor_g_per_kg * leanBodyMassKg'.
+    *   Set both 'minProteinGramsPerDay' and 'maxProteinGramsPerDay' to this calculated value.
 
 3.  **Prepare Output Factors for Display.**
-    * The output fields \`minProteinFactor\` and \`maxProteinFactor\` should be the factor you chose, converted to the user's \`unitPreference\`.
-    * Get the chosen factor in both g/kg and g/lb from the table.
-    * If \`unitPreference\` is 'g/kgLBM', set both output factors to the 'g/kg LBM' value.
-    * If \`unitPreference\` is 'g/lbLBM', set both output factors to the 'g/lb LBM' value.
-    * The 'displayUnit' output field MUST match the user's 'unitPreference'.
+    *   The output fields 'minProteinFactor' and 'maxProteinFactor' should be the factor you chose, converted to the user's 'unitPreference'.
+    *   Get the chosen factor in both g/kg and g/lb from the table.
+    *   If 'unitPreference' is 'g/kgLBM', set both output factors to the 'g/kg LBM' value.
+    *   If 'unitPreference' is 'g/lbLBM', set both output factors to the 'g/lb LBM' value.
+    *   The 'displayUnit' output field MUST match the user's 'unitPreference'.
 
-4.  **Provide Justification.**
-    * Provide a concise 'justification' (2-4 sentences).
-    * State which recommendation type was chosen (e.g., "Based on your 'better safe than sorry' preference...").
-    * Mention that the calculation is based on lean body mass for accuracy.
-    * If the 'flexible' option was chosen, you MUST add a sentence explaining that this target is based on a total body weight guideline and is an estimate when applied to LBM.
-    * You may use the contextual inputs like 'primaryGoal' to add a sentence of relevant color, e.g. "This intake will effectively support your goal of muscle gain."
+4.  **Provide a Human-Friendly Justification.**
+    *   Create a simple, human-friendly explanation based on the user's chosen 'recommendationType'. **You must use one of the templates below, filling in the bracketed information.**
+    *   **Use the 'dailyProteinGrams' value you calculated in step 2, rounded to the nearest whole number, where the template says [rounded daily grams].**
+
+    *   **If 'recommendationType' is 'average':**
+        "You selected the 'average' target. This is a strong, evidence-based goal designed to be enough to maximize muscle growth for most people. Based on your lean body mass, your daily protein target is around [rounded daily grams]g. This intake will effectively support your primary goal of {{{primaryGoal}}}."
+
+    *   **If 'recommendationType' is 'safe':**
+        "You opted for the 'safe' approach. This is our 'better safe than sorry' recommendation, providing a slightly higher intake to ensure you're getting more than enough protein to fuel your results. For your lean body mass, this comes out to a daily target of about [rounded daily grams]g. This is particularly effective for supporting your goal of {{{primaryGoal}}}."
+
+    *   **If 'recommendationType' is 'flexible':**
+        "You chose the 'flexible' target. This is a great option if you prefer a lower protein intake to allow for more dietary variety with carbs and fats, while still making great gains. Your target is around [rounded daily grams]g per day. It's worth noting this is an estimate based on a general guideline, applied to your specific lean body mass for accuracy."
 
 Output the entire response as a single, valid JSON object that conforms EXACTLY to the 'SuggestProteinIntakeOutputSchema'. Do NOT include any text or formatting outside of this JSON object.
 `,
