@@ -20,6 +20,7 @@ import type {
   RecipeFormData,
   DashboardSettings,
   UKSupermarketCategory,
+  DailyWeightLog,
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil } from '@/lib/data';
@@ -48,6 +49,7 @@ const DEFAULT_USER_PROFILE: UserProfileSettings = {
     primaryGoal: 'maintenance',
     tdee: null,
     leanBodyMassKg: null,
+    dailyWeightLog: [],
     dashboardSettings: {
         showMacros: true,
         showMenu: true,
@@ -132,7 +134,10 @@ interface AppContextType {
   addMealToPlan: (recipe: Recipe, date: string, mealType: MealType, servings: number) => Promise<void>;
   removeMealFromPlan: (plannedMealId: string) => Promise<void>;
   updatePlannedMealServings: (plannedMealId: string, newServings: number) => Promise<void>;
-  getDailyMacros: (date: string) => Macros;
+  updateMealStatus: (plannedMealId: string, status: 'planned' | 'eaten') => Promise<void>;
+  logWeight: (date: string, weightKg: number) => Promise<void>;
+  getConsumedMacrosForDate: (date: string) => Macros;
+  getPlannedMacrosForDate: (date: string) => Macros;
   toggleShoppingListItem: (itemId: string) => Promise<void>;
   clearMealPlanForDate: (date: string) => Promise<void>;
   clearAllData: () => Promise<void>;
@@ -228,7 +233,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       recipeId: recipe.id, 
       date: date, 
       mealType: mealType, 
-      servings: servings 
+      servings: servings,
+      status: 'planned',
     };
     setMealPlan(prev => [...prev, newPlannedMeal]);
   }, [user]);
@@ -351,7 +357,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem(`userProfile_${userId}`);
   }, [user]);
 
-  const getDailyMacros = useCallback((date: string): Macros => calculateTotalMacrosUtil(mealPlan.filter(pm => pm.date === date), allRecipesCache), [mealPlan, allRecipesCache]);
+  const getConsumedMacrosForDate = useCallback((date: string): Macros => calculateTotalMacrosUtil(mealPlan.filter(pm => pm.date === date && pm.status === 'eaten'), allRecipesCache), [mealPlan, allRecipesCache]);
+  const getPlannedMacrosForDate = useCallback((date: string): Macros => calculateTotalMacrosUtil(mealPlan.filter(pm => pm.date === date), allRecipesCache), [mealPlan, allRecipesCache]);
   
   const getMealsForDate = useCallback((date: string): PlannedMeal[] => {
     return mealPlan
@@ -365,23 +372,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setShoppingList(prev => prev.map(item => item.id === itemId ? {...item, purchased: !item.purchased} : item));
   }, []);
 
+  const updateMealStatus = useCallback(async (plannedMealId: string, status: 'planned' | 'eaten') => {
+    if (!user) return;
+    setMealPlan(prev => prev.map(pm => pm.id === plannedMealId ? { ...pm, status } : pm));
+  }, [user]);
+
+  const logWeight = useCallback(async (date: string, weightKg: number) => {
+    if (!userProfile || !user) return;
+    const newLogEntry: DailyWeightLog = { date, weightKg };
+    
+    // Ensure dailyWeightLog is an array
+    const currentLogs = userProfile.dailyWeightLog || [];
+    
+    const existingLogIndex = currentLogs.findIndex(log => log.date === date);
+
+    let updatedLogs: DailyWeightLog[];
+    if (existingLogIndex > -1) {
+        // Update existing entry
+        updatedLogs = [...currentLogs];
+        updatedLogs[existingLogIndex] = newLogEntry;
+    } else {
+        // Add new entry
+        updatedLogs = [...currentLogs, newLogEntry];
+    }
+
+    // Sort logs by date descending
+    updatedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // Update the profile state
+    updateUserProfileInDb({ dailyWeightLog: updatedLogs });
+  }, [user, userProfile, updateUserProfileInDb]);
+
+
   const contextValue = useMemo(() => ({
     mealPlan, shoppingList, pantryItems, userProfile, allRecipesCache,
-    addMealToPlan, removeMealFromPlan, updatePlannedMealServings, getDailyMacros,
+    addMealToPlan, removeMealFromPlan, updatePlannedMealServings, getConsumedMacrosForDate,
     toggleShoppingListItem, clearMealPlanForDate, clearAllData, getMealsForDate,
     setMacroTargets, setDietaryPreferences, setAllergens, setMealStructure,
     setUserInformation, isRecipeCacheLoading, isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe,
     isRecipeFavorite, addPantryItem, removePantryItem, updatePantryItemQuantity,
     parseIngredient, assignIngredientCategory, addCustomRecipe, userRecipes, setDashboardSettings,
-    acceptTerms,
+    acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate,
   }), [
     mealPlan, shoppingList, pantryItems, userProfile, allRecipesCache, addMealToPlan, removeMealFromPlan,
-    updatePlannedMealServings, getDailyMacros, toggleShoppingListItem,
+    updatePlannedMealServings, getConsumedMacrosForDate, toggleShoppingListItem,
     clearMealPlanForDate, clearAllData, getMealsForDate, setMacroTargets,
     setDietaryPreferences, setAllergens, setMealStructure, setUserInformation, isRecipeCacheLoading,
     isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe, isRecipeFavorite,
     addPantryItem, removePantryItem, updatePantryItemQuantity, parseIngredient, assignIngredientCategory,
-    addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms,
+    addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate,
   ]);
   
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;

@@ -1,5 +1,4 @@
 
-
 export interface Ingredient {
   name: string;
   quantity: number;
@@ -39,6 +38,7 @@ export interface PlannedMeal {
   date: string; // YYYY-MM-DD
   mealType: MealType;
   servings: number;
+  status: 'planned' | 'eaten';
   recipeDetails?: Recipe;
 }
 
@@ -128,6 +128,11 @@ export interface DashboardSettings {
   showQuickRecipes: boolean;
 }
 
+export interface DailyWeightLog {
+  date: string; // YYYY-MM-DD
+  weightKg: number;
+}
+
 export interface UserProfileSettings {
   name?: string | null;
   email?: string | null;
@@ -149,6 +154,7 @@ export interface UserProfileSettings {
   abdomenCircumferenceCm?: number | null; // Male
   waistCircumferenceCm?: number | null;   // Female
   hipCircumferenceCm?: number | null;     // Female
+  dailyWeightLog?: DailyWeightLog[];
   dashboardSettings?: DashboardSettings;
   favorite_recipe_ids?: number[];
   subscription_status: SubscriptionStatus;

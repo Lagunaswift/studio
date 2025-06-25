@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { format, addDays, subDays, isValid } from 'date-fns';
-import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info, CalendarDays as CalendarDaysIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info, CalendarDays as CalendarDaysIcon, CheckCircle2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,8 @@ import { useToast } from '@/hooks/use-toast';
 import { RecipeCard } from '@/components/shared/RecipeCard';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
+import { Checkbox } from '@/components/ui/checkbox';
+import { cn } from '@/lib/utils';
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import {
@@ -47,14 +50,15 @@ const chartConfig = {
 export default function MealPlanPage() {
   const {
     userProfile,
-    getDailyMacros,
+    getPlannedMacrosForDate,
     removeMealFromPlan,
     updatePlannedMealServings,
     clearMealPlanForDate,
     getMealsForDate,
     addMealToPlan,
     allRecipesCache,
-    isRecipeCacheLoading: isAppRecipeCacheLoading
+    isRecipeCacheLoading: isAppRecipeCacheLoading,
+    updateMealStatus,
   } = useAppContext();
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -73,7 +77,7 @@ export default function MealPlanPage() {
   const mealStructureToUse = userProfile?.mealStructure || MEAL_SLOT_CONFIG;
 
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-  const dailyMacros = getDailyMacros(formattedDate);
+  const dailyMacros = getPlannedMacrosForDate(formattedDate);
   const currentMacroTargets = userProfile?.macroTargets;
   const dailyMeals = getMealsForDate(formattedDate);
 
@@ -194,9 +198,9 @@ export default function MealPlanPage() {
         <div className="w-full lg:flex-1">
            <Card className="shadow-lg h-full">
             <CardHeader>
-              <CardTitle className="font-headline text-primary">Daily Totals for {format(selectedDate, 'PPP')}</CardTitle>
+              <CardTitle className="font-headline text-primary">Planned Daily Totals for {format(selectedDate, 'PPP')}</CardTitle>
               <CardDescription>
-                {currentMacroTargets ? "Review your macronutrient intake against your targets." : "Review your macronutrient intake. Set targets in profile for comparison."}
+                {currentMacroTargets ? "Review your planned macronutrient intake against your targets." : "Review your planned macronutrient intake. Set targets in profile for comparison."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -209,7 +213,7 @@ export default function MealPlanPage() {
                       <XAxis type="number" tickFormatter={(value) => `${value}`} />
                       <YAxis dataKey="name" type="category" tickLine={false} tickMargin={10} axisLine={false} width={60} />
                       <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
-                      <Bar dataKey="consumed" fill="var(--color-consumed)" radius={4} barSize={25} name="Consumed" />
+                      <Bar dataKey="consumed" fill="var(--color-consumed)" radius={4} barSize={25} name="Planned" />
                       {currentMacroTargets && <Bar dataKey="target" fill="var(--color-target)" radius={4} barSize={25} name="Target" />}
                       <ChartLegend content={<ChartLegendContent />} />
                     </BarChart>
@@ -225,7 +229,7 @@ export default function MealPlanPage() {
                       <XAxis type="number" tickFormatter={(value) => `${value}g`} />
                       <YAxis dataKey="name" type="category" tickLine={false} tickMargin={10} axisLine={false} width={60}/>
                       <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
-                      <Bar dataKey="consumed" fill="var(--color-consumed)" radius={4} barSize={15} name="Consumed" />
+                      <Bar dataKey="consumed" fill="var(--color-consumed)" radius={4} barSize={15} name="Planned" />
                       {currentMacroTargets && <Bar dataKey="target" fill="var(--color-target)" radius={4} barSize={15} name="Target" />}
                        <ChartLegend content={<ChartLegendContent />} />
                     </BarChart>
@@ -286,7 +290,10 @@ export default function MealPlanPage() {
               <h3 className="text-xl font-semibold font-headline text-primary/90 mb-4">{slotConfig.name}</h3>
               {mealToDisplay ? (
                 <div className="w-full max-w-lg mx-auto">
-                  <Card className="overflow-hidden shadow-md flex flex-col sm:flex-row">
+                   <Card className={cn(
+                      "overflow-hidden shadow-md flex flex-col sm:flex-row transition-all",
+                      mealToDisplay.status === 'eaten' && "border-green-500 bg-green-500/5"
+                    )}>
                     {mealToDisplay.recipeDetails?.image && (
                       <div className="sm:w-1/3 relative h-32 sm:h-auto">
                         <Image
@@ -300,9 +307,12 @@ export default function MealPlanPage() {
                     )}
                     <div className="sm:w-2/3 p-4 flex flex-col justify-between">
                       <div>
-                        <CardTitle className="text-lg font-headline text-primary h-[3.5rem] line-clamp-2 break-words" title={mealToDisplay.recipeDetails?.name ?? ''}>
-                          <Link href={`/recipes/${mealToDisplay.recipeId}`} className="hover:underline">{mealToDisplay.recipeDetails?.name}</Link>
-                        </CardTitle>
+                        <div className="flex justify-between items-start gap-2">
+                            <CardTitle className="text-lg font-headline text-primary h-[3.5rem] line-clamp-2 break-words" title={mealToDisplay.recipeDetails?.name ?? ''}>
+                                <Link href={`/recipes/${mealToDisplay.recipeId}`} className="hover:underline">{mealToDisplay.recipeDetails?.name}</Link>
+                            </CardTitle>
+                            {mealToDisplay.status === 'eaten' && <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0"/>}
+                        </div>
                         <CardDescription>Servings: {mealToDisplay.servings}</CardDescription>
                         {mealToDisplay.recipeDetails && (
                           <div className="mt-2">
@@ -318,16 +328,28 @@ export default function MealPlanPage() {
                           </div>
                         )}
                       </div>
-                      <CardFooter className="p-0 pt-4 flex gap-2 justify-end">
-                        <Button variant="outline" size="sm" onClick={() => handleEditMeal(mealToDisplay!)}>
-                          <Edit3 className="mr-1 h-3 w-3" /> Edit Servings
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={() => {
-                          removeMealFromPlan(mealToDisplay!.id);
-                          toast({ title: "Meal Removed", description: `${mealToDisplay!.recipeDetails?.name} removed.`});
-                        }}>
-                          <Trash2 className="mr-1 h-3 w-3" /> Remove
-                        </Button>
+                      <CardFooter className="p-0 pt-4 flex gap-2 justify-between items-center">
+                        <div className="flex items-center space-x-2">
+                            <Checkbox
+                                id={`eaten-${mealToDisplay.id}`}
+                                checked={mealToDisplay.status === 'eaten'}
+                                onCheckedChange={(checked) => {
+                                updateMealStatus(mealToDisplay.id, checked ? 'eaten' : 'planned');
+                                }}
+                            />
+                            <Label htmlFor={`eaten-${mealToDisplay.id}`} className="text-sm font-medium text-muted-foreground">Mark as Eaten</Label>
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                            <Button variant="outline" size="sm" onClick={() => handleEditMeal(mealToDisplay!)}>
+                            <Edit3 className="mr-1 h-3 w-3" /> Edit
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => {
+                            removeMealFromPlan(mealToDisplay!.id);
+                            toast({ title: "Meal Removed", description: `${mealToDisplay!.recipeDetails?.name} removed.`});
+                            }}>
+                            <Trash2 className="mr-1 h-3 w-3" /> Remove
+                            </Button>
+                        </div>
                       </CardFooter>
                     </div>
                   </Card>
