@@ -26,6 +26,8 @@ import type {
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
 import { loadState, saveState } from '@/lib/localStorage';
+import { runProCoach, type ProCoachInput, type ProCoachOutput } from '@/ai/flows/pro-coach-flow';
+import { format, subDays, differenceInDays } from 'date-fns';
 
 // Default user profile for a fresh start in local mode
 const DEFAULT_USER_PROFILE: UserProfileSettings = {
@@ -48,6 +50,7 @@ const DEFAULT_USER_PROFILE: UserProfileSettings = {
     bodyFatPercentage: null,
     athleteType: 'notSpecified',
     primaryGoal: 'maintenance',
+    targetWeightChangeRateKg: 0,
     tdee: null,
     leanBodyMassKg: null,
     dailyWeightLog: [],
@@ -59,6 +62,7 @@ const DEFAULT_USER_PROFILE: UserProfileSettings = {
     },
     hasAcceptedTerms: true, // Assume accepted for local dev
     subscription_status: 'active',
+    lastCheckInDate: null,
 };
 
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
@@ -127,7 +131,7 @@ interface AppContextType {
   addCustomRecipe: (recipeData: RecipeFormData) => Promise<void>;
   userRecipes: Recipe[];
   acceptTerms: () => Promise<void>;
-  runWeeklyCheckin: () => Promise<{ success: boolean; message: string; newTDEE?: number; }>;
+  runWeeklyCheckin: () => Promise<{ success: boolean; message: string; recommendation?: ProCoachOutput | null }>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -370,83 +374,78 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateUserProfileInDb({ dailyWeightLog: updatedLogs, weightKg });
   }, [user, userProfile, updateUserProfileInDb]);
   
-  const runWeeklyCheckin = useCallback(async () => {
+  const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: ProCoachOutput | null }> => {
     if (!userProfile || !userProfile.dailyWeightLog || userProfile.dailyWeightLog.length < 14) {
-      const message = "At least 14 days of weight and calorie data are needed for an accurate calculation.";
-      console.log(message);
-      return { success: false, message };
+      return { success: false, message: "At least 14 days of weight and calorie data are needed for an accurate calculation." };
     }
-
-    // Trend weight is calculated on a sorted-ascending array and returned sorted-descending
+    
+    // 1. Calculate Trend Weight and Dynamic TDEE
     const logsWithTrend = calculateTrendWeight(userProfile.dailyWeightLog);
-    
-    // Filter for logs that have a trend weight after calculation
     const validTrendLogs = logsWithTrend.filter(log => log.trendWeightKg !== undefined);
-    
+
     if (validTrendLogs.length < 7) {
-        const message = "Not enough consistent data to establish a weight trend. Keep logging daily!";
-        console.log(message);
-        return { success: false, message };
+      return { success: false, message: "Not enough consistent data to establish a weight trend. Keep logging daily!" };
     }
 
-    // Use last 21 days of data if available, otherwise minimum 14
-    const daysToAnalyze = Math.min(21, validTrendLogs.length);
-    const recentLogs = validTrendLogs.slice(0, daysToAnalyze);
-
-    // Calculate average calorie intake over the period
-    let totalCalories = 0;
-    let daysWithCalorieData = 0;
+    const endDate = new Date(validTrendLogs[0].date);
+    const startDate = subDays(endDate, 21);
     
+    const recentLogs = validTrendLogs.filter(log => new Date(log.date) >= startDate);
+    
+    if (recentLogs.length < 14) {
+      return { success: false, message: `Need at least 14 days of data in the last 3 weeks. You have ${recentLogs.length}.` };
+    }
+    
+    let totalCalories = 0;
     const dateSet = new Set(recentLogs.map(l => l.date));
     const relevantMeals = mealPlan.filter(m => dateSet.has(m.date) && m.status === 'eaten');
-
-    recentLogs.forEach(log => {
-      const macros = calculateTotalMacrosUtil(relevantMeals.filter(m => m.date === log.date), allRecipesCache);
-      if (macros.calories > 0) {
-        totalCalories += macros.calories;
-        daysWithCalorieData++;
-      }
-    });
     
+    const calorieLog = new Map<string, number>();
+    relevantMeals.forEach(meal => {
+        const macros = calculateTotalMacrosUtil([meal], allRecipesCache);
+        calorieLog.set(meal.date, (calorieLog.get(meal.date) || 0) + macros.calories);
+    });
+
+    calorieLog.forEach(calories => totalCalories += calories);
+    const daysWithCalorieData = calorieLog.size;
+
     if (daysWithCalorieData < 7) {
-         const message = `Need at least 7 days of calorie logs in the last ${daysToAnalyze} days.`;
-         console.log(message);
-         return { success: false, message };
+      return { success: false, message: `Need at least 7 days of calorie logs in the analysis period. You have ${daysWithCalorieData}.` };
     }
     const averageDailyCalories = totalCalories / daysWithCalorieData;
 
-    // Calculate weight change from trend
     const latestTrendWeight = recentLogs[0].trendWeightKg!;
     const oldestTrendWeight = recentLogs[recentLogs.length - 1].trendWeightKg!;
     const weightChangeKg = latestTrendWeight - oldestTrendWeight;
-    const durationDays = (new Date(recentLogs[0].date).getTime() - new Date(recentLogs[recentLogs.length - 1].date).getTime()) / (1000 * 3600 * 24);
+    const durationDays = differenceInDays(new Date(recentLogs[0].date), new Date(recentLogs[recentLogs.length - 1].date)) || 1;
+    const actualWeeklyWeightChangeKg = (weightChangeKg / durationDays) * 7;
 
-    if (durationDays < 7) {
-        const message = "Trend data available for less than 7 days.";
-        console.log(message);
-        return { success: false, message };
-    }
-
-    // Energy balance: 1 kg of body weight ≈ 7700 kcal
     const caloriesFromWeightChange = weightChangeKg * 7700;
     const averageDailyDeficitOrSurplus = caloriesFromWeightChange / durationDays;
-
     const newDynamicTDEE = Math.round(averageDailyCalories - averageDailyDeficitOrSurplus);
 
     if (isNaN(newDynamicTDEE) || newDynamicTDEE <= 0) {
-        const message = "Calculation resulted in an invalid TDEE. Check your logged data for consistency.";
-        console.log(message);
-        return { success: false, message };
+      return { success: false, message: "Calculation resulted in an invalid TDEE. Check your logged data for consistency." };
     }
     
-    console.log(`[Dynamic TDEE] Old: ${userProfile.tdee}, New: ${newDynamicTDEE}. Based on ${durationDays} days of data.`);
-    // Update the profile with the new, more accurate TDEE
-    await setUserInformation({ tdee: newDynamicTDEE });
+    // 2. Prepare and run the Pro Coach AI Flow
+    const proCoachInput: ProCoachInput = {
+      primaryGoal: userProfile.primaryGoal || 'maintenance',
+      targetWeightChangeRateKg: userProfile.targetWeightChangeRateKg || 0,
+      dynamicTdee: newDynamicTDEE,
+      actualAvgCalories: averageDailyCalories,
+      actualWeeklyWeightChangeKg: actualWeeklyWeightChangeKg,
+      currentProteinTarget: userProfile.macroTargets?.protein || 0,
+      currentFatTarget: userProfile.macroTargets?.fat || 0,
+    };
 
-    const message = `Your TDEE has been updated to ${newDynamicTDEE} kcal/day based on your recent progress.`;
-    return { success: true, newTDEE: newDynamicTDEE, message };
-}, [userProfile, mealPlan, allRecipesCache, setUserInformation]);
+    const recommendation = await runProCoach(proCoachInput);
+    
+    // 3. Update profile with new TDEE and check-in date
+    await setUserInformation({ tdee: newDynamicTDEE, lastCheckInDate: format(new Date(), 'yyyy-MM-dd') });
 
+    return { success: true, message: "Check-in complete!", recommendation };
+  }, [userProfile, mealPlan, allRecipesCache, setUserInformation]);
 
   const contextValue = useMemo(() => ({
     mealPlan, shoppingList, pantryItems, userProfile, allRecipesCache,
