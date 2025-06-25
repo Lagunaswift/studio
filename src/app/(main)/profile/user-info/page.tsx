@@ -13,9 +13,9 @@ import * as z from 'zod';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import type { UserProfileSettings, Sex, ActivityLevel, AthleteType, PrimaryGoal } from '@/types';
-import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS } from '@/types';
-import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale } from 'lucide-react';
+import type { UserProfileSettings, Sex, ActivityLevel, AthleteType, PrimaryGoal, TrainingExperienceLevel } from '@/types';
+import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS, TRAINING_EXPERIENCE_OPTIONS } from '@/types';
+import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale, Award } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
@@ -69,6 +69,7 @@ const userInfoSchema = z.object({
   age: z.coerce.number().min(1, "Age must be at least 1").max(120, "Age must be at most 120").nullable().optional(),
   sex: z.enum(SEX_OPTIONS).nullable().optional(),
   activityLevel: z.enum(ACTIVITY_LEVEL_OPTIONS.map(o => o.value) as [ActivityLevel, ...ActivityLevel[]]).nullable().optional(),
+  trainingExperienceLevel: z.enum(TRAINING_EXPERIENCE_OPTIONS.map(o => o.value) as [TrainingExperienceLevel, ...TrainingExperienceLevel[]]).nullable().optional(),
   bodyFatPercentage: z.coerce.number().min(1, "Body fat % must be at least 1").max(70, "Body fat % must be at most 70").nullable().optional(),
   athleteType: z.enum(ATHLETE_TYPE_OPTIONS.map(o => o.value) as [AthleteType, ...AthleteType[]]).nullable().optional(),
   primaryGoal: z.enum(PRIMARY_GOAL_OPTIONS.map(o => o.value) as [PrimaryGoal, ...PrimaryGoal[]]).nullable().optional(),
@@ -114,6 +115,7 @@ export default function UserInfoPage() {
       age: userProfile?.age || null,
       sex: userProfile?.sex || null,
       activityLevel: userProfile?.activityLevel || null,
+      trainingExperienceLevel: userProfile?.trainingExperienceLevel || null,
       bodyFatPercentage: userProfile?.bodyFatPercentage || null,
       athleteType: userProfile?.athleteType || 'notSpecified',
       primaryGoal: userProfile?.primaryGoal || 'notSpecified',
@@ -136,6 +138,7 @@ export default function UserInfoPage() {
         age: userProfile.age || null,
         sex: userProfile.sex || null,
         activityLevel: userProfile.activityLevel || null,
+        trainingExperienceLevel: userProfile.trainingExperienceLevel || null,
         bodyFatPercentage: userProfile.bodyFatPercentage || null,
         athleteType: userProfile.athleteType || 'notSpecified',
         primaryGoal: userProfile.primaryGoal || 'notSpecified',
@@ -346,6 +349,52 @@ export default function UserInfoPage() {
                     )}
                   />
                 </div>
+                 <div className="grid sm:grid-cols-2 gap-6">
+                   <FormField
+                    control={form.control}
+                    name="trainingExperienceLevel"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center"><Award className="mr-2 h-4 w-4 text-muted-foreground"/>Training Experience</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value ?? 'notSpecified'}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select your training level" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {TRAINING_EXPERIENCE_OPTIONS.map(option => (
+                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="activityLevel"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center"><Activity className="mr-2 h-4 w-4 text-muted-foreground"/> Activity Level</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select activity level" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {ACTIVITY_LEVEL_OPTIONS.map(option => (
+                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                 </div>
 
                 <div className="space-y-2 p-4 border rounded-md bg-muted/20">
                     <h4 className="text-md font-semibold text-primary flex items-center mb-3">
@@ -434,28 +483,7 @@ export default function UserInfoPage() {
                     </FormItem>
                   )}
                 />
-                 <FormField
-                  control={form.control}
-                  name="activityLevel"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center"><Activity className="mr-2 h-4 w-4 text-muted-foreground"/> Activity Level</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value ?? undefined}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select activity level" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {ACTIVITY_LEVEL_OPTIONS.map(option => (
-                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                 
                 <div className="grid sm:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}

@@ -120,6 +120,15 @@ export const PRIMARY_GOAL_OPTIONS: { value: PrimaryGoal; label: string }[] = [
   { value: 'muscleGain', label: 'Muscle Gain' },
 ];
 
+export type TrainingExperienceLevel = 'beginner' | 'intermediate' | 'advanced' | 'veryAdvanced' | 'notSpecified';
+export const TRAINING_EXPERIENCE_OPTIONS: { value: TrainingExperienceLevel; label: string }[] = [
+    { value: 'notSpecified', label: 'Not Specified' },
+    { value: 'beginner', label: 'Beginner (1st year)' },
+    { value: 'intermediate', label: 'Intermediate (2nd year)' },
+    { value: 'advanced', label: 'Advanced (3rd year)' },
+    { value: 'veryAdvanced', label: 'Very Advanced (4+ years)' },
+];
+
 export type SubscriptionStatus = 'active' | 'inactive' | 'none' | null;
 
 export interface DashboardSettings {
@@ -147,6 +156,7 @@ export interface UserProfileSettings {
   age: number | null;
   sex: Sex | null;
   activityLevel: ActivityLevel | null;
+  trainingExperienceLevel: TrainingExperienceLevel | null;
   bodyFatPercentage: number | null;
   athleteType: AthleteType | null;
   primaryGoal: PrimaryGoal | null;

@@ -10,7 +10,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
-import type { MacroTargets } from '@/types';
+import type { MacroTargets, TrainingExperienceLevel } from '@/types';
 import { useEffect, useState, useMemo } from 'react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { suggestProteinIntake, type SuggestProteinIntakeInput, type SuggestProteinIntakeOutput } from '@/ai/flows/suggest-protein-intake-flow';
@@ -37,6 +37,28 @@ interface FatSuggestion {
   justification: string;
 }
 
+const getMonthlyGainKg = (sex: 'male' | 'female' | null, level: TrainingExperienceLevel | null): number => {
+    if (!sex || !level || level === 'notSpecified') return 0;
+    
+    if (sex === 'female') {
+        switch(level) {
+            case 'beginner': return 0.75;
+            case 'intermediate': return 0.55;
+            case 'advanced': return 0.325;
+            case 'veryAdvanced': return 0.175;
+            default: return 0;
+        }
+    } else { // male
+        switch(level) {
+            case 'beginner': return 1.5;
+            case 'intermediate': return 1.0;
+            case 'advanced': return 0.65;
+            case 'veryAdvanced': return 0.4;
+            default: return 0;
+        }
+    }
+};
+
 export default function DietaryTargetsPage() {
   const { userProfile, setMacroTargets } = useAppContext();
   const { toast } = useToast();
@@ -51,7 +73,6 @@ export default function DietaryTargetsPage() {
   const [energyAvailabilityWarning, setEnergyAvailabilityWarning] = useState<string | null>(null);
   
   const [lossPercentage, setLossPercentage] = useState<number>(0.75);
-  const [surplusCalories, setSurplusCalories] = useState<number>(300);
 
 
   const macroForm = useForm<MacroTargetFormValues>({
@@ -138,13 +159,17 @@ export default function DietaryTargetsPage() {
   }, [userProfile?.weightKg, userProfile?.tdee, lossPercentage]);
   
   const muscleGainCalculation = useMemo(() => {
-    if (!userProfile?.tdee) {
-      return { weeklyGainKg: 0, calorieTarget: 0, enabled: false };
+    if (!userProfile?.tdee || !userProfile.sex || !userProfile.trainingExperienceLevel) {
+      return { monthlyGainKg: 0, calorieTarget: 0, enabled: false };
     }
-    const weeklyGainKg = (surplusCalories * 7) / 7700;
-    const calorieTarget = Math.round(userProfile.tdee + surplusCalories);
-    return { weeklyGainKg, calorieTarget, enabled: true };
-  }, [userProfile?.tdee, surplusCalories]);
+    const monthlyGainKg = getMonthlyGainKg(userProfile.sex, userProfile.trainingExperienceLevel);
+    if (monthlyGainKg === 0) {
+        return { monthlyGainKg: 0, calorieTarget: 0, enabled: false, reason: "Please specify your sex and training experience in your User Info to get a muscle gain target." };
+    }
+    const dailySurplus = (monthlyGainKg * 7700) / 30.44; // Avg days in month
+    const calorieTarget = Math.round(userProfile.tdee + dailySurplus);
+    return { monthlyGainKg, calorieTarget, enabled: true };
+  }, [userProfile?.tdee, userProfile?.sex, userProfile?.trainingExperienceLevel]);
 
 
   const handleApplyCalorieTarget = (calorieTarget: number) => {
@@ -497,7 +522,7 @@ export default function DietaryTargetsPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {!fatLossCalculation.enabled ? (
+                    {!userProfile?.tdee ? (
                         <Alert variant="destructive">
                             <Info className="h-4 w-4" />
                             <AlertTitle>Missing Information</AlertTitle>
@@ -539,6 +564,7 @@ export default function DietaryTargetsPage() {
                                             step={0.05}
                                             value={[lossPercentage]}
                                             onValueChange={(value) => setLossPercentage(value[0])}
+                                            disabled={!fatLossCalculation.enabled}
                                         />
                                         <div className="flex justify-between text-xs text-muted-foreground">
                                             <span>Slower (0.5%)</span>
@@ -557,60 +583,40 @@ export default function DietaryTargetsPage() {
                                         type="button" 
                                         onClick={() => handleApplyCalorieTarget(fatLossCalculation.calorieTarget)}
                                         className="w-full"
+                                        disabled={!fatLossCalculation.enabled}
                                     >
                                         Apply This Calorie Target (by adjusting Carbs)
                                     </Button>
                                 </div>
                             </TabsContent>
                              <TabsContent value="gain" className="pt-4">
-                                <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="gain-slider" className="flex items-center gap-2">
-                                            Select Your Daily Calorie Surplus
-                                            <TooltipProvider>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <HelpCircle className="h-4 w-4 text-muted-foreground cursor-pointer" />
-                                                    </TooltipTrigger>
-                                                    <TooltipContent className="max-w-xs">
-                                                        <p className="font-bold">Making Your Choice:</p>
-                                                         <ul className="list-disc pl-5 mt-1 space-y-1 text-xs">
-                                                            <li>A small, consistent surplus is best for lean muscle gain while minimizing fat gain.</li>
-                                                            <li>Aiming for a surplus of 250-500 kcal/day is a common recommendation.</li>
-                                                        </ul>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                        </Label>
-                                        <Slider
-                                            id="gain-slider"
-                                            min={200}
-                                            max={500}
-                                            step={25}
-                                            value={[surplusCalories]}
-                                            onValueChange={(value) => setSurplusCalories(value[0])}
-                                        />
-                                        <div className="flex justify-between text-xs text-muted-foreground">
-                                            <span>Leaner Gain (+200 kcal)</span>
-                                            <span>Faster Gain (+500 kcal)</span>
-                                        </div>
-                                    </div>
-                                    <Alert>
-                                        <AlertTitle>Your Calculated Target</AlertTitle>
+                                {!muscleGainCalculation.enabled ? (
+                                    <Alert variant="destructive">
+                                        <Info className="h-4 w-4" />
+                                        <AlertTitle>Missing Information</AlertTitle>
                                         <AlertDescription>
-                                            A <span className="font-bold text-primary">+{surplusCalories} kcal</span> surplus aims for a gain of <span className="font-bold text-primary">{muscleGainCalculation.weeklyGainKg.toFixed(2)} kg</span> per week.
-                                            <br />
-                                            Your resulting daily calorie target is <span className="font-bold text-accent">{muscleGainCalculation.calorieTarget} kcal</span>.
+                                            {muscleGainCalculation.reason || `Please complete your User Info (Sex & Training Experience) to get a calculated muscle gain target.`} <Link href="/profile/user-info" className="underline">Update here.</Link>
                                         </AlertDescription>
                                     </Alert>
-                                    <Button 
-                                        type="button" 
-                                        onClick={() => handleApplyCalorieTarget(muscleGainCalculation.calorieTarget)}
-                                        className="w-full"
-                                    >
-                                        Apply This Calorie Target (by adjusting Carbs)
-                                    </Button>
-                                </div>
+                                ) : (
+                                    <div className="space-y-6">
+                                        <Alert>
+                                            <AlertTitle>Your Calculated Target</AlertTitle>
+                                            <AlertDescription>
+                                                Based on your profile, a reasonable goal is a gain of <span className="font-bold text-primary">{muscleGainCalculation.monthlyGainKg.toFixed(2)} kg</span> per month.
+                                                <br />
+                                                Your resulting daily calorie target is <span className="font-bold text-accent">{muscleGainCalculation.calorieTarget} kcal</span>.
+                                            </AlertDescription>
+                                        </Alert>
+                                        <Button 
+                                            type="button" 
+                                            onClick={() => handleApplyCalorieTarget(muscleGainCalculation.calorieTarget)}
+                                            className="w-full"
+                                        >
+                                            Apply This Calorie Target (by adjusting Carbs)
+                                        </Button>
+                                    </div>
+                                )}
                             </TabsContent>
                         </Tabs>
                     )}
@@ -633,4 +639,4 @@ export default function DietaryTargetsPage() {
     </PageWrapper>
   );
 
-    
+}
