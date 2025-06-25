@@ -60,7 +60,7 @@ const getMonthlyGainKg = (sex: 'male' | 'female' | null, level: TrainingExperien
 };
 
 export default function DietaryTargetsPage() {
-  const { userProfile, setMacroTargets } = useAppContext();
+  const { userProfile, setMacroTargets, setUserInformation } = useAppContext();
   const { toast } = useToast();
   const [isAISuggesting, setIsAISuggesting] = useState(false);
   const [proteinSuggestion, setProteinSuggestion] = useState<SuggestProteinIntakeOutput | null>(null);
@@ -160,7 +160,7 @@ export default function DietaryTargetsPage() {
   
   const muscleGainCalculation = useMemo(() => {
     if (!userProfile?.tdee || !userProfile.sex || !userProfile.trainingExperienceLevel) {
-      return { monthlyGainKg: 0, calorieTarget: 0, enabled: false };
+      return { monthlyGainKg: 0, calorieTarget: 0, enabled: false, reason: "Please specify your sex and training experience in your User Info to get a muscle gain target." };
     }
     const monthlyGainKg = getMonthlyGainKg(userProfile.sex, userProfile.trainingExperienceLevel);
     if (monthlyGainKg === 0) {
@@ -194,13 +194,23 @@ export default function DietaryTargetsPage() {
     // The useEffect will automatically update the calories field now
     toast({
         title: "Calorie Target Applied",
-        description: `Carbs have been set to ${suggestedCarbs}g to meet your new calorie goal. You can now save your profile.`
+        description: `Carbs have been set to ${suggestedCarbs}g to meet your new calorie goal. Click 'Save Macro Targets' to confirm.`
     });
   };
 
 
   const handleMacroSubmit: SubmitHandler<MacroTargetFormValues> = (data) => {
-    setMacroTargets(data);
+    let newTargetRateKg: number | null = null;
+    if (userProfile?.tdee && data.calories > 0) {
+        const dailyDeficitOrSurplus = data.calories - userProfile.tdee;
+        newTargetRateKg = (dailyDeficitOrSurplus * 7) / 7700;
+    }
+    
+    setUserInformation({
+      macroTargets: data,
+      targetWeightChangeRateKg: newTargetRateKg
+    });
+
     toast({
       title: "Macro Targets Updated",
       description: "Your daily caloric and macro targets have been saved.",
