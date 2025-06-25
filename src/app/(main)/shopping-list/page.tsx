@@ -249,7 +249,6 @@ export default function ShoppingListPage() {
                               className={`text-sm ${ing.purchased && ing.shoppingListItemId ? "line-through text-muted-foreground" : "text-foreground"}`}
                             >
                               {ing.parsedQuantity.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {ing.parsedUnit} {ing.parsedName}
-                               <span className="text-xs text-muted-foreground italic ml-2">(Original: {ing.originalIngredientString})</span>
                             </label>
                           </div>
                         ))}
