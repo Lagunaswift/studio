@@ -29,7 +29,7 @@ import { SheetTitle } from '@/components/ui/sheet';
 import { 
   UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, 
   PanelLeft, Target, Leaf, ListChecks, UserCog, UserCircle2, 
-  BookOpen, Archive, Bot, SlidersHorizontal, Search, LogOut, FileText, Shield, CheckSquare, Settings, TrendingUp, ChevronDown
+  BookOpen, Archive, Bot, SlidersHorizontal, Search, LogOut, FileText, Shield, CheckSquare, Settings, TrendingUp, ChefHat
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -48,20 +48,20 @@ interface NavItem {
 const dashboardNavItem: NavItem = { href: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true };
 
 const planNavItems: NavItem[] = [
-    { href: '/ai-suggestions', label: 'AI Meal Planner', icon: Sparkles },
+    { href: '/ai-suggestions', label: 'AI Plan Generator', icon: Sparkles },
     { href: '/meal-plan', label: 'Daily/Weekly View', icon: CalendarDays },
     { href: '/shopping-list', label: 'Shopping List', icon: ShoppingBag },
     { href: '/pantry', label: 'Pantry', icon: Archive },
 ];
 
 const recipesNavItems: NavItem[] = [
-  { href: '/ai-recipe-finder', label: 'AI Recipe Finder', icon: Bot },
+  { href: '/ai-recipe-finder', label: 'Pantry Chef', icon: ChefHat },
   { href: '/recipes', label: 'My Saved Recipes', icon: UtensilsCrossed },
 ];
 
 const progressNavItems: NavItem[] = [
     { href: '/profile/targets', label: 'My Goals & Targets', icon: Target },
-    { href: '/weekly-check-in', label: 'Weekly Check-in', icon: CheckSquare },
+    { href: '/weekly-check-in', label: 'Adaptive Coach Check-in', icon: CheckSquare },
 ];
 
 const settingsNavItems: NavItem[] = [

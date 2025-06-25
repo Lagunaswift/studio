@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -135,7 +136,7 @@ export default function AISuggestionsPage() {
 
   if (isAuthLoading || isAppRecipeCacheLoading) {
     return (
-      <PageWrapper title="Automated AI Meal Planner">
+      <PageWrapper title="AI Plan Generator">
         <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
           <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
           <p className="text-lg">Loading AI Planner...</p>
@@ -147,7 +148,7 @@ export default function AISuggestionsPage() {
   const isProfileSetupMissing = !userSettingsToUse || !userSettingsToUse.mealStructure || userSettingsToUse.mealStructure.length === 0;
 
   return (
-    <PageWrapper title="Automated AI Meal Planner">
+    <PageWrapper title="AI Plan Generator">
       <div className="space-y-8">
         <Card className="shadow-lg">
           <CardHeader>
