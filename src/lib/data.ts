@@ -247,135 +247,82 @@ export const assignCategory = (ingredientName: string): UKSupermarketCategory =>
 };
 
 
-// --- Shopping List Generation V2 ---
+export const generateShoppingList = (
+  plannedMeals: PlannedMeal[],
+  recipesSource?: Recipe[],
+  pantryItems: PantryItem[] = []
+): ShoppingListItem[] => {
+  const ingredientMap = new Map<string, { quantity: number; unit: string; recipes: { recipeId: number; recipeName: string }[] }>();
+  const recipesToUse = recipesSource && recipesSource.length > 0 ? recipesSource : allRecipesCache;
 
-const CONVERSIONS = {
-    'tsp': 1, 'tbsp': 3,
-    'g': 1, 'kg': 1000,
-    'ml': 1, 'L': 1000,
-};
+  // List of ingredients that should be rounded up to the nearest whole number
+  const wholeUnitItems = ['egg', 'banana', 'apple', 'avocado', 'onion', 'tomato', 'pepper', 'lemon', 'lime', 'garlic clove', 'salmon fillet', 'chicken breast'];
 
-const UNIT_GROUPS = {
-    'volume': ['ml', 'L'],
-    'weight': ['g', 'kg'],
-    'spoons': ['tsp', 'tbsp']
-};
+  plannedMeals.forEach(plannedMeal => {
+    const recipe = plannedMeal.recipeDetails || recipesToUse.find(r => r.id === plannedMeal.recipeId);
+    if (recipe) {
+      recipe.ingredients.forEach(ingredientString => {
+        const parsed = parseIngredientString(ingredientString);
 
-const getBaseUnit = (unit: string): { baseUnit: string, factor: number } => {
-    unit = unit.toLowerCase();
-    for (const group in UNIT_GROUPS) {
-        if (UNIT_GROUPS[group as keyof typeof UNIT_GROUPS].includes(unit)) {
-            const base = UNIT_GROUPS[group as keyof typeof UNIT_GROUPS][0];
-            return { baseUnit: base, factor: CONVERSIONS[unit as keyof typeof CONVERSIONS] / CONVERSIONS[base as keyof typeof CONVERSIONS] };
+        if (!parsed.name || parsed.quantity === 0 || parsed.name.trim() === '') return;
+
+        const key = `${parsed.name.toLowerCase()}|${parsed.unit}`;
+        let entry = ingredientMap.get(key);
+
+        if (!entry) {
+          entry = { quantity: 0, unit: parsed.unit, recipes: [] };
         }
-    }
-    return { baseUnit: unit, factor: 1 };
-};
 
-const smartRoundAndFormat = (totalQuantity: number, baseUnit: string): { quantity: number, unit: string } => {
-    // Round Counts
-    if (baseUnit === 'item(s)' || baseUnit === 'egg' || baseUnit.includes('fillet') || baseUnit === 'slice' || baseUnit === 'can') {
-        return { quantity: Math.ceil(totalQuantity), unit: baseUnit };
-    }
-    // Round Weight
-    if (baseUnit === 'g') {
-        if (totalQuantity >= 1000) return { quantity: parseFloat((totalQuantity / 1000).toFixed(2)), unit: 'kg' };
-        if (totalQuantity < 10) return { quantity: 10, unit: 'g'};
-        return { quantity: Math.ceil(totalQuantity / 10) * 10, unit: 'g'};
-    }
-    // Round Volume
-    if (baseUnit === 'ml') {
-        if (totalQuantity >= 1000) return { quantity: parseFloat((totalQuantity / 1000).toFixed(2)), unit: 'L' };
-        if (totalQuantity < 50) return { quantity: Math.ceil(totalQuantity / 10) * 10, unit: 'ml'};
-        return { quantity: Math.ceil(totalQuantity / 50) * 50, unit: 'ml'};
-    }
-    // Round Spoons
-    if (baseUnit === 'tsp') {
-        if (totalQuantity >= 3) return { quantity: parseFloat((totalQuantity / 3).toFixed(2)), unit: 'tbsp'};
-        return { quantity: parseFloat(totalQuantity.toFixed(2)), unit: 'tsp'};
-    }
-     // Cups - round to nearest quarter cup
-    if (baseUnit === 'cup') {
-        return { quantity: Math.ceil(totalQuantity * 4) / 4, unit: 'cup' };
-    }
-
-    // Fallback
-    return { quantity: parseFloat(totalQuantity.toFixed(2)), unit: baseUnit };
-};
-
-export const generateShoppingList = (plannedMeals: PlannedMeal[], recipesSource?: Recipe[], pantryItems: PantryItem[] = []): ShoppingListItem[] => {
-    const ingredientMap = new Map<string, { totalQuantity: number; baseUnit: string; category: UKSupermarketCategory; recipes: Array<{ recipeId: number; recipeName: string }> }>();
-    const recipesToUse = recipesSource && recipesSource.length > 0 ? recipesSource : allRegisteredRecipesFull;
-
-    const pantryMap = new Map<string, number>();
-    pantryItems.forEach(item => {
-        const { baseUnit, factor } = getBaseUnit(item.unit);
-        const mapKey = `${item.name.toLowerCase().trim()}|${baseUnit}`;
-        const currentQty = pantryMap.get(mapKey) || 0;
-        pantryMap.set(mapKey, currentQty + (item.quantity * factor));
-    });
-
-    plannedMeals.forEach(plannedMeal => {
-        const recipe = plannedMeal.recipeDetails || recipesToUse.find(r => r.id === plannedMeal.recipeId);
-        if (recipe) {
-            recipe.ingredients.forEach(ingredientString => {
-                const parsed = parseIngredientString(ingredientString);
-                if (!parsed.name || parsed.name.trim() === "" || parsed.name.toLowerCase() === "unknown ingredient") return;
-
-                const { baseUnit, factor } = getBaseUnit(parsed.unit);
-                const mapKey = `${parsed.name.toLowerCase().trim()}|${baseUnit}`;
-                let requiredQuantityInBase = (parsed.quantity * plannedMeal.servings) * factor;
-
-                const pantryQuantity = pantryMap.get(mapKey) || 0;
-                if (pantryQuantity > 0) {
-                    const deduction = Math.min(requiredQuantityInBase, pantryQuantity);
-                    requiredQuantityInBase -= deduction;
-                    pantryMap.set(mapKey, pantryQuantity - deduction);
-                }
-                
-                if (requiredQuantityInBase > 0) {
-                    const existingItem = ingredientMap.get(mapKey);
-                    if (existingItem) {
-                        existingItem.totalQuantity += requiredQuantityInBase;
-                        if (!existingItem.recipes.some(r => r.recipeId === recipe.id)) {
-                            existingItem.recipes.push({ recipeId: recipe.id, recipeName: recipe.name });
-                        }
-                    } else {
-                        ingredientMap.set(mapKey, {
-                            totalQuantity: requiredQuantityInBase,
-                            baseUnit: baseUnit,
-                            category: assignCategory(parsed.name),
-                            recipes: [{ recipeId: recipe.id, recipeName: recipe.name }],
-                        });
-                    }
-                }
-            });
+        entry.quantity += parsed.quantity * plannedMeal.servings;
+        if (!entry.recipes.find(r => r.recipeId === recipe.id)) {
+          entry.recipes.push({ recipeId: recipe.id, recipeName: recipe.name });
         }
-    });
 
-    const finalShoppingList: ShoppingListItem[] = [];
-    ingredientMap.forEach((item, key) => {
-        const [name] = key.split('|');
-        const { quantity, unit } = smartRoundAndFormat(item.totalQuantity, item.baseUnit);
-        
-        if (quantity > 0) {
-            finalShoppingList.push({
-                id: key,
-                name: name.charAt(0).toUpperCase() + name.slice(1),
-                quantity: quantity,
-                unit: unit,
-                category: item.category,
-                purchased: false,
-                recipes: item.recipes,
-            });
-        }
-    });
+        ingredientMap.set(key, entry);
+      });
+    }
+  });
 
-    return finalShoppingList.sort((a,b) => {
-        if (a.category < b.category) return -1;
-        if (a.category > b.category) return 1;
-        return a.name.localeCompare(b.name);
+  // Subtract pantry items
+  pantryItems.forEach(pantryItem => {
+    const key = `${pantryItem.name.toLowerCase()}|${pantryItem.unit}`;
+    const requiredItem = ingredientMap.get(key);
+
+    if (requiredItem) {
+      requiredItem.quantity -= pantryItem.quantity;
+      if (requiredItem.quantity <= 0) {
+        ingredientMap.delete(key);
+      }
+    }
+  });
+
+  const shoppingList: ShoppingListItem[] = [];
+  ingredientMap.forEach((value, key) => {
+    const [name] = key.split('|');
+    
+    // Check if the ingredient should be rounded up
+    const isWholeUnit = wholeUnitItems.some(item => name.toLowerCase().includes(item));
+    const finalQuantity = isWholeUnit ? Math.ceil(value.quantity) : value.quantity;
+
+    // Don't add items with zero or negative quantity to the list
+    if (finalQuantity <= 0) return;
+
+    shoppingList.push({
+      id: key,
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      quantity: finalQuantity,
+      unit: value.unit,
+      category: assignCategory(name),
+      purchased: false,
+      recipes: value.recipes,
     });
+  });
+
+  return shoppingList.sort((a, b) => {
+    if (a.category < b.category) return -1;
+    if (a.category > b.category) return 1;
+    return a.name.localeCompare(b.name);
+  });
 };
 
 
@@ -408,3 +355,4 @@ export const calculateTrendWeight = (dailyWeightLog: DailyWeightLog[]): DailyWei
   // Return sorted descending to match expected order in AppContext
   return trendWeightData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
+
