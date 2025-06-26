@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { Footer } from '@/components/layout/Footer';
 import { ThemeToggleButton } from '@/components/layout/ThemeToggleButton';
 import { TermsAcceptanceModal } from '@/components/legal/TermsAcceptanceModal';
+import { PreppyHelp } from '@/components/shared/PreppyHelp'; // Import the new component
 import {
   Accordion,
   AccordionContent,
@@ -288,6 +289,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </SidebarInset>
+      <PreppyHelp /> {/* Add the help component */}
       <TermsAcceptanceModal
         isOpen={!isAppDataLoading && !!userProfile && !userProfile.hasAcceptedTerms}
         onAccept={acceptTerms}
