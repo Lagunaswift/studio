@@ -93,7 +93,7 @@ export default function RecipeDetailPage() {
   useEffect(() => {
     if (!recipe || isNaN(displayServings) || displayServings <= 0) {
       if(recipe) {
-        setScaledIngredients(recipe.ingredients);
+        setScaledIngredients(recipe.ingredients.map(ing => `${ing.quantity} ${ing.unit} ${ing.name}`));
         setScaledMacros(recipe.macrosPerServing);
       }
       return;
@@ -109,12 +109,10 @@ export default function RecipeDetailPage() {
     };
     setScaledMacros(newMacros);
     
-    const newIngredients = recipe.ingredients.map(ingString => {
-        const parsed = parseIngredientString(ingString);
-        if(!parsed.name || parsed.quantity <= 0) return ingString; // Return original if parsing fails
-        const newQuantity = parsed.quantity * scalingFactor;
+    const newIngredients = recipe.ingredients.map(ing => {
+        const newQuantity = ing.quantity * scalingFactor;
         const formattedQuantity = newQuantity % 1 !== 0 ? parseFloat(newQuantity.toFixed(2)) : newQuantity;
-        return `${formattedQuantity} ${parsed.unit} ${parsed.name}`;
+        return `${formattedQuantity} ${ing.unit} ${ing.name}`;
     });
 
     setScaledIngredients(newIngredients);
@@ -194,7 +192,7 @@ export default function RecipeDetailPage() {
         recipeToModify: {
           name: recipe.name,
           description: recipe.description,
-          ingredients: recipe.ingredients,
+          ingredients: recipe.ingredients.map(ing => `${ing.quantity} ${ing.unit} ${ing.name}`),
           instructions: recipe.instructions,
           tags: recipe.tags,
         },
@@ -254,7 +252,7 @@ export default function RecipeDetailPage() {
   };
   
   const aiHint = recipe && recipe.tags && recipe.tags.length > 0 ? recipe.tags.slice(0, 2).join(' ') : "food meal";
-  const dynamicImageSrc = `/images/recipe-${recipeId}.jpg`;
+  const dynamicImageSrc = `/images/${recipeId}.jpg`;
   const defaultPlaceholder = `https://placehold.co/600x400.png`;
   const imageSrc = imageLoadError ? defaultPlaceholder : dynamicImageSrc;
 
@@ -428,7 +426,7 @@ export default function RecipeDetailPage() {
               <ul className="space-y-2 list-disc list-inside bg-muted/20 p-4 rounded-md text-sm text-muted-foreground">
                 {recipe.ingredients.map((ing, index) => (
                   <li key={index}>
-                    {ing}
+                    {ing.quantity} {ing.unit} {ing.name}
                   </li>
                 ))}
               </ul>

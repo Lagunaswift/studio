@@ -36,7 +36,7 @@ export function RecipeCard({
     setImageError(false);
   }, [recipe?.id]);
 
-  const dynamicImageSrc = `/images/recipe-${recipe?.id}.jpg`;
+  const dynamicImageSrc = `/images/${recipe?.id}.jpg`;
   const defaultPlaceholder = `https://placehold.co/600x400.png`;
   const imageSrc = imageError ? defaultPlaceholder : dynamicImageSrc;
 
