@@ -251,12 +251,6 @@ export default function RecipeDetailPage() {
         });
     }
   };
-  
-  const aiHint = recipe && recipe.tags && recipe.tags.length > 0 ? recipe.tags.slice(0, 2).join(' ') : "food meal";
-  const dynamicImageSrc = `/images/recipe-${recipeId}.jpg`;
-  const defaultPlaceholder = `https://placehold.co/600x400.png`;
-  const imageSrc = imageLoadError ? defaultPlaceholder : dynamicImageSrc;
-
 
   if (isLoading) {
     return (
@@ -297,6 +291,11 @@ export default function RecipeDetailPage() {
       </PageWrapper>
     );
   }
+  
+  const aiHint = recipe && recipe.tags && recipe.tags.length > 0 ? recipe.tags.slice(0, 2).join(' ') : "food meal";
+  const dynamicImageSrc = `/images/${recipe.id}.jpg`;
+  const defaultPlaceholder = `https://placehold.co/600x400.png`;
+  const imageSrc = imageLoadError ? defaultPlaceholder : dynamicImageSrc;
 
   return (
     <PageWrapper>
@@ -590,3 +589,5 @@ export default function RecipeDetailPage() {
     </PageWrapper>
   );
 }
+
+    
