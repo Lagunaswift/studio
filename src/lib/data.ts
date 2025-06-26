@@ -26,17 +26,17 @@ const mapToFullRecipe = (rawRecipe: any): Recipe => {
     id: rawRecipe.id,
     name: rawRecipe.name,
     servings: servings,
-    ingredients: Array.isArray(rawRecipe.ingredients) ? rawRecipe.ingredients : [], // Now expects structured data
+    ingredients: Array.isArray(rawRecipe.ingredients) ? rawRecipe.ingredients : [],
     tags: Array.isArray(rawRecipe.tags) ? rawRecipe.tags : [],
     prepTime: typeof rawRecipe.prepTime === 'string' ? rawRecipe.prepTime : "N/A",
     cookTime: typeof rawRecipe.cookTime === 'string' ? rawRecipe.cookTime : "N/A",
     chillTime: typeof rawRecipe.chillTime === 'string' ? rawRecipe.chillTime : undefined,
     instructions: Array.isArray(rawRecipe.instructions) ? rawRecipe.instructions : [],
     macrosPerServing: {
-      calories: totalCalories / servings,
-      protein: totalProtein / servings,
-      carbs: totalCarbs / servings,
-      fat: totalFat / servings,
+      calories: totalCalories,
+      protein: totalProtein,
+      carbs: totalCarbs,
+      fat: totalFat,
     },
     image: rawRecipe.image || `https://placehold.co/600x400.png?text=${encodeURIComponent(rawRecipe.name)}`,
     description: rawRecipe.description || "No description available.",
@@ -165,16 +165,17 @@ export const generateShoppingList = (
     plannedMeals.forEach(plannedMeal => {
         const recipe = recipesToUse.find(r => r.id === plannedMeal.recipeId);
         if (recipe) {
-            recipe.ingredients.forEach(ingredient => { // Now iterates over structured ingredients
-                if (!ingredient.name || ingredient.quantity <= 0 || ingredient.name.toLowerCase() === 'non-item') return;
+            recipe.ingredients.forEach(ingredientString => {
+                const parsed = parseIngredientString(ingredientString as any);
+                if (!parsed.name || parsed.quantity <= 0 || parsed.name.toLowerCase() === 'non-item') return;
 
                 const recipeBaseServings = recipe.servings > 0 ? recipe.servings : 1;
-                const quantityPerServing = ingredient.quantity / recipeBaseServings;
+                const quantityPerServing = parsed.quantity / recipeBaseServings;
                 const totalRequired = quantityPerServing * plannedMeal.servings;
 
-                const key = `${ingredient.name.toLowerCase()}|${ingredient.unit}`;
+                const key = `${parsed.name.toLowerCase()}|${parsed.unit}`;
                 let entry = ingredientMap.get(key);
-                if (!entry) { entry = { quantity: 0, unit: ingredient.unit, recipes: [] }; }
+                if (!entry) { entry = { quantity: 0, unit: parsed.unit, recipes: [] }; }
                 entry.quantity += totalRequired;
                 if (!entry.recipes.find(r => r.recipeId === recipe.id)) { entry.recipes.push({ recipeId: recipe.id, recipeName: recipe.name }); }
                 ingredientMap.set(key, entry);
