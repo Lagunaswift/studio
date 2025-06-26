@@ -1,4 +1,3 @@
-
 "use client";
 
 import Image from 'next/image';
@@ -34,7 +33,6 @@ export function RecipeCard({
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
-    // Reset error state when recipe changes
     setImageError(false);
   }, [recipe?.id]);
 
@@ -74,13 +72,13 @@ export function RecipeCard({
     <Card className={cn("flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg h-full group", className)}>
       <div className="relative w-full h-60">
         <Image
-          src={imageSrc} 
+          src={imageSrc}
           alt={recipe.name}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           className="object-cover"
           data-ai-hint={imageError ? aiHint : undefined}
-          onError={handleImageError} 
+          onError={handleImageError}
         />
         <Button 
           variant="ghost" 
