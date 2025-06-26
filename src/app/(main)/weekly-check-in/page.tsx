@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Sparkles, CheckSquare, Info, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
-import type { ProCoachOutput } from '@/ai/flows/pro-coach-flow';
+import type { PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -19,7 +19,7 @@ export default function WeeklyCheckinPage() {
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [recommendation, setRecommendation] = useState<ProCoachOutput | null>(null);
+  const [recommendation, setRecommendation] = useState<PreppyOutput | null>(null);
 
   const handleRunCheckin = async () => {
     setIsLoading(true);
@@ -52,7 +52,7 @@ export default function WeeklyCheckinPage() {
 
   if (isAppDataLoading) {
      return (
-      <PageWrapper title="Pro Coach: Weekly Check-in">
+      <PageWrapper title="Preppy: Weekly Check-in">
         <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
           <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
           <p className="text-lg">Loading your data...</p>
@@ -62,16 +62,16 @@ export default function WeeklyCheckinPage() {
   }
 
   return (
-    <PageWrapper title="Pro Coach: Weekly Check-in">
+    <PageWrapper title="Preppy: Weekly Check-in">
       <div className="space-y-8">
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="font-headline text-primary flex items-center">
               <CheckSquare className="w-6 h-6 mr-2 text-accent" />
-              Your Weekly Check-in with Pro Coach
+              Your Weekly Check-in with Preppy
             </CardTitle>
             <CardDescription>
-              This is where my adaptive coaching system shines. Based on your logged weight and food intake, I'll calculate your true energy expenditure (TDEE) and adjust your targets to keep you perfectly on track.
+              This is where my AI coaching shines. Based on your logged weight and food intake, I'll calculate your true energy expenditure (TDEE) and adjust your targets to keep you perfectly on track.
             </CardDescription>
           </CardHeader>
           <CardContent>

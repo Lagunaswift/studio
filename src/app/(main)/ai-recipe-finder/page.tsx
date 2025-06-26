@@ -84,7 +84,7 @@ export default function AIRecipeFinderPage() {
 
   if (isRecipeCacheLoading) {
     return (
-      <PageWrapper title="Pro Coach: Pantry Chef">
+      <PageWrapper title="Preppy: Pantry Chef">
         <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
           <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
           <p className="text-lg">Loading recipes for AI analysis...</p>
@@ -95,7 +95,7 @@ export default function AIRecipeFinderPage() {
 
 
   return (
-    <PageWrapper title="Pro Coach: Pantry Chef">
+    <PageWrapper title="Preppy: Pantry Chef">
       <div className="space-y-8">
         <Card className="shadow-lg">
           <CardHeader>

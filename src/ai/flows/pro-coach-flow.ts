@@ -1,19 +1,19 @@
 
 'use server';
 /**
- * @fileOverview The Pro Coach AI agent that analyzes user progress and provides new macro targets.
+ * @fileOverview The Preppy AI agent that analyzes user progress and provides new macro targets.
  *
- * - runProCoach - A function that handles the coaching analysis.
- * - ProCoachInput - The input type for the runProCoach function.
- * - ProCoachOutput - The return type for the runProCoach function.
+ * - runPreppy - A function that handles the coaching analysis.
+ * - PreppyInput - The input type for the runPreppy function.
+ * - PreppyOutput - The return type for the runPreppy function.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { MacroDataSchema } from './schemas';
 
-// Input schema for the Pro Coach flow
-const ProCoachInputSchema = z.object({
+// Input schema for the Preppy flow
+const PreppyInputSchema = z.object({
   primaryGoal: z.enum(['fatLoss', 'muscleGain', 'maintenance', 'notSpecified']).describe("User's primary goal."),
   targetWeightChangeRateKg: z.number().describe("User's desired weekly weight change rate in kg (e.g., -0.5 for loss, 0.25 for gain)."),
   dynamicTdee: z.number().positive().describe("User's newly calculated dynamic TDEE (Total Daily Energy Expenditure)."),
@@ -22,26 +22,26 @@ const ProCoachInputSchema = z.object({
   currentProteinTarget: z.number().nonnegative().describe("User's current daily protein target in grams."),
   currentFatTarget: z.number().nonnegative().describe("User's current daily fat target in grams."),
 });
-export type ProCoachInput = z.infer<typeof ProCoachInputSchema>;
+export type PreppyInput = z.infer<typeof PreppyInputSchema>;
 
-// Output schema for the Pro Coach flow
-const ProCoachOutputSchema = z.object({
+// Output schema for the Preppy flow
+const PreppyOutputSchema = z.object({
   newMacroTargets: MacroDataSchema.describe("The new recommended daily macro targets for the user."),
   coachingSummary: z.string().describe("A concise, encouraging, and adherence-neutral summary of the week's progress and the recommended changes."),
 });
-export type ProCoachOutput = z.infer<typeof ProCoachOutputSchema>;
+export type PreppyOutput = z.infer<typeof PreppyOutputSchema>;
 
 
-export async function runProCoach(input: ProCoachInput): Promise<ProCoachOutput> {
-  return proCoachFlow(input);
+export async function runPreppy(input: PreppyInput): Promise<PreppyOutput> {
+  return preppyFlow(input);
 }
 
 
-const proCoachPrompt = ai.definePrompt({
-    name: 'proCoachPrompt',
-    input: {schema: ProCoachInputSchema},
-    output: {schema: ProCoachOutputSchema},
-    prompt: `You are "Pro Coach," a supportive, data-driven, and adherence-neutral nutrition coach. Your goal is to help the user make steady progress toward their goal without shaming them for any deviations from previous targets. Your tone is encouraging and focuses on the data.
+const preppyPrompt = ai.definePrompt({
+    name: 'preppyPrompt',
+    input: {schema: PreppyInputSchema},
+    output: {schema: PreppyOutputSchema},
+    prompt: `You are "Preppy," a supportive, data-driven, and adherence-neutral nutrition coach. Your goal is to help the user make steady progress toward their goal without shaming them for any deviations from previous targets. Your tone is encouraging and focuses on the data.
 
 **User's Data & Goals:**
 - Primary Goal: {{{primaryGoal}}}
@@ -79,27 +79,27 @@ const proCoachPrompt = ai.definePrompt({
   "coachingSummary": "..."
 }
 
-Output the entire response as a single, valid JSON object that conforms EXACTLY to the \`ProCoachOutputSchema\`. Do not include any text outside this JSON object.
+Output the entire response as a single, valid JSON object that conforms EXACTLY to the \`PreppyOutputSchema\`. Do not include any text outside this JSON object.
 `
 });
 
 
-const proCoachFlow = ai.defineFlow(
+const preppyFlow = ai.defineFlow(
   {
-    name: 'proCoachFlow',
-    inputSchema: ProCoachInputSchema,
-    outputSchema: ProCoachOutputSchema,
+    name: 'preppyFlow',
+    inputSchema: PreppyInputSchema,
+    outputSchema: PreppyOutputSchema,
   },
   async (input) => {
     // Basic validation
     if (!input.dynamicTdee || input.dynamicTdee <= 0) {
-      throw new Error("A valid Dynamic TDEE is required for the Pro Coach analysis.");
+      throw new Error("A valid Dynamic TDEE is required for the Preppy analysis.");
     }
     
-    const {output} = await proCoachPrompt(input);
+    const {output} = await preppyPrompt(input);
 
     if (!output) {
-        throw new Error("AI Pro Coach failed to generate a recommendation.");
+        throw new Error("AI Preppy failed to generate a recommendation.");
     }
     
     return output;
