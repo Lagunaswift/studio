@@ -1,6 +1,5 @@
 import type { PlannedMeal, Recipe, PantryItem, ShoppingListItem, UKSupermarketCategory, Macros, MealType, DailyWeightLog } from '@/types';
 import { getAllRecipes as getAllRecipesFromRegistry } from '@/features/recipes/recipeRegistry';
-import { differenceInDays } from 'date-fns';
 
 // Helper function to map registry recipes to the full Recipe type
 const mapToFullRecipe = (rawRecipe: any): Recipe => {
@@ -72,6 +71,7 @@ export const calculateTotalMacros = (plannedMeals: PlannedMeal[], recipesSource?
   }, { protein: 0, carbs: 0, fat: 0, calories: 0 });
 };
 
+
 // --- START: FINALIZED SHOPPING LIST CODE ---
 
 function unicodeFractionToNumber(str: string): number {
@@ -88,70 +88,98 @@ export const parseIngredientString = (ingredientString: string): { name: string;
         return { name: 'Unknown', quantity: 0, unit: '' };
     }
 
+    // 1. Pre-process the string
     let workingString = ingredientString.toLowerCase().trim()
         .replace(/[\u00BC-\u00BE\u2150-\u215E]/g, match => ` ${unicodeFractionToNumber(match)} `)
+        .replace(/\b(tbsp|tsp)\./g, '$1')
         .replace(/\s+/g, ' ');
 
     if (workingString.includes('to taste') || workingString.includes('if needed') || workingString.includes('to serve')) {
         return { name: 'non-item', quantity: 0, unit: '' };
     }
+    
+    // 2. Define units and descriptors
+    const unitMap: { [key: string]: string } = {
+        'gram': 'g', 'grams': 'g', 'g': 'g',
+        'kilogram': 'kg', 'kilograms': 'kg', 'kg': 'kg',
+        'ml': 'ml', 'milliliter': 'ml', 'milliliters': 'ml',
+        'l': 'l', 'liter': 'l', 'liters': 'l',
+        'tsp': 'tsp', 'teaspoon': 'tsp', 'teaspoons': 'tsp',
+        'tbsp': 'tbsp', 'tablespoon': 'tbsp', 'tablespoons': 'tbsp',
+        'cup': 'cup', 'cups': 'cup',
+        'oz': 'oz', 'ounce': 'oz', 'ounces': 'oz',
+        'pinch': 'pinch', 'pinches': 'pinch',
+        'handful': 'handful', 'handfuls': 'handful',
+        'clove': 'clove', 'cloves': 'clove',
+        'slice': 'slice', 'slices': 'slice',
+        'can': 'can', 'cans': 'can',
+        'small': 'small', 'medium': 'medium', 'large': 'large',
+    };
+    const units = Object.keys(unitMap);
 
-    let unitFromParentheses: string | null = null;
-    let quantityFromParentheses: number | null = null;
-    workingString = workingString.replace(/\(([^)]+)\)/g, (match, innerContent) => {
-        const parenMatch = innerContent.match(/(\d+(?:\.\d+)?)\s*(g|ml|kg)/);
-        if (parenMatch) {
-            quantityFromParentheses = parseFloat(parenMatch[1]);
-            unitFromParentheses = parenMatch[2];
-        }
-        return '';
-    }).trim();
+    const descriptors = ['chopped', 'frozen', 'sliced', 'peeled', 'drained', 'in water', 'finely', 'minced', 'thinly', 'grated', 'natural', 'lean', 'ground', 'fresh', 'smoked', 'liquid', 'mashed', 'plant or dairy', 'peel only', 'rinsed and', 'cooked', 'cut in cubes', 'cut into pieces', 'halved', 'lightly beaten', 'packed', 'softened', 'white', 'unsalted'];
 
-    const units = ['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'ml', 'milliliter', 'milliliters', 'l', 'liter', 'liters', 'tsp', 'teaspoon', 'teaspoons', 'tbsp', 'tablespoon', 'tablespoons', 'cup', 'cups', 'oz', 'ounce', 'ounces', 'pinch', 'handful', 'clove', 'cloves', 'slice', 'slices', 'can', 'cans'];
-    const unitRegexString = `(?:${units.join('|')})`;
-
-    const regex = new RegExp(`^(\\d+(?:\\.\\d+)?(?:\\s\\d\\/\\d)?|\\d+\\/\\d+)?\\s*(${unitRegexString})?\\s*(.*)$`);
-    const match = workingString.match(regex);
+    // 3. The main parsing Regex
+    const regex = new RegExp(
+        `^(\\d*\\s*\\d/\\d|\\d+\\.\\d+|\\d+)?\\s*(${units.join('|')})?\\s*(.*)$`
+    );
+    let match = workingString.match(regex);
 
     if (!match) {
         return { name: ingredientString.trim(), quantity: 1, unit: 'item' };
     }
 
     let [, quantityStr, unitStr, nameStr] = match;
-    let quantity: number;
-    let unit: string;
 
-    if (quantityFromParentheses && unitFromParentheses) {
-        quantity = quantityFromParentheses;
-        unit = unitFromParentheses;
-    } else {
-        quantity = 1;
-        if (quantityStr) {
-            const trimmedQuantityStr = quantityStr.trim();
-            if (trimmedQuantityStr.includes(' ')) { const parts = trimmedQuantityStr.split(' '); quantity = parseInt(parts[0], 10) + eval(parts[1]); }
-            else if (trimmedQuantityStr.includes('/')) { quantity = eval(trimmedQuantityStr); }
-            else { quantity = parseFloat(trimmedQuantityStr); }
+    // 4. Extract and clean up parts
+    let quantity: number = 1;
+    if (quantityStr) {
+        const trimmedQty = quantityStr.trim();
+        if (trimmedQty.includes('/')) {
+            const parts = trimmedQty.split(' ');
+            if (parts.length > 1) {
+                quantity = parseInt(parts[0], 10) + eval(parts[1]);
+            } else {
+                quantity = eval(trimmedQty);
+            }
+        } else {
+            quantity = parseFloat(trimmedQty);
         }
-        const unitMap: { [key: string]: string } = { gram: 'g', kg: 'kg', ml: 'ml', l: 'l', oz: 'oz', tsp: 'tsp', tbsp: 'tbsp', cup: 'cup', pinch: 'pinch', handful: 'handful', clove: 'clove', slice: 'slice', can: 'can' };
-        unit = unitStr ? (unitMap[unitStr.replace(/s$/, '')] || unitStr.replace(/s$/, '')) : 'item';
     }
     
-    // Expanded list of descriptive words to remove from the ingredient name
-    const descriptors = ['medium', 'small', 'large', 'chopped', 'frozen', 'sliced', 'peeled', 'drained', 'in water', 'finely', 'minced', 'thinly', 'grated', 'natural', 'lean', 'ground', 'fresh', 'smoked', 'liquid', 'mashed', 'plant or dairy', 'peel only', 'rinsed and', 'cooked', 'cut in cubes', 'cut into pieces', 'halved'];
-    const nameRegex = new RegExp(`\\b(${descriptors.join('|')})\\b`, 'g');
-    let name = nameStr.replace(nameRegex, '').replace(/^of\s+/, '').replace(/,/g, '').replace(/\./g, '').replace(/\s+/g, ' ').trim();
+    const unit = unitStr ? unitMap[unitStr] : 'item';
 
-    // Comprehensive map to standardize ingredient names for accurate grouping
-    const nameMap: { [key: string]: string } = { 'peach': 'peaches', 'banana': 'banana', 'yogurt': 'natural yogurt', 'vanilla whey powder': 'vanilla protein powder', 'salad leaves': 'salad leaves', 'radish': 'radishes', 'tuna': 'tuna', 'bread': 'bread', 'broccoli': 'broccoli', 'parmesan': 'parmesan', 'olive oil': 'olive oil', 'lemon juice': 'lemon juice', 'honey': 'honey', 'potato': 'potato', 'onion': 'onion', 'zucchini': 'zucchini', 'egg': 'egg', 'turkey': 'turkey mince', 'rice': 'rice', 'garlic': 'garlic', 'oil': 'oil', 'tomatoe': 'chopped tomatoes', 'bell pepper': 'red bell pepper', 'vegetable broth': 'vegetable broth', 'kidney beans': 'red kidney beans', 'sweet corn': 'sweet corn', 'cottage cheese': 'cottage cheese', 'watercress': 'watercress', 'lemon': 'lemon', 'soy milk': 'soy milk', 'mixed herbs': 'mixed herbs', 'coconut oil': 'coconut oil', 'salmon': 'smoked salmon', 'egg whites': 'egg whites', 'almond milk': 'almond milk', 'spinach': 'spinach', 'cheese': 'cheese', 'parsley': 'parsley', 'asparagus': 'asparagus', 'feta cheese': 'feta cheese', 'cherry tomatoes': 'cherry tomatoes', 'dill': 'dill', 'blueberries': 'blueberries', 'quinoa': 'quinoa', 'chickpeas': 'chickpeas', 'cucumber': 'cucumber', 'dijon mustard': 'dijon mustard', 'red wine vinegar': 'red wine vinegar', 'lime juice': 'lime juice', 'mango': 'mango', 'kale': 'kale', 'almond butter': 'almond butter', 'coconut water': 'coconut water', 'walnuts': 'walnuts' };
+    const descriptorRegex = new RegExp(`\\b(${descriptors.join('|')})\\b`, 'g');
+    let name = nameStr
+        .replace(descriptorRegex, '')
+        .replace(/^of\s+/, '')
+        .replace(/,/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    // 5. Standardize the final ingredient name for grouping
+    const nameMap: { [key: string]: string } = {
+        'egg': 'egg', 'potato': 'potato', 'onion': 'onion', 'zucchini': 'zucchini',
+        'olive oil': 'olive oil', 'cottage cheese': 'cottage cheese',
+        'watercress': 'watercress', 'lemon': 'lemon', 'soy milk': 'soy milk',
+        'mixed herbs': 'mixed herbs', 'coconut oil': 'oil', 'oil': 'oil',
+        'salmon': 'smoked salmon',
+    };
+
     let standardizedName = name;
-    for (const key in nameMap) {
+    const sortedNameKeys = Object.keys(nameMap).sort((a,b) => b.length - a.length);
+    for (const key of sortedNameKeys) {
         if (name.includes(key)) {
             standardizedName = nameMap[key];
             break;
         }
     }
 
-    return { name: standardizedName.charAt(0).toUpperCase() + standardizedName.slice(1), quantity: isNaN(quantity) ? 1 : quantity, unit: unit };
+    return {
+        name: standardizedName.charAt(0).toUpperCase() + standardizedName.slice(1),
+        quantity: isNaN(quantity) ? 1 : quantity,
+        unit: unit
+    };
 };
 
 export const generateShoppingList = (
@@ -161,13 +189,12 @@ export const generateShoppingList = (
 ): ShoppingListItem[] => {
     const ingredientMap = new Map<string, { quantity: number; unit: string; recipes: { recipeId: number; recipeName: string }[] }>();
     const recipesToUse = recipesSource && recipesSource.length > 0 ? recipesSource : allRecipesCache;
-    const wholeUnitItems = ['egg', 'banana', 'apple', 'avocado', 'onion', 'tomato', 'potato', 'zucchini', 'pepper', 'lemon', 'lime', 'garlic', 'salmon', 'chicken breast', 'radishes', 'peaches', 'bread', 'asparagus', 'bell pepper', 'cucumber'];
 
     plannedMeals.forEach(plannedMeal => {
         const recipe = recipesToUse.find(r => r.id === plannedMeal.recipeId);
         if (recipe) {
             recipe.ingredients.forEach(ingredientString => {
-                const parsed = parseIngredientString(ingredientString as any);
+                const parsed = parseIngredientString(ingredientString as string);
                 if (!parsed.name || parsed.quantity <= 0 || parsed.name.toLowerCase() === 'non-item') return;
 
                 const recipeBaseServings = recipe.servings > 0 ? recipe.servings : 1;
@@ -176,9 +203,15 @@ export const generateShoppingList = (
 
                 const key = `${parsed.name.toLowerCase()}|${parsed.unit}`;
                 let entry = ingredientMap.get(key);
-                if (!entry) { entry = { quantity: 0, unit: parsed.unit, recipes: [] }; }
+
+                if (!entry) {
+                    entry = { quantity: 0, unit: parsed.unit, recipes: [] };
+                }
+
                 entry.quantity += totalRequired;
-                if (!entry.recipes.find(r => r.recipeId === recipe.id)) { entry.recipes.push({ recipeId: recipe.id, recipeName: recipe.name }); }
+                if (!entry.recipes.some(r => r.recipeId === recipe.id)) {
+                    entry.recipes.push({ recipeId: recipe.id, recipeName: recipe.name });
+                }
                 ingredientMap.set(key, entry);
             });
         }
@@ -187,18 +220,37 @@ export const generateShoppingList = (
     pantryItems.forEach(pantryItem => {
         const key = `${pantryItem.name.toLowerCase()}|${pantryItem.unit}`;
         const requiredItem = ingredientMap.get(key);
-        if (requiredItem) { requiredItem.quantity -= pantryItem.quantity; }
+        if (requiredItem) {
+            requiredItem.quantity -= pantryItem.quantity;
+        }
     });
-
+    
     const shoppingList: ShoppingListItem[] = [];
+    const wholeUnitItems = ['egg', 'banana', 'apple', 'avocado', 'onion', 'tomato', 'potato', 'zucchini', 'pepper', 'lemon', 'lime'];
+    
     ingredientMap.forEach((value, key) => {
         if (value.quantity <= 0) return;
-        const [name] = key.split('|');
-        const isWholeUnit = wholeUnitItems.some(item => name.toLowerCase().includes(item));
+
+        const [name, unit] = key.split('|');
+        
+        const isWholeUnit = wholeUnitItems.some(item => name.toLowerCase().includes(item)) && unit === 'item';
         const finalQuantity = isWholeUnit ? Math.ceil(value.quantity) : value.quantity;
-        const displayQuantity = finalQuantity % 1 !== 0 ? parseFloat(finalQuantity.toFixed(2)) : finalQuantity;
+
+        const displayQuantity = finalQuantity % 1 !== 0 && !isWholeUnit
+            ? parseFloat(finalQuantity.toFixed(2))
+            : Math.round(finalQuantity);
+
         if (displayQuantity <= 0) return;
-        shoppingList.push({ id: key, name: name.charAt(0).toUpperCase() + name.slice(1), quantity: displayQuantity, unit: value.unit, category: assignCategory(name) as UKSupermarketCategory, purchased: false, recipes: value.recipes });
+
+        shoppingList.push({
+            id: key,
+            name: name.charAt(0).toUpperCase() + name.slice(1),
+            quantity: displayQuantity,
+            unit: value.unit,
+            category: assignCategory(name) as UKSupermarketCategory,
+            purchased: false,
+            recipes: value.recipes
+        });
     });
 
     return shoppingList.sort((a, b) => {
@@ -234,10 +286,10 @@ export function assignCategory(ingredientName: string): UKSupermarketCategory {
 
 export const calculateTrendWeight = (dailyWeightLog: DailyWeightLog[]): DailyWeightLog[] => {
   if (!dailyWeightLog || dailyWeightLog.length < 7) {
-    return daily_weight_log.map(log => ({...log, trend_weight_kg: undefined}));
+    return dailyWeightLog.map(log => ({...log, trend_weight_kg: undefined}));
   }
 
-  const sorted_logs = [...daily_weight_log].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const sorted_logs = [...dailyWeightLog].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const trend_weight_data: DailyWeightLog[] = sorted_logs.map((log, index, arr) => {
     const start = Math.max(0, index - 3);
