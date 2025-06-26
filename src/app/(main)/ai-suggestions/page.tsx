@@ -154,7 +154,7 @@ export default function AISuggestionsPage() {
           <CardHeader>
             <CardTitle className="font-headline text-primary flex items-center">
               <Sparkles className="w-6 h-6 mr-2 text-accent" />
-              Let's Plan Your Day
+              Let Me Plan Your Day
             </CardTitle>
             <CardDescription>
               Just say the word, and I'll craft a personalized meal plan for you based on your profile settings and your recipe collection.
