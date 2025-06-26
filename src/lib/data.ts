@@ -5,14 +5,13 @@ import { differenceInDays } from 'date-fns';
 
 // Helper function to map registry recipes to the full Recipe type
 const mapToFullRecipe = (rawRecipe: any): Recipe => {
-  // Basic validation for essential fields
   if (typeof rawRecipe.id !== 'number' || !rawRecipe.name || typeof rawRecipe.name !== 'string') {
     console.warn('Skipping invalid raw recipe data:', rawRecipe);
     return {
         id: -1, name: 'Invalid Recipe Data',
         servings: 0, ingredients: [], instructions: [], prepTime: '', cookTime: '',
         macrosPerServing: { calories: 0, protein: 0, carbs: 0, fat: 0 },
-        image: 'https://placehold.co/600x400/007bff/ffffff.png?text=Error', // Blue placeholder for invalid data
+        image: 'https://placehold.co/600x400/007bff/ffffff.png?text=Error',
         description: "This recipe data was invalid and could not be loaded."
     } as Recipe;
   }
@@ -74,7 +73,7 @@ export const calculateTotalMacros = (plannedMeals: PlannedMeal[], recipesSource?
   }, { protein: 0, carbs: 0, fat: 0, calories: 0 });
 };
 
-// --- START: NEW AND IMPROVED SHOPPING LIST CODE ---
+// --- START: FINALIZED SHOPPING LIST CODE ---
 
 function unicodeFractionToNumber(str: string): number {
   const fractions: { [key: string]: number } = {
@@ -108,7 +107,6 @@ export const parseIngredientString = (ingredientString: string): { name: string;
         }
         return '';
     }).trim();
-
 
     const units = ['g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'ml', 'milliliter', 'milliliters', 'l', 'liter', 'liters', 'tsp', 'teaspoon', 'teaspoons', 'tbsp', 'tablespoon', 'tablespoons', 'cup', 'cups', 'oz', 'ounce', 'ounces', 'pinch', 'handful', 'clove', 'cloves', 'slice', 'slices', 'can', 'cans'];
     const unitRegexString = `(?:${units.join('|')})`;
@@ -231,7 +229,7 @@ export function assignCategory(ingredientName: string): UKSupermarketCategory {
   return 'Other Food Items';
 }
 
-// --- END: NEW AND IMPROVED SHOPPING LIST CODE ---
+// --- END: FINALIZED SHOPPING LIST CODE ---
 
 export const calculateTrendWeight = (dailyWeightLog: DailyWeightLog[]): DailyWeightLog[] => {
   if (!dailyWeightLog || dailyWeightLog.length < 7) {
