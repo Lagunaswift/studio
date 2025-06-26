@@ -62,7 +62,7 @@ export default function AIRecipeFinderPage() {
       if (result.suggestedRecipes.length === 0) {
         toast({
             title: "No Matching Recipes Found",
-            description: "The AI couldn't find any recipes that closely match your ingredients and profile settings."
+            description: "I couldn't find any recipes that closely match your ingredients and profile settings."
         })
       }
     } catch (err: any) {
@@ -84,7 +84,7 @@ export default function AIRecipeFinderPage() {
 
   if (isRecipeCacheLoading) {
     return (
-      <PageWrapper title="Pantry Chef">
+      <PageWrapper title="Pro Coach: Pantry Chef">
         <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
           <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
           <p className="text-lg">Loading recipes for AI analysis...</p>
@@ -95,16 +95,16 @@ export default function AIRecipeFinderPage() {
 
 
   return (
-    <PageWrapper title="Pantry Chef">
+    <PageWrapper title="Pro Coach: Pantry Chef">
       <div className="space-y-8">
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="font-headline text-primary flex items-center">
               <ChefHat className="w-6 h-6 mr-2 text-accent" />
-              What Can I Make?
+              What Can We Make?
             </CardTitle>
             <CardDescription>
-              Enter the ingredients you have on hand, separated by commas. The AI will find the best recipes you can make from your collection.
+              Enter the ingredients you have on hand, separated by commas. I'll find the best recipes from your collection that you can make right now.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -129,7 +129,7 @@ export default function AIRecipeFinderPage() {
         {isGenerating && (
           <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
             <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
-            <p className="text-lg">AI is searching for recipes...</p>
+            <p className="text-lg">I'm searching for recipes...</p>
             <p className="text-sm">This might take a moment.</p>
           </div>
         )}
@@ -147,7 +147,7 @@ export default function AIRecipeFinderPage() {
             <CardHeader>
               <CardTitle className="font-headline text-primary flex items-center">
                 <Lightbulb className="w-7 h-7 mr-3 text-accent" />
-                AI Recipe Suggestions
+                My Recipe Suggestions
               </CardTitle>
               <CardDescription>
                 Based on your ingredients, here are some recipes you could make.
@@ -156,7 +156,7 @@ export default function AIRecipeFinderPage() {
             <CardContent className="space-y-6">
               {suggestion.aiGeneralNotes && (
                  <div>
-                    <h3 className="text-lg font-semibold mb-1 text-primary-focus">AI Chef's Notes:</h3>
+                    <h3 className="text-lg font-semibold mb-1 text-primary-focus">My Chef's Notes:</h3>
                     <p className="text-sm text-foreground/80 bg-secondary/30 p-3 rounded-md">{suggestion.aiGeneralNotes}</p>
                 </div>
               )}
