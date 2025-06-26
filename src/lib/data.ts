@@ -1,4 +1,3 @@
-
 import type { PlannedMeal, Recipe, PantryItem, ShoppingListItem, UKSupermarketCategory, Macros, MealType, DailyWeightLog } from '@/types';
 import { getAllRecipes as getAllRecipesFromRegistry } from '@/features/recipes/recipeRegistry';
 import { differenceInDays } from 'date-fns';
@@ -169,6 +168,7 @@ export const generateShoppingList = (
                 const parsed = parseIngredientString(ingredientString);
                 if (!parsed.name || parsed.quantity <= 0 || parsed.name.toLowerCase() === 'non-item') return;
 
+                // This is the corrected calculation logic
                 const recipeBaseServings = recipe.servings > 0 ? recipe.servings : 1;
                 const quantityPerServing = parsed.quantity / recipeBaseServings;
                 const totalRequired = quantityPerServing * plannedMeal.servings;
@@ -255,5 +255,3 @@ export const calculateTrendWeight = (dailyWeightLog: DailyWeightLog[]): DailyWei
 
   return trendWeightData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
-
-    
