@@ -94,24 +94,33 @@ export default function RecipeDetailPage() {
   useEffect(() => {
     if (!recipe) return;
 
-    const currentServings = (!isNaN(displayServings) && displayServings > 0) ? displayServings : recipe.servings;
-    const scalingFactor = currentServings / recipe.servings;
+    // This is the number of servings the user wants to see
+    const currentDisplayServings = (!isNaN(displayServings) && displayServings > 0) ? displayServings : (recipe.servings || 1);
 
+    // --- CORRECTED MACRO CALCULATION ---
+    // recipe.macrosPerServing is ALREADY per one serving. We just multiply by the desired servings.
     const newMacros = {
-      calories: recipe.macrosPerServing.calories * scalingFactor,
-      protein: recipe.macrosPerServing.protein * scalingFactor,
-      carbs: recipe.macrosPerServing.carbs * scalingFactor,
-      fat: recipe.macrosPerServing.fat * scalingFactor,
+        calories: recipe.macrosPerServing.calories * currentDisplayServings,
+        protein: recipe.macrosPerServing.protein * currentDisplayServings,
+        carbs: recipe.macrosPerServing.carbs * currentDisplayServings,
+        fat: recipe.macrosPerServing.fat * currentDisplayServings,
     };
     setScaledMacros(newMacros);
     
+    // --- CORRECTED INGREDIENT SCALING ---
     const newIngredients = recipe.ingredients.map(ingString => {
         const parsed = parseIngredientString(ingString);
-        if (!parsed.name || parsed.name.toLowerCase() === 'non-item') {
-            return null;
+        if (!parsed.name || parsed.name.toLowerCase() === 'non-item' || parsed.quantity <= 0) {
+            return null; // Filter out non-items or ingredients with no quantity
         }
+
+        // 1. Get quantity for a SINGLE serving from the original recipe data
+        // The `parsed.quantity` is for the entire recipe's servings count (e.g., 6 eggs for 2 servings)
+        const quantityPerServing = parsed.quantity / (recipe.servings || 1);
+
+        // 2. Scale it by the number of servings the user wants to see
+        const newQuantity = quantityPerServing * currentDisplayServings;
         
-        const newQuantity = parsed.quantity * scalingFactor;
         const formattedQuantity = newQuantity % 1 !== 0 ? parseFloat(newQuantity.toFixed(2)) : newQuantity;
         return `${formattedQuantity} ${parsed.unit} ${parsed.name}`;
     }).filter((ing): ing is string => ing !== null);
@@ -589,5 +598,3 @@ export default function RecipeDetailPage() {
     </PageWrapper>
   );
 }
-
-    
