@@ -59,7 +59,7 @@ export function PreppyHelp() {
       <DialogTrigger asChild>
         <Button
           className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50 bg-accent hover:bg-accent/90 text-accent-foreground flex items-center justify-center"
-          aria-label="Ask Preppy for help"
+          aria-label="Ask me for help"
         >
           <Bot className="h-7 w-7" />
         </Button>
@@ -68,7 +68,7 @@ export function PreppyHelp() {
         <DialogHeader>
           <DialogTitle className="flex items-center text-xl font-headline text-primary">
             <Bot className="w-6 h-6 mr-2 text-accent" />
-            Ask Preppy
+            Ask Me Anything
           </DialogTitle>
           <DialogDescription>
             Have a question about how the app works? I'm here to help!
@@ -85,7 +85,7 @@ export function PreppyHelp() {
           {isLoading && (
             <div className="flex items-center justify-center p-4">
               <Loader2 className="h-6 w-6 animate-spin text-accent" />
-              <p className="ml-2 text-muted-foreground">Preppy is thinking...</p>
+              <p className="ml-2 text-muted-foreground">I'm thinking...</p>
             </div>
           )}
           {error && (
@@ -98,7 +98,7 @@ export function PreppyHelp() {
             <div className="p-4 bg-secondary/50 rounded-md space-y-2">
               <h4 className="font-semibold flex items-center text-primary">
                 <Sparkles className="w-4 h-4 mr-2 text-accent" />
-                Preppy's Answer
+                My Answer
               </h4>
               <p className="text-sm text-foreground/90 whitespace-pre-wrap">{answer}</p>
             </div>
