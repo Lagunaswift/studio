@@ -1,3 +1,4 @@
+
 "use client";
 
 import Image from 'next/image';
@@ -30,18 +31,18 @@ export function RecipeCard({
 }: RecipeCardProps) {
   const { toggleFavoriteRecipe, isRecipeFavorite } = useAppContext();
   
-  const defaultPlaceholder = `https://placehold.co/600x400.png?text=Recipe+ID+${recipe?.id || 'Unknown'}`;
-  
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
-    setImageError(!recipe?.image);
-  }, [recipe]);
+    // Reset error state when recipe changes
+    setImageError(false);
+  }, [recipe?.id]);
 
-  const imageSrc = imageError ? defaultPlaceholder : (recipe?.image || defaultPlaceholder);
+  const dynamicImageSrc = `/images/recipe-${recipe?.id}.jpg`;
+  const defaultPlaceholder = `https://placehold.co/600x400.png`;
+  const imageSrc = imageError ? defaultPlaceholder : dynamicImageSrc;
 
   const isFavorited = recipe ? isRecipeFavorite(recipe.id) : false;
-
 
   if (!recipe) {
     return (
@@ -54,7 +55,9 @@ export function RecipeCard({
   }
   
   const handleImageError = () => {
-    setImageError(true);
+    if (!imageError) {
+      setImageError(true);
+    }
   };
   
   const aiHint = recipe.tags && recipe.tags.length > 0 

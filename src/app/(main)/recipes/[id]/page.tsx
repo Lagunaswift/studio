@@ -55,10 +55,7 @@ export default function RecipeDetailPage() {
   const [tweakError, setTweakError] = useState<string | null>(null);
   const [tweakSuggestion, setTweakSuggestion] = useState<SuggestRecipeModificationOutput | null>(null);
 
-
-  const [currentImageSrc, setCurrentImageSrc] = useState<string>('');
   const [imageLoadError, setImageLoadError] = useState(false);
-
   const isFavorited = recipe ? isRecipeFavorite(recipe.id) : false;
 
   useEffect(() => {
@@ -66,7 +63,6 @@ export default function RecipeDetailPage() {
       if (isNaN(recipeId)) {
         setError("Invalid recipe ID.");
         setIsLoading(false);
-        setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Error`);
         setImageLoadError(true);
         return;
       }
@@ -78,20 +74,16 @@ export default function RecipeDetailPage() {
         const foundRecipe = await getRecipeById(recipeId);
         if (foundRecipe) {
           setRecipe(foundRecipe);
-          setCurrentImageSrc(foundRecipe.image);
           setDisplayServings(foundRecipe.servings || 1);
           setPlanServings(foundRecipe.servings || 1);
-          setScaledIngredients(foundRecipe.ingredients);
-          setScaledMacros(foundRecipe.macrosPerServing);
+          // The ingredients scaling logic will run in the next useEffect
         } else {
           setError(`Recipe with ID ${recipeId} not found.`);
-          setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+Not+Found`);
           setImageLoadError(true);
         }
       } catch (e: any) {
         console.error("Error fetching recipe by ID:", e);
         setError(e.message || "Failed to load recipe.");
-        setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Error+Loading`);
         setImageLoadError(true);
       } finally {
         setIsLoading(false);
@@ -102,6 +94,10 @@ export default function RecipeDetailPage() {
 
   useEffect(() => {
     if (!recipe || isNaN(displayServings) || displayServings <= 0) {
+      if(recipe) {
+        setScaledIngredients(recipe.ingredients.map(ing => `${ing.quantity} ${ing.unit} ${ing.name}`));
+        setScaledMacros(recipe.macrosPerServing);
+      }
       return;
     }
     
@@ -114,26 +110,11 @@ export default function RecipeDetailPage() {
       fat: recipe.macrosPerServing.fat * scalingFactor,
     };
     setScaledMacros(newMacros);
-
+    
     const newIngredients = recipe.ingredients.map(ing => {
-      const parsed = parseIngredientString(ing);
-      const originalQtyIsOneAndImplicit = parsed.quantity === 1 && !ing.trim().match(/^(1|1\.0)\s/);
-
-      if (originalQtyIsOneAndImplicit) {
-        return ing;
-      }
-      
-      const newQuantity = parsed.quantity * scalingFactor;
-      const formattedQuantity = newQuantity.toLocaleString('en-US', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2,
-      }).replace(/\.00$/, '');
-
-      if (parsed.unit === 'item(s)') {
-        return `${formattedQuantity} ${parsed.name}`;
-      }
-      
-      return `${formattedQuantity} ${parsed.unit} ${parsed.name}`;
+      const newQuantity = ing.quantity * scalingFactor;
+      const formattedQuantity = newQuantity % 1 !== 0 ? parseFloat(newQuantity.toFixed(2)) : newQuantity;
+      return `${formattedQuantity} ${ing.unit} ${ing.name}`;
     });
     setScaledIngredients(newIngredients);
 
@@ -141,8 +122,9 @@ export default function RecipeDetailPage() {
 
 
   const handleImageError = () => {
-    setCurrentImageSrc(`https://placehold.co/600x400/007bff/ffffff.png?text=Recipe+ID+${recipeId}`);
-    setImageLoadError(true);
+    if (!imageLoadError) {
+      setImageLoadError(true);
+    }
   };
 
   const handleOpenAddToPlanDialog = () => {
@@ -211,7 +193,8 @@ export default function RecipeDetailPage() {
         recipeToModify: {
           name: recipe.name,
           description: recipe.description,
-          ingredients: recipe.ingredients,
+          // Convert structured ingredients back to strings for the AI prompt
+          ingredients: recipe.ingredients.map(ing => `${ing.quantity} ${ing.unit} ${ing.name}`),
           instructions: recipe.instructions,
           tags: recipe.tags,
         },
@@ -240,7 +223,7 @@ export default function RecipeDetailPage() {
     const recipeFormData: RecipeFormData = {
         name: tweakSuggestion.newName,
         description: tweakSuggestion.newDescription,
-        image: recipe.image,
+        image: `/images/recipe-${recipe.id}.jpg`, // Point to original image
         servings: recipe.servings,
         prepTime: recipe.prepTime,
         cookTime: recipe.cookTime,
@@ -270,8 +253,12 @@ export default function RecipeDetailPage() {
         });
     }
   };
-
+  
   const aiHint = recipe && recipe.tags && recipe.tags.length > 0 ? recipe.tags.slice(0, 2).join(' ') : "food meal";
+  const dynamicImageSrc = `/images/recipe-${recipeId}.jpg`;
+  const defaultPlaceholder = `https://placehold.co/600x400.png`;
+  const imageSrc = imageLoadError ? defaultPlaceholder : dynamicImageSrc;
+
 
   if (isLoading) {
     return (
@@ -321,7 +308,7 @@ export default function RecipeDetailPage() {
       <Card className="overflow-hidden shadow-xl rounded-lg">
         <div className="relative w-full h-64 md:h-96">
           <Image
-            src={currentImageSrc} 
+            src={imageSrc} 
             alt={recipe.name}
             fill
             sizes="(max-width: 768px) 100vw, 100vw"
@@ -440,9 +427,9 @@ export default function RecipeDetailPage() {
                 Original Ingredients (for {recipe.servings} servings)
               </h3>
               <ul className="space-y-2 list-disc list-inside bg-muted/20 p-4 rounded-md text-sm text-muted-foreground">
-                {recipe.ingredients.map((ingredient, index) => (
+                {recipe.ingredients.map((ing, index) => (
                   <li key={index}>
-                    {ingredient}
+                    {ing.quantity} {ing.unit} {ing.name}
                   </li>
                 ))}
               </ul>
