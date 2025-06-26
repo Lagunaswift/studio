@@ -1,5 +1,4 @@
 
-
 import type { Recipe, Macros, MealType, PlannedMeal, ShoppingListItem, UKSupermarketCategory, PantryItem, DailyWeightLog } from '@/types';
 import { getAllRecipes as getAllRecipesFromRegistry } from '@/features/recipes/recipeRegistry';
 
@@ -88,147 +87,107 @@ const categoryKeywords: Record<UKSupermarketCategory, string[]> = {
   "Other Food Items": ["parsley", "dill", "basil", "mint", "coriander", "cilantro", "chives", "lemongrass", "kaffir lime leaves", "nori sheets", "bay leaves", "thyme", "rosemary", "saffron", "za'atar"]
 };
 
-const KNOWN_UNITS_REGEX_PART = "\\b(cups?|tbsp|tablespoons?|tsp|teaspoons?|g|grams?|kg|kilograms?|ml|milliliters?|L|liters?|oz|ounces?|cans?|bunches?|cloves?|stalks?|sprigs?|slices?|sheets?|fillets?|heads?|eggs?|scoops?)\\b";
-
-const DESCRIPTOR_SUFFIXES_ARRAY = [
-  'peeled and chopped', 'peeled and diced', 'peeled and sliced', 'peeled and grated',
-  'drained and rinsed', 'rinsed and drained',
-  'cut into matchsticks', 'cut into bite-size pieces', 'tough bottoms removed',
-  'white parts only', 'green part', 'flesh only', 'seeds removed', 'stems removed', 'core removed',
-  'skin on', 'skin off', 'bone in', 'bone out',
-  'pitted', 'deseeded', 'without stone',
-  'thinly sliced', 'finely chopped', 'coarsely grated',
-  'peeled', 'chopped', 'diced', 'sliced', 'minced', 'grated', 'crushed', 'trimmed', 'halved', 'quartered',
-  'rinsed', 'drained', 'frozen', 'fresh', 'cooked', 'uncooked', 'ripe', 'large', 'medium', 'small',
-  'thin', 'thick', 'whole', 'ground', 'light', 'dark', 'sweet', 'unsweetened', 'salted', 'unsalted',
-  'plus extra', 'plus more', 'for garnish', 'to serve', 'to taste', 'optional', 'room temperature',
-  'softened', 'melted', 'natural', 'organic', 'heaping', 'rounded-sm', 'scant',
-  'in brine', 'in olive oil', 'in water', 'in juice', 'with liquid', 'including juices',
-  'rehydrated', 'store bought or homemade', 'unthawed', 'boneless and skinless', 'boneless, skinless'
-];
-DESCRIPTOR_SUFFIXES_ARRAY.sort((a, b) => b.length - a.length);
-
-const suffixPatternString = `(?:,?\\s+(?:${DESCRIPTOR_SUFFIXES_ARRAY.map(s => s.replace(/\s+/g, '\\s*')).join('|')}|\\(.*?\\)))+$`;
-const suffixPatternGlobalString = `(?:,?\\s*(?:${DESCRIPTOR_SUFFIXES_ARRAY.map(s => s.replace(/\s+/g, '\\s*')).join('|')}|\\(.*?\\)))+`;
-
+function unicodeFractionToNumber(str: string): number {
+  const fractions: { [key: string]: number } = {
+    '¼': 0.25, '½': 0.5, '¾': 0.75, '⅐': 0.142, '⅑': 0.111, '⅒': 0.1,
+    '⅓': 0.333, '⅔': 0.666, '⅕': 0.2, '⅖': 0.4, '⅗': 0.6, '⅘': 0.8,
+    '⅙': 0.166, '⅚': 0.833, '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875
+  };
+  return fractions[str] || 0;
+}
 
 export const parseIngredientString = (ingredientString: string): { name: string; quantity: number; unit: string } => {
-  let cleanedString = ingredientString.replace(/\./g, '');
-  
-  const mainRegex = new RegExp(`^(\\d+\\s*\\/?\\s*\\d*|\\d*\\s?½|\\d*\\s?¼|\\d*\\s?¾)?\\s*(${KNOWN_UNITS_REGEX_PART})?\\s*(?:of\\s+)?(.*)$`, 'i');
-  const match = cleanedString.match(mainRegex);
+  if (!ingredientString) {
+    return { name: 'Unknown', quantity: 0, unit: '' };
+  }
 
+  // Normalize and handle special cases
+  let workingString = ingredientString.toLowerCase().trim()
+    .replace(/[\u00BC-\u00BE\u2150-\u215E]/g, (match) => ` ${unicodeFractionToNumber(match)} `)
+    .replace(/(\d+)\s*\/\s*(\d+)/g, (match, num, den) => ` ${parseInt(num, 10) / parseInt(den, 10)} `)
+    .replace(/\s+/g, ' ');
+
+  if (workingString.includes('to taste') || workingString.includes('if needed')) {
+    return { name: ingredientString.replace(/to taste|if needed/i, '').trim(), quantity: 0, unit: 'to taste' };
+  }
+
+  // Comprehensive regex to capture quantity, unit, and name
+  const ingredientRegex = new RegExp(
+      /^(\d+\s\d\/\d|\d+\/\d+|\d+(?:\.\d+)?|\d+)?\s*(tbsps?|cups?|tsps?|g|grams?|kg|kgs?|ml|l|oz|pinch|handfuls?|cloves?|slices?|cans?|big\shandfuls?)?\s*(.*)$/
+  );
+
+  const match = workingString.match(ingredientRegex);
+
+  if (!match) {
+    return { name: ingredientString.trim(), quantity: 1, unit: 'item' };
+  }
+
+  let [, quantityStr, unitStr, nameStr] = match;
+
+  // --- Quantity Processing ---
   let quantity = 1;
-  let unit = 'item(s)';
-  let name = ingredientString.trim();
-
-  if (match) {
-    const qtyStr = match[1] ? match[1].trim() : null;
-    const unitStr = match[2] ? match[2].trim().replace(/\.$/, '') : null; // Remove trailing dot from unit
-    let namePart = match[3] ? match[3].trim() : '';
-
-    if (qtyStr) {
-      if (qtyStr.includes('½')) quantity = (parseFloat(qtyStr.replace('½','').trim() || "0") + 0.5) || 0.5;
-      else if (qtyStr.includes('¼')) quantity = (parseFloat(qtyStr.replace('¼','').trim() || "0") + 0.25) || 0.25;
-      else if (qtyStr.includes('¾')) quantity = (parseFloat(qtyStr.replace('¾','').trim() || "0") + 0.75) || 0.75;
-      else if (qtyStr.includes('/')) {
-        const parts = qtyStr.split('/');
-        if (parts.length === 2) {
-          const num = parseFloat(parts[0].trim()); // trim spaces for "1 / 2"
-          const den = parseFloat(parts[1].trim());
-          if (!isNaN(num) && !isNaN(den) && den !== 0) {
-             if (parts[0].includes(' ')) { // Handle mixed fractions like "1 1/2"
-                const wholeParts = parts[0].split(' ');
-                const whole = parseFloat(wholeParts[0]);
-                const fracNum = parseFloat(wholeParts[1]);
-                quantity = whole + (fracNum / den);
-             } else {
-                quantity = num / den;
-             }
-          } else {
-            quantity = 1;
-          }
-        }
-      } else {
-        quantity = parseFloat(qtyStr) || 1;
-      }
+  if (quantityStr) {
+    if (quantityStr.includes(' ')) { // Handles "1 1/2"
+      const parts = quantityStr.split(' ');
+      quantity = parseInt(parts[0], 10) + parseFloat(parts[1]);
+    } else {
+      quantity = parseFloat(quantityStr);
     }
-    
-    if (unitStr) {
-      unit = unitStr.toLowerCase(); // Standardize unit to lowercase early
-    }
-    
-    name = namePart || (unitStr ? ingredientString.split(new RegExp(`\\b${unitStr}\\b`, 'i'))[1] || ingredientString : ingredientString).trim();
-    if (name.toLowerCase().startsWith('of ')) {
-      name = name.substring(3).trim();
-    }
-     if (qtyStr && !unitStr && name.startsWith(qtyStr)) {
-        name = name.substring(qtyStr.length).trim();
-     }
-
-  } else {
-     const simpleQtyMatch = ingredientString.match(/^(\d+)\s+(.*)/);
-     if (simpleQtyMatch) {
-       quantity = parseInt(simpleQtyMatch[1], 10);
-       name = simpleQtyMatch[2].trim();
-     } else {
-       name = ingredientString.trim();
-     }
-  }
-  
-  // Normalize Unit
-  if (['tbsp', 'tablespoon', 'tablespoons'].includes(unit)) unit = 'tbsp';
-  else if (['tsp', 'teaspoon', 'teaspoons'].includes(unit)) unit = 'tsp';
-  else if (['g', 'gram', 'grams'].includes(unit)) unit = 'g';
-  else if (['ml', 'milliliter', 'milliliters'].includes(unit)) unit = 'ml';
-  else if (['l', 'liter', 'liters'].includes(unit)) unit = 'L';
-  else if (['kg', 'kilogram', 'kilograms'].includes(unit)) unit = 'kg';
-  else if (['oz', 'ounce', 'ounces'].includes(unit)) unit = 'oz.'; // Keep oz. consistent
-  else if (['cup', 'cups'].includes(unit)) unit = 'cup';
-  else if (['can', 'cans'].includes(unit)) unit = 'can';
-  else if (['scoop', 'scoops'].includes(unit)) unit = 'scoop';
-  else if (['egg', 'eggs'].includes(unit)) {
-      unit = 'egg'; 
-      if (name.toLowerCase().includes('egg')) name = 'egg';
-  } else if (!new RegExp(KNOWN_UNITS_REGEX_PART, 'i').test(unit) && unit !== 'item(s)') { 
-      name = `${unit} ${name}`.trim();
-      unit = 'item(s)';
   }
 
+  // --- Unit Processing ---
+  const unitMap: { [key: string]: string } = {
+    g: 'g', gram: 'g', grams: 'g',
+    kg: 'kg', kgs: 'kg',
+    ml: 'ml', l: 'l',
+    oz: 'oz',
+    tsp: 'tsp', tsps: 'tsp',
+    tbsp: 'tbsp', tbsps: 'tbsp',
+    cup: 'cup', cups: 'cup',
+    pinch: 'pinch',
+    handful: 'handful', handfuls: 'handful', 'big handfuls': 'handful',
+    clove: 'clove', cloves: 'clove',
+    slice: 'slice', slices: 'slice',
+    can: 'can', cans: 'can'
+  };
+  let unit = unitStr && unitMap[unitStr.replace(/s$/, '')] ? unitMap[unitStr.replace(/s$/, '')] : 'item';
 
-  // Clean Name
-  name = name.replace(/\(\s*[^)]*\s*\)/g, '').trim(); // Remove anything in parentheses e.g. (optional), (14oz./400g)
-  
-  let oldName;
-  const suffixRemovalPattern = new RegExp(suffixPatternString, 'i');
-  do {
-    oldName = name;
-    name = name.replace(suffixRemovalPattern, '').trim();
-    name = name.replace(/,$/, '').trim(); 
-  } while (name !== oldName && name.length > 0);
+  // --- Name Processing ---
+  let name = nameStr.replace(/^of\s+/, '').replace(/,/g, '').trim();
 
-  const generalDescriptorPattern = new RegExp(`(?:^|,)\\s*(?:${DESCRIPTOR_SUFFIXES_ARRAY.map(s => s.replace(/\s+/g, '\\s*')).join('|')})\\b`, 'gi');
-  name = name.replace(generalDescriptorPattern, '').trim();
-  name = name.replace(/^,/, '').trim(); 
-
-  name = name.replace(/\s+/g, ' ').trim();
-
-  // Specific typo correction
-  if (name.toLowerCase() === 'ettuce leaves' || name.toLowerCase() === 'ettuce') name = 'Lettuce leaves';
-  if (name.toLowerCase() === 'ranny smith apple') name = 'Granny Smith apple'; // More specific if known
-
-  if (!name.trim() && (unit.toLowerCase() === 'egg')) {
-      name = 'Egg';
-  }
-  if (!name.trim() && ingredientString.trim()) {
-      name = ingredientString.trim().split(',')[0].trim();
-      name = name.replace(new RegExp(suffixPatternGlobalString, 'gi'), '').trim();
-      name = name.replace(/\s+/g, ' ').trim();
+  // Handle cases where the unit is still in the name
+  const nameWords = name.split(' ');
+  const potentialUnit = nameWords[0].replace(/s$/, '');
+  if (unit === 'item' && unitMap[potentialUnit]) {
+    unit = unitMap[potentialUnit];
+    name = nameWords.slice(1).join(' ').trim();
   }
 
-  return { name: name ? name.charAt(0).toUpperCase() + name.slice(1) : "Unknown Ingredient", quantity, unit };
+  // Final name cleanup
+  name = name.replace(/s$/, ''); // Remove trailing 's' for better consolidation
+  if (!name) {
+    return { name: 'Unknown', quantity: 0, unit: ''}; // Avoid blank items
+  }
+
+  // Name standardization
+  const nameMap: {[key: string]: string} = {
+      'salad leave': 'salad leaves',
+      'radish': 'radishes',
+      'potato': 'potatoes',
+      'zucchini': 'zucchini',
+      'red bell pepper': 'red bell pepper',
+      'red kidney bean': 'red kidney beans',
+      'sweet corn': 'sweet corn',
+  };
+  name = nameMap[name] || name;
+
+
+  return {
+    name: name.charAt(0).toUpperCase() + name.slice(1),
+    quantity: isNaN(quantity) ? 1 : quantity,
+    unit: unit,
+  };
 };
-
 
 export const assignCategory = (ingredientName: string): UKSupermarketCategory => {
   const lowerIngredientName = ingredientName.toLowerCase();
@@ -255,8 +214,12 @@ export const generateShoppingList = (
   const ingredientMap = new Map<string, { quantity: number; unit: string; recipes: { recipeId: number; recipeName: string }[] }>();
   const recipesToUse = recipesSource && recipesSource.length > 0 ? recipesSource : allRecipesCache;
 
-  // List of ingredients that should be rounded up to the nearest whole number
-  const wholeUnitItems = ['egg', 'banana', 'apple', 'avocado', 'onion', 'tomato', 'pepper', 'lemon', 'lime', 'garlic clove', 'salmon fillet', 'chicken breast'];
+  // Expanded list for better rounding
+  const wholeUnitItems = [
+    'egg', 'banana', 'apple', 'avocado', 'onion', 'tomato', 'potato', 'zucchini',
+    'pepper', 'lemon', 'lime', 'garlic clove', 'salmon fillet', 'chicken breast',
+    'radish', 'peach'
+  ];
 
   plannedMeals.forEach(plannedMeal => {
     const recipe = plannedMeal.recipeDetails || recipesToUse.find(r => r.id === plannedMeal.recipeId);
@@ -264,7 +227,7 @@ export const generateShoppingList = (
       recipe.ingredients.forEach(ingredientString => {
         const parsed = parseIngredientString(ingredientString);
 
-        if (!parsed.name || parsed.quantity === 0 || parsed.name.trim() === '') return;
+        if (!parsed.name || parsed.quantity === 0 || parsed.name.trim() === '' || parsed.name === 'Unknown') return;
 
         const key = `${parsed.name.toLowerCase()}|${parsed.unit}`;
         let entry = ingredientMap.get(key);
@@ -273,7 +236,7 @@ export const generateShoppingList = (
           entry = { quantity: 0, unit: parsed.unit, recipes: [] };
         }
 
-        entry.quantity += parsed.quantity * plannedMeal.servings;
+        entry.quantity += parsed.quantity * (plannedMeal.servings || 1);
         if (!entry.recipes.find(r => r.recipeId === recipe.id)) {
           entry.recipes.push({ recipeId: recipe.id, recipeName: recipe.name });
         }
@@ -299,18 +262,20 @@ export const generateShoppingList = (
   const shoppingList: ShoppingListItem[] = [];
   ingredientMap.forEach((value, key) => {
     const [name] = key.split('|');
-    
-    // Check if the ingredient should be rounded up
+
     const isWholeUnit = wholeUnitItems.some(item => name.toLowerCase().includes(item));
     const finalQuantity = isWholeUnit ? Math.ceil(value.quantity) : value.quantity;
+    
+    // Use toFixed(2) for decimal quantities to avoid long numbers, but only if it's not a whole number
+    const displayQuantity = finalQuantity % 1 !== 0 ? parseFloat(finalQuantity.toFixed(2)) : finalQuantity;
 
-    // Don't add items with zero or negative quantity to the list
-    if (finalQuantity <= 0) return;
+
+    if (displayQuantity <= 0) return;
 
     shoppingList.push({
       id: key,
       name: name.charAt(0).toUpperCase() + name.slice(1),
-      quantity: finalQuantity,
+      quantity: displayQuantity,
       unit: value.unit,
       category: assignCategory(name),
       purchased: false,
@@ -355,4 +320,3 @@ export const calculateTrendWeight = (dailyWeightLog: DailyWeightLog[]): DailyWei
   // Return sorted descending to match expected order in AppContext
   return trendWeightData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
-
