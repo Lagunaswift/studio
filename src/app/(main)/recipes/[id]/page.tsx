@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useParams, useRouter } from 'next/navigation';
@@ -76,7 +75,6 @@ export default function RecipeDetailPage() {
           setRecipe(foundRecipe);
           setDisplayServings(foundRecipe.servings || 1);
           setPlanServings(foundRecipe.servings || 1);
-          // The ingredients scaling logic will run in the next useEffect
         } else {
           setError(`Recipe with ID ${recipeId} not found.`);
           setImageLoadError(true);
@@ -95,7 +93,7 @@ export default function RecipeDetailPage() {
   useEffect(() => {
     if (!recipe || isNaN(displayServings) || displayServings <= 0) {
       if(recipe) {
-        setScaledIngredients(recipe.ingredients.map(ing => `${ing.quantity} ${ing.unit} ${ing.name}`));
+        setScaledIngredients(recipe.ingredients);
         setScaledMacros(recipe.macrosPerServing);
       }
       return;
@@ -111,11 +109,14 @@ export default function RecipeDetailPage() {
     };
     setScaledMacros(newMacros);
     
-    const newIngredients = recipe.ingredients.map(ing => {
-      const newQuantity = ing.quantity * scalingFactor;
-      const formattedQuantity = newQuantity % 1 !== 0 ? parseFloat(newQuantity.toFixed(2)) : newQuantity;
-      return `${formattedQuantity} ${ing.unit} ${ing.name}`;
+    const newIngredients = recipe.ingredients.map(ingString => {
+        const parsed = parseIngredientString(ingString);
+        if(!parsed.name || parsed.quantity <= 0) return ingString; // Return original if parsing fails
+        const newQuantity = parsed.quantity * scalingFactor;
+        const formattedQuantity = newQuantity % 1 !== 0 ? parseFloat(newQuantity.toFixed(2)) : newQuantity;
+        return `${formattedQuantity} ${parsed.unit} ${parsed.name}`;
     });
+
     setScaledIngredients(newIngredients);
 
   }, [displayServings, recipe]);
@@ -193,8 +194,7 @@ export default function RecipeDetailPage() {
         recipeToModify: {
           name: recipe.name,
           description: recipe.description,
-          // Convert structured ingredients back to strings for the AI prompt
-          ingredients: recipe.ingredients.map(ing => `${ing.quantity} ${ing.unit} ${ing.name}`),
+          ingredients: recipe.ingredients,
           instructions: recipe.instructions,
           tags: recipe.tags,
         },
@@ -223,7 +223,6 @@ export default function RecipeDetailPage() {
     const recipeFormData: RecipeFormData = {
         name: tweakSuggestion.newName,
         description: tweakSuggestion.newDescription,
-        image: `/images/recipe-${recipe.id}.jpg`, // Point to original image
         servings: recipe.servings,
         prepTime: recipe.prepTime,
         cookTime: recipe.cookTime,
@@ -429,7 +428,7 @@ export default function RecipeDetailPage() {
               <ul className="space-y-2 list-disc list-inside bg-muted/20 p-4 rounded-md text-sm text-muted-foreground">
                 {recipe.ingredients.map((ing, index) => (
                   <li key={index}>
-                    {ing.quantity} {ing.unit} {ing.name}
+                    {ing}
                   </li>
                 ))}
               </ul>
