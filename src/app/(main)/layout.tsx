@@ -48,7 +48,7 @@ interface NavItem {
 const dashboardNavItem: NavItem = { href: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true };
 
 const planNavItems: NavItem[] = [
-    { href: '/ai-suggestions', label: 'AI Plan Generator', icon: Sparkles },
+    { href: '/ai-suggestions', label: 'AI Planner', icon: Sparkles },
     { href: '/meal-plan', label: 'Daily/Weekly View', icon: CalendarDays },
     { href: '/shopping-list', label: 'Shopping List', icon: ShoppingBag },
     { href: '/pantry', label: 'Pantry', icon: Archive },
@@ -61,7 +61,7 @@ const recipesNavItems: NavItem[] = [
 
 const progressNavItems: NavItem[] = [
     { href: '/profile/targets', label: 'My Goals & Targets', icon: Target },
-    { href: '/weekly-check-in', label: 'Adaptive Coach Check-in', icon: CheckSquare },
+    { href: '/weekly-check-in', label: 'Coach Check-in', icon: CheckSquare },
 ];
 
 const settingsNavItems: NavItem[] = [

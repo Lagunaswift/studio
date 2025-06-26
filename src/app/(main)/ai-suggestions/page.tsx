@@ -136,7 +136,7 @@ export default function AISuggestionsPage() {
 
   if (isAuthLoading || isAppRecipeCacheLoading) {
     return (
-      <PageWrapper title="AI Plan Generator">
+      <PageWrapper title="Pro Coach: Plan Generator">
         <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
           <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
           <p className="text-lg">Loading AI Planner...</p>
@@ -148,16 +148,16 @@ export default function AISuggestionsPage() {
   const isProfileSetupMissing = !userSettingsToUse || !userSettingsToUse.mealStructure || userSettingsToUse.mealStructure.length === 0;
 
   return (
-    <PageWrapper title="AI Plan Generator">
+    <PageWrapper title="Pro Coach: Plan Generator">
       <div className="space-y-8">
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="font-headline text-primary flex items-center">
               <Sparkles className="w-6 h-6 mr-2 text-accent" />
-              Generate Your Daily Meal Plan
+              Let's Plan Your Day
             </CardTitle>
             <CardDescription>
-              Let our AI craft a personalized meal plan for you based on your profile settings and recipe database.
+              Just say the word, and I'll craft a personalized meal plan for you based on your profile settings and your recipe collection.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -226,15 +226,15 @@ export default function AISuggestionsPage() {
             <CardHeader>
               <CardTitle className="font-headline text-primary flex items-center">
                 <Lightbulb className="w-7 h-7 mr-3 text-accent" />
-                Your AI-Generated Meal Plan
+                Your Meal Plan
               </CardTitle>
               <CardDescription>
-                Here's what our AI chef cooked up for you for today! Review the plan and add it to your calendar.
+                Here's what I've cooked up for you! Review the plan and add it to your calendar if you like it.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold mb-1 text-primary-focus">AI Justification:</h3>
+                <h3 className="text-lg font-semibold mb-1 text-primary-focus">My Justification:</h3>
                 <p className="text-sm text-foreground/80 bg-secondary/30 p-3 rounded-md">{suggestion.aiJustification}</p>
               </div>
               <div>

@@ -450,10 +450,10 @@ export default function RecipeDetailPage() {
         <CardHeader>
           <CardTitle className="font-headline text-primary flex items-center">
             <Bot className="w-6 h-6 mr-2 text-accent" />
-            AI Recipe Tweaker
+            Pro Coach: Recipe Tweaker
           </CardTitle>
           <CardDescription>
-            Want to change something? Ask the AI to modify this recipe for you.
+            Want to change something? Ask me to modify this recipe for you.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -491,13 +491,13 @@ export default function RecipeDetailPage() {
             <CardHeader>
                 <CardTitle className="font-headline text-primary flex items-center">
                     <Sparkles className="w-6 h-6 mr-2 text-accent" />
-                    AI's Modified Recipe: {tweakSuggestion.newName}
+                    My Modified Recipe: {tweakSuggestion.newName}
                 </CardTitle>
                 <CardDescription>{tweakSuggestion.newDescription}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
                 <div>
-                    <h4 className="text-lg font-semibold mb-2 text-primary-focus">AI's Justification:</h4>
+                    <h4 className="text-lg font-semibold mb-2 text-primary-focus">My Justification:</h4>
                     <p className="text-sm text-foreground/80 bg-secondary/50 p-3 rounded-md italic">"{tweakSuggestion.aiJustification}"</p>
                 </div>
                 

@@ -52,7 +52,7 @@ export default function WeeklyCheckinPage() {
 
   if (isAppDataLoading) {
      return (
-      <PageWrapper title="Adaptive Coach Check-in">
+      <PageWrapper title="Pro Coach: Weekly Check-in">
         <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
           <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
           <p className="text-lg">Loading your data...</p>
@@ -62,16 +62,16 @@ export default function WeeklyCheckinPage() {
   }
 
   return (
-    <PageWrapper title="Adaptive Coach Check-in">
+    <PageWrapper title="Pro Coach: Weekly Check-in">
       <div className="space-y-8">
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="font-headline text-primary flex items-center">
               <CheckSquare className="w-6 h-6 mr-2 text-accent" />
-              Your Adaptive Nutrition Coach
+              Your Weekly Check-in with Pro Coach
             </CardTitle>
             <CardDescription>
-              This is the core of the adaptive coaching system. Based on your logged weight and food intake, the app calculates your true energy expenditure (TDEE) and adjusts your targets to keep you on track.
+              This is where my adaptive coaching system shines. Based on your logged weight and food intake, I'll calculate your true energy expenditure (TDEE) and adjust your targets to keep you perfectly on track.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -116,7 +116,7 @@ export default function WeeklyCheckinPage() {
             <CardContent className="space-y-6">
                 <div>
                     <h3 className="text-lg font-semibold mb-1 text-primary-focus flex items-center">
-                        <Sparkles className="w-5 h-5 mr-2 text-accent" /> Pro Coach Summary
+                        <Sparkles className="w-5 h-5 mr-2 text-accent" /> My Coaching Summary
                     </h3>
                     <p className="text-sm text-foreground/80 bg-secondary/30 p-3 rounded-md whitespace-pre-wrap">{recommendation.coachingSummary}</p>
                 </div>
@@ -142,4 +142,3 @@ export default function WeeklyCheckinPage() {
     </PageWrapper>
   );
 }
-

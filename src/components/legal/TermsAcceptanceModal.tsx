@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import Link from 'next/link';
+import { Bot } from 'lucide-react';
 
 interface TermsAcceptanceModalProps {
   isOpen: boolean;
@@ -28,14 +29,19 @@ export function TermsAcceptanceModal({ isOpen, onAccept }: TermsAcceptanceModalP
         }}
       >
         <DialogHeader>
-          <DialogTitle className="text-2xl font-headline text-primary">Welcome to Macro Teal Meal Planner!</DialogTitle>
-          <DialogDescription className="pt-2">
-            Before you get started, please review and accept our terms of use.
-          </DialogDescription>
+          <div className="flex flex-col items-center text-center">
+            <div className="bg-accent/20 p-3 rounded-full mb-4">
+              <Bot className="h-10 w-10 text-accent" />
+            </div>
+            <DialogTitle className="text-2xl font-headline text-primary">Hello! I'm Pro Coach.</DialogTitle>
+            <DialogDescription className="pt-2">
+              I'm your AI-powered nutrition assistant. Before we begin, please review and accept the app's terms.
+            </DialogDescription>
+          </div>
         </DialogHeader>
         <div className="py-4 space-y-4 text-sm text-foreground/80">
             <p>
-                Our app provides tools and information for meal planning and is not a substitute for professional medical advice.
+                This app provides tools and information for meal planning but is not a substitute for professional medical advice.
             </p>
              <p>
                 By checking the box below, you confirm that you are over 18 years old and agree to our 

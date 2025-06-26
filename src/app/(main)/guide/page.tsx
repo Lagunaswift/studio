@@ -61,12 +61,12 @@ const sections: GuideSection[] = [
   },
   {
     icon: Sparkles,
-    title: "AI Meal Suggestions",
+    title: "Pro Coach: AI Planner",
     content: [
-      "Let our AI chef do the heavy lifting on the <strong>AI Suggestions</strong> page!",
+      "Let me do the heavy lifting on the <strong>AI Planner</strong> page!",
       "<strong>Important:</strong> For the best suggestions, ensure your <a href='/profile/user-info' class='text-accent underline hover:text-accent/80'>Profile Settings</a> are complete, especially your Macro Targets, Meal Structure, Dietary Preferences, and Allergens.",
-      "Click 'Generate My AI Meal Plan'. The AI will consider your profile and available recipes (from your recipe database) to create a balanced one-day meal plan.",
-      "Review the AI's justification and the overall fitness assessment.",
+      "Click 'Generate My AI Meal Plan'. I will consider your profile and available recipes (from your recipe database) to create a balanced one-day meal plan.",
+      "Review my justification and the overall fitness assessment.",
       "If you like the plan, click <strong>'Add This Plan to My Calendar'</strong> to automatically populate your meal plan for the current day."
     ]
   },
