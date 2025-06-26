@@ -49,20 +49,20 @@ interface NavItem {
 const dashboardNavItem: NavItem = { href: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true };
 
 const planNavItems: NavItem[] = [
-    { href: '/ai-suggestions', label: 'Plan Generator', icon: Sparkles },
+    { href: '/ai-suggestions', label: 'Preppy: Plan Generator', icon: Sparkles },
     { href: '/meal-plan', label: 'Daily/Weekly View', icon: CalendarDays },
     { href: '/shopping-list', label: 'Shopping List', icon: ShoppingBag },
     { href: '/pantry', label: 'Pantry', icon: Archive },
 ];
 
 const recipesNavItems: NavItem[] = [
-  { href: '/ai-recipe-finder', label: 'Pantry Chef', icon: ChefHat },
+  { href: '/ai-recipe-finder', label: 'Preppy: Pantry Chef', icon: ChefHat },
   { href: '/recipes', label: 'My Saved Recipes', icon: UtensilsCrossed },
 ];
 
 const progressNavItems: NavItem[] = [
     { href: '/profile/targets', label: 'My Goals & Targets', icon: Target },
-    { href: '/weekly-check-in', label: 'Preppy Check-in', icon: CheckSquare },
+    { href: '/weekly-check-in', label: 'Preppy: Weekly Check-in', icon: CheckSquare },
 ];
 
 const settingsNavItems: NavItem[] = [

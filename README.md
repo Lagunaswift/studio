@@ -19,7 +19,7 @@ Your daily command center. Get a quick snapshot of your progress, including:
 A flexible and powerful recipe book tailored to your needs.
 - **Recipe Library**: Store and browse all your favorite recipes.
 - **Detailed View**: Access full ingredient lists, step-by-step instructions, and macronutrient information for every recipe.
-- **AI Recipe Tweaker**: Ask the AI to modify any existing recipe to suit your needs (e.g., "make this vegetarian," "what can I use instead of almonds?").
+- **Preppy: Recipe Tweaker**: Ask me to modify any existing recipe to suit your needs (e.g., "make this vegetarian," "what can I use instead of almonds?").
 - **Add Your Own**: Easily add your custom recipes with a comprehensive form.
 
 ### 🗓️ Meal Planning
@@ -38,9 +38,10 @@ Smart inventory management that saves you time and money.
 
 ### 🤖 AI-Powered Tools
 Leverage the power of generative AI for a truly personalized experience.
-- **AI Plan Generator**: Let the AI create a complete, one-day meal plan based on your macro targets, meal structure, dietary preferences, and available recipes.
-- **Pantry Chef (AI Recipe Finder)**: Don't know what to make? Enter the ingredients you have, and the AI will suggest the best recipes from your collection that you can make right now.
-- **Adaptive Coach Check-in**: This is the core of MealPlannerPro's intelligence. After 14 days of data, the weekly check-in analyzes your weight trend and actual calorie intake to calculate your true energy expenditure (TDEE). It then recommends new, optimized macro targets to ensure you stay on track with your goals.
+- **Preppy: Plan Generator**: Let me create a complete, one-day meal plan for you based on your macro targets, meal structure, dietary preferences, and available recipes.
+- **Preppy: Pantry Chef**: Don't know what to make? Enter the ingredients you have, and I'll suggest the best recipes from your collection that you can make right now.
+- **Preppy: Weekly Check-in**: This is the core of MealPlannerPro's intelligence. After 14 days of data, the weekly check-in analyzes your weight trend and actual calorie intake to calculate your true energy expenditure (TDEE). It then recommends new, optimized macro targets to ensure you stay on track with your goals.
+- **Preppy: App Help**: Have a question about how the app works? Click the floating robot icon to ask me anything!
 
 ### ⚙️ Comprehensive Profile & Goal Setting
 Fine-tune every aspect of your nutrition journey.
@@ -62,13 +63,13 @@ Fine-tune every aspect of your nutrition journey.
 
 2.  **Build Your Recipe Book**: Navigate to `Recipes` -> `My Saved Recipes` and click "Add New Recipe" to start populating your collection.
 
-3.  **Plan Your Week**: Use the `Daily/Weekly View` under the `Plan` section to manually add recipes, or let the `AI Plan Generator` create a plan for you.
+3.  **Plan Your Week**: Use the `Daily/Weekly View` under the `Plan` section to manually add recipes, or let the `Preppy: Plan Generator` create a plan for you.
 
 4.  **Track Your Progress**:
     - Log your weight daily on the `Dashboard`.
     - Mark meals as "eaten" on the `Meal Plan` page.
 
-5.  **Check In & Adapt**: After logging data for 14 days, visit the `Adaptive Coach Check-in` page under `Progress`. Run the check-in, review the AI's recommendations, and click "Accept" to automatically update your macro targets for the week ahead.
+5.  **Check In & Adapt**: After logging data for 14 days, visit the `Preppy: Weekly Check-in` page under `Progress`. Run the check-in, review my recommendations, and click "Accept" to automatically update your macro targets for the week ahead.
 
 ---
 
