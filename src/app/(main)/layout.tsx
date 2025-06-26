@@ -49,7 +49,7 @@ interface NavItem {
 const dashboardNavItem: NavItem = { href: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true };
 
 const planNavItems: NavItem[] = [
-    { href: '/ai-suggestions', label: 'AI Planner', icon: Sparkles },
+    { href: '/ai-suggestions', label: 'Plan Generator', icon: Sparkles },
     { href: '/meal-plan', label: 'Daily/Weekly View', icon: CalendarDays },
     { href: '/shopping-list', label: 'Shopping List', icon: ShoppingBag },
     { href: '/pantry', label: 'Pantry', icon: Archive },
@@ -62,7 +62,7 @@ const recipesNavItems: NavItem[] = [
 
 const progressNavItems: NavItem[] = [
     { href: '/profile/targets', label: 'My Goals & Targets', icon: Target },
-    { href: '/weekly-check-in', label: 'Coach Check-in', icon: CheckSquare },
+    { href: '/weekly-check-in', label: 'Preppy Check-in', icon: CheckSquare },
 ];
 
 const settingsNavItems: NavItem[] = [
@@ -157,13 +157,19 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const { userProfile, acceptTerms, isAppDataLoading } = useAppContext();
 
   const getCurrentPageTitle = () => {
+    // Specific titles for AI pages
+    if (pathname === '/ai-suggestions') return 'Preppy: Plan Generator';
+    if (pathname === '/ai-recipe-finder') return 'Preppy: Pantry Chef';
+    if (pathname === '/weekly-check-in') return 'Preppy: Weekly Check-in';
+    
+    // General titles
     if (pathname === '/') return 'Dashboard';
     if (pathname.startsWith('/recipes/add')) return 'Add New Recipe';
     if (pathname.match(/^\/recipes\/\d+$/)) return 'Recipe Details';
     
     let bestMatch: { href: string; label: string; } | undefined;
     for (const item of allNavItems) {
-      if (item.href === '/') continue; // handle dashboard separately
+      if (item.href === '/') continue; 
       if (pathname.startsWith(item.href)) {
         if (!bestMatch || item.href.length > bestMatch.href.length) {
           bestMatch = item;

@@ -104,7 +104,7 @@ export default function AIRecipeFinderPage() {
               What Can We Make?
             </CardTitle>
             <CardDescription>
-              Enter the ingredients you have on hand, separated by commas. I'll find the best recipes from your collection that you can make right now.
+              Enter the ingredients you have on hand, and I'll find the best recipes from your collection that you can make right now.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

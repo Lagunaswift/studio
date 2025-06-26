@@ -86,7 +86,7 @@ export default function WeeklyCheckinPage() {
             ) : (
                 <Button onClick={handleRunCheckin} disabled={isLoading} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                    Start My Weekly Check-in
+                    Start My Check-in
                 </Button>
             )}
           </CardContent>
