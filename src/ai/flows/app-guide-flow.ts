@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview An AI agent that answers user questions about how the app works.
@@ -125,7 +124,7 @@ const appGuideFlow = ai.defineFlow(
   async (input) => {
     const { output } = await appGuidePrompt(input);
     if (!output) {
-      throw new Error("Preppy was unable to generate an answer.");
+      throw new Error("I was unable to generate an answer.");
     }
     return output;
   }
