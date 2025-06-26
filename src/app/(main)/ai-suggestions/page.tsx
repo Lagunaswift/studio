@@ -195,7 +195,7 @@ export default function AISuggestionsPage() {
                 ) : (
                   <Send className="mr-2 h-4 w-4" />
                 )}
-                Generate My AI Meal Plan
+                Generate My Meal Plan
               </Button>
             )}
             {isAppRecipeCacheLoading && <p className="text-sm text-muted-foreground mt-2 text-center">Loading recipe data for AI...</p>}
