@@ -76,7 +76,7 @@ export const calculateTotalMacros = (plannedMeals: PlannedMeal[], recipesSource?
 
 function unicodeFractionToNumber(str: string): number {
   const fractions: { [key: string]: number } = {
-    '¼': 0.25, '½': 0.5, '¾': 0.75, '⅐': 0.142, '⅑': 0.111, '⅒': 0.1,
+    '½': 0.5, '¼': 0.25, '¾': 0.75, '⅐': 0.142, '⅑': 0.111, '⅒': 0.1,
     '⅓': 0.333, '⅔': 0.666, '⅕': 0.2, '⅖': 0.4, '⅗': 0.6, '⅘': 0.8,
     '⅙': 0.166, '⅚': 0.833, '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875,
   };
@@ -88,11 +88,13 @@ export const parseIngredientString = (ingredientString: string): { name: string;
         return { name: 'Unknown', quantity: 0, unit: '' };
     }
 
-    // 1. Pre-process the string
+    // 1. Pre-process the string for better matching
     let workingString = ingredientString.toLowerCase().trim()
-        .replace(/[\u00BC-\u00BE\u2150-\u215E]/g, match => ` ${unicodeFractionToNumber(match)} `)
-        .replace(/\b(tbsp|tsp)\./g, '$1')
-        .replace(/\s+/g, ' ');
+        .replace(/[\u00BC-\u00BE\u2150-\u215E]/g, match => ` ${unicodeFractionToNumber(match)} `) // Handle unicode fractions
+        .replace(/\b(tbsp|tsp)\./g, '$1') // Handle tbsp. tsp.
+        .split(',')[0] // Take only the part before the first comma
+        .trim()
+        .replace(/\s+/g, ' '); // Standardize spacing
 
     if (workingString.includes('to taste') || workingString.includes('if needed') || workingString.includes('to serve')) {
         return { name: 'non-item', quantity: 0, unit: '' };
@@ -116,12 +118,11 @@ export const parseIngredientString = (ingredientString: string): { name: string;
         'small': 'small', 'medium': 'medium', 'large': 'large',
     };
     const units = Object.keys(unitMap);
-
     const descriptors = ['chopped', 'frozen', 'sliced', 'peeled', 'drained', 'in water', 'finely', 'minced', 'thinly', 'grated', 'natural', 'lean', 'ground', 'fresh', 'smoked', 'liquid', 'mashed', 'plant or dairy', 'peel only', 'rinsed and', 'cooked', 'cut in cubes', 'cut into pieces', 'halved', 'lightly beaten', 'packed', 'softened', 'white', 'unsalted'];
 
-    // 3. The main parsing Regex
+    // 3. The main parsing Regex - with word boundaries `\b` for units
     const regex = new RegExp(
-        `^(\\d*\\s*\\d/\\d|\\d+\\.\\d+|\\d+)?\\s*(${units.join('|')})?\\s*(.*)$`
+        `^(\\d*\\s*\\d/\\d|\\d+\\.\\d+|\\d+)?\\s*(\\b(?:${units.join('|')})\\b)?\\s*(.*)$`
     );
     let match = workingString.match(regex);
 
@@ -133,29 +134,27 @@ export const parseIngredientString = (ingredientString: string): { name: string;
 
     // 4. Extract and clean up parts
     let quantity: number = 1;
-    if (quantityStr) {
+    if (quantityStr && quantityStr.trim()) {
         const trimmedQty = quantityStr.trim();
         if (trimmedQty.includes('/')) {
             const parts = trimmedQty.split(' ');
-            if (parts.length > 1) {
-                quantity = parseInt(parts[0], 10) + eval(parts[1]);
-            } else {
-                quantity = eval(trimmedQty);
-            }
+            quantity = parts.reduce((acc, part) => acc + eval(part), 0);
         } else {
             quantity = parseFloat(trimmedQty);
         }
     }
     
-    const unit = unitStr ? unitMap[unitStr] : 'item';
-
+    let unit = unitStr ? unitMap[unitStr] : 'item';
+    let name = nameStr.trim();
+    
+    // If no unit was found but the name is plural (like 'eggs'), singularize it.
+    if (unit === 'item' && name.endsWith('s')) {
+        name = name.slice(0, -1);
+    }
+    
+    // Remove descriptors from the name
     const descriptorRegex = new RegExp(`\\b(${descriptors.join('|')})\\b`, 'g');
-    let name = nameStr
-        .replace(descriptorRegex, '')
-        .replace(/^of\s+/, '')
-        .replace(/,/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
+    name = name.replace(descriptorRegex, '').replace(/^of\s+/, '').trim();
 
     // 5. Standardize the final ingredient name for grouping
     const nameMap: { [key: string]: string } = {
