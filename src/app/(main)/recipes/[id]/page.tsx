@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useParams, useRouter } from 'next/navigation';
@@ -91,15 +92,10 @@ export default function RecipeDetailPage() {
   }, [recipeId]);
 
   useEffect(() => {
-    if (!recipe || isNaN(displayServings) || displayServings <= 0) {
-      if(recipe) {
-        setScaledIngredients(recipe.ingredients.map(ing => `${ing.quantity} ${ing.unit} ${ing.name}`));
-        setScaledMacros(recipe.macrosPerServing);
-      }
-      return;
-    }
-    
-    const scalingFactor = displayServings / recipe.servings;
+    if (!recipe) return;
+
+    const currentServings = (!isNaN(displayServings) && displayServings > 0) ? displayServings : recipe.servings;
+    const scalingFactor = currentServings / recipe.servings;
 
     const newMacros = {
       calories: recipe.macrosPerServing.calories * scalingFactor,
@@ -109,11 +105,16 @@ export default function RecipeDetailPage() {
     };
     setScaledMacros(newMacros);
     
-    const newIngredients = recipe.ingredients.map(ing => {
-        const newQuantity = ing.quantity * scalingFactor;
+    const newIngredients = recipe.ingredients.map(ingString => {
+        const parsed = parseIngredientString(ingString);
+        if (!parsed.name || parsed.name.toLowerCase() === 'non-item') {
+            return null;
+        }
+        
+        const newQuantity = parsed.quantity * scalingFactor;
         const formattedQuantity = newQuantity % 1 !== 0 ? parseFloat(newQuantity.toFixed(2)) : newQuantity;
-        return `${formattedQuantity} ${ing.unit} ${ing.name}`;
-    });
+        return `${formattedQuantity} ${parsed.unit} ${parsed.name}`;
+    }).filter((ing): ing is string => ing !== null);
 
     setScaledIngredients(newIngredients);
 
@@ -192,7 +193,7 @@ export default function RecipeDetailPage() {
         recipeToModify: {
           name: recipe.name,
           description: recipe.description,
-          ingredients: recipe.ingredients.map(ing => `${ing.quantity} ${ing.unit} ${ing.name}`),
+          ingredients: recipe.ingredients,
           instructions: recipe.instructions,
           tags: recipe.tags,
         },
@@ -252,7 +253,7 @@ export default function RecipeDetailPage() {
   };
   
   const aiHint = recipe && recipe.tags && recipe.tags.length > 0 ? recipe.tags.slice(0, 2).join(' ') : "food meal";
-  const dynamicImageSrc = `/images/${recipeId}.jpg`;
+  const dynamicImageSrc = `/images/recipe-${recipeId}.jpg`;
   const defaultPlaceholder = `https://placehold.co/600x400.png`;
   const imageSrc = imageLoadError ? defaultPlaceholder : dynamicImageSrc;
 
@@ -424,9 +425,9 @@ export default function RecipeDetailPage() {
                 Original Ingredients (for {recipe.servings} servings)
               </h3>
               <ul className="space-y-2 list-disc list-inside bg-muted/20 p-4 rounded-md text-sm text-muted-foreground">
-                {recipe.ingredients.map((ing, index) => (
+                {recipe.ingredients.map((ingredient, index) => (
                   <li key={index}>
-                    {ing.quantity} {ing.unit} {ing.name}
+                    {ingredient}
                   </li>
                 ))}
               </ul>
