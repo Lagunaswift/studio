@@ -450,7 +450,7 @@ export default function RecipeDetailPage() {
         <CardHeader>
           <CardTitle className="font-headline text-primary flex items-center">
             <Bot className="w-6 h-6 mr-2 text-accent" />
-            Pro Coach: Recipe Tweaker
+            Preppy: Recipe Tweaker
           </CardTitle>
           <CardDescription>
             Want to change something? Ask me to modify this recipe for you.

@@ -26,7 +26,7 @@ import type {
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
 import { loadState, saveState } from '@/lib/localStorage';
-import { runProCoach, type ProCoachInput, type ProCoachOutput } from '@/ai/flows/pro-coach-flow';
+import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { format, subDays, differenceInDays } from 'date-fns';
 
 // Default user profile for a fresh start in local mode
@@ -60,7 +60,7 @@ const DEFAULT_USER_PROFILE: UserProfileSettings = {
         showFeaturedRecipe: true,
         showQuickRecipes: true,
     },
-    hasAcceptedTerms: true, // Assume accepted for local dev
+    hasAcceptedTerms: false, // Set to false to trigger modal for local dev
     subscription_status: 'active',
     lastCheckInDate: null,
 };
@@ -131,7 +131,7 @@ interface AppContextType {
   addCustomRecipe: (recipeData: RecipeFormData) => Promise<void>;
   userRecipes: Recipe[];
   acceptTerms: () => Promise<void>;
-  runWeeklyCheckin: () => Promise<{ success: boolean; message: string; recommendation?: ProCoachOutput | null }>;
+  runWeeklyCheckin: () => Promise<{ success: boolean; message: string; recommendation?: PreppyOutput | null }>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -374,7 +374,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateUserProfileInDb({ dailyWeightLog: updatedLogs, weightKg });
   }, [user, userProfile, updateUserProfileInDb]);
   
-  const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: ProCoachOutput | null }> => {
+  const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: PreppyOutput | null }> => {
     if (!userProfile || !userProfile.dailyWeightLog || userProfile.dailyWeightLog.length < 14) {
       return { success: false, message: "At least 14 days of weight and calorie data are needed for an accurate calculation." };
     }
@@ -428,8 +428,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: "Calculation resulted in an invalid TDEE. Check your logged data for consistency." };
     }
     
-    // 2. Prepare and run the Pro Coach AI Flow
-    const proCoachInput: ProCoachInput = {
+    // 2. Prepare and run the Preppy AI Flow
+    const preppyInput: PreppyInput = {
       primaryGoal: userProfile.primaryGoal || 'maintenance',
       targetWeightChangeRateKg: userProfile.targetWeightChangeRateKg || 0,
       dynamicTdee: newDynamicTDEE,
@@ -439,7 +439,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       currentFatTarget: userProfile.macroTargets?.fat || 0,
     };
 
-    const recommendation = await runProCoach(proCoachInput);
+    const recommendation = await runPreppy(preppyInput);
     
     // 3. Update profile with new TDEE and check-in date
     await setUserInformation({ tdee: newDynamicTDEE, lastCheckInDate: format(new Date(), 'yyyy-MM-dd') });

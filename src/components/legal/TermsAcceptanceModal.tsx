@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import Link from 'next/link';
-import { Bot } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 interface TermsAcceptanceModalProps {
   isOpen: boolean;
@@ -31,9 +31,9 @@ export function TermsAcceptanceModal({ isOpen, onAccept }: TermsAcceptanceModalP
         <DialogHeader>
           <div className="flex flex-col items-center text-center">
             <div className="bg-accent/20 p-3 rounded-full mb-4">
-              <Bot className="h-10 w-10 text-accent" />
+              <Sparkles className="h-10 w-10 text-accent" />
             </div>
-            <DialogTitle className="text-2xl font-headline text-primary">Hello! I'm Pro Coach.</DialogTitle>
+            <DialogTitle className="text-2xl font-headline text-primary">Hello! I'm Preppy.</DialogTitle>
             <DialogDescription className="pt-2">
               I'm your AI-powered nutrition assistant. Before we begin, please review and accept the app's terms.
             </DialogDescription>
