@@ -135,11 +135,13 @@ export const parseIngredientString = (ingredientString: string): { name: string;
         const unitMap: { [key: string]: string } = { gram: 'g', kg: 'kg', ml: 'ml', l: 'l', oz: 'oz', tsp: 'tsp', tbsp: 'tbsp', cup: 'cup', pinch: 'pinch', handful: 'handful', clove: 'clove', slice: 'slice', can: 'can' };
         unit = unitStr ? (unitMap[unitStr.replace(/s$/, '')] || unitStr.replace(/s$/, '')) : 'item';
     }
-
-    const descriptors = ['medium', 'small', 'large', 'chopped', 'frozen', 'sliced', 'peeled', 'drained', 'in water', 'finely', 'minced', 'thinly', 'grated', 'natural', 'lean', 'ground', 'fresh', 'smoked', 'liquid', 'mashed', 'plant or dairy', 'peel only', 'rinsed and', 'cooked', 'cut in cubes', 'cut into pieces', 'halved', 'to serve'];
+    
+    // Expanded list of descriptive words to remove from the ingredient name
+    const descriptors = ['medium', 'small', 'large', 'chopped', 'frozen', 'sliced', 'peeled', 'drained', 'in water', 'finely', 'minced', 'thinly', 'grated', 'natural', 'lean', 'ground', 'fresh', 'smoked', 'liquid', 'mashed', 'plant or dairy', 'peel only', 'rinsed and', 'cooked', 'cut in cubes', 'cut into pieces', 'halved'];
     const nameRegex = new RegExp(`\\b(${descriptors.join('|')})\\b`, 'g');
     let name = nameStr.replace(nameRegex, '').replace(/^of\s+/, '').replace(/,/g, '').replace(/\./g, '').replace(/\s+/g, ' ').trim();
 
+    // Comprehensive map to standardize ingredient names for accurate grouping
     const nameMap: { [key: string]: string } = { 'peach': 'peaches', 'banana': 'banana', 'yogurt': 'natural yogurt', 'vanilla whey powder': 'vanilla protein powder', 'salad leaves': 'salad leaves', 'radish': 'radishes', 'tuna': 'tuna', 'bread': 'bread', 'broccoli': 'broccoli', 'parmesan': 'parmesan', 'olive oil': 'olive oil', 'lemon juice': 'lemon juice', 'honey': 'honey', 'potato': 'potato', 'onion': 'onion', 'zucchini': 'zucchini', 'egg': 'egg', 'turkey': 'turkey mince', 'rice': 'rice', 'garlic': 'garlic', 'oil': 'oil', 'tomatoe': 'chopped tomatoes', 'bell pepper': 'red bell pepper', 'vegetable broth': 'vegetable broth', 'kidney beans': 'red kidney beans', 'sweet corn': 'sweet corn', 'cottage cheese': 'cottage cheese', 'watercress': 'watercress', 'lemon': 'lemon', 'soy milk': 'soy milk', 'mixed herbs': 'mixed herbs', 'coconut oil': 'coconut oil', 'salmon': 'smoked salmon', 'egg whites': 'egg whites', 'almond milk': 'almond milk', 'spinach': 'spinach', 'cheese': 'cheese', 'parsley': 'parsley', 'asparagus': 'asparagus', 'feta cheese': 'feta cheese', 'cherry tomatoes': 'cherry tomatoes', 'dill': 'dill', 'blueberries': 'blueberries', 'quinoa': 'quinoa', 'chickpeas': 'chickpeas', 'cucumber': 'cucumber', 'dijon mustard': 'dijon mustard', 'red wine vinegar': 'red wine vinegar', 'lime juice': 'lime juice', 'mango': 'mango', 'kale': 'kale', 'almond butter': 'almond butter', 'coconut water': 'coconut water', 'walnuts': 'walnuts' };
     let standardizedName = name;
     for (const key in nameMap) {
@@ -232,25 +234,25 @@ export function assignCategory(ingredientName: string): UKSupermarketCategory {
 
 export const calculateTrendWeight = (dailyWeightLog: DailyWeightLog[]): DailyWeightLog[] => {
   if (!dailyWeightLog || dailyWeightLog.length < 7) {
-    return dailyWeightLog.map(log => ({...log, trendWeightKg: undefined}));
+    return daily_weight_log.map(log => ({...log, trend_weight_kg: undefined}));
   }
 
-  const sortedLogs = [...dailyWeightLog].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const sorted_logs = [...daily_weight_log].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  const trendWeightData: DailyWeightLog[] = sortedLogs.map((log, index, arr) => {
+  const trend_weight_data: DailyWeightLog[] = sorted_logs.map((log, index, arr) => {
     const start = Math.max(0, index - 3);
     const end = Math.min(arr.length, index + 4);
     
     if (end - start < 4) {
-      return { ...log, trendWeightKg: undefined };
+      return { ...log, trend_weight_kg: undefined };
     }
 
     const window = arr.slice(start, end);
-    const sum = window.reduce((acc, current) => acc + current.weightKg, 0);
-    const trendWeight = sum / window.length;
+    const sum = window.reduce((acc, current) => acc + current.weight_kg, 0);
+    const trend_weight = sum / window.length;
 
-    return { ...log, trendWeightKg: parseFloat(trendWeight.toFixed(2)) };
+    return { ...log, trend_weight_kg: parseFloat(trend_weight.toFixed(2)) };
   });
 
-  return trendWeightData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return trend_weight_data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
