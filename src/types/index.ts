@@ -1,17 +1,15 @@
-
-
-export interface Ingredient {
-  name: string;
-  quantity: number;
-  unit: string;
-  category: string; // e.g., Produce, Dairy, Meat, Pantry
-}
-
 export interface Macros {
   protein: number; // in grams
   carbs: number; // in grams
   fat: number; // in grams
   calories: number;
+}
+
+// Updated Ingredient structure
+export interface Ingredient {
+  name: string;
+  quantity: number;
+  unit: string;
 }
 
 export interface Recipe {
@@ -23,7 +21,7 @@ export interface Recipe {
   prepTime: string;
   cookTime: string;
   chillTime?: string;
-  ingredients: string[];
+  ingredients: Ingredient[]; // <-- UPDATED from string[]
   macrosPerServing: Macros;
   instructions: string[];
   tags?: string[];
