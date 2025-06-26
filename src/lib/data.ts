@@ -26,7 +26,7 @@ const mapToFullRecipe = (rawRecipe: any): Recipe => {
     id: rawRecipe.id,
     name: rawRecipe.name,
     servings: servings,
-    ingredients: Array.isArray(rawRecipe.ingredients) ? rawRecipe.ingredients : [],
+    ingredients: Array.isArray(rawRecipe.ingredients) ? rawRecipe.ingredients : [], // Now expects structured data
     tags: Array.isArray(rawRecipe.tags) ? rawRecipe.tags : [],
     prepTime: typeof rawRecipe.prepTime === 'string' ? rawRecipe.prepTime : "N/A",
     cookTime: typeof rawRecipe.cookTime === 'string' ? rawRecipe.cookTime : "N/A",
@@ -165,17 +165,16 @@ export const generateShoppingList = (
     plannedMeals.forEach(plannedMeal => {
         const recipe = recipesToUse.find(r => r.id === plannedMeal.recipeId);
         if (recipe) {
-            recipe.ingredients.forEach(ingredientString => {
-                const parsed = parseIngredientString(ingredientString);
-                if (!parsed.name || parsed.quantity <= 0 || parsed.name.toLowerCase() === 'non-item') return;
+            recipe.ingredients.forEach(ingredient => { // Now iterates over structured ingredients
+                if (!ingredient.name || ingredient.quantity <= 0 || ingredient.name.toLowerCase() === 'non-item') return;
 
                 const recipeBaseServings = recipe.servings > 0 ? recipe.servings : 1;
-                const quantityPerServing = parsed.quantity / recipeBaseServings;
+                const quantityPerServing = ingredient.quantity / recipeBaseServings;
                 const totalRequired = quantityPerServing * plannedMeal.servings;
 
-                const key = `${parsed.name.toLowerCase()}|${parsed.unit}`;
+                const key = `${ingredient.name.toLowerCase()}|${ingredient.unit}`;
                 let entry = ingredientMap.get(key);
-                if (!entry) { entry = { quantity: 0, unit: parsed.unit, recipes: [] }; }
+                if (!entry) { entry = { quantity: 0, unit: ingredient.unit, recipes: [] }; }
                 entry.quantity += totalRequired;
                 if (!entry.recipes.find(r => r.recipeId === recipe.id)) { entry.recipes.push({ recipeId: recipe.id, recipeName: recipe.name }); }
                 ingredientMap.set(key, entry);
@@ -255,5 +254,3 @@ export const calculateTrendWeight = (dailyWeightLog: DailyWeightLog[]): DailyWei
 
   return trendWeightData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
-
-    
