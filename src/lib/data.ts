@@ -90,36 +90,19 @@ export const parseIngredientString = (ingredientString: string): { name: string;
 
     let workingString = ingredientString.toLowerCase().trim()
         .replace(/[\u00BC-\u00BE\u2150-\u215E]/g, match => ` ${unicodeFractionToNumber(match)} `)
+        .replace(/(\d+)\s*\/\s*(\d+)/g, (match, num, den) => ` ${parseInt(num, 10) / parseInt(den, 10)} `)
         .replace(/\s+/g, ' ');
 
-    // Handle non-shopping list items first
     if (workingString.includes('to taste') || workingString.includes('if needed') || workingString.includes('to serve')) {
-        return { name: 'non-item', quantity: 0, unit: '' };
+        return { name: 'non-item', quantity: 0, unit: 'to taste' };
     }
 
-    // Extract and remove parenthetical information, giving preference to metric units inside
-    let unitFromParentheses: string | null = null;
-    let quantityFromParentheses: number | null = null;
-    workingString = workingString.replace(/\(([^)]+)\)/g, (match, innerContent) => {
-        const parenMatch = innerContent.match(/(\d+(?:\.\d+)?)\s*(g|ml|kg)/);
-        if (parenMatch) {
-            quantityFromParentheses = parseFloat(parenMatch[1]);
-            unitFromParentheses = parenMatch[2];
-        }
-        return '';
-    }).trim();
+    // Comprehensive regex to capture quantity, unit, and name
+    const ingredientRegex = new RegExp(
+        /^(\d+\s\d\/\d|\d+\/\d+|\d+(?:\.\d+)?|\d+)?\s*(tbsps?|cups?|tsps?|g|grams?|kg|kgs?|ml|l|oz|pinch|handfuls?|cloves?|slices?|cans?|big\shandfuls?)?\s*(.*)$/
+    );
 
-
-    const units = [
-        'g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'ml', 'milliliter', 'milliliters',
-        'l', 'liter', 'liters', 'tsp', 'teaspoon', 'teaspoons', 'tbsp', 'tablespoon', 'tablespoons',
-        'cup', 'cups', 'oz', 'ounce', 'ounces', 'pinch', 'handful', 'clove', 'cloves', 'slice', 'slices', 'can', 'cans'
-    ];
-    const unitRegexString = `(?:${units.join('|')})`;
-
-    // Main regex to find quantity, unit, and name
-    const regex = new RegExp(`^(\\d+(?:\\.\\d+)?(?:\\s\\d\\/\\d)?|\\d+\\/\\d+)?\\s*(${unitRegexString})?\\s*(.*)$`);
-    const match = workingString.match(regex);
+    const match = workingString.match(ingredientRegex);
 
     if (!match) {
         return { name: ingredientString.trim(), quantity: 1, unit: 'item' };
@@ -127,107 +110,78 @@ export const parseIngredientString = (ingredientString: string): { name: string;
 
     let [, quantityStr, unitStr, nameStr] = match;
 
-    let quantity: number;
-    let unit: string;
-
-    // --- Quantity & Unit ---
-    if (quantityFromParentheses && unitFromParentheses) {
-        quantity = quantityFromParentheses;
-        unit = unitFromParentheses;
-    } else {
-        quantity = 1;
-        if (quantityStr) {
-            const trimmedQuantityStr = quantityStr.trim();
-            if (trimmedQuantityStr.includes(' ')) { // Handles "1 1/2" type fractions
-                const parts = trimmedQuantityStr.split(' ');
-                quantity = parseInt(parts[0], 10) + eval(parts[1]);
-            } else if (trimmedQuantityStr.includes('/')) {
-                quantity = eval(trimmedQuantityStr);
-            }
-            else {
-                quantity = parseFloat(trimmedQuantityStr);
-            }
+    // --- Quantity Processing ---
+    let quantity = 1;
+    if (quantityStr) {
+        if (quantityStr.includes(' ')) { // Handles "1 1/2"
+            const parts = quantityStr.split(' ');
+            quantity = parseInt(parts[0], 10) + parseFloat(parts[1]);
+        } else {
+            quantity = parseFloat(quantityStr);
         }
-        const unitMap: { [key: string]: string } = {
-            gram: 'g', kg: 'kg', ml: 'ml', l: 'l', oz: 'oz', tsp: 'tsp', tbsp: 'tbsp',
-            cup: 'cup', pinch: 'pinch', handful: 'handful', clove: 'clove', slice: 'slice', can: 'can'
-        };
-        unit = unitStr ? (unitMap[unitStr.replace(/s$/, '')] || unitStr.replace(/s$/, '')) : 'item';
     }
 
-
-    // --- Name ---
-    const descriptors = [
-        'medium', 'small', 'large', 'chopped', 'frozen', 'sliced', 'peeled', 'drained',
-        'in water', 'finely', 'minced', 'thinly', 'grated', 'natural', 'lean', 'ground',
-        'fresh', 'smoked', 'liquid', 'mashed', 'plant or dairy'
-    ];
-    const nameRegex = new RegExp(`\\b(${descriptors.join('|')})\\b`, 'g');
-    let name = nameStr.replace(nameRegex, '').replace(/^of\s+/, '').replace(/,/g, '').replace(/\./g, '').replace(/\s+/g, ' ').trim();
-
-    // Standardize names for better consolidation
-    const nameMap: {[key:string]: string} = {
-      'peach': 'peaches',
-      'banana': 'banana',
-      'yogurt': 'natural yogurt',
-      'vanilla whey powder': 'vanilla protein powder',
-      'salad leaves': 'salad leaves',
-      'radish': 'radishes',
-      'tuna': 'tuna',
-      'bread': 'bread',
-      'broccoli': 'broccoli',
-      'parmesan': 'parmesan',
-      'olive oil': 'olive oil',
-      'lemon juice': 'lemon juice',
-      'honey': 'honey',
-      'potato': 'potato',
-      'onion': 'onion',
-      'zucchini': 'zucchini',
-      'egg': 'egg',
-      'turkey': 'turkey mince',
-      'rice': 'rice',
-      'garlic': 'garlic',
-      'oil': 'oil',
-      'tomatoe': 'chopped tomatoes',
-      'bell pepper': 'red bell pepper',
-      'vegetable broth': 'vegetable broth',
-      'kidney beans': 'red kidney beans',
-      'sweet corn': 'sweet corn',
-      'cottage cheese': 'cottage cheese',
-      'watercress': 'watercress',
-      'lemon peel': 'lemon',
-      'soy milk': 'soy milk',
-      'mixed herbs': 'mixed herbs',
-      'coconut oil': 'coconut oil',
-      'salmon': 'smoked salmon',
-      'egg whites': 'egg whites',
-      'almond milk': 'almond milk',
-      'spinach': 'spinach',
-      'cheese': 'cheese',
-      'parsley': 'parsley',
-      'asparagus': 'asparagus',
-      'feta cheese': 'feta cheese',
-      'cherry tomatoes': 'cherry tomatoes',
-      'dill': 'dill',
-      'blueberries': 'blueberries',
+    // --- Unit Processing ---
+    const unitMap: { [key: string]: string } = {
+        g: 'g', gram: 'g',
+        kg: 'kg', kgs: 'kg',
+        ml: 'ml', l: 'l',
+        oz: 'oz',
+        tsp: 'tsp',
+        tbsp: 'tbsp',
+        cup: 'cup',
+        pinch: 'pinch',
+        handful: 'handful', 'big handful': 'handful',
+        clove: 'clove',
+        slice: 'slice',
+        can: 'can'
     };
-
-    let standardizedName = name;
-    for (const key in nameMap) {
-      if (name.includes(key)) {
-        standardizedName = nameMap[key];
-        break;
-      }
+    let unit = 'item';
+    if (unitStr) {
+      const singularUnit = unitStr.endsWith('s') ? unitStr.slice(0, -1) : unitStr;
+      unit = unitMap[singularUnit] || singularUnit;
     }
+
+
+    // --- Name Processing ---
+    let name = nameStr.replace(/^of\s+/, '').replace(/,/g, '').trim();
+
+    // Handle cases where the unit is still in the name
+    const nameWords = name.split(' ');
+    const potentialUnit = nameWords[0].replace(/s$/, '');
+    if (unit === 'item' && unitMap[potentialUnit]) {
+        unit = unitMap[potentialUnit];
+        name = nameWords.slice(1).join(' ').trim();
+    }
+
+    // Remove trailing 's' for better consolidation, but be careful with words like 'chickpeas'
+    if (!name.endsWith('ss') && name.endsWith('s')) {
+      name = name.slice(0, -1);
+    }
+    
+    if (!name) {
+        return { name: 'Unknown', quantity: 0, unit: ''}; // Avoid blank items
+    }
+
+    // Name standardization
+    const nameMap: {[key: string]: string} = {
+        'salad leave': 'salad leaves',
+        'radish': 'radishes',
+        'potato': 'potatoes',
+        'zucchini': 'zucchini',
+        'red bell pepper': 'red bell pepper',
+        'red kidney bean': 'red kidney beans',
+        'sweet corn': 'sweet corn',
+    };
+    name = nameMap[name] || name;
 
 
     return {
-        name: standardizedName.charAt(0).toUpperCase() + standardizedName.slice(1),
+        name: name.charAt(0).toUpperCase() + name.slice(1),
         quantity: isNaN(quantity) ? 1 : quantity,
         unit: unit,
     };
 };
-
 
 export const generateShoppingList = (
     plannedMeals: PlannedMeal[],
@@ -237,10 +191,11 @@ export const generateShoppingList = (
     const ingredientMap = new Map<string, { quantity: number; unit: string; recipes: { recipeId: number; recipeName: string }[] }>();
     const recipesToUse = recipesSource && recipesSource.length > 0 ? recipesSource : allRecipesCache;
 
+    // Expanded list for better rounding
     const wholeUnitItems = [
         'egg', 'banana', 'apple', 'avocado', 'onion', 'tomato', 'potato', 'zucchini',
-        'pepper', 'lemon', 'lime', 'garlic', 'salmon', 'chicken breast',
-        'radishes', 'peaches', 'bread', 'asparagus', 'bell pepper'
+        'pepper', 'lemon', 'lime', 'garlic clove', 'salmon fillet', 'chicken breast',
+        'radish', 'peach'
     ];
 
     plannedMeals.forEach(plannedMeal => {
@@ -249,22 +204,28 @@ export const generateShoppingList = (
             recipe.ingredients.forEach(ingredientString => {
                 const parsed = parseIngredientString(ingredientString);
 
-                if (!parsed.name || parsed.quantity === 0 || parsed.name.trim() === '' || parsed.name === 'Unknown' || parsed.name === 'Non-item') return;
+                if (!parsed.name || parsed.quantity === 0 || parsed.name.trim() === '' || parsed.name === 'Unknown') return;
 
                 const key = `${parsed.name.toLowerCase()}|${parsed.unit}`;
                 let entry = ingredientMap.get(key);
 
                 if (!entry) {
                     entry = { quantity: 0, unit: parsed.unit, recipes: [] };
+                    ingredientMap.set(key, entry);
                 }
-
-                const servingsMultiplier = plannedMeal.servings / (recipe.servings || 1);
-                entry.quantity += parsed.quantity * servingsMultiplier;
                 
+                // CORRECTED CALCULATION
+                const recipeBaseServings = recipe.servings > 0 ? recipe.servings : 1;
+                const quantityPerServing = parsed.quantity / recipeBaseServings;
+                const totalRequiredForThisMeal = quantityPerServing * (plannedMeal.servings || 1);
+
+                entry.quantity += totalRequiredForThisMeal;
+                // END CORRECTION
+
                 if (!entry.recipes.find(r => r.recipeId === recipe.id)) {
                     entry.recipes.push({ recipeId: recipe.id, recipeName: recipe.name });
                 }
-                ingredientMap.set(key, entry);
+
             });
         }
     });
@@ -273,22 +234,24 @@ export const generateShoppingList = (
     pantryItems.forEach(pantryItem => {
         const key = `${pantryItem.name.toLowerCase()}|${pantryItem.unit}`;
         const requiredItem = ingredientMap.get(key);
+
         if (requiredItem) {
             requiredItem.quantity -= pantryItem.quantity;
-            if (requiredItem.quantity <= 0) {
-                ingredientMap.delete(key);
-            }
         }
     });
 
     const shoppingList: ShoppingListItem[] = [];
     ingredientMap.forEach((value, key) => {
+        if(value.quantity <= 0) return;
+
         const [name] = key.split('|');
 
         const isWholeUnit = wholeUnitItems.some(item => name.toLowerCase().includes(item));
         const finalQuantity = isWholeUnit ? Math.ceil(value.quantity) : value.quantity;
-
+        
+        // Use toFixed(2) for decimal quantities to avoid long numbers, but only if it's not a whole number
         const displayQuantity = finalQuantity % 1 !== 0 ? parseFloat(finalQuantity.toFixed(2)) : finalQuantity;
+
 
         if (displayQuantity <= 0) return;
 
@@ -361,3 +324,5 @@ export const calculateTrendWeight = (dailyWeightLog: DailyWeightLog[]): DailyWei
   // Return sorted descending to match expected order in AppContext
   return trendWeightData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
+
+    
