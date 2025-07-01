@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import type React from 'react';
@@ -118,6 +116,7 @@ interface AppContextType {
   getPlannedMacrosForDate: (date: string) => Macros;
   toggleShoppingListItem: (itemId: string) => Promise<void>;
   clearMealPlanForDate: (date: string) => Promise<void>;
+  clearEntireMealPlan: () => Promise<void>;
   clearAllData: () => Promise<void>;
   getMealsForDate: (date: string) => PlannedMeal[];
   setMacroTargets: (targets: MacroTargets) => Promise<void>;
@@ -231,6 +230,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const clearMealPlanForDate = useCallback(async (date: string) => {
     if (!user) return;
     setMealPlan(prev => prev.filter(pm => pm.date !== date));
+  }, [user]);
+
+  const clearEntireMealPlan = useCallback(async () => {
+    if (!user) return;
+    setMealPlan([]);
   }, [user]);
   
   const updateUserProfileInDb = useCallback(async (updates: Partial<UserProfileSettings>) => {
@@ -498,7 +502,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUserInformation, isRecipeCacheLoading, isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe,
     isRecipeFavorite, addPantryItem, removePantryItem, updatePantryItemQuantity,
     parseIngredient, assignIngredientCategory, addCustomRecipe, userRecipes, setDashboardSettings,
-    acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin, logWellness, logVitals
+    acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin, logWellness, logVitals,
+    clearEntireMealPlan
   }), [
     mealPlan, shoppingList, pantryItems, userProfile, allRecipesCache, addMealToPlan, removeMealFromPlan,
     updatePlannedMealServings, getConsumedMacrosForDate, toggleShoppingListItem,
@@ -506,7 +511,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDietaryPreferences, setAllergens, setMealStructure, setUserInformation, isRecipeCacheLoading,
     isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe, isRecipeFavorite,
     addPantryItem, removePantryItem, updatePantryItemQuantity, parseIngredient, assignIngredientCategory,
-    addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin, logWellness, logVitals
+    addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin, logWellness, logVitals,
+    clearEntireMealPlan
   ]);
   
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
