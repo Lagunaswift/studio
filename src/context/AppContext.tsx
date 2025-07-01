@@ -22,6 +22,9 @@ import type {
   DashboardSettings,
   UKSupermarketCategory,
   DailyWeightLog,
+  Mood,
+  Energy,
+  DailyWellnessLog
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
@@ -54,6 +57,7 @@ const DEFAULT_USER_PROFILE: UserProfileSettings = {
     tdee: null,
     leanBodyMassKg: null,
     dailyWeightLog: [],
+    dailyWellnessLog: [],
     dashboardSettings: {
         showMacros: true,
         showMenu: true,
@@ -106,6 +110,7 @@ interface AppContextType {
   updatePlannedMealServings: (plannedMealId: string, newServings: number) => Promise<void>;
   updateMealStatus: (plannedMealId: string, status: 'planned' | 'eaten') => Promise<void>;
   logWeight: (date: string, weightKg: number) => Promise<void>;
+  logWellness: (date: string, mood: Mood, energy: Energy) => Promise<void>;
   getConsumedMacrosForDate: (date: string) => Macros;
   getPlannedMacrosForDate: (date: string) => Macros;
   toggleShoppingListItem: (itemId: string) => Promise<void>;
@@ -303,10 +308,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cookTime: recipeData.cookTime,
         chillTime: recipeData.chillTime,
         ingredients: recipeData.ingredients.map(ing => ing.value),
-        instructions: recipeData.instructions.map(inst => inst.value),
         macrosPerServing: {
           calories: recipeData.calories, protein: recipeData.protein, carbs: recipeData.carbs, fat: recipeData.fat,
         },
+        instructions: recipeData.instructions.map(inst => inst.value),
         tags: recipeData.tags,
         isCustom: true,
     };
@@ -374,6 +379,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateUserProfileInDb({ dailyWeightLog: updatedLogs, weightKg });
   }, [user, userProfile, updateUserProfileInDb]);
   
+  const logWellness = useCallback(async (date: string, mood: Mood, energy: Energy) => {
+    if (!userProfile || !user) return;
+    const newLogEntry: DailyWellnessLog = { date, mood, energy };
+
+    const currentLogs = userProfile.dailyWellnessLog || [];
+    const existingLogIndex = currentLogs.findIndex(log => log.date === date);
+
+    let updatedLogs: DailyWellnessLog[];
+    if (existingLogIndex > -1) {
+        updatedLogs = [...currentLogs];
+        updatedLogs[existingLogIndex] = newLogEntry;
+    } else {
+        updatedLogs = [...currentLogs, newLogEntry];
+    }
+
+    updatedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    updateUserProfileInDb({ dailyWellnessLog: updatedLogs });
+  }, [user, userProfile, updateUserProfileInDb]);
+
   const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: PreppyOutput | null }> => {
     if (!userProfile || !userProfile.dailyWeightLog || userProfile.dailyWeightLog.length < 14) {
       return { success: false, message: "At least 14 days of weight and calorie data are needed for an accurate calculation." };
@@ -455,7 +480,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUserInformation, isRecipeCacheLoading, isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe,
     isRecipeFavorite, addPantryItem, removePantryItem, updatePantryItemQuantity,
     parseIngredient, assignIngredientCategory, addCustomRecipe, userRecipes, setDashboardSettings,
-    acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin,
+    acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin, logWellness,
   }), [
     mealPlan, shoppingList, pantryItems, userProfile, allRecipesCache, addMealToPlan, removeMealFromPlan,
     updatePlannedMealServings, getConsumedMacrosForDate, toggleShoppingListItem,
@@ -463,7 +488,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDietaryPreferences, setAllergens, setMealStructure, setUserInformation, isRecipeCacheLoading,
     isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe, isRecipeFavorite,
     addPantryItem, removePantryItem, updatePantryItemQuantity, parseIngredient, assignIngredientCategory,
-    addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin
+    addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin, logWellness,
   ]);
   
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
@@ -476,3 +501,5 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
+    

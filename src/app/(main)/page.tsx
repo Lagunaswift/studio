@@ -2,11 +2,11 @@
 "use client";
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Target, Edit, Star, Loader2, CalendarCheck, PlusCircle, UtensilsCrossed, Zap, SlidersHorizontal, Scale, Save } from 'lucide-react';
+import { Target, Edit, Star, Loader2, CalendarCheck, PlusCircle, UtensilsCrossed, Zap, SlidersHorizontal, Scale, Save, Frown, Meh, Smile, BatteryLow, BatteryMedium, BatteryFull, CheckCircle2 } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { format, parseISO, isValid } from 'date-fns';
@@ -17,12 +17,14 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import type { MacroTargets, Macros, Recipe, PlannedMeal } from '@/types';
+import type { MacroTargets, Macros, Recipe, PlannedMeal, Mood, Energy } from '@/types';
 import { RecipeCard } from '@/components/shared/RecipeCard';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { cn } from '@/lib/utils';
+
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import {
@@ -52,6 +54,116 @@ const chartConfig = {
   consumed: { label: "Consumed", color: "hsl(var(--chart-1))" },
   target: { label: "Target", color: "hsl(var(--chart-2))" },
 } satisfies ChartConfig;
+
+
+function DailyWellnessCheckin() {
+  const { userProfile, logWellness } = useAppContext();
+  const { toast } = useToast();
+  const clientTodayDate = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+  
+  const todayLog = useMemo(() => 
+    userProfile?.dailyWellnessLog?.find(log => log.date === clientTodayDate),
+    [userProfile?.dailyWellnessLog, clientTodayDate]
+  );
+
+  const [mood, setMood] = useState<Mood | null>(todayLog?.mood || null);
+  const [energy, setEnergy] = useState<Energy | null>(todayLog?.energy || null);
+  const [isLoggedToday, setIsLoggedToday] = useState(!!todayLog);
+
+  useEffect(() => {
+    const todayLog = userProfile?.dailyWellnessLog?.find(log => log.date === clientTodayDate);
+    if (todayLog) {
+      setMood(todayLog.mood);
+      setEnergy(todayLog.energy);
+      setIsLoggedToday(true);
+    } else {
+      setIsLoggedToday(false);
+      setMood(null);
+      setEnergy(null);
+    }
+  }, [userProfile?.dailyWellnessLog, clientTodayDate]);
+
+  const handleLogWellness = async () => {
+    if (mood && energy) {
+      await logWellness(clientTodayDate, mood, energy);
+      toast({
+        title: "Wellness Logged",
+        description: "Your mood and energy for today have been saved.",
+      });
+      setIsLoggedToday(true);
+    }
+  };
+
+  const moodOptions: { value: Mood; label: string; icon: React.ElementType }[] = [
+    { value: 'stressed', label: 'Stressed', icon: Frown },
+    { value: 'okay', label: 'Okay', icon: Meh },
+    { value: 'great', label: 'Great', icon: Smile },
+  ];
+
+  const energyOptions: { value: Energy; label: string; icon: React.ElementType }[] = [
+    { value: 'low', label: 'Low', icon: BatteryLow },
+    { value: 'medium', label: 'Medium', icon: BatteryMedium },
+    { value: 'high', label: 'High', icon: BatteryFull },
+  ];
+
+  return (
+    <Card className="shadow-md">
+      <CardHeader>
+        <CardTitle className="text-xl font-bold font-headline text-primary flex items-center">
+          <CheckCircle2 className="mr-2 h-5 w-5 text-accent" /> Daily Check-in
+        </CardTitle>
+        <CardDescription>How are you feeling today?</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div>
+          <FormLabel>Mood</FormLabel>
+          <div className="flex justify-between gap-2 mt-2">
+            {moodOptions.map(({ value, label, icon: Icon }) => (
+              <Button
+                key={value}
+                variant={mood === value ? 'default' : 'outline'}
+                onClick={() => setMood(value)}
+                className="flex-1"
+                disabled={isLoggedToday}
+              >
+                <Icon className="mr-2 h-5 w-5" /> {label}
+              </Button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <FormLabel>Energy</FormLabel>
+          <div className="flex justify-between gap-2 mt-2">
+            {energyOptions.map(({ value, label, icon: Icon }) => (
+              <Button
+                key={value}
+                variant={energy === value ? 'default' : 'outline'}
+                onClick={() => setEnergy(value)}
+                className="flex-1"
+                disabled={isLoggedToday}
+              >
+                <Icon className="mr-2 h-5 w-5" /> {label}
+              </Button>
+            ))}
+          </div>
+        </div>
+        {isLoggedToday ? (
+          <Alert variant="default" className="border-green-500/50 text-center">
+            <CheckCircle2 className="h-4 w-4" />
+            <AlertTitle>Logged for Today!</AlertTitle>
+            <AlertDescription className="text-xs">
+              Come back tomorrow to log again.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Button onClick={handleLogWellness} disabled={!mood || !energy} className="w-full">
+            <Save className="mr-2 h-4 w-4" /> Log Wellness
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 
 export default function HomePage() {
@@ -128,7 +240,7 @@ export default function HomePage() {
     if (appContextUserProfile) {
       weightLogForm.reset({ weightKg: appContextUserProfile.weightKg || '' });
     }
-  }, [appContextUserProfile, weightLogForm.reset]);
+  }, [appContextUserProfile, weightLogForm]);
 
 
   const proteinValue = macroTargetForm.watch("protein");
@@ -367,6 +479,8 @@ export default function HomePage() {
                     </CardContent>
                 </Card>
 
+                <DailyWellnessCheckin />
+
                  {showQuickRecipes && (
                     <section>
                     <h2 className="text-2xl font-bold font-headline text-primary mb-4 flex items-center">
@@ -470,3 +584,5 @@ export default function HomePage() {
     </PageWrapper>
   );
 }
+
+    
