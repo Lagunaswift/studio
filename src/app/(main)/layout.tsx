@@ -30,7 +30,7 @@ import { SheetTitle } from '@/components/ui/sheet';
 import { 
   UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, 
   PanelLeft, Target, Leaf, ListChecks, UserCog, UserCircle2, 
-  BookOpen, Archive, Bot, SlidersHorizontal, Search, LogOut, FileText, Shield, CheckSquare, Settings, TrendingUp, ChefHat
+  BookOpen, Archive, Bot, SlidersHorizontal, Search, LogOut, FileText, Shield, CheckSquare, Settings, TrendingUp, ChefHat, ClipboardList
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -61,6 +61,7 @@ const recipesNavItems: NavItem[] = [
 ];
 
 const progressNavItems: NavItem[] = [
+    { href: '/daily-log', label: 'Daily Log', icon: ClipboardList },
     { href: '/profile/targets', label: 'My Goals & Targets', icon: Target },
     { href: '/weekly-check-in', label: 'Preppy: Weekly Check-in', icon: CheckSquare },
 ];
