@@ -24,7 +24,8 @@ import type {
   DailyWeightLog,
   Mood,
   Energy,
-  DailyWellnessLog
+  DailyVitalsLog,
+  DailyWellnessLog,
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
@@ -58,6 +59,7 @@ const DEFAULT_USER_PROFILE: UserProfileSettings = {
     leanBodyMassKg: null,
     dailyWeightLog: [],
     dailyWellnessLog: [],
+    dailyVitalsLog: [], // Added for new feature
     dashboardSettings: {
         showMacros: true,
         showMenu: true,
@@ -111,6 +113,7 @@ interface AppContextType {
   updateMealStatus: (plannedMealId: string, status: 'planned' | 'eaten') => Promise<void>;
   logWeight: (date: string, weightKg: number) => Promise<void>;
   logWellness: (date: string, mood: Mood, energy: Energy) => Promise<void>;
+  logVitals: (date: string, vitals: Omit<DailyVitalsLog, 'date'>) => Promise<void>; // New function
   getConsumedMacrosForDate: (date: string) => Macros;
   getPlannedMacrosForDate: (date: string) => Macros;
   toggleShoppingListItem: (itemId: string) => Promise<void>;
@@ -357,25 +360,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!userProfile || !user) return;
     const newLogEntry: DailyWeightLog = { date, weightKg };
     
-    // Ensure dailyWeightLog is an array
     const currentLogs = userProfile.dailyWeightLog || [];
-    
     const existingLogIndex = currentLogs.findIndex(log => log.date === date);
 
     let updatedLogs: DailyWeightLog[];
     if (existingLogIndex > -1) {
-        // Update existing entry
         updatedLogs = [...currentLogs];
         updatedLogs[existingLogIndex] = newLogEntry;
     } else {
-        // Add new entry
         updatedLogs = [...currentLogs, newLogEntry];
     }
 
-    // Sort logs by date descending
     updatedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    // Update the profile state
     updateUserProfileInDb({ dailyWeightLog: updatedLogs, weightKg });
   }, [user, userProfile, updateUserProfileInDb]);
   
@@ -398,6 +395,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     updateUserProfileInDb({ dailyWellnessLog: updatedLogs });
   }, [user, userProfile, updateUserProfileInDb]);
+
+  const logVitals = useCallback(async (date: string, vitals: Omit<DailyVitalsLog, 'date'>) => {
+    if (!userProfile || !user) return;
+    const newLogEntry: DailyVitalsLog = { date, ...vitals };
+
+    const currentLogs = userProfile.dailyVitalsLog || [];
+    const existingLogIndex = currentLogs.findIndex(log => log.date === date);
+
+    let updatedLogs: DailyVitalsLog[];
+    if (existingLogIndex > -1) {
+        updatedLogs = [...currentLogs];
+        updatedLogs[existingLogIndex] = newLogEntry;
+    } else {
+        updatedLogs = [...currentLogs, newLogEntry];
+    }
+    
+    updatedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    updateUserProfileInDb({ dailyVitalsLog: updatedLogs });
+  }, [user, userProfile, updateUserProfileInDb]);
+
 
   const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: PreppyOutput | null }> => {
     if (!userProfile || !userProfile.dailyWeightLog || userProfile.dailyWeightLog.length < 14) {
@@ -480,7 +498,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUserInformation, isRecipeCacheLoading, isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe,
     isRecipeFavorite, addPantryItem, removePantryItem, updatePantryItemQuantity,
     parseIngredient, assignIngredientCategory, addCustomRecipe, userRecipes, setDashboardSettings,
-    acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin, logWellness,
+    acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin, logWellness, logVitals
   }), [
     mealPlan, shoppingList, pantryItems, userProfile, allRecipesCache, addMealToPlan, removeMealFromPlan,
     updatePlannedMealServings, getConsumedMacrosForDate, toggleShoppingListItem,
@@ -488,7 +506,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDietaryPreferences, setAllergens, setMealStructure, setUserInformation, isRecipeCacheLoading,
     isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe, isRecipeFavorite,
     addPantryItem, removePantryItem, updatePantryItemQuantity, parseIngredient, assignIngredientCategory,
-    addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin, logWellness,
+    addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin, logWellness, logVitals
   ]);
   
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
