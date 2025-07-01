@@ -1,3 +1,4 @@
+
 export interface Macros {
   protein: number; // in grams
   carbs: number; // in grams
@@ -142,6 +143,15 @@ export interface DailyWeightLog {
   trendWeightKg?: number;
 }
 
+export type Mood = 'stressed' | 'okay' | 'great';
+export type Energy = 'low' | 'medium' | 'high';
+
+export interface DailyWellnessLog {
+  date: string; // YYYY-MM-DD
+  mood: Mood;
+  energy: Energy;
+}
+
 export interface UserProfileSettings {
   name?: string | null;
   email?: string | null;
@@ -165,6 +175,7 @@ export interface UserProfileSettings {
   waistCircumferenceCm?: number | null;   // Female
   hipCircumferenceCm?: number | null;     // Female
   dailyWeightLog?: DailyWeightLog[];
+  dailyWellnessLog?: DailyWellnessLog[];
   dashboardSettings?: DashboardSettings;
   favorite_recipe_ids?: number[];
   subscription_status: SubscriptionStatus;
@@ -194,3 +205,5 @@ export interface RecipeFormData {
   fat: number;
   tags?: string[];
 }
+
+    
