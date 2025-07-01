@@ -116,7 +116,7 @@ function DailyWellnessCheckin() {
       </CardHeader>
       <CardContent className="space-y-6">
         <div>
-          <FormLabel>Mood</FormLabel>
+          <Label>Mood</Label>
           <div className="flex justify-between gap-2 mt-2">
             {moodOptions.map(({ value, label, icon: Icon }) => (
               <Button
@@ -132,7 +132,7 @@ function DailyWellnessCheckin() {
           </div>
         </div>
         <div>
-          <FormLabel>Energy</FormLabel>
+          <Label>Energy</Label>
           <div className="flex justify-between gap-2 mt-2">
             {energyOptions.map(({ value, label, icon: Icon }) => (
               <Button
