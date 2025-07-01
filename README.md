@@ -1,3 +1,4 @@
+
 # MealPlannerPro
 
 ## 🚀 Your Intelligent Adaptive Nutrition Coach
@@ -56,20 +57,20 @@ Fine-tune every aspect of your nutrition journey.
 ## 🗺️ The User Journey: How to Get Started
 
 1.  **Set Up Your Profile**: The more information you provide, the better the app works.
-    - Go to `Settings` -> `My Profile` and fill out your user info.
-    - Go to `Settings` -> `Diet & Allergens` to set your preferences.
-    - Go to `Settings` -> `Meal Structure` to define your daily meals.
-    - Go to `Progress` -> `My Goals & Targets` to set your initial macro goals using the Goal Calculator.
+    - Go to \`Settings\` -> \`My Profile\` and fill out your user info.
+    - Go to \`Settings\` -> \`Diet & Allergens\` to set your preferences.
+    - Go to \`Settings\` -> \`Meal Structure\` to define your daily meals.
+    - Go to \`Settings\` -> \`My Goals & Targets\` to set your initial macro goals using the Goal Calculator.
 
-2.  **Build Your Recipe Book**: Navigate to `Recipes` -> `My Saved Recipes` and click "Add New Recipe" to start populating your collection.
+2.  **Build Your Recipe Book**: Navigate to \`Recipes\` -> \`My Saved Recipes\` and click "Add New Recipe" to start populating your collection.
 
-3.  **Plan Your Week**: Use the `Daily/Weekly View` under the `Plan` section to manually add recipes, or let the `Preppy: Plan Generator` create a plan for you.
+3.  **Plan Your Week**: Use the \`Daily/Weekly View\` under the \`Plan\` section to manually add recipes, or let the \`Preppy: Plan Generator\` create a plan for you.
 
 4.  **Track Your Progress**:
-    - Log your weight daily on the `Dashboard`.
-    - Mark meals as "eaten" on the `Meal Plan` page. This is crucial for the weekly check-in feature.
+    - Log your weight daily on the \`Dashboard\`.
+    - Mark meals as "eaten" on the \`Meal Plan\` page. This is crucial for the weekly check-in feature.
 
-5.  **Check In & Adapt**: After logging data for 14 days, visit the `Preppy: Weekly Check-in` page under `Progress`. Run the check-in, review Preppy's recommendations, and click "Accept" to automatically update your macro targets for the week ahead.
+5.  **Check In & Adapt**: After logging data for 14 days, visit the \`Preppy: Weekly Check-in\` page under \`Progress\`. Run the check-in, review Preppy's recommendations, and click "Accept" to automatically update your macro targets for the week ahead.
 
 ---
 
@@ -88,14 +89,14 @@ Fine-tune every aspect of your nutrition journey.
 
 To get started, clone the repository and install the dependencies:
 
-```bash
+\`\`\`bash
 npm install
-```
+\`\`\`
 
 Then, run the development server:
 
-```bash
+\`\`\`bash
 npm run dev
-```
+\`\`\`
 
 Open [http://localhost:9002](http://localhost:9002) with your browser to see the result.
