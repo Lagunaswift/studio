@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -46,15 +45,15 @@ interface RecipeShoppingGroup {
 }
 
 export default function ShoppingListPage() {
-  const { shoppingList, toggleShoppingListItem, clearAllData, mealPlan, allRecipesCache } = useAppContext();
+  const { shoppingList, toggleShoppingListItem, clearEntireMealPlan, mealPlan, allRecipesCache } = useAppContext();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"aisle" | "recipe">("aisle");
 
   const handleClearList = () => {
-    clearAllData(); 
+    clearEntireMealPlan(); 
     toast({
-      title: "Shopping List Cleared",
-      description: "Your shopping list and meal plan have been cleared.",
+      title: "Meal Plan Cleared",
+      description: "Your meal plan and shopping list have been cleared.",
     });
   };
 
@@ -136,14 +135,14 @@ export default function ShoppingListPage() {
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive">
-                    <Trash2 className="mr-2 h-4 w-4" /> Clear List & Plan
+                    <Trash2 className="mr-2 h-4 w-4" /> Clear List &amp; Plan
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action will clear your entire shopping list and meal plan. This cannot be undone.
+                      This action will clear your entire meal plan. This cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
