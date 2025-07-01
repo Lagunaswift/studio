@@ -1,4 +1,5 @@
 
+
 export interface Macros {
   protein: number; // in grams
   carbs: number; // in grams
@@ -152,6 +153,23 @@ export interface DailyWellnessLog {
   energy: Energy;
 }
 
+// --- New Types for Daily Vitals Check-in ---
+export type EnergyLevelV2 = 'low' | 'moderate' | 'high' | 'vibrant';
+export type SorenessLevel = 'none' | 'mild' | 'moderate' | 'severe';
+export type ActivityYesterdayLevel = 'rest' | 'light' | 'moderate' | 'strenuous';
+
+export interface DailyVitalsLog {
+  date: string; // YYYY-MM-DD
+  sleepQuality: number; // 1-10
+  energyLevel: EnergyLevelV2;
+  cravingsLevel: number; // 1-10
+  muscleSoreness: SorenessLevel;
+  activityYesterday: ActivityYesterdayLevel;
+  notes?: string;
+}
+// --- End of New Types ---
+
+
 export interface UserProfileSettings {
   name?: string | null;
   email?: string | null;
@@ -176,6 +194,7 @@ export interface UserProfileSettings {
   hipCircumferenceCm?: number | null;     // Female
   dailyWeightLog?: DailyWeightLog[];
   dailyWellnessLog?: DailyWellnessLog[];
+  dailyVitalsLog?: DailyVitalsLog[]; // Added for new feature
   dashboardSettings?: DashboardSettings;
   favorite_recipe_ids?: number[];
   subscription_status: SubscriptionStatus;

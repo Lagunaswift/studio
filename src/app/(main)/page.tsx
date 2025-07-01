@@ -5,23 +5,27 @@ import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Target, Edit, Star, Loader2, CalendarCheck, PlusCircle, UtensilsCrossed, Zap, SlidersHorizontal, Scale, Save, Frown, Meh, Smile, BatteryLow, BatteryMedium, BatteryFull, CheckCircle2 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Target, Edit, Star, Loader2, CalendarCheck, PlusCircle, UtensilsCrossed, Zap, SlidersHorizontal, Scale, Save, Frown, Meh, Smile, BatteryLow, BatteryMedium, BatteryFull, CheckCircle2, Moon, Sun, Utensils, Droplets, BookOpen, BrainCircuit } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { format, parseISO, isValid } from 'date-fns';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useForm, SubmitHandler } from 'react-hook-form';
+import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Slider } from '@/components/ui/slider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import type { MacroTargets, Macros, Recipe, PlannedMeal, Mood, Energy } from '@/types';
+import type { MacroTargets, Macros, Recipe, PlannedMeal, Mood, Energy, DailyVitalsLog, EnergyLevelV2, SorenessLevel, ActivityYesterdayLevel } from '@/types';
 import { RecipeCard } from '@/components/shared/RecipeCard';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { cn } from '@/lib/utils';
 
@@ -50,119 +54,287 @@ const weightLogSchema = z.object({
 });
 type WeightLogFormValues = z.infer<typeof weightLogSchema>;
 
+const vitalsSchema = z.object({
+  sleepQuality: z.coerce.number().min(1).max(10),
+  energyLevel: z.enum(['low', 'moderate', 'high', 'vibrant']),
+  cravingsLevel: z.coerce.number().min(1).max(10),
+  muscleSoreness: z.enum(['none', 'mild', 'moderate', 'severe']),
+  activityYesterday: z.enum(['rest', 'light', 'moderate', 'strenuous']),
+  notes: z.string().max(500, "Notes must be under 500 characters.").optional(),
+});
+type VitalsFormValues = z.infer<typeof vitalsSchema>;
+
 const chartConfig = {
   consumed: { label: "Consumed", color: "hsl(var(--chart-1))" },
   target: { label: "Target", color: "hsl(var(--chart-2))" },
 } satisfies ChartConfig;
 
 
-function DailyWellnessCheckin() {
-  const { userProfile, logWellness } = useAppContext();
+function DailyVitalsCheckin() {
+  const { userProfile, logVitals } = useAppContext();
   const { toast } = useToast();
+  const [isOpen, setIsOpen] = useState(false);
   const clientTodayDate = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   
   const todayLog = useMemo(() => 
-    userProfile?.dailyWellnessLog?.find(log => log.date === clientTodayDate),
-    [userProfile?.dailyWellnessLog, clientTodayDate]
+    userProfile?.dailyVitalsLog?.find(log => log.date === clientTodayDate),
+    [userProfile?.dailyVitalsLog, clientTodayDate]
   );
-
-  const [mood, setMood] = useState<Mood | null>(todayLog?.mood || null);
-  const [energy, setEnergy] = useState<Energy | null>(todayLog?.energy || null);
-  const [isLoggedToday, setIsLoggedToday] = useState(!!todayLog);
-
+  
+  const form = useForm<VitalsFormValues>({
+    resolver: zodResolver(vitalsSchema),
+    defaultValues: {
+      sleepQuality: todayLog?.sleepQuality || 7,
+      energyLevel: todayLog?.energyLevel || 'moderate',
+      cravingsLevel: todayLog?.cravingsLevel || 5,
+      muscleSoreness: todayLog?.muscleSoreness || 'none',
+      activityYesterday: todayLog?.activityYesterday || 'light',
+      notes: todayLog?.notes || ''
+    }
+  });
+  
   useEffect(() => {
-    const todayLog = userProfile?.dailyWellnessLog?.find(log => log.date === clientTodayDate);
     if (todayLog) {
-      setMood(todayLog.mood);
-      setEnergy(todayLog.energy);
-      setIsLoggedToday(true);
-    } else {
-      setIsLoggedToday(false);
-      setMood(null);
-      setEnergy(null);
+      form.reset(todayLog);
     }
-  }, [userProfile?.dailyWellnessLog, clientTodayDate]);
+  }, [todayLog, form]);
 
-  const handleLogWellness = async () => {
-    if (mood && energy) {
-      await logWellness(clientTodayDate, mood, energy);
-      toast({
-        title: "Wellness Logged",
-        description: "Your mood and energy for today have been saved.",
-      });
-      setIsLoggedToday(true);
-    }
+  const onSubmit: SubmitHandler<VitalsFormValues> = async (data) => {
+    await logVitals(clientTodayDate, data);
+    toast({
+      title: "Vitals Logged",
+      description: "Your daily vitals have been saved. Preppy will use this to provide better insights!",
+    });
+    setIsOpen(false);
   };
 
-  const moodOptions: { value: Mood; label: string; icon: React.ElementType }[] = [
-    { value: 'stressed', label: 'Stressed', icon: Frown },
-    { value: 'okay', label: 'Okay', icon: Meh },
-    { value: 'great', label: 'Great', icon: Smile },
+  const energyOptions: { value: EnergyLevelV2, label: string }[] = [
+    { value: 'low', label: 'Low' }, { value: 'moderate', label: 'Moderate' },
+    { value: 'high', label: 'High' }, { value: 'vibrant', label: 'Vibrant' },
+  ];
+  
+  const sorenessOptions: { value: SorenessLevel, label: string }[] = [
+    { value: 'none', label: 'None' }, { value: 'mild', label: 'Mild' },
+    { value: 'moderate', label: 'Moderate' }, { value: 'severe', label: 'Severe (DOMS)' },
+  ];
+  
+  const activityOptions: { value: ActivityYesterdayLevel, label: string }[] = [
+    { value: 'rest', label: 'Rest Day' }, { value: 'light', label: 'Light Activity (e.g., walk)' },
+    { value: 'moderate', label: 'Moderate Exercise (e.g., gym)' }, { value: 'strenuous', label: 'Strenuous Exercise (e.g., HIIT)' },
   ];
 
-  const energyOptions: { value: Energy; label: string; icon: React.ElementType }[] = [
-    { value: 'low', label: 'Low', icon: BatteryLow },
-    { value: 'medium', label: 'Medium', icon: BatteryMedium },
-    { value: 'high', label: 'High', icon: BatteryFull },
-  ];
+  if (todayLog) {
+    return (
+      <Card className="shadow-md">
+        <CardHeader>
+          <CardTitle className="text-xl font-bold font-headline text-primary flex items-center">
+            <CheckCircle2 className="mr-2 h-5 w-5 text-green-500" /> Daily Vitals Logged
+          </CardTitle>
+          <CardDescription>You're all checked in for today. Great job!</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <p><strong>Sleep:</strong> {todayLog.sleepQuality}/10</p>
+            <p><strong>Energy:</strong> <span className="capitalize">{todayLog.energyLevel}</span></p>
+            <p><strong>Recovery:</strong> <span className="capitalize">{todayLog.muscleSoreness}</span></p>
+        </CardContent>
+        <CardFooter>
+           <Button variant="outline" onClick={() => setIsOpen(true)}>Edit Today's Vitals</Button>
+        </CardFooter>
+      </Card>
+    )
+  }
 
   return (
-    <Card className="shadow-md">
-      <CardHeader>
-        <CardTitle className="text-xl font-bold font-headline text-primary flex items-center">
-          <CheckCircle2 className="mr-2 h-5 w-5 text-accent" /> Daily Check-in
-        </CardTitle>
-        <CardDescription>How are you feeling today?</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div>
-          <Label>Mood</Label>
-          <div className="flex justify-between gap-2 mt-2">
-            {moodOptions.map(({ value, label, icon: Icon }) => (
-              <Button
-                key={value}
-                variant={mood === value ? 'default' : 'outline'}
-                onClick={() => setMood(value)}
-                className="flex-1"
-                disabled={isLoggedToday}
-              >
-                <Icon className="mr-2 h-5 w-5" /> {label}
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Card className="shadow-md">
+        <CardHeader>
+          <CardTitle className="text-xl font-bold font-headline text-primary flex items-center">
+            <BrainCircuit className="mr-2 h-5 w-5 text-accent" /> Log Today's Vitals
+          </CardTitle>
+          <CardDescription>Check in daily to help Preppy provide smarter coaching.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <p className="text-sm text-muted-foreground">Log how you feel today to track trends and get better insights.</p>
+        </CardContent>
+        <CardFooter>
+          <DialogTrigger asChild>
+            <Button className="w-full">Log Vitals</Button>
+          </DialogTrigger>
+        </CardFooter>
+      </Card>
+
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Daily Vitals Check-in</DialogTitle>
+          <DialogDescription>
+            Take a moment to reflect on your sleep, energy, and recovery.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
+             <FormField
+                control={form.control}
+                name="sleepQuality"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sleep Quality (1-10)</FormLabel>
+                    <FormControl>
+                        <div className="flex items-center gap-4">
+                            <span className="text-xs text-muted-foreground">Restless</span>
+                            <Controller
+                                name="sleepQuality"
+                                control={form.control}
+                                render={({ field: controllerField }) => (
+                                    <Slider
+                                        defaultValue={[controllerField.value]}
+                                        onValueChange={(value) => controllerField.onChange(value[0])}
+                                        max={10} min={1} step={1}
+                                        className="flex-1"
+                                    />
+                                )}
+                            />
+                            <span className="text-xs text-muted-foreground">Perfect</span>
+                        </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+            <FormField
+              control={form.control}
+              name="energyLevel"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>Morning Energy Level</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="grid grid-cols-2 gap-4"
+                    >
+                      {energyOptions.map(opt => (
+                        <FormItem key={opt.value} className="flex items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value={opt.value} />
+                          </FormControl>
+                          <FormLabel className="font-normal">{opt.label}</FormLabel>
+                        </FormItem>
+                      ))}
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="cravingsLevel"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Appetite / Cravings (1-10)</FormLabel>
+                  <FormControl>
+                    <div className="flex items-center gap-4">
+                        <span className="text-xs text-muted-foreground">None</span>
+                        <Controller
+                            name="cravingsLevel"
+                            control={form.control}
+                            render={({ field: controllerField }) => (
+                                <Slider
+                                    defaultValue={[controllerField.value]}
+                                    onValueChange={(value) => controllerField.onChange(value[0])}
+                                    max={10} min={1} step={1}
+                                    className="flex-1"
+                                />
+                            )}
+                        />
+                        <span className="text-xs text-muted-foreground">Ravenous</span>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="muscleSoreness"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>Muscle Soreness / Recovery</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="grid grid-cols-2 gap-4"
+                    >
+                      {sorenessOptions.map(opt => (
+                        <FormItem key={opt.value} className="flex items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value={opt.value} />
+                          </FormControl>
+                          <FormLabel className="font-normal">{opt.label}</FormLabel>
+                        </FormItem>
+                      ))}
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="activityYesterday"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Yesterday's Activity Level</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select activity level" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {activityOptions.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>General Notes / Thoughts (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="e.g., Felt bloated after dinner, stressed from work..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <DialogFooter>
+               <DialogClose asChild>
+                <Button type="button" variant="outline">Cancel</Button>
+              </DialogClose>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4"/>}
+                Log Vitals
               </Button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <Label>Energy</Label>
-          <div className="flex justify-between gap-2 mt-2">
-            {energyOptions.map(({ value, label, icon: Icon }) => (
-              <Button
-                key={value}
-                variant={energy === value ? 'default' : 'outline'}
-                onClick={() => setEnergy(value)}
-                className="flex-1"
-                disabled={isLoggedToday}
-              >
-                <Icon className="mr-2 h-5 w-5" /> {label}
-              </Button>
-            ))}
-          </div>
-        </div>
-        {isLoggedToday ? (
-          <Alert variant="default" className="border-green-500/50 text-center">
-            <CheckCircle2 className="h-4 w-4" />
-            <AlertTitle>Logged for Today!</AlertTitle>
-            <AlertDescription className="text-xs">
-              Come back tomorrow to log again.
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <Button onClick={handleLogWellness} disabled={!mood || !energy} className="w-full">
-            <Save className="mr-2 h-4 w-4" /> Log Wellness
-          </Button>
-        )}
-      </CardContent>
-    </Card>
-  );
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 
@@ -479,7 +651,7 @@ export default function HomePage() {
                     </CardContent>
                 </Card>
 
-                <DailyWellnessCheckin />
+                <DailyVitalsCheckin />
 
                  {showQuickRecipes && (
                     <section>
