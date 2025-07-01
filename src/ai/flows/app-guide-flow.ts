@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview An AI agent that answers user questions about how the app works.
@@ -73,7 +74,7 @@ Fine-tune every aspect of your nutrition journey.
     - Go to \`Settings\` -> \`My Profile\` and fill out your user info.
     - Go to \`Settings\` -> \`Diet & Allergens\` to set your preferences.
     - Go to \`Settings\` -> \`Meal Structure\` to define your daily meals.
-    - Go to \`Progress\` -> \`My Goals & Targets\` to set your initial macro goals using the Goal Calculator.
+    - Go to \`Settings\` -> \`My Goals & Targets\` to set your initial macro goals using the Goal Calculator.
 
 2.  **Build Your Recipe Book**: Navigate to \`Recipes\` -> \`My Saved Recipes\` and click "Add New Recipe" to start populating your collection.
 

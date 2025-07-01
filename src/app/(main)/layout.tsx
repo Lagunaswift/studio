@@ -62,12 +62,12 @@ const recipesNavItems: NavItem[] = [
 
 const progressNavItems: NavItem[] = [
     { href: '/daily-log', label: 'Daily Log', icon: ClipboardList },
-    { href: '/profile/targets', label: 'My Goals & Targets', icon: Target },
     { href: '/weekly-check-in', label: 'Preppy: Weekly Check-in', icon: CheckSquare },
 ];
 
 const settingsNavItems: NavItem[] = [
   { href: '/profile/user-info', label: 'My Profile', icon: UserCircle2 },
+  { href: '/profile/targets', label: 'My Goals & Targets', icon: Target },
   { href: '/profile/diet-type', label: 'Diet & Allergens', icon: Leaf },
   { href: '/profile/meal-structure', label: 'Meal Structure', icon: ListChecks },
   { href: '/profile/dashboard-settings', label: 'Customize Dashboard', icon: SlidersHorizontal },
