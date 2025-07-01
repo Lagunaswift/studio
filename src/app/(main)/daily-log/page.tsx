@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Scale, Save, Loader2, BrainCircuit, CheckCircle2 } from 'lucide-react';
+import { Scale, Save, Loader2, BrainCircuit, CheckCircle2, TrendingUp } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { format, parseISO } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
@@ -21,6 +21,16 @@ import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import type { DailyVitalsLog, EnergyLevelV2, SorenessLevel, ActivityYesterdayLevel } from '@/types';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig
+} from "@/components/ui/chart";
 
 
 const weightLogSchema = z.object({
@@ -386,6 +396,100 @@ function DailyWeightLog() {
     );
 }
 
+function VitalsHistoryCharts() {
+  const { userProfile } = useAppContext();
+  
+  const vitalsData = useMemo(() => {
+    if (!userProfile?.dailyVitalsLog || userProfile.dailyVitalsLog.length === 0) {
+      return [];
+    }
+    
+    // Data is stored newest first, so we reverse it for chronological charts
+    const last14Days = userProfile.dailyVitalsLog.slice(0, 14).reverse(); 
+
+    // Mapping categorical data to numerical values for charting
+    const energyMap: Record<EnergyLevelV2, number> = { low: 1, moderate: 2, high: 3, vibrant: 4 };
+    const sorenessMap: Record<SorenessLevel, number> = { none: 1, mild: 2, moderate: 3, severe: 4 };
+    const activityMap: Record<ActivityYesterdayLevel, number> = { rest: 1, light: 2, moderate: 3, strenuous: 4 };
+
+    return last14Days.map(log => ({
+      date: format(parseISO(log.date), 'dd/MM'),
+      ...log,
+      energyValue: energyMap[log.energyLevel] || 0,
+      sorenessValue: sorenessMap[log.muscleSoreness] || 0,
+      activityValue: activityMap[log.activityYesterday] || 0,
+    }));
+  }, [userProfile?.dailyVitalsLog]);
+
+  if (vitalsData.length < 2) {
+    return (
+      <Card className="mt-8 col-span-1 md:col-span-2">
+        <CardHeader>
+          <CardTitle className="flex items-center"><TrendingUp className="mr-2 h-5 w-5 text-accent" />Vitals History</CardTitle>
+          <CardDescription>Log your vitals for a few more days to see your trends here.</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  const chartConfig = {
+    sleepQuality: { label: "Sleep Quality (1-10)", color: "hsl(var(--chart-1))" },
+    cravingsLevel: { label: "Cravings (1-10)", color: "hsl(var(--chart-2))" },
+    energyValue: { label: "Energy Level", color: "hsl(var(--chart-3))" },
+    sorenessValue: { label: "Soreness", color: "hsl(var(--chart-4))" },
+    activityValue: { label: "Activity", color: "hsl(var(--chart-5))" },
+  } satisfies ChartConfig;
+
+  return (
+    <Card className="mt-8 col-span-1 md:col-span-2">
+      <CardHeader>
+        <CardTitle className="flex items-center"><TrendingUp className="mr-2 h-5 w-5 text-accent" />Your Vitals History (Last {vitalsData.length} Days)</CardTitle>
+        <CardDescription>
+          Visualize your daily check-in data to spot trends in your wellness.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-8">
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Sleep & Cravings Trends</h3>
+          <ChartContainer config={chartConfig} className="w-full h-[300px]">
+            <LineChart accessibilityLayer data={vitalsData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
+              <YAxis domain={[0, 10]} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <ChartLegend content={<ChartLegendContent />} />
+              <Line dataKey="sleepQuality" type="monotone" stroke="var(--color-sleepQuality)" strokeWidth={2} dot={true} name="Sleep Quality" />
+              <Line dataKey="cravingsLevel" type="monotone" stroke="var(--color-cravingsLevel)" strokeWidth={2} dot={true} name="Cravings" />
+            </LineChart>
+          </ChartContainer>
+        </div>
+        
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Energy, Soreness & Activity Levels</h3>
+           <ChartContainer config={chartConfig} className="w-full h-[300px]">
+            <BarChart accessibilityLayer data={vitalsData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
+              <YAxis domain={[0, 4]} ticks={[1, 2, 3, 4]} tickFormatter={(value) => {
+                  if (value === 1) return 'Low';
+                  if (value === 2) return 'Med';
+                  if (value === 3) return 'High';
+                  if (value === 4) return 'Max';
+                  return '';
+              }} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <ChartLegend content={<ChartLegendContent />} />
+              <Bar dataKey="energyValue" fill="var(--color-energyValue)" radius={4} name="Energy Level" />
+              <Bar dataKey="sorenessValue" fill="var(--color-sorenessValue)" radius={4} name="Soreness" />
+              <Bar dataKey="activityValue" fill="var(--color-activityValue)" radius={4} name="Activity" />
+            </BarChart>
+          </ChartContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 
 export default function DailyLogPage() {
     return (
@@ -393,8 +497,8 @@ export default function DailyLogPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <DailyWeightLog />
                 <DailyVitalsCheckin />
+                <VitalsHistoryCharts />
             </div>
         </PageWrapper>
     );
 }
-
