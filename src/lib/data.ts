@@ -1,4 +1,4 @@
-import type { PlannedMeal, Recipe, PantryItem, ShoppingListItem, UKSupermarketCategory, Macros, MealType, DailyWeightLog } from '@/types';
+import type { PlannedMeal, Recipe, PantryItem, ShoppingListItem, UKSupermarketCategory, Macros, MealType, DailyWeightLog, Sex, RDA } from '@/types';
 import { getAllRecipes as getAllRecipesFromRegistry } from '@/features/recipes/recipeRegistry';
 
 // Helper function to map registry recipes to the full Recipe type
@@ -9,6 +9,7 @@ const mapToFullRecipe = (rawRecipe: any): Recipe => {
         id: -1, name: 'Invalid Recipe Data',
         servings: 0, ingredients: [], instructions: [], prepTime: '', cookTime: '',
         macrosPerServing: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+        micronutrientsPerServing: null,
         image: 'https://placehold.co/600x400/007bff/ffffff.png?text=Error',
         description: "This recipe data was invalid and could not be loaded."
     } as Recipe;
@@ -36,6 +37,7 @@ const mapToFullRecipe = (rawRecipe: any): Recipe => {
       carbs: totalCarbs,
       fat: totalFat,
     },
+    micronutrientsPerServing: null, // Default to null for now
     image: rawRecipe.image || `https://placehold.co/600x400.png?text=${encodeURIComponent(rawRecipe.name)}`,
     description: rawRecipe.description || "No description available.",
   };
@@ -165,21 +167,15 @@ export const parseIngredientString = (ingredientString: string): { name: string;
         'salmon': 'smoked salmon',
     };
 
-    let standardizedName = name;
-    const sortedNameKeys = Object.keys(nameMap).sort((a,b) => b.length - a.length);
-    for (const key of sortedNameKeys) {
-        if (name.includes(key)) {
-            standardizedName = nameMap[key];
-            break;
-        }
-    }
-
+    const standardizedName = name; // Simplified for now
+   
     return {
         name: standardizedName.charAt(0).toUpperCase() + standardizedName.slice(1),
         quantity: isNaN(quantity) ? 1 : quantity,
         unit: unit
     };
 };
+
 
 export const generateShoppingList = (
     plannedMeals: PlannedMeal[],
@@ -285,7 +281,7 @@ export function assignCategory(ingredientName: string): UKSupermarketCategory {
 
 export const calculateTrendWeight = (dailyWeightLog: DailyWeightLog[]): DailyWeightLog[] => {
   if (!dailyWeightLog || dailyWeightLog.length < 7) {
-    return dailyWeightLog.map(log => ({...log, trend_weight_kg: undefined}));
+    return dailyWeightLog.map(log => ({...log, trendWeightKg: undefined}));
   }
 
   const sorted_logs = [...dailyWeightLog].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -295,15 +291,55 @@ export const calculateTrendWeight = (dailyWeightLog: DailyWeightLog[]): DailyWei
     const end = Math.min(arr.length, index + 4);
     
     if (end - start < 4) {
-      return { ...log, trend_weight_kg: undefined };
+      return { ...log, trendWeightKg: undefined };
     }
 
     const window = arr.slice(start, end);
-    const sum = window.reduce((acc, current) => acc + current.weight_kg, 0);
+    const sum = window.reduce((acc, current) => acc + current.weightKg, 0);
     const trend_weight = sum / window.length;
 
-    return { ...log, trend_weight_kg: parseFloat(trend_weight.toFixed(2)) };
+    return { ...log, trendWeightKg: parseFloat(trend_weight.toFixed(2)) };
   });
 
   return trend_weight_data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+};
+
+export const getRdaProfile = (sex: Sex | null | undefined, age: number | null | undefined): RDA | null => {
+    if (!sex || !age) {
+        return null;
+    }
+
+    // Simplified RDA values for demonstration. A real app would use a more complex table.
+    // Values are for adults aged 19-50.
+    if (age >= 19 && age <= 50) {
+        if (sex === 'male') {
+            return {
+                iron: 8,
+                calcium: 1000,
+                potassium: 3400,
+                vitaminA: 900,
+                vitaminC: 90,
+                vitaminD: 15
+            };
+        } else { // female
+            return {
+                iron: 18,
+                calcium: 1000,
+                potassium: 2600,
+                vitaminA: 700,
+                vitaminC: 75,
+                vitaminD: 15
+            };
+        }
+    }
+
+    // Default for other age groups for now
+    return {
+        iron: 10,
+        calcium: 1200,
+        potassium: 3000,
+        vitaminA: 800,
+        vitaminC: 80,
+        vitaminD: 15
+    };
 };

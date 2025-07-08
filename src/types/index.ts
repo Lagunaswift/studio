@@ -7,6 +7,18 @@ export interface Macros {
   calories: number;
 }
 
+// New type for micronutrients
+export interface Micronutrients {
+  iron: number | null;
+  calcium: number | null;
+  potassium: number | null;
+  vitaminA: number | null;
+  vitaminC: number | null;
+  vitaminD: number | null;
+}
+
+export type RDA = Micronutrients;
+
 // Updated Ingredient structure
 export interface Ingredient {
   name: string;
@@ -23,8 +35,9 @@ export interface Recipe {
   prepTime: string;
   cookTime: string;
   chillTime?: string;
-  ingredients: Ingredient[]; // <-- UPDATED from string[]
+  ingredients: string[]; 
   macrosPerServing: Macros;
+  micronutrientsPerServing: Micronutrients | null; // Added micronutrients
   instructions: string[];
   tags?: string[];
   isCustom?: boolean;
@@ -188,6 +201,7 @@ export interface UserProfileSettings {
   primaryGoal: PrimaryGoal | null;
   tdee: number | null;
   leanBodyMassKg: number | null;
+  rda: RDA | null; // Added RDA
   neckCircumferenceCm?: number | null;
   abdomenCircumferenceCm?: number | null; // Male
   waistCircumferenceCm?: number | null;   // Female
