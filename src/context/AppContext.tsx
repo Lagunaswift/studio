@@ -1,3 +1,4 @@
+
 "use client";
 
 import type React from 'react';
@@ -24,11 +25,13 @@ import type {
   Energy,
   DailyVitalsLog,
   DailyWellnessLog,
+  RDA,
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
-import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
+import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight, getRdaProfile } from '@/lib/data';
 import { loadState, saveState } from '@/lib/localStorage';
 import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-coach-flow';
+import { suggestMicronutrients } from '@/ai/flows/suggest-micronutrients-flow';
 import { format, subDays, differenceInDays } from 'date-fns';
 
 // Default user profile for a fresh start in local mode
@@ -55,6 +58,7 @@ const DEFAULT_USER_PROFILE: UserProfileSettings = {
     targetWeightChangeRateKg: 0,
     tdee: null,
     leanBodyMassKg: null,
+    rda: null,
     dailyWeightLog: [],
     dailyWellnessLog: [],
     dailyVitalsLog: [], // Added for new feature
@@ -258,11 +262,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const finalBodyFatPercentage = newProfileData.bodyFatPercentage;
     const finalLbm = calculateLBM(newProfileData.weightKg, finalBodyFatPercentage);
     const finalTdee = calculateTDEE(newProfileData.weightKg, newProfileData.heightCm, newProfileData.age, newProfileData.sex, newProfileData.activityLevel);
+    const finalRda = getRdaProfile(newProfileData.sex, newProfileData.age);
 
     setUserProfile({
       ...newProfileData,
       tdee: finalTdee,
-      leanBodyMassKg: finalLbm
+      leanBodyMassKg: finalLbm,
+      rda: finalRda
     });
   }, [user, userProfile]);
   
@@ -304,7 +310,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   const addCustomRecipe = useCallback(async (recipeData: RecipeFormData) => {
     if (!user) return;
-    const newRecipe: Recipe = {
+    
+    let newRecipe: Recipe = {
         id: -Date.now(),
         user_id: user.id,
         name: recipeData.name,
@@ -318,10 +325,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         macrosPerServing: {
           calories: recipeData.calories, protein: recipeData.protein, carbs: recipeData.carbs, fat: recipeData.fat,
         },
+        micronutrientsPerServing: null, // Initialize as null
         instructions: recipeData.instructions.map(inst => inst.value),
         tags: recipeData.tags,
         isCustom: true,
     };
+
+    try {
+      // Get ingredients for a single serving to send to the AI
+      const ingredientsPerServing = newRecipe.ingredients.map(ingStr => {
+          const parsed = parseIngredientStringUtil(ingStr);
+          const quantityPerServing = parsed.quantity / (newRecipe.servings || 1);
+          return `${quantityPerServing.toFixed(2)} ${parsed.unit} ${parsed.name}`;
+      });
+      
+      const micros = await suggestMicronutrients({ ingredients: ingredientsPerServing });
+      newRecipe.micronutrientsPerServing = micros;
+
+    } catch (e) {
+      console.warn("AI Micronutrient estimation failed for new recipe:", e);
+      // Proceed with null micronutrients
+    }
+
     setUserRecipes(prev => [...prev, newRecipe]);
   }, [user]);
 

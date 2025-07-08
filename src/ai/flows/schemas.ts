@@ -14,3 +14,13 @@ export const MacroDataSchema = z.object({
   carbs: z.number().finite().nonnegative().describe("Total carbohydrates in grams"),
   fat: z.number().finite().nonnegative().describe("Total fat in grams"),
 });
+
+// Reusable schema for micronutrient data
+export const MicronutrientsSchema = z.object({
+  iron: z.number().nullable().describe('Estimated iron in milligrams (mg).'),
+  calcium: z.number().nullable().describe('Estimated calcium in milligrams (mg).'),
+  potassium: z.number().nullable().describe('Estimated potassium in milligrams (mg).'),
+  vitaminA: z.number().nullable().describe('Estimated Vitamin A in micrograms (mcg).'),
+  vitaminC: z.number().nullable().describe('Estimated Vitamin C in milligrams (mg).'),
+  vitaminD: z.number().nullable().describe('Estimated Vitamin D in micrograms (mcg).'),
+});
