@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Mail, Lock, LogIn } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-// import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -33,49 +33,43 @@ export default function LoginPage() {
   });
 
   const onSubmit: SubmitHandler<LoginFormValues> = async (data) => {
-    // Supabase logic commented out for local storage mode.
-    // form.clearErrors(); 
-    // try {
-    //   const { error } = await supabase.auth.signInWithPassword({
-    //     email: data.email,
-    //     password: data.password,
-    //   });
+    form.clearErrors(); 
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
 
-    //   if (error) {
-    //     toast({
-    //       title: "Login Failed",
-    //       description: error.message,
-    //       variant: "destructive",
-    //     });
-    //   } else {
-    //     toast({
-    //       title: "Login Successful!",
-    //       description: "Welcome back!",
-    //     });
-    //     router.push('/'); // Redirect to homepage or dashboard
-    //     router.refresh(); // Refresh to update server-side session state if needed
-    //   }
-    // } catch (e: any) {
-    //   toast({
-    //     title: "Login Error",
-    //     description: e.message || "An unexpected error occurred.",
-    //     variant: "destructive",
-    //   });
-    // }
-    toast({
-        title: "Local Mode Active",
-        description: "Login is disabled. Redirecting to the app.",
-    });
-    router.push('/');
+      if (error) {
+        toast({
+          title: "Login Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Login Successful!",
+          description: "Welcome back!",
+        });
+        router.push('/'); // Redirect to homepage or dashboard
+        router.refresh(); // Refresh to update server-side session state if needed
+      }
+    } catch (e: any) {
+      toast({
+        title: "Login Error",
+        description: e.message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
     <Card className="shadow-2xl">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-headline text-primary flex items-center justify-center">
-          <LogIn className="mr-2 h-6 w-6" /> Sign In (Local Mode)
+          <LogIn className="mr-2 h-6 w-6" /> Sign In
         </CardTitle>
-        <CardDescription>Authentication is disabled in local mode. You can proceed directly to the app.</CardDescription>
+        <CardDescription>Enter your credentials to access your meal plan.</CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -87,7 +81,7 @@ export default function LoginPage() {
                 <FormItem>
                   <FormLabel className="flex items-center"><Mail className="mr-2 h-4 w-4 text-muted-foreground" />Email</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="you@example.com" {...field} disabled />
+                    <Input type="email" placeholder="you@example.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -100,7 +94,7 @@ export default function LoginPage() {
                 <FormItem>
                   <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-muted-foreground" />Password</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} disabled />
+                    <Input type="password" placeholder="••••••••" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -108,12 +102,12 @@ export default function LoginPage() {
             />
           </CardContent>
           <CardFooter className="flex flex-col items-center space-y-4">
-            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-              Enter App
+            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? 'Signing In...' : 'Sign In'}
             </Button>
             <div className="text-sm text-center w-full">
-              <Link href="/" className="font-medium text-primary hover:underline">
-                Sign up is disabled in local mode.
+              <Link href="/signup" className="font-medium text-primary hover:underline">
+                Don't have an account? Sign up
               </Link>
             </div>
           </CardFooter>
