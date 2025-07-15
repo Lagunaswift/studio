@@ -1,0 +1,19 @@
+# Exclude Node.js dependencies
+node_modules/
+
+# Exclude Next.js build output
+.next/
+
+# Exclude general build output directory
+dist/
+
+# Exclude editor-specific metadata
+.vscode/
+.idx/
+
+# Exclude local Supabase files if any
+supabase/
+
+# Exclude environment variables
+.env
+.env.local

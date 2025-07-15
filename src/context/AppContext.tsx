@@ -61,7 +61,8 @@ const DEFAULT_USER_PROFILE: UserProfileSettings = {
     rda: null,
     dailyWeightLog: [],
     dailyWellnessLog: [],
-    dailyVitalsLog: [], // Added for new feature
+    dailyVitalsLog: [],
+    dailyManualMacrosLog: [], // Added for new feature
     dashboardSettings: {
         showMacros: true,
         showMenu: true,
@@ -115,7 +116,8 @@ interface AppContextType {
   updateMealStatus: (plannedMealId: string, status: 'planned' | 'eaten') => Promise<void>;
   logWeight: (date: string, weightKg: number) => Promise<void>;
   logWellness: (date: string, mood: Mood, energy: Energy) => Promise<void>;
-  logVitals: (date: string, vitals: Omit<DailyVitalsLog, 'date'>) => Promise<void>; // New function
+  logVitals: (date: string, vitals: Omit<DailyVitalsLog, 'date'>) => Promise<void>;
+  logManualMacros: (date: string, macros: Macros) => Promise<void>;
   getConsumedMacrosForDate: (date: string) => Macros;
   getPlannedMacrosForDate: (date: string) => Macros;
   toggleShoppingListItem: (itemId: string) => Promise<void>;
@@ -162,7 +164,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   const isAppDataLoading = isAuthLoading || isRecipeCacheLoading;
 
-  // Load static recipes from data file on initial mount
   useEffect(() => {
     getAllRecipesFromDataFile().then(recipes => {
       setStaticRecipes(recipes);
@@ -176,7 +177,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return uniqueRecipes;
   }, [staticRecipes, userRecipes]);
 
-  // Load user data from local storage when user is available
   useEffect(() => {
     if (user && !isAuthLoading) {
       const userId = user.id;
@@ -188,7 +188,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [user, isAuthLoading]);
 
-  // Save all user data to local storage whenever it changes
   useEffect(() => {
     if (user && !isAppDataLoading) {
       const userId = user.id;
@@ -200,7 +199,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [user, mealPlan, pantryItems, userProfile, userRecipes, favoriteRecipeIds, isAppDataLoading]);
 
-  // Recalculate shopping list whenever meal plan or pantry changes
   useEffect(() => {
     if (!isAppDataLoading) {
       const newShoppingList = generateShoppingListUtil(mealPlan, allRecipesCache, pantryItems);
@@ -332,7 +330,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     try {
-      // Get ingredients for a single serving to send to the AI
       const ingredientsPerServing = newRecipe.ingredients.map(ingStr => {
           const parsed = parseIngredientStringUtil(ingStr);
           const quantityPerServing = parsed.quantity / (newRecipe.servings || 1);
@@ -344,7 +341,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     } catch (e) {
       console.warn("AI Micronutrient estimation failed for new recipe:", e);
-      // Proceed with null micronutrients
     }
 
     setUserRecipes(prev => [...prev, newRecipe]);
@@ -365,7 +361,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem(`userProfile_${userId}`);
   }, [user]);
 
-  const getConsumedMacrosForDate = useCallback((date: string): Macros => calculateTotalMacrosUtil(mealPlan.filter(pm => pm.date === date && pm.status === 'eaten'), allRecipesCache), [mealPlan, allRecipesCache]);
+  const getConsumedMacrosForDate = useCallback((date: string): Macros => {
+    const manualLog = userProfile?.dailyManualMacrosLog?.find(log => log.date === date);
+    if (manualLog) {
+      return manualLog.macros;
+    }
+    return calculateTotalMacrosUtil(mealPlan.filter(pm => pm.date === date && pm.status === 'eaten'), allRecipesCache);
+  }, [mealPlan, allRecipesCache, userProfile?.dailyManualMacrosLog]);
+  
   const getPlannedMacrosForDate = useCallback((date: string): Macros => calculateTotalMacrosUtil(mealPlan.filter(pm => pm.date === date), allRecipesCache), [mealPlan, allRecipesCache]);
   
   const getMealsForDate = useCallback((date: string): PlannedMeal[] => {
@@ -445,13 +448,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateUserProfileInDb({ dailyVitalsLog: updatedLogs });
   }, [user, userProfile, updateUserProfileInDb]);
 
+  const logManualMacros = useCallback(async (date: string, macros: Macros) => {
+    if (!userProfile || !user) return;
+    const newLogEntry = { date, macros };
+
+    const currentLogs = userProfile.dailyManualMacrosLog || [];
+    const existingLogIndex = currentLogs.findIndex(log => log.date === date);
+
+    let updatedLogs: { date: string, macros: Macros }[];
+    if (existingLogIndex > -1) {
+      updatedLogs = [...currentLogs];
+      updatedLogs[existingLogIndex] = newLogEntry;
+    } else {
+      updatedLogs = [...currentLogs, newLogEntry];
+    }
+
+    updatedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    updateUserProfileInDb({ dailyManualMacrosLog: updatedLogs });
+  }, [user, userProfile, updateUserProfileInDb]);
+
 
   const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: PreppyOutput | null }> => {
     if (!userProfile || !userProfile.dailyWeightLog || userProfile.dailyWeightLog.length < 14) {
       return { success: false, message: "At least 14 days of weight and calorie data are needed for an accurate calculation." };
     }
     
-    // 1. Calculate Trend Weight and Dynamic TDEE
     const logsWithTrend = calculateTrendWeight(userProfile.dailyWeightLog);
     const validTrendLogs = logsWithTrend.filter(log => log.trendWeightKg !== undefined);
 
@@ -462,34 +484,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const endDate = new Date(validTrendLogs[0].date);
     const startDate = subDays(endDate, 21);
     
-    const recentLogs = validTrendLogs.filter(log => new Date(log.date) >= startDate);
+    const recentWeightLogs = validTrendLogs.filter(log => new Date(log.date) >= startDate);
     
-    if (recentLogs.length < 14) {
-      return { success: false, message: `Need at least 14 days of data in the last 3 weeks. You have ${recentLogs.length}.` };
+    if (recentWeightLogs.length < 14) {
+      return { success: false, message: `Need at least 14 days of weight data in the last 3 weeks. You have ${recentWeightLogs.length}.` };
     }
-    
-    let totalCalories = 0;
-    const dateSet = new Set(recentLogs.map(l => l.date));
-    const relevantMeals = mealPlan.filter(m => dateSet.has(m.date) && m.status === 'eaten');
-    
-    const calorieLog = new Map<string, number>();
-    relevantMeals.forEach(meal => {
-        const macros = calculateTotalMacrosUtil([meal], allRecipesCache);
-        calorieLog.set(meal.date, (calorieLog.get(meal.date) || 0) + macros.calories);
-    });
 
-    calorieLog.forEach(calories => totalCalories += calories);
-    const daysWithCalorieData = calorieLog.size;
+    const datesInPeriod = recentWeightLogs.map(l => l.date);
+    let totalCalories = 0;
+    let daysWithCalorieData = 0;
+    
+    for (const date of datesInPeriod) {
+        const consumed = getConsumedMacrosForDate(date);
+        if (consumed && consumed.calories > 0) {
+            totalCalories += consumed.calories;
+            daysWithCalorieData++;
+        }
+    }
 
     if (daysWithCalorieData < 7) {
       return { success: false, message: `Need at least 7 days of calorie logs in the analysis period. You have ${daysWithCalorieData}.` };
     }
     const averageDailyCalories = totalCalories / daysWithCalorieData;
 
-    const latestTrendWeight = recentLogs[0].trendWeightKg!;
-    const oldestTrendWeight = recentLogs[recentLogs.length - 1].trendWeightKg!;
+    const latestTrendWeight = recentWeightLogs[0].trendWeightKg!;
+    const oldestTrendWeight = recentWeightLogs[recentWeightLogs.length - 1].trendWeightKg!;
     const weightChangeKg = latestTrendWeight - oldestTrendWeight;
-    const durationDays = differenceInDays(new Date(recentLogs[0].date), new Date(recentLogs[recentLogs.length - 1].date)) || 1;
+    const durationDays = differenceInDays(new Date(recentWeightLogs[0].date), new Date(recentWeightLogs[recentWeightLogs.length - 1].date)) || 1;
     const actualWeeklyWeightChangeKg = (weightChangeKg / durationDays) * 7;
 
     const caloriesFromWeightChange = weightChangeKg * 7700;
@@ -500,7 +521,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: "Calculation resulted in an invalid TDEE. Check your logged data for consistency." };
     }
     
-    // 2. Prepare and run the Preppy AI Flow
     const preppyInput: PreppyInput = {
       primaryGoal: userProfile.primaryGoal || 'maintenance',
       targetWeightChangeRateKg: userProfile.targetWeightChangeRateKg || 0,
@@ -513,11 +533,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const recommendation = await runPreppy(preppyInput);
     
-    // 3. Update profile with new TDEE and check-in date
     await setUserInformation({ tdee: newDynamicTDEE, lastCheckInDate: format(new Date(), 'yyyy-MM-dd') });
 
     return { success: true, message: "Check-in complete!", recommendation };
-  }, [userProfile, mealPlan, allRecipesCache, setUserInformation]);
+  }, [userProfile, allRecipesCache, setUserInformation, getConsumedMacrosForDate]);
 
   const contextValue = useMemo(() => ({
     mealPlan, shoppingList, pantryItems, userProfile, allRecipesCache,
@@ -528,7 +547,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isRecipeFavorite, addPantryItem, removePantryItem, updatePantryItemQuantity,
     parseIngredient, assignIngredientCategory, addCustomRecipe, userRecipes, setDashboardSettings,
     acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin, logWellness, logVitals,
-    clearEntireMealPlan
+    logManualMacros, clearEntireMealPlan
   }), [
     mealPlan, shoppingList, pantryItems, userProfile, allRecipesCache, addMealToPlan, removeMealFromPlan,
     updatePlannedMealServings, getConsumedMacrosForDate, toggleShoppingListItem,
@@ -537,7 +556,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe, isRecipeFavorite,
     addPantryItem, removePantryItem, updatePantryItemQuantity, parseIngredient, assignIngredientCategory,
     addCustomRecipe, userRecipes, setDashboardSettings, acceptTerms, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin, logWellness, logVitals,
-    clearEntireMealPlan
+    logManualMacros, clearEntireMealPlan
   ]);
   
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
@@ -550,5 +569,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-
-    

@@ -7,7 +7,6 @@ export interface Macros {
   calories: number;
 }
 
-// New type for micronutrients
 export interface Micronutrients {
   iron: number | null;
   calcium: number | null;
@@ -19,7 +18,6 @@ export interface Micronutrients {
 
 export type RDA = Micronutrients;
 
-// Updated Ingredient structure
 export interface Ingredient {
   name: string;
   quantity: number;
@@ -37,17 +35,17 @@ export interface Recipe {
   chillTime?: string;
   ingredients: string[]; 
   macrosPerServing: Macros;
-  micronutrientsPerServing: Micronutrients | null; // Added micronutrients
+  micronutrientsPerServing: Micronutrients | null;
   instructions: string[];
   tags?: string[];
   isCustom?: boolean;
-  user_id?: string | null; // For custom recipes
+  user_id?: string | null;
 }
 
 export type MealType = "Breakfast" | "Lunch" | "Dinner" | "Snack";
 
 export interface PlannedMeal {
-  id: string; // Corresponds to id in meal_plan_entries table
+  id: string; 
   recipeId: number;
   date: string; // YYYY-MM-DD
   mealType: MealType;
@@ -79,12 +77,12 @@ export interface ShoppingListItem {
 }
 
 export interface PantryItem {
-  id: string; // Corresponds to id in pantry_items table
+  id: string; 
   name: string;
   quantity: number;
   unit: string;
   category: UKSupermarketCategory;
-  expiryDate?: string; // YYYY-MM-DD format
+  expiryDate?: string; 
 }
 
 
@@ -166,7 +164,6 @@ export interface DailyWellnessLog {
   energy: Energy;
 }
 
-// --- New Types for Daily Vitals Check-in ---
 export type EnergyLevelV2 = 'low' | 'moderate' | 'high' | 'vibrant';
 export type SorenessLevel = 'none' | 'mild' | 'moderate' | 'severe';
 export type ActivityYesterdayLevel = 'rest' | 'light' | 'moderate' | 'strenuous';
@@ -180,8 +177,11 @@ export interface DailyVitalsLog {
   activityYesterday: ActivityYesterdayLevel;
   notes?: string;
 }
-// --- End of New Types ---
 
+export interface DailyManualMacrosLog {
+    date: string; // YYYY-MM-DD
+    macros: Macros;
+}
 
 export interface UserProfileSettings {
   name?: string | null;
@@ -201,14 +201,15 @@ export interface UserProfileSettings {
   primaryGoal: PrimaryGoal | null;
   tdee: number | null;
   leanBodyMassKg: number | null;
-  rda: RDA | null; // Added RDA
+  rda: RDA | null;
   neckCircumferenceCm?: number | null;
   abdomenCircumferenceCm?: number | null; // Male
   waistCircumferenceCm?: number | null;   // Female
   hipCircumferenceCm?: number | null;     // Female
   dailyWeightLog?: DailyWeightLog[];
   dailyWellnessLog?: DailyWellnessLog[];
-  dailyVitalsLog?: DailyVitalsLog[]; // Added for new feature
+  dailyVitalsLog?: DailyVitalsLog[];
+  dailyManualMacrosLog?: DailyManualMacrosLog[]; // Added for new feature
   dashboardSettings?: DashboardSettings;
   favorite_recipe_ids?: number[];
   subscription_status: SubscriptionStatus;
@@ -217,26 +218,23 @@ export interface UserProfileSettings {
   subscription_end_date?: string | null;
   subscription_duration?: string | null;
   hasAcceptedTerms?: boolean;
-  lastCheckInDate?: string | null; // YYYY-MM-DD
-  targetWeightChangeRateKg?: number | null; // e.g., -0.5 for loss, 0.25 for gain
+  lastCheckInDate?: string | null; 
+  targetWeightChangeRateKg?: number | null; 
 }
 
-// This type will be used for the Recipe Form
 export interface RecipeFormData {
   name: string;
   description?: string;
-  image?: string; // URL
+  image?: string; 
   servings: number;
   prepTime: string;
   cookTime: string;
   chillTime?: string;
-  ingredients: { value: string }[]; // For react-hook-form field array
-  instructions: { value: string }[]; // For react-hook-form field array
+  ingredients: { value: string }[];
+  instructions: { value: string }[];
   calories: number;
   protein: number;
   carbs: number;
   fat: number;
   tags?: string[];
 }
-
-    
