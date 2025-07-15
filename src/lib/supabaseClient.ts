@@ -1,21 +1,15 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-// Read Supabase credentials from environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js';
 
-// Check if the environment variables are set
-if (!supabaseUrl) {
-  // This warning is helpful for developers during build and in browser console.
-  console.warn("Supabase URL is missing! Ensure NEXT_PUBLIC_SUPABASE_URL is set in your .env file or environment variables.");
-}
+// This function creates a new Supabase client instance.
+// It should be called on the client-side where process.env is available.
+export const createClient = (): SupabaseClient => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!supabaseAnonKey) {
-  // This warning is helpful for developers during build and in browser console.
-  console.warn("Supabase Anon Key is missing! Ensure NEXT_PUBLIC_SUPABASE_ANON_KEY is set in your .env file or environment variables.");
-}
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Supabase credentials are not set. Please check your .env file and ensure they are prefixed with NEXT_PUBLIC_.");
+  }
 
-// Create and export the Supabase client. 
-// It's okay if the URL/key are undefined here initially, 
-// as the AuthContext will handle re-initialization on the client-side.
-export const supabase: SupabaseClient = createClient(supabaseUrl!, supabaseAnonKey!);
+  return createSupabaseClient(supabaseUrl, supabaseAnonKey);
+};
