@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Mail, KeyRound, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/context/AuthContext';
 import { useState, useEffect } from 'react';
 
 const resetPasswordSchema = z.object({
@@ -22,6 +22,7 @@ type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
 export default function ResetPasswordPage() {
   const { toast } = useToast();
+  const { supabase } = useAuth();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -37,7 +38,10 @@ export default function ResetPasswordPage() {
 
   const onSubmit: SubmitHandler<ResetPasswordFormValues> = async (data) => {
     form.clearErrors();
-    if (!isClient) return;
+    if (!isClient || !supabase) {
+       toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive"});
+      return;
+    }
 
     try {
       const origin = window.location.origin.trim();

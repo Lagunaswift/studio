@@ -1,9 +1,9 @@
 
 'use client';
 
-import { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { supabase } from '@/lib/supabaseClient'; 
-import type { Session, User } from '@supabase/supabase-js';
+import { createContext, useState, useEffect, useContext, ReactNode, useMemo } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import type { Session, User, SupabaseClient } from '@supabase/supabase-js';
 import type { UserProfileSettings } from '@/types';
 
 // The Profile type here will be a subset of UserProfileSettings.
@@ -15,6 +15,7 @@ interface Profile extends Partial<UserProfileSettings> {
 }
 
 interface AuthContextType {
+  supabase: SupabaseClient | null;
   session: Session | null;
   user: User | null;
   profile: Profile | null;
@@ -25,29 +26,55 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error("Supabase credentials not found. Make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.");
+      setIsLoading(false);
+      return;
+    }
+    
+    const client = createClient(supabaseUrl, supabaseAnonKey);
+    setSupabase(client);
+
     const getActiveSession = async () => {
-      const { data: { session: activeSession } } = await supabase.auth.getSession();
+      const { data: { session: activeSession } } = await client.auth.getSession();
       setSession(activeSession);
       setUser(activeSession?.user ?? null);
       if (activeSession?.user) {
-        await fetchProfile(activeSession.user);
+        // For local mode, we synthesize a profile instead of fetching.
+        const synthesizedProfile: Profile = {
+            id: activeSession.user.id,
+            email: activeSession.user.email,
+            name: activeSession.user.user_metadata.name || activeSession.user.email,
+            updated_at: new Date().toISOString()
+        };
+        setProfile(synthesizedProfile);
       }
       setIsLoading(false);
     };
     
     getActiveSession();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: authListener } = client.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        await fetchProfile(session.user);
+         const synthesizedProfile: Profile = {
+            id: session.user.id,
+            email: session.user.email,
+            name: session.user.user_metadata.name || session.user.email,
+            updated_at: new Date().toISOString()
+        };
+        setProfile(synthesizedProfile);
       } else {
         setProfile(null);
       }
@@ -59,19 +86,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const fetchProfile = async (user: User) => {
-    // In local mode, we don't fetch a profile from Supabase.
-    // Instead, we can synthesize a profile from the user object.
-    const synthesizedProfile: Profile = {
-        id: user.id,
-        email: user.email,
-        name: user.user_metadata.name || user.email,
-        updated_at: new Date().toISOString()
-    };
-    setProfile(synthesizedProfile);
-  }
-
   const signOut = async () => {
+    if (!supabase) return;
     const { error } = await supabase.auth.signOut();
     if (error) console.error("Error signing out:", error);
     setUser(null);
@@ -79,7 +95,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setProfile(null);
   };
 
-  const value = { session, user, profile, isLoading, signOut };
+  const value = useMemo(() => ({ supabase, session, user, profile, isLoading, signOut }), 
+    [supabase, session, user, profile, isLoading]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Lock, KeyRound, AlertTriangle, ArrowLeft, Eye, EyeOff } from 'lucide-react'; 
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabaseClient'; 
+import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 
 const updatePasswordSchema = z.object({
@@ -27,6 +27,7 @@ type UpdatePasswordFormValues = z.infer<typeof updatePasswordSchema>;
 
 function UpdatePasswordFormComponent() {
   const { toast } = useToast();
+  const { supabase } = useAuth();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isTokenValid, setIsTokenValid] = useState(false); 
@@ -35,6 +36,8 @@ function UpdatePasswordFormComponent() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
+    if (!supabase) return;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY") {
         setIsTokenValid(true);
@@ -47,7 +50,7 @@ function UpdatePasswordFormComponent() {
     return () => {
         subscription.unsubscribe();
     };
-  }, []);
+  }, [supabase]);
 
 
   const form = useForm<UpdatePasswordFormValues>({
@@ -61,6 +64,11 @@ function UpdatePasswordFormComponent() {
   const onSubmit: SubmitHandler<UpdatePasswordFormValues> = async (data) => {
     form.clearErrors();
     setError(null);
+    
+    if (!supabase) {
+       toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive"});
+       return;
+    }
 
     if (!isTokenValid) {
       const msg = "Password recovery token is not valid or session has expired. Please request a new reset link.";

@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Mail, Lock, LogIn, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
 
 const loginSchema = z.object({
@@ -24,6 +24,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const { toast } = useToast();
+  const { supabase } = useAuth();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const form = useForm<LoginFormValues>({
@@ -35,6 +36,11 @@ export default function LoginPage() {
   });
 
   const onSubmit: SubmitHandler<LoginFormValues> = async (data) => {
+    if (!supabase) {
+      toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive"});
+      return;
+    }
+
     form.clearErrors(); 
     try {
       const { error } = await supabase.auth.signInWithPassword({
