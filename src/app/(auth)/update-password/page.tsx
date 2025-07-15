@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Lock, KeyRound, AlertTriangle, ArrowLeft } from 'lucide-react'; 
+import { Lock, KeyRound, AlertTriangle, ArrowLeft, Eye, EyeOff } from 'lucide-react'; 
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabaseClient'; 
 import Link from 'next/link';
@@ -31,6 +31,8 @@ function UpdatePasswordFormComponent() {
   const [error, setError] = useState<string | null>(null);
   const [isTokenValid, setIsTokenValid] = useState(false); 
   const [isCheckingToken, setIsCheckingToken] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -140,7 +142,17 @@ function UpdatePasswordFormComponent() {
                 <FormItem>
                   <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-muted-foreground" />New Password</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="Minimum 8 characters" {...field} disabled={!isTokenValid} />
+                    <div className="relative">
+                      <Input type={showPassword ? 'text' : 'password'} placeholder="Minimum 8 characters" {...field} disabled={!isTokenValid} />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-primary"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -153,7 +165,17 @@ function UpdatePasswordFormComponent() {
                 <FormItem>
                   <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-muted-foreground" />Confirm New Password</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="Re-type your new password" {...field} disabled={!isTokenValid} />
+                    <div className="relative">
+                      <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="Re-type your new password" {...field} disabled={!isTokenValid} />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-primary"
+                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
