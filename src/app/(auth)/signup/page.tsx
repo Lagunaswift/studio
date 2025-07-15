@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Mail, Lock, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -28,6 +28,7 @@ type SignUpFormValues = z.infer<typeof signUpSchema>;
 
 export default function SignUpPage() {
   const { toast } = useToast();
+  const { supabase } = useAuth();
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -47,6 +48,11 @@ export default function SignUpPage() {
   });
 
   const onSubmit: SubmitHandler<SignUpFormValues> = async (data) => {
+    if (!supabase) {
+       toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive"});
+       return;
+    }
+
     form.clearErrors(); 
     
     let emailRedirectToPath = '/login'; 
