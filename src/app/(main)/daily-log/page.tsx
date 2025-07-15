@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Scale, Save, Loader2, BrainCircuit, CheckCircle2, TrendingUp } from 'lucide-react';
+import { Scale, Save, Loader2, BrainCircuit, CheckCircle2, TrendingUp, Edit, CalculatorIcon } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { format, parseISO } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
@@ -19,7 +19,7 @@ import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import type { DailyVitalsLog, EnergyLevelV2, SorenessLevel, ActivityYesterdayLevel } from '@/types';
+import type { DailyVitalsLog, EnergyLevelV2, SorenessLevel, ActivityYesterdayLevel, Macros } from '@/types';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -37,6 +37,14 @@ const weightLogSchema = z.object({
   weightKg: z.coerce.number().positive("Weight must be a positive number.").min(20, "Weight must be at least 20kg").max(500, "Weight must be at most 500kg"),
 });
 type WeightLogFormValues = z.infer<typeof weightLogSchema>;
+
+const manualMacroLogSchema = z.object({
+  calories: z.coerce.number().min(0, "Calories must be non-negative."),
+  protein: z.coerce.number().min(0, "Protein must be non-negative."),
+  carbs: z.coerce.number().min(0, "Carbs must be non-negative."),
+  fat: z.coerce.number().min(0, "Fat must be non-negative."),
+});
+type ManualMacroLogFormValues = z.infer<typeof manualMacroLogSchema>;
 
 const vitalsSchema = z.object({
   sleepQuality: z.coerce.number().min(1).max(10),
@@ -396,6 +404,92 @@ function DailyWeightLog() {
     );
 }
 
+function ManualMacroLog() {
+    const { userProfile, logManualMacros } = useAppContext();
+    const { toast } = useToast();
+    const clientTodayDate = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+
+    const todayLog = useMemo(() => 
+        userProfile?.dailyManualMacrosLog?.find(log => log.date === clientTodayDate)?.macros,
+        [userProfile?.dailyManualMacrosLog, clientTodayDate]
+    );
+
+    const form = useForm<ManualMacroLogFormValues>({
+        resolver: zodResolver(manualMacroLogSchema),
+        defaultValues: todayLog || { calories: 0, protein: 0, carbs: 0, fat: 0 },
+    });
+    
+    useEffect(() => {
+        if (todayLog) {
+            form.reset(todayLog);
+        }
+    }, [todayLog, form]);
+
+    const onSubmit: SubmitHandler<ManualMacroLogFormValues> = async (data) => {
+        await logManualMacros(clientTodayDate, data);
+        toast({
+            title: "Macros Logged",
+            description: "Your manually entered macros have been saved for today.",
+        });
+    };
+
+    return (
+        <Card className="shadow-md">
+            <CardHeader>
+                <CardTitle className="text-xl font-bold font-headline text-primary flex items-center">
+                    <CalculatorIcon className="mr-2 h-5 w-5 text-accent" /> Manually Log Macros
+                </CardTitle>
+                <CardDescription>Ate off-plan? Enter your totals here to keep the weekly check-in accurate.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField control={form.control} name="calories" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Calories</FormLabel>
+                                    <FormControl><Input type="number" placeholder="kcal" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                            <FormField control={form.control} name="protein" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Protein (g)</FormLabel>
+                                    <FormControl><Input type="number" placeholder="grams" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                            <FormField control={form.control} name="carbs" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Carbs (g)</FormLabel>
+                                    <FormControl><Input type="number" placeholder="grams" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                            <FormField control={form.control} name="fat" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Fat (g)</FormLabel>
+                                    <FormControl><Input type="number" placeholder="grams" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                        </div>
+                        <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+                            <Save className="mr-2 h-4 w-4"/> {todayLog ? 'Update' : 'Log'} Daily Macros
+                        </Button>
+                    </form>
+                </Form>
+                 {todayLog && (
+                    <div className="mt-4 text-center p-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-md text-sm">
+                        <CheckCircle2 className="inline-block h-4 w-4 mr-2" />
+                        You have already logged macros manually for today. Submitting again will overwrite the previous entry.
+                    </div>
+                 )}
+            </CardContent>
+        </Card>
+    );
+}
+
 function VitalsHistoryCharts() {
   const { userProfile } = useAppContext();
   
@@ -404,10 +498,8 @@ function VitalsHistoryCharts() {
       return [];
     }
     
-    // Data is stored newest first, so we reverse it for chronological charts
     const last14Days = userProfile.dailyVitalsLog.slice(0, 14).reverse(); 
 
-    // Mapping categorical data to numerical values for charting
     const energyMap: Record<EnergyLevelV2, number> = { low: 1, moderate: 2, high: 3, vibrant: 4 };
     const sorenessMap: Record<SorenessLevel, number> = { none: 1, mild: 2, moderate: 3, severe: 4 };
     const activityMap: Record<ActivityYesterdayLevel, number> = { rest: 1, light: 2, moderate: 3, strenuous: 4 };
@@ -497,6 +589,7 @@ export default function DailyLogPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <DailyWeightLog />
                 <DailyVitalsCheckin />
+                <ManualMacroLog />
                 <VitalsHistoryCharts />
             </div>
         </PageWrapper>
