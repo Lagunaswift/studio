@@ -38,6 +38,7 @@ import { useState, type FormEvent } from 'react';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/context/AuthContext';
 import { useAppContext } from '@/context/AppContext';
+import { Button } from '@/components/ui/button';
 
 interface NavItem {
   href: string;
@@ -172,6 +173,7 @@ function ServiceStatusBanner() {
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { userProfile, acceptTerms, isAppDataLoading } = useAppContext();
+  const { user } = useAuth();
 
   const getCurrentPageTitle = () => {
     // Specific titles for AI pages
@@ -277,20 +279,20 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           </SidebarMenu>
           
           <SidebarMenu className="mt-auto">
-            {helpNavItems.map((item) => {
-                const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={isActive} tooltip={{ children: item.label, side: 'right', align: 'center' }}>
-                      <Link href={item.href}>
-                        <item.icon />
-                        <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-              <LogoutButton />
+             {helpNavItems.map((item) => {
+              const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+              return (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton asChild isActive={isActive} tooltip={{ children: item.label, side: 'right', align: 'center' }}>
+                    <Link href={item.href}>
+                      <item.icon />
+                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+            {user && <LogoutButton />}
           </SidebarMenu>
         </SidebarContent>
       </Sidebar>
@@ -304,7 +306,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           <h1 className="flex-grow text-center text-xl font-bold font-headline text-primary">
             {currentPageTitle}
           </h1>
-          <div className="w-10"> {/* Container for ThemeToggleButton */}
+          <div className="w-10 flex justify-end"> {/* Container for ThemeToggleButton */}
             <ThemeToggleButton />
           </div>
         </header>

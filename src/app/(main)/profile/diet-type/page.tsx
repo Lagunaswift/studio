@@ -1,3 +1,4 @@
+
 "use client";
 
 import { PageWrapper } from '@/components/layout/PageWrapper';
@@ -32,7 +33,7 @@ const dietAndAllergensSchema = z.object({
 type DietAndAllergensFormValues = z.infer<typeof dietAndAllergensSchema>;
 
 export default function DietAndAllergensPage() {
-  const { userProfile, setDietaryPreferences, setAllergens } = useAppContext();
+  const { userProfile, setUserInformation } = useAppContext();
   const { toast } = useToast();
   
   const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -47,16 +48,20 @@ export default function DietAndAllergensPage() {
   });
 
   useEffect(() => {
-    form.reset({
-      dietaryPreferences: userProfile?.dietaryPreferences || [],
-      allergens: userProfile?.allergens || [],
-    });
+    if (userProfile) {
+        form.reset({
+            dietaryPreferences: userProfile.dietaryPreferences || [],
+            allergens: userProfile.allergens || [],
+        });
+    }
   }, [userProfile, form]);
 
   const handleConfirmSubmit = () => {
     if (formData) {
-        setDietaryPreferences(formData.dietaryPreferences);
-        setAllergens(formData.allergens);
+        setUserInformation({ 
+            dietaryPreferences: formData.dietaryPreferences, 
+            allergens: formData.allergens 
+        });
         toast({
             title: "Settings Updated",
             description: "Your diet and allergen preferences have been saved.",
@@ -77,8 +82,10 @@ export default function DietAndAllergensPage() {
         setIsAlertOpen(true);
     } else {
         // If no new allergens are added, or if allergens are only removed, save directly.
-        setDietaryPreferences(data.dietaryPreferences);
-        setAllergens(data.allergens);
+        setUserInformation({ 
+            dietaryPreferences: data.dietaryPreferences, 
+            allergens: data.allergens 
+        });
         toast({
             title: "Settings Updated",
             description: "Your diet and allergen preferences have been saved.",
