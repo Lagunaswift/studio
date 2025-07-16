@@ -4,7 +4,7 @@
 import type React from 'react';
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
-// import { supabase } from '@/lib/supabaseClient'; // Supabase is no longer used
+import { supabase } from '@/lib/supabaseClient'; // Import the singleton client
 import type {
   PlannedMeal,
   ShoppingListItem,
@@ -26,6 +26,7 @@ import type {
   DailyVitalsLog,
   DailyWellnessLog,
   RDA,
+  DailyManualMacrosLog,
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight, getRdaProfile } from '@/lib/data';
@@ -33,46 +34,6 @@ import { loadState, saveState } from '@/lib/localStorage';
 import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { suggestMicronutrients } from '@/ai/flows/suggest-micronutrients-flow';
 import { format, subDays, differenceInDays } from 'date-fns';
-
-// Default user profile for a fresh start in local mode
-const DEFAULT_USER_PROFILE: UserProfileSettings = {
-    name: 'Local User',
-    email: 'user@example.com',
-    macroTargets: { calories: 2000, protein: 150, carbs: 200, fat: 60 },
-    dietaryPreferences: [],
-    allergens: [],
-    mealStructure: [
-      { id: 'default-breakfast', name: 'Breakfast', type: 'Breakfast' },
-      { id: 'default-lunch', name: 'Lunch', type: 'Lunch' },
-      { id: 'default-dinner', name: 'Dinner', type: 'Dinner' },
-      { id: 'default-snack1', name: 'Snack', type: 'Snack' },
-    ],
-    heightCm: null,
-    weightKg: null,
-    age: null,
-    sex: null,
-    activityLevel: null,
-    bodyFatPercentage: null,
-    athleteType: 'notSpecified',
-    primaryGoal: 'maintenance',
-    targetWeightChangeRateKg: 0,
-    tdee: null,
-    leanBodyMassKg: null,
-    rda: null,
-    dailyWeightLog: [],
-    dailyWellnessLog: [],
-    dailyVitalsLog: [],
-    dailyManualMacrosLog: [], // Added for new feature
-    dashboardSettings: {
-        showMacros: true,
-        showMenu: true,
-        showFeaturedRecipe: true,
-        showQuickRecipes: true,
-    },
-    hasAcceptedTerms: false, // Set to false to trigger modal for local dev
-    subscription_status: 'active',
-    lastCheckInDate: null,
-};
 
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
   if (weightKg && weightKg > 0 && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
@@ -150,12 +111,13 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, profile: authProfile, setProfile: setAuthProfile, isLoading: isAuthLoading } = useAuth();
   
   const [mealPlan, setMealPlan] = useState<PlannedMeal[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
-  const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
+  // userProfile is now derived from authProfile
+  const userProfile = authProfile;
   const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
   const [favoriteRecipeIds, setFavoriteRecipeIds] = useState<number[]>([]);
 
@@ -177,28 +139,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return uniqueRecipes;
   }, [staticRecipes, userRecipes]);
 
+  // Load data from localStorage when user is available
   useEffect(() => {
-    if (user && !isAuthLoading) {
+    if (user && !isAuthLoading && authProfile) { // Check for authProfile too
       const userId = user.id;
       setMealPlan(loadState(`mealPlan_${userId}`) || []);
       setPantryItems(loadState(`pantryItems_${userId}`) || []);
-      setUserProfile(loadState(`userProfile_${userId}`) || DEFAULT_USER_PROFILE);
       setUserRecipes(loadState(`userRecipes_${userId}`) || []);
       setFavoriteRecipeIds(loadState(`favoriteRecipeIds_${userId}`) || []);
     }
-  }, [user, isAuthLoading]);
+  }, [user, isAuthLoading, authProfile]);
 
+  // Save data to localStorage when it changes
   useEffect(() => {
     if (user && !isAppDataLoading) {
       const userId = user.id;
       saveState(`mealPlan_${userId}`, mealPlan);
       saveState(`pantryItems_${userId}`, pantryItems);
-      saveState(`userProfile_${userId}`, userProfile);
       saveState(`userRecipes_${userId}`, userRecipes);
       saveState(`favoriteRecipeIds_${userId}`, favoriteRecipeIds);
     }
-  }, [user, mealPlan, pantryItems, userProfile, userRecipes, favoriteRecipeIds, isAppDataLoading]);
+  }, [user, mealPlan, pantryItems, userRecipes, favoriteRecipeIds, isAppDataLoading]);
 
+  // Regenerate shopping list when dependencies change
   useEffect(() => {
     if (!isAppDataLoading) {
       const newShoppingList = generateShoppingListUtil(mealPlan, allRecipesCache, pantryItems);
@@ -238,11 +201,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!user) return;
     setMealPlan([]);
   }, [user]);
-  
+
   const updateUserProfileInDb = useCallback(async (updates: Partial<UserProfileSettings>) => {
-    if (!user) return;
-    setUserProfile(prev => prev ? { ...prev, ...updates } : null);
-  }, [user]);
+    if (!user || !authProfile) return;
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error updating profile in Supabase:", error);
+      // Optionally re-throw or handle the error in UI
+    } else if (data) {
+      setAuthProfile(data); // Update profile in AuthContext
+    }
+}, [user, authProfile, setAuthProfile]);
+
 
   const acceptTerms = useCallback(async () => {
     await updateUserProfileInDb({ hasAcceptedTerms: true });
@@ -255,25 +232,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setDashboardSettings = useCallback((settings: DashboardSettings) => updateUserProfileInDb({ dashboardSettings: settings }), [updateUserProfileInDb]);
   
   const setUserInformation = useCallback(async (info: Partial<UserProfileSettings>) => {
-    if (!user) return;
-    const newProfileData = { ...(userProfile || {}), ...info } as UserProfileSettings;
+    if (!user || !userProfile) return;
+    
+    // Merge new info with existing profile
+    const newProfileData = { ...userProfile, ...info } as UserProfileSettings;
+
+    // Recalculate derived values
     const finalBodyFatPercentage = newProfileData.bodyFatPercentage;
     const finalLbm = calculateLBM(newProfileData.weightKg, finalBodyFatPercentage);
     const finalTdee = calculateTDEE(newProfileData.weightKg, newProfileData.heightCm, newProfileData.age, newProfileData.sex, newProfileData.activityLevel);
     const finalRda = getRdaProfile(newProfileData.sex, newProfileData.age);
 
-    setUserProfile({
-      ...newProfileData,
+    const updatesForDb: Partial<UserProfileSettings> = {
+      ...info,
       tdee: finalTdee,
       leanBodyMassKg: finalLbm,
       rda: finalRda
-    });
-  }, [user, userProfile]);
+    };
+    
+    await updateUserProfileInDb(updatesForDb);
+
+  }, [user, userProfile, updateUserProfileInDb]);
   
   const toggleFavoriteRecipe = useCallback(async (recipeId: number) => {
     if (!user) return;
     const newFavs = favoriteRecipeIds.includes(recipeId) ? favoriteRecipeIds.filter(id => id !== recipeId) : [...favoriteRecipeIds, recipeId];
     setFavoriteRecipeIds(newFavs);
+    // Note: To persist this to Supabase, we would need a 'favorite_recipe_ids' column in the profiles table
+    // or a separate 'favorite_recipes' table. For now, it remains in localStorage.
   }, [user, favoriteRecipeIds]);
   
   const isRecipeFavorite = useCallback((recipeId: number): boolean => favoriteRecipeIds.includes(recipeId), [favoriteRecipeIds]);
@@ -323,7 +309,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         macrosPerServing: {
           calories: recipeData.calories, protein: recipeData.protein, carbs: recipeData.carbs, fat: recipeData.fat,
         },
-        micronutrientsPerServing: null, // Initialize as null
+        micronutrientsPerServing: null,
         instructions: recipeData.instructions.map(inst => inst.value),
         tags: recipeData.tags,
         isCustom: true,
@@ -352,14 +338,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPantryItems([]);
     setUserRecipes([]);
     setFavoriteRecipeIds([]);
-    setUserProfile(DEFAULT_USER_PROFILE);
+    // Clearing profile is now handled by Supabase, maybe a reset function there is needed
+    // For now, we only clear local data
     const userId = user.id;
     localStorage.removeItem(`mealPlan_${userId}`);
     localStorage.removeItem(`pantryItems_${userId}`);
     localStorage.removeItem(`userRecipes_${userId}`);
     localStorage.removeItem(`favoriteRecipeIds_${userId}`);
-    localStorage.removeItem(`userProfile_${userId}`);
   }, [user]);
+  
+    const logData = useCallback(async (logType: 'dailyWeightLog' | 'dailyVitalsLog' | 'dailyManualMacrosLog', date: string, data: any) => {
+        if (!userProfile || !user) return;
+        
+        const newLogEntry = { date, ...data };
+        if (logType === 'dailyManualMacrosLog') {
+             newLogEntry.macros = data;
+             delete newLogEntry.date;
+        }
+
+
+        const currentLogs = userProfile[logType] || [];
+        const existingLogIndex = currentLogs.findIndex(log => log.date === date);
+
+        let updatedLogs: any[];
+        if (existingLogIndex > -1) {
+            updatedLogs = [...currentLogs];
+            updatedLogs[existingLogIndex] = newLogEntry;
+        } else {
+            updatedLogs = [...currentLogs, newLogEntry];
+        }
+
+        updatedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        const updates: Partial<UserProfileSettings> = { [logType]: updatedLogs };
+        if (logType === 'dailyWeightLog') {
+            updates.weightKg = data.weightKg;
+        }
+        
+        updateUserProfileInDb(updates);
+    }, [user, userProfile, updateUserProfileInDb]);
+
+
+    const logWeight = (date: string, weightKg: number) => logData('dailyWeightLog', date, { weightKg });
+    const logVitals = (date: string, vitals: Omit<DailyVitalsLog, 'date'>) => logData('dailyVitalsLog', date, vitals);
+    const logManualMacros = (date: string, macros: Macros) => logData('dailyManualMacrosLog', date, { macros });
+    const logWellness = (date: string, mood: Mood, energy: Energy) => { /* Deprecated, use logVitals */ };
+
 
   const getConsumedMacrosForDate = useCallback((date: string): Macros => {
     const manualLog = userProfile?.dailyManualMacrosLog?.find(log => log.date === date);
@@ -387,86 +411,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!user) return;
     setMealPlan(prev => prev.map(pm => pm.id === plannedMealId ? { ...pm, status } : pm));
   }, [user]);
-
-  const logWeight = useCallback(async (date: string, weightKg: number) => {
-    if (!userProfile || !user) return;
-    const newLogEntry: DailyWeightLog = { date, weightKg };
-    
-    const currentLogs = userProfile.dailyWeightLog || [];
-    const existingLogIndex = currentLogs.findIndex(log => log.date === date);
-
-    let updatedLogs: DailyWeightLog[];
-    if (existingLogIndex > -1) {
-        updatedLogs = [...currentLogs];
-        updatedLogs[existingLogIndex] = newLogEntry;
-    } else {
-        updatedLogs = [...currentLogs, newLogEntry];
-    }
-
-    updatedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    updateUserProfileInDb({ dailyWeightLog: updatedLogs, weightKg });
-  }, [user, userProfile, updateUserProfileInDb]);
-  
-  const logWellness = useCallback(async (date: string, mood: Mood, energy: Energy) => {
-    if (!userProfile || !user) return;
-    const newLogEntry: DailyWellnessLog = { date, mood, energy };
-
-    const currentLogs = userProfile.dailyWellnessLog || [];
-    const existingLogIndex = currentLogs.findIndex(log => log.date === date);
-
-    let updatedLogs: DailyWellnessLog[];
-    if (existingLogIndex > -1) {
-        updatedLogs = [...currentLogs];
-        updatedLogs[existingLogIndex] = newLogEntry;
-    } else {
-        updatedLogs = [...currentLogs, newLogEntry];
-    }
-
-    updatedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    updateUserProfileInDb({ dailyWellnessLog: updatedLogs });
-  }, [user, userProfile, updateUserProfileInDb]);
-
-  const logVitals = useCallback(async (date: string, vitals: Omit<DailyVitalsLog, 'date'>) => {
-    if (!userProfile || !user) return;
-    const newLogEntry: DailyVitalsLog = { date, ...vitals };
-
-    const currentLogs = userProfile.dailyVitalsLog || [];
-    const existingLogIndex = currentLogs.findIndex(log => log.date === date);
-
-    let updatedLogs: DailyVitalsLog[];
-    if (existingLogIndex > -1) {
-        updatedLogs = [...currentLogs];
-        updatedLogs[existingLogIndex] = newLogEntry;
-    } else {
-        updatedLogs = [...currentLogs, newLogEntry];
-    }
-    
-    updatedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    
-    updateUserProfileInDb({ dailyVitalsLog: updatedLogs });
-  }, [user, userProfile, updateUserProfileInDb]);
-
-  const logManualMacros = useCallback(async (date: string, macros: Macros) => {
-    if (!userProfile || !user) return;
-    const newLogEntry = { date, macros };
-
-    const currentLogs = userProfile.dailyManualMacrosLog || [];
-    const existingLogIndex = currentLogs.findIndex(log => log.date === date);
-
-    let updatedLogs: { date: string, macros: Macros }[];
-    if (existingLogIndex > -1) {
-      updatedLogs = [...currentLogs];
-      updatedLogs[existingLogIndex] = newLogEntry;
-    } else {
-      updatedLogs = [...currentLogs, newLogEntry];
-    }
-
-    updatedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    
-    updateUserProfileInDb({ dailyManualMacrosLog: updatedLogs });
-  }, [user, userProfile, updateUserProfileInDb]);
 
 
   const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: PreppyOutput | null }> => {
