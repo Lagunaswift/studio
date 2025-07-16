@@ -1,8 +1,10 @@
 
 "use client";
 
-import React, { createContext, useContext, useEffect, useMemo, useCallback, useState } from 'react';
+import React, { createContext, useContext, useMemo, useCallback, useState, useEffect } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from './AuthContext';
+import { db, getOrCreateUserProfile, updateUserProfile } from '@/lib/db';
 import {
   PlannedMeal,
   ShoppingListItem,
@@ -18,16 +20,13 @@ import {
   Sex,
   ActivityLevel,
   RDA,
+  MealSlotConfig,
+  DashboardSettings,
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
 import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { format, subDays, differenceInDays } from 'date-fns';
-import { supabase } from '@/lib/supabaseClient';
-import { loadState, saveState } from '@/lib/localStorage';
-
-// Helper to determine if we should use Supabase or fallback to local storage
-const isOnlineMode = () => process.env.NEXT_PUBLIC_SERVICE_STATUS === 'online';
 
 // --- Calculation Helpers ---
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
@@ -84,20 +83,21 @@ const processProfile = (profileData: UserProfileSettings): UserProfileSettings =
     return p;
 };
 
-
 interface AppContextType {
-  // State
+  // State from DB (via useLiveQuery)
   mealPlan: PlannedMeal[];
-  shoppingList: ShoppingListItem[];
   pantryItems: PantryItem[];
-  userProfile: UserProfileSettings | null;
   userRecipes: Recipe[];
-  allRecipesCache: Recipe[];
-  favoriteRecipeIds: number[];
+  userProfile: UserProfileSettings | null;
   dailyWeightLog: DailyWeightLog[];
   dailyVitalsLog: DailyVitalsLog[];
   dailyManualMacrosLog: DailyManualMacrosLog[];
   
+  // Computed State
+  allRecipesCache: Recipe[];
+  shoppingList: ShoppingListItem[];
+  favoriteRecipeIds: number[];
+
   // Loaders
   isRecipeCacheLoading: boolean;
   isAppDataLoading: boolean;
@@ -108,9 +108,9 @@ interface AppContextType {
   updatePlannedMealServings: (plannedMealId: string, newServings: number) => Promise<void>;
   updateMealStatus: (plannedMealId: string, status: 'planned' | 'eaten') => Promise<void>;
   logWeight: (date: string, weightKg: number) => Promise<void>;
-  logVitals: (date: string, vitals: Omit<DailyVitalsLog, 'date' | 'id' | 'user_id' | 'created_at'>) => Promise<void>;
+  logVitals: (date: string, vitals: Omit<DailyVitalsLog, 'id' | 'date' >) => Promise<void>;
   logManualMacros: (date: string, macros: Macros) => Promise<void>;
-  toggleShoppingListItem: (itemId: string) => Promise<void>;
+  toggleShoppingListItem: (itemId: string) => Promise<void>; // Note: This might need more thought in a DB context
   clearMealPlanForDate: (date: string) => Promise<void>;
   clearEntireMealPlan: () => Promise<void>;
   toggleFavoriteRecipe: (recipeId: number) => Promise<void>;
@@ -119,380 +119,184 @@ interface AppContextType {
   updatePantryItemQuantity: (itemId: string, newQuantity: number) => Promise<void>;
   addCustomRecipe: (recipeData: RecipeFormData) => Promise<void>;
   runWeeklyCheckin: () => Promise<{ success: boolean; message: string; recommendation?: PreppyOutput | null }>;
+  
+  // Profile Actions
   setUserInformation: (updates: Partial<UserProfileSettings>) => Promise<void>;
   setMacroTargets: (targets: Macros) => Promise<void>;
-  setDietaryPreferences: (preferences: string[]) => Promise<void>;
-  setAllergens: (allergens: string[]) => Promise<void>;
   setMealStructure: (structure: MealSlotConfig[]) => Promise<void>;
   setDashboardSettings: (settings: Partial<DashboardSettings>) => Promise<void>;
+  acceptTerms: () => Promise<void>;
 
   // Getters
   getConsumedMacrosForDate: (date: string) => Macros;
   getPlannedMacrosForDate: (date: string) => Macros;
   getMealsForDate: (date: string) => PlannedMeal[];
   isRecipeFavorite: (recipeId: number) => boolean;
-  parseIngredient: (ingredientString: string) => { name: string; quantity: number; unit: string };
-  assignIngredientCategory: (ingredientName: string) => string;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, profile: authProfile, isLoading: isAuthLoading, updateUserProfileInDb } = useAuth();
+  const { user, profile: authProfile, isLoading: isAuthLoading } = useAuth();
   
-  const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
-  const { 
-    mealPlan, pantryItems, userRecipes, favoriteRecipeIds, 
-    dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog, 
-    setMealPlan, setPantryItems, setUserRecipes, setFavoriteRecipeIds,
-    setDailyWeightLog, setDailyVitalsLog, setDailyManualMacrosLog
-  } = useAppData(user?.id, isAuthLoading);
-
+  // --- Live queries to keep UI in sync with the database ---
+  const userProfile = useLiveQuery(
+    () => user ? getOrCreateUserProfile(user.id).then(processProfile) : Promise.resolve(null),
+    [user?.id], // Rerun when user ID changes
+    null
+  );
+  const userRecipes = useLiveQuery(() => db.recipes.where({ isCustom: 1 }).toArray(), [], []);
+  const mealPlan = useLiveQuery(() => db.plannedMeals.toArray(), [], []);
+  const pantryItems = useLiveQuery(() => db.pantryItems.toArray(), [], []);
+  const dailyWeightLog = useLiveQuery(() => db.dailyWeightLog.orderBy('date').reverse().toArray(), [], []);
+  const dailyVitalsLog = useLiveQuery(() => db.dailyVitalsLog.orderBy('date').reverse().toArray(), [], []);
+  const dailyManualMacrosLog = useLiveQuery(() => db.dailyManualMacrosLog.orderBy('date').reverse().toArray(), [], []);
+  
   const [staticRecipes, setStaticRecipes] = useState<Recipe[]>([]);
-  const [isRecipeCacheLoading, setIsRecipeCacheLoading] = useState(true);
-  
-  const isAppDataLoading = isAuthLoading || isRecipeCacheLoading;
+  const [isStaticRecipeLoading, setIsStaticRecipeLoading] = useState(true);
+
+  const isAppDataLoading = isAuthLoading || isStaticRecipeLoading || userProfile === undefined;
+
+  // --- Load static recipes from data file ---
+  useEffect(() => {
+    async function loadStaticRecipes() {
+      const recipes = await getAllRecipesFromDataFile();
+      // Only add to DB if they don't already exist
+      await db.transaction('rw', db.recipes, async () => {
+        for (const recipe of recipes) {
+          const exists = await db.recipes.get(recipe.id);
+          if (!exists) {
+            await db.recipes.add(recipe);
+          }
+        }
+      });
+      setStaticRecipes(recipes);
+      setIsStaticRecipeLoading(false);
+    }
+    loadStaticRecipes();
+  }, []);
   
   const allRecipesCache = useMemo(() => {
     const combined = [...staticRecipes, ...userRecipes];
     const uniqueRecipes = Array.from(new Map(combined.map(recipe => [recipe.id, recipe])).values());
     return uniqueRecipes;
   }, [staticRecipes, userRecipes]);
-  
+
+  const favoriteRecipeIds = useMemo(() => userProfile?.favorite_recipe_ids || [], [userProfile]);
+
   const shoppingList = useMemo(() => {
      if (isAppDataLoading) return [];
      return generateShoppingListUtil(mealPlan, allRecipesCache, pantryItems);
   }, [mealPlan, pantryItems, allRecipesCache, isAppDataLoading]);
 
-  useEffect(() => {
-    getAllRecipesFromDataFile().then(recipes => {
-      setStaticRecipes(recipes);
-      setIsRecipeCacheLoading(false);
-    });
-  }, []);
+  // --- ACTIONS ---
 
-  useEffect(() => {
-    if (isOnlineMode()) {
-        if (authProfile) {
-            setUserProfile(processProfile(authProfile));
-        } else if (!isAuthLoading) {
-            setUserProfile(null);
-        }
-    } else if (!isAuthLoading) {
-        const localProfile = loadState<UserProfileSettings>('userProfile');
-        if (localProfile) {
-            setUserProfile(processProfile(localProfile));
-        } else {
-             setUserProfile({
-                macroTargets: { calories: 2000, protein: 150, carbs: 200, fat: 60 },
-                dietaryPreferences: [],
-                allergens: [],
-                mealStructure: [
-                    { id: '1', name: 'Breakfast', type: 'Breakfast' },
-                    { id: '2', name: 'Lunch', type: 'Lunch' },
-                    { id: '3', name: 'Dinner', type: 'Dinner' },
-                    { id: '4', name: 'Snack', type: 'Snack' },
-                ],
-                hasAcceptedTerms: false,
-             } as UserProfileSettings);
-        }
-    }
-  }, [authProfile, isAuthLoading]);
-  
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
-    const newProfile = { ...(userProfile || {}), ...updates } as UserProfileSettings;
-    const processed = processProfile(newProfile);
-    setUserProfile(processed);
-    if (isOnlineMode()) {
-        await updateUserProfileInDb(updates);
-    } else {
-        saveState('userProfile', processed);
-    }
-  }, [userProfile, updateUserProfileInDb]);
-  
+    if (!user) return;
+    await updateUserProfile(user.id, updates);
+  }, [user]);
+
+  const acceptTerms = useCallback(async () => {
+    if (!user) return;
+    await updateUserProfile(user.id, { hasAcceptedTerms: true });
+  }, [user]);
+
   const setMacroTargets = useCallback(async (targets: Macros) => {
-    await setUserInformation({ macroTargets: targets });
-  }, [setUserInformation]);
-
-  const setDietaryPreferences = useCallback(async (preferences: string[]) => {
-    await setUserInformation({ dietaryPreferences: preferences });
-  }, [setUserInformation]);
-
-  const setAllergens = useCallback(async (allergens: string[]) => {
-    await setUserInformation({ allergens });
-  }, [setUserInformation]);
-
-  const setMealStructure = useCallback(async (structure: MealSlotConfig[]) => {
-    await setUserInformation({ mealStructure: structure });
-  }, [setUserInformation]);
+    if (!user) return;
+    await updateUserProfile(user.id, { macroTargets: targets });
+  }, [user]);
   
+  const setMealStructure = useCallback(async (structure: MealSlotConfig[]) => {
+    if (!user) return;
+    await updateUserProfile(user.id, { mealStructure: structure });
+  }, [user]);
+
   const setDashboardSettings = useCallback(async (settings: Partial<DashboardSettings>) => {
+    if (!user) return;
     const newSettings = { ...(userProfile?.dashboardSettings || {}), ...settings };
-    await setUserInformation({ dashboardSettings: newSettings });
-  }, [userProfile, setUserInformation]);
+    await updateUserProfile(user.id, { dashboardSettings: newSettings });
+  }, [user, userProfile]);
 
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
-    const newPlannedMeal = { 
+    const newPlannedMeal: PlannedMeal = { 
       id: `meal_${Date.now()}`,
       recipeId: recipe.id, 
       date, 
       mealType, 
       servings,
-      status: 'planned' as 'planned' | 'eaten',
+      status: 'planned',
     };
-
-    if (isOnlineMode() && user) {
-        try {
-            const { data, error } = await supabase.from('planned_meals').insert({
-                user_id: user.id, recipe_id: recipe.id, date, meal_type: mealType, servings, status: 'planned'
-            }).select().single();
-            if (error) throw error;
-            if (data) setMealPlan(prev => [...prev, data as PlannedMeal]);
-        } catch (e) {
-            console.error("Supabase failed. Falling back to local storage.", e);
-            setMealPlan(prev => {
-                const newState = [...prev, newPlannedMeal];
-                saveState('mealPlan', newState);
-                return newState;
-            });
-        }
-    } else {
-        setMealPlan(prev => {
-            const newState = [...prev, newPlannedMeal];
-            saveState('mealPlan', newState);
-            return newState;
-        });
-    }
-  }, [user, setMealPlan]);
+    await db.plannedMeals.add(newPlannedMeal);
+  }, []);
 
   const removeMealFromPlan = useCallback(async (plannedMealId: string) => {
-    if (isOnlineMode() && user) {
-        try {
-            const { error } = await supabase.from('planned_meals').delete().eq('id', plannedMealId).eq('user_id', user.id);
-            if (error) throw error;
-            setMealPlan(prev => prev.filter(pm => pm.id !== plannedMealId));
-        } catch (e) {
-            console.error("Supabase failed. Falling back to local storage.", e);
-            setMealPlan(prev => {
-                const newState = prev.filter(pm => pm.id !== plannedMealId);
-                saveState('mealPlan', newState);
-                return newState;
-            });
-        }
-    } else {
-        setMealPlan(prev => {
-            const newState = prev.filter(pm => pm.id !== plannedMealId);
-            saveState('mealPlan', newState);
-            return newState;
-        });
-    }
-  }, [user, setMealPlan]);
+    await db.plannedMeals.delete(plannedMealId);
+  }, []);
 
   const updatePlannedMealServings = useCallback(async (plannedMealId: string, newServings: number) => {
-     if (isOnlineMode() && user) {
-        try {
-            const { data, error } = await supabase.from('planned_meals').update({ servings: newServings }).eq('id', plannedMealId).select().single();
-            if (error) throw error;
-            if (data) setMealPlan(prev => prev.map(pm => pm.id === plannedMealId ? data as PlannedMeal : pm));
-        } catch (e) {
-             console.error("Supabase failed. Falling back to local storage.", e);
-             setMealPlan(prev => {
-                const newState = prev.map(pm => pm.id === plannedMealId ? { ...pm, servings: newServings } : pm);
-                saveState('mealPlan', newState);
-                return newState;
-             });
-        }
-    } else {
-         setMealPlan(prev => {
-            const newState = prev.map(pm => pm.id === plannedMealId ? { ...pm, servings: newServings } : pm);
-            saveState('mealPlan', newState);
-            return newState;
-         });
-    }
-  }, [user, setMealPlan]);
+    await db.plannedMeals.update(plannedMealId, { servings: newServings });
+  }, []);
 
   const updateMealStatus = useCallback(async (plannedMealId: string, status: 'planned' | 'eaten') => {
-    if (isOnlineMode() && user) {
-        try {
-            const { data, error } = await supabase.from('planned_meals').update({ status }).eq('id', plannedMealId).select().single();
-            if (error) throw error;
-            if (data) setMealPlan(prev => prev.map(pm => pm.id === plannedMealId ? data as PlannedMeal : pm));
-        } catch (e) {
-            console.error("Supabase failed. Falling back to local storage.", e);
-            setMealPlan(prev => {
-                const newState = prev.map(pm => pm.id === plannedMealId ? { ...pm, status } : pm);
-                saveState('mealPlan', newState);
-                return newState;
-            });
-        }
-    } else {
-        setMealPlan(prev => {
-            const newState = prev.map(pm => pm.id === plannedMealId ? { ...pm, status } : pm);
-            saveState('mealPlan', newState);
-            return newState;
-        });
-    }
-  }, [user, setMealPlan]);
+    await db.plannedMeals.update(plannedMealId, { status });
+  }, []);
 
   const clearMealPlanForDate = useCallback(async (date: string) => {
-    if (isOnlineMode() && user) {
-        try {
-            const { error } = await supabase.from('planned_meals').delete().eq('user_id', user.id).eq('date', date);
-            if (error) throw error;
-            setMealPlan(prev => prev.filter(pm => pm.date !== date));
-        } catch (e) {
-             console.error("Supabase failed. Falling back to local storage.", e);
-             setMealPlan(prev => {
-                const newState = prev.filter(pm => pm.date !== date);
-                saveState('mealPlan', newState);
-                return newState;
-             });
-        }
-    } else {
-        setMealPlan(prev => {
-            const newState = prev.filter(pm => pm.date !== date);
-            saveState('mealPlan', newState);
-            return newState;
-        });
-    }
-  }, [user, setMealPlan]);
+    const mealsToDelete = await db.plannedMeals.where('date').equals(date).primaryKeys();
+    await db.plannedMeals.bulkDelete(mealsToDelete);
+  }, []);
 
   const clearEntireMealPlan = useCallback(async () => {
-    if (isOnlineMode() && user) {
-        try {
-            const { error } = await supabase.from('planned_meals').delete().eq('user_id', user.id);
-            if (error) throw error;
-            setMealPlan([]);
-        } catch (e) {
-            console.error("Supabase failed. Falling back to local storage.", e);
-            setMealPlan([]);
-            saveState('mealPlan', []);
-        }
-    } else {
-        setMealPlan([]);
-        saveState('mealPlan', []);
-    }
-  }, [user, setMealPlan]);
-  
+    await db.plannedMeals.clear();
+  }, []);
+
   const toggleFavoriteRecipe = useCallback(async (recipeId: number) => {
-    const isCurrentlyFavorite = favoriteRecipeIds.includes(recipeId);
-    
-    if (isOnlineMode() && user) {
-        try {
-            if (isCurrentlyFavorite) {
-                const { error } = await supabase.from('favorite_recipes').delete().eq('user_id', user.id).eq('recipe_id', recipeId);
-                if (error) throw error;
-            } else {
-                const { error } = await supabase.from('favorite_recipes').insert({ user_id: user.id, recipe_id: recipeId });
-                if (error) throw error;
-            }
-        } catch(e) {
-            console.error("Supabase failed. Cannot update favorite.", e);
-            return; 
-        }
-    }
-    
-    const newFavoriteIds = isCurrentlyFavorite ? favoriteRecipeIds.filter(id => id !== recipeId) : [...favoriteRecipeIds, recipeId];
-    setFavoriteRecipeIds(newFavoriteIds);
-    if (!isOnlineMode()) {
-        saveState('favoriteRecipeIds', newFavoriteIds);
-    }
-  }, [user, favoriteRecipeIds, setFavoriteRecipeIds]);
+    if (!user) return;
+    const currentFavorites = userProfile?.favorite_recipe_ids || [];
+    const isCurrentlyFavorite = currentFavorites.includes(recipeId);
+    const newFavorites = isCurrentlyFavorite
+      ? currentFavorites.filter(id => id !== recipeId)
+      : [...currentFavorites, recipeId];
+    await updateUserProfile(user.id, { favorite_recipe_ids: newFavorites });
+  }, [user, userProfile]);
   
-  const isRecipeFavorite = useCallback((recipeId: number): boolean => favoriteRecipeIds.includes(recipeId), [favoriteRecipeIds]);
-
   const addPantryItem = useCallback(async (name: string, quantity: number, unit: string, category: string, expiryDate?: string) => {
-    const newItem = {
-        id: `pantry_${Date.now()}`,
-        name, quantity, unit, category, expiryDate,
-    };
+    const existingItem = await db.pantryItems
+      .where('name').equalsIgnoreCase(name)
+      .and(item => item.unit === unit)
+      .first();
 
-    if (isOnlineMode() && user) {
-        try {
-            const existingItem = pantryItems.find(p => p.name.toLowerCase() === name.toLowerCase() && p.unit === unit);
-            if (existingItem) {
-                const newQuantity = existingItem.quantity + quantity;
-                const { data, error } = await supabase.from('pantry_items').update({ quantity: newQuantity, expiry_date: expiryDate }).eq('id', existingItem.id).select().single();
-                if (error) throw error;
-                if(data) setPantryItems(prev => prev.map(p => p.id === existingItem.id ? data : p));
-            } else {
-                const { data, error } = await supabase.from('pantry_items').insert({ ...newItem, user_id: user.id, item_name: name, expiration_date: expiryDate }).select().single();
-                if (error) throw error;
-                if (data) setPantryItems(prev => [...prev, data]);
-            }
-        } catch (e) {
-            console.error("Supabase failed. Falling back to local storage.", e);
-            setPantryItems(prev => {
-                const existing = prev.find(p => p.name.toLowerCase() === name.toLowerCase() && p.unit === unit);
-                const newState = existing ? prev.map(p => p.id === existing.id ? { ...p, quantity: p.quantity + quantity } : p) : [...prev, newItem];
-                saveState('pantryItems', newState);
-                return newState;
-            });
-        }
+    if (existingItem) {
+      await db.pantryItems.update(existingItem.id, { 
+        quantity: existingItem.quantity + quantity,
+        expiryDate: expiryDate // Optionally update expiry date
+      });
     } else {
-        setPantryItems(prev => {
-            const existing = prev.find(p => p.name.toLowerCase() === name.toLowerCase() && p.unit === unit);
-            const newState = existing ? prev.map(p => p.id === existing.id ? { ...p, quantity: p.quantity + quantity } : p) : [...prev, newItem];
-            saveState('pantryItems', newState);
-            return newState;
-        });
+      const newItem: PantryItem = {
+        id: `pantry_${Date.now()}`,
+        name, quantity, unit, 
+        category: category as UKSupermarketCategory, 
+        expiryDate
+      };
+      await db.pantryItems.add(newItem);
     }
-  }, [user, pantryItems, setPantryItems]);
-
+  }, []);
 
   const removePantryItem = useCallback(async (itemId: string) => {
-    if (isOnlineMode() && user) {
-        try {
-            const { error } = await supabase.from('pantry_items').delete().eq('id', itemId);
-            if (error) throw error;
-            setPantryItems(prev => prev.filter(p => p.id !== itemId));
-        } catch (e) {
-            console.error("Supabase failed. Falling back to local storage.", e);
-            setPantryItems(prev => {
-                const newState = prev.filter(p => p.id !== itemId);
-                saveState('pantryItems', newState);
-                return newState;
-            });
-        }
-    } else {
-        setPantryItems(prev => {
-            const newState = prev.filter(p => p.id !== itemId);
-            saveState('pantryItems', newState);
-            return newState;
-        });
-    }
-  }, [user, setPantryItems]);
+    await db.pantryItems.delete(itemId);
+  }, []);
 
   const updatePantryItemQuantity = useCallback(async (itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
       await removePantryItem(itemId);
-      return;
-    }
-    if (isOnlineMode() && user) {
-        try {
-            const { data, error } = await supabase.from('pantry_items').update({ quantity: newQuantity }).eq('id', itemId).select().single();
-            if (error) throw error;
-            if (data) setPantryItems(prev => prev.map(p => p.id === itemId ? data : p));
-        } catch(e) {
-            console.error("Supabase failed. Falling back to local storage.", e);
-            setPantryItems(prev => {
-                const newState = prev.map(p => p.id === itemId ? { ...p, quantity: newQuantity } : p);
-                saveState('pantryItems', newState);
-                return newState;
-            });
-        }
     } else {
-        setPantryItems(prev => {
-            const newState = prev.map(p => p.id === itemId ? { ...p, quantity: newQuantity } : p);
-            saveState('pantryItems', newState);
-            return newState;
-        });
+      await db.pantryItems.update(itemId, { quantity: newQuantity });
     }
-  }, [user, removePantryItem, setPantryItems]);
-  
+  }, [removePantryItem]);
+
   const addCustomRecipe = useCallback(async (recipeData: RecipeFormData) => {
-    const localId = Date.now();
-    const recipeBase = {
+    const newRecipe: Recipe = {
+        id: Date.now(), // Use timestamp for unique local ID
         name: recipeData.name,
         description: recipeData.description,
         image: recipeData.image || `https://placehold.co/600x400.png?text=${encodeURIComponent(recipeData.name)}`,
@@ -505,111 +309,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         instructions: recipeData.instructions.map(inst => inst.value),
         tags: recipeData.tags,
         isCustom: true,
+        user_id: user?.id
     };
-    
-    if (isOnlineMode() && user) {
-        try {
-            const { data: newRecipeData, error } = await supabase.from('user_recipes').insert({ ...recipeBase, user_id: user.id }).select().single();
-            if(error) throw error;
-            if(newRecipeData) setUserRecipes(prev => [...prev, newRecipeData]);
-        } catch(e) {
-             console.error("Supabase failed. Falling back to local storage.", e);
-             setUserRecipes(prev => {
-                const newState = [...prev, { ...recipeBase, id: localId }];
-                saveState('userRecipes', newState);
-                return newState;
-            });
-        }
-    } else {
-        setUserRecipes(prev => {
-            const newState = [...prev, { ...recipeBase, id: localId }];
-            saveState('userRecipes', newState);
-            return newState;
-        });
-    }
-  }, [user, setUserRecipes]);
+    await db.recipes.add(newRecipe);
+  }, [user]);
 
   const logWeight = useCallback(async (date: string, weightKg: number) => {
-    if (isOnlineMode() && user) {
-        try {
-            const { error: deleteError } = await supabase.from('daily_weight_logs').delete().match({ user_id: user.id, date });
-            if (deleteError) console.error('Error clearing old weight log:', deleteError);
-            const { data, error } = await supabase.from('daily_weight_logs').insert({ user_id: user.id, date, weight_kg: weightKg }).select().single();
-            if (error) throw error;
-            setDailyWeightLog(prev => [...prev.filter(log => log.date !== date), data]);
-        } catch (e) {
-            console.error("Supabase failed. Falling back to local storage.", e);
-            const newLog = { date, weightKg };
-            setDailyWeightLog(prev => {
-                const newState = [...prev.filter(l => l.date !== date), newLog];
-                saveState('dailyWeightLog', newState);
-                return newState;
-            });
-        }
-    } else {
-        const newLog = { date, weightKg };
-        setDailyWeightLog(prev => {
-            const newState = [...prev.filter(l => l.date !== date), newLog];
-            saveState('dailyWeightLog', newState);
-            return newState;
-        });
-    }
-    await setUserInformation({ weightKg });
-  }, [user, setDailyWeightLog, setUserInformation]);
+    if (!user) return;
+    const newLog: DailyWeightLog = { date, weightKg };
+    await db.dailyWeightLog.put(newLog); // put will add or update based on primary key 'date'
+    await updateUserProfile(user.id, { weightKg });
+  }, [user]);
 
-  const logVitals = useCallback(async (date: string, vitals: Omit<DailyVitalsLog, 'date' | 'id' | 'user_id' | 'created_at'>) => {
-    if (isOnlineMode() && user) {
-        try {
-            const { error: deleteError } = await supabase.from('daily_vitals_logs').delete().match({ user_id: user.id, date });
-            if (deleteError) console.error('Error clearing old vitals log:', deleteError);
-            const { data, error } = await supabase.from('daily_vitals_logs').insert({ user_id: user.id, date, ...vitals }).select().single();
-            if (error) throw error;
-            setDailyVitalsLog(prev => [...prev.filter(log => log.date !== date), data]);
-        } catch (e) {
-            console.error("Supabase failed. Falling back to local storage.", e);
-            const newLog = { date, ...vitals };
-            setDailyVitalsLog(prev => {
-                const newState = [...prev.filter(l => l.date !== date), newLog];
-                saveState('dailyVitalsLog', newState);
-                return newState;
-            });
-        }
-    } else {
-        const newLog = { date, ...vitals };
-        setDailyVitalsLog(prev => {
-            const newState = [...prev.filter(l => l.date !== date), newLog];
-            saveState('dailyVitalsLog', newState);
-            return newState;
-        });
-    }
-  }, [user, setDailyVitalsLog]);
+  const logVitals = useCallback(async (date: string, vitals: Omit<DailyVitalsLog, 'id' | 'date' >) => {
+    const newLog: DailyVitalsLog = { date, ...vitals };
+    await db.dailyVitalsLog.put(newLog);
+  }, []);
   
   const logManualMacros = useCallback(async (date: string, macros: Macros) => {
-    if (isOnlineMode() && user) {
-        try {
-            const { error: deleteError } = await supabase.from('daily_manual_macros_logs').delete().match({ user_id: user.id, date });
-            if (deleteError) console.error('Error clearing old manual macros log:', deleteError);
-            const { data, error } = await supabase.from('daily_manual_macros_logs').insert({ user_id: user.id, date, macros }).select().single();
-            if (error) throw error;
-            setDailyManualMacrosLog(prev => [...prev.filter(log => log.date !== date), data]);
-        } catch(e) {
-             console.error("Supabase failed. Falling back to local storage.", e);
-             const newLog = { date, macros };
-             setDailyManualMacrosLog(prev => {
-                const newState = [...prev.filter(l => l.date !== date), newLog];
-                saveState('dailyManualMacrosLog', newState);
-                return newState;
-            });
-        }
-    } else {
-        const newLog = { date, macros };
-        setDailyManualMacrosLog(prev => {
-            const newState = [...prev.filter(l => l.date !== date), newLog];
-            saveState('dailyManualMacrosLog', newState);
-            return newState;
-        });
-    }
-  }, [user, setDailyManualMacrosLog]);
+    const newLog: DailyManualMacrosLog = { date, macros };
+    await db.dailyManualMacrosLog.put(newLog);
+  }, []);
+
+  // --- GETTERS ---
 
   const getConsumedMacrosForDate = useCallback((date: string): Macros => {
     const manualLog = dailyManualMacrosLog.find(log => log.date === date);
@@ -627,11 +349,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .map(pm => ({ ...pm, recipeDetails: allRecipesCache.find(r => r.id === pm.recipeId) }));
   }, [mealPlan, allRecipesCache]);
 
-  const parseIngredient = useCallback((ingredientString: string) => parseIngredientStringUtil(ingredientString), []);
-  const assignIngredientCategory = useCallback((ingredientName: string) => assignCategoryUtil(ingredientName), []);
-  const toggleShoppingListItem = useCallback(async (itemId: string) => { 
-      // This is a client-side only operation for now
-  }, []);
+  const isRecipeFavorite = useCallback((recipeId: number): boolean => favoriteRecipeIds.includes(recipeId), [favoriteRecipeIds]);
+  
+  // Placeholder for now, can be implemented if needed
+  const toggleShoppingListItem = useCallback(async (itemId: string) => {}, []);
+  
+  // --- AI FLOWS ---
 
   const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: PreppyOutput | null }> => {
     if (!userProfile || !dailyWeightLog || dailyWeightLog.length < 14) {
@@ -697,112 +420,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const recommendation = await runPreppy(preppyInput);
     
-    await setUserInformation({ tdee: newDynamicTDEE, lastCheckInDate: format(new Date(), 'yyyy-MM-dd') });
+    if (user) {
+        await updateUserProfile(user.id, { tdee: newDynamicTDEE, lastCheckInDate: format(new Date(), 'yyyy-MM-dd') });
+    }
 
     return { success: true, message: "Check-in complete!", recommendation };
-  }, [userProfile, dailyWeightLog, getConsumedMacrosForDate, setUserInformation]);
+  }, [userProfile, dailyWeightLog, getConsumedMacrosForDate, user]);
+
 
   const contextValue = useMemo(() => ({
-    mealPlan, shoppingList, pantryItems, userProfile, userRecipes, allRecipesCache,
-    addMealToPlan, removeMealFromPlan, updatePlannedMealServings, getConsumedMacrosForDate,
-    toggleShoppingListItem, clearMealPlanForDate, getMealsForDate,
-    isRecipeCacheLoading, isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe,
-    isRecipeFavorite, addPantryItem, removePantryItem, updatePantryItemQuantity,
-    parseIngredient, assignIngredientCategory, addCustomRecipe, 
-    updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin, logVitals,
-    logManualMacros, clearEntireMealPlan, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog,
-    setUserInformation, setMacroTargets, setDietaryPreferences, setAllergens, setMealStructure, setDashboardSettings
+    mealPlan, pantryItems, userRecipes, userProfile, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog,
+    allRecipesCache, shoppingList, favoriteRecipeIds, isRecipeCacheLoading: isStaticRecipeLoading, isAppDataLoading,
+    addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus, 
+    logWeight, logVitals, logManualMacros,
+    toggleShoppingListItem, clearMealPlanForDate, clearEntireMealPlan,
+    toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
+    addCustomRecipe, runWeeklyCheckin,
+    setUserInformation, setMacroTargets, setMealStructure, setDashboardSettings, acceptTerms,
+    getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
   }), [
-    mealPlan, shoppingList, pantryItems, userProfile, userRecipes, allRecipesCache, addMealToPlan, removeMealFromPlan,
-    updatePlannedMealServings, getConsumedMacrosForDate, toggleShoppingListItem,
-    clearMealPlanForDate, getMealsForDate, isRecipeCacheLoading,
-    isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe, isRecipeFavorite,
-    addPantryItem, removePantryItem, updatePantryItemQuantity, parseIngredient, assignIngredientCategory,
-    addCustomRecipe, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin, logVitals,
-    logManualMacros, clearEntireMealPlan, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog,
-    setUserInformation, setMacroTargets, setDietaryPreferences, setAllergens, setMealStructure, setDashboardSettings
+    mealPlan, pantryItems, userRecipes, userProfile, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog,
+    allRecipesCache, shoppingList, favoriteRecipeIds, isStaticRecipeLoading, isAppDataLoading,
+    addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus,
+    logWeight, logVitals, logManualMacros, toggleShoppingListItem, clearMealPlanForDate,
+    clearEntireMealPlan, toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
+    addCustomRecipe, runWeeklyCheckin, setUserInformation, setMacroTargets, setMealStructure,
+    setDashboardSettings, acceptTerms, getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
   ]);
   
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 };
-
-
-function useAppData(userId: string | undefined, isAuthLoading: boolean) {
-    const [mealPlan, setMealPlan] = useState<PlannedMeal[]>([]);
-    const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
-    const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
-    const [favoriteRecipeIds, setFavoriteRecipeIds] = useState<number[]>([]);
-    const [dailyWeightLog, setDailyWeightLog] = useState<DailyWeightLog[]>([]);
-    const [dailyVitalsLog, setDailyVitalsLog] = useState<DailyVitalsLog[]>([]);
-    const [dailyManualMacrosLog, setDailyManualMacrosLog] = useState<DailyManualMacrosLog[]>([]);
-
-    useEffect(() => {
-        const onlineMode = isOnlineMode();
-
-        if (onlineMode && userId && !isAuthLoading) {
-            const fetchData = async () => {
-                try {
-                    const [
-                        mealPlanRes, pantryRes, userRecipesRes, favoritesRes,
-                        weightLogsRes, vitalsLogsRes, manualMacrosLogsRes
-                    ] = await Promise.all([
-                        supabase.from('planned_meals').select('*').eq('user_id', userId).order('date', { ascending: false }),
-                        supabase.from('pantry_items').select('*').eq('user_id', userId),
-                        supabase.from('user_recipes').select('*').eq('user_id', userId),
-                        supabase.from('favorite_recipes').select('recipe_id').eq('user_id', userId),
-                        supabase.from('daily_weight_logs').select('*').eq('user_id', userId).order('date', { ascending: false }),
-                        supabase.from('daily_vitals_logs').select('*').eq('user_id', userId).order('date', { ascending: false }),
-                        supabase.from('daily_manual_macros_logs').select('*').eq('user_id', userId).order('date', { ascending: false }),
-                    ]);
-
-                    if (mealPlanRes.error) throw mealPlanRes.error;
-                    setMealPlan(mealPlanRes.data || []);
-                    if (pantryRes.error) throw pantryRes.error;
-                    setPantryItems(pantryRes.data.map(p => ({...p, name: p.item_name, expiryDate: p.expiration_date})) || []);
-                    if (userRecipesRes.error) throw userRecipesRes.error;
-                    setUserRecipes(userRecipesRes.data || []);
-                    if (favoritesRes.error) throw favoritesRes.error;
-                    setFavoriteRecipeIds(favoritesRes.data?.map(f => f.recipe_id) || []);
-                    if (weightLogsRes.error) throw weightLogsRes.error;
-                    setDailyWeightLog(weightLogsRes.data.map(l => ({...l, weightKg: l.weight_kg})) || []);
-                    if (vitalsLogsRes.error) throw vitalsLogsRes.error;
-                    setDailyVitalsLog(vitalsLogsRes.data || []);
-                    if (manualMacrosLogsRes.error) throw manualMacrosLogsRes.error;
-                    setDailyManualMacrosLog(manualMacrosLogsRes.data || []);
-
-                } catch (error) {
-                    console.error("Supabase fetch failed, falling back to local storage.", error);
-                    setMealPlan(loadState('mealPlan') || []);
-                    setPantryItems(loadState('pantryItems') || []);
-                    setUserRecipes(loadState('userRecipes') || []);
-                    setFavoriteRecipeIds(loadState('favoriteRecipeIds') || []);
-                    setDailyWeightLog(loadState('dailyWeightLog') || []);
-                    setDailyVitalsLog(loadState('dailyVitalsLog') || []);
-                    setDailyManualMacrosLog(loadState('dailyManualMacrosLog') || []);
-                }
-            };
-            fetchData();
-        } else if (!isAuthLoading) {
-            setMealPlan(loadState('mealPlan') || []);
-            setPantryItems(loadState('pantryItems') || []);
-            setUserRecipes(loadState('userRecipes') || []);
-            setFavoriteRecipeIds(loadState('favoriteRecipeIds') || []);
-            setDailyWeightLog(loadState('dailyWeightLog') || []);
-            setDailyVitalsLog(loadState('dailyVitalsLog') || []);
-            setDailyManualMacrosLog(loadState('dailyManualMacrosLog') || []);
-        }
-    }, [userId, isAuthLoading]);
-
-    return {
-        mealPlan, setMealPlan,
-        pantryItems, setPantryItems,
-        userRecipes, setUserRecipes,
-        favoriteRecipeIds, setFavoriteRecipeIds,
-        dailyWeightLog, setDailyWeightLog,
-        dailyVitalsLog, setDailyVitalsLog,
-        dailyManualMacrosLog, setDailyManualMacrosLog
-    };
-}
 
 
 export const useAppContext = (): AppContextType => {
