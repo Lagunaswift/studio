@@ -1,200 +1,76 @@
---
--- Main User Profiles Table
--- Stores comprehensive user information, settings, and calculated values.
---
-CREATE TABLE profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  updated_at TIMESTAMP WITH TIME ZONE,
-  name TEXT,
-  email TEXT UNIQUE,
-  
-  -- Physical Attributes
-  height_cm REAL,
-  weight_kg REAL,
-  age REAL,
-  sex TEXT,
-  body_fat_percentage REAL,
-  neck_circumference_cm REAL,
-  abdomen_circumference_cm REAL,
-  waist_circumference_cm REAL,
-  hip_circumference_cm REAL,
+-- Drop existing types and tables if they exist to ensure a clean setup.
+DROP TYPE IF EXISTS "sex_enum" CASCADE;
+DROP TYPE IF EXISTS "activity_level_enum" CASCADE;
+DROP TYPE IF EXISTS "training_experience_enum" CASCADE;
+DROP TYPE IF EXISTS "athlete_type_enum" CASCADE;
+DROP TYPE IF EXISTS "primary_goal_enum" CASCADE;
+DROP TYPE IF EXISTS "meal_type_enum" CASCADE;
+DROP TYPE IF EXISTS "meal_status_enum" CASCADE;
+DROP TYPE IF EXISTS "energy_level_v2_enum" CASCADE;
+DROP TYPE IF EXISTS "soreness_level_enum" CASCADE;
+DROP TYPE IF EXISTS "activity_yesterday_level_enum" CASCADE;
 
-  -- Goals & Activity
-  activity_level TEXT,
-  training_experience_level TEXT,
-  athlete_type TEXT,
-  primary_goal TEXT,
-  target_weight_change_rate_kg REAL,
-  
-  -- Calculated Estimates
-  tdee REAL, -- Total Daily Energy Expenditure
-  lean_body_mass_kg REAL,
+DROP TABLE IF EXISTS "profiles" CASCADE;
+DROP TABLE IF EXISTS "user_recipes" CASCADE;
+DROP TABLE IF EXISTS "pantry_items" CASCADE;
+DROP TABLE IF EXISTS "planned_meals" CASCADE;
+DROP TABLE IF EXISTS "daily_weight_logs" CASCADE;
+DROP TABLE IF EXISTS "daily_vitals_log" CASCADE;
+DROP TABLE IF EXISTS "daily_manual_macros_log" CASCADE;
 
-  -- App Settings
-  macro_targets JSONB,
-  dietary_preferences TEXT[],
-  allergens TEXT[],
-  meal_structure JSONB[],
-  dashboard_settings JSONB,
-  
-  -- App State
-  has_accepted_terms BOOLEAN DEFAULT FALSE,
-  last_check_in_date DATE,
-  
-  -- Subscription Info (for future use)
-  subscription_status TEXT,
-  subscription_end_date TIMESTAMP WITH TIME ZONE
+
+-- Create custom ENUM types for structured data, improving data integrity.
+CREATE TYPE "sex_enum" AS ENUM ('male', 'female');
+CREATE TYPE "activity_level_enum" AS ENUM ('sedentary', 'light', 'moderate', 'active', 'veryActive');
+CREATE TYPE "training_experience_enum" AS ENUM ('beginner', 'intermediate', 'advanced', 'veryAdvanced', 'notSpecified');
+CREATE TYPE "athlete_type_enum" AS ENUM ('endurance', 'strengthPower', 'generalFitness', 'notSpecified');
+CREATE TYPE "primary_goal_enum" AS ENUM ('fatLoss', 'muscleGain', 'maintenance', 'notSpecified');
+CREATE TYPE "meal_type_enum" AS ENUM ('Breakfast', 'Lunch', 'Dinner', 'Snack');
+CREATE TYPE "meal_status_enum" AS ENUM ('planned', 'eaten');
+CREATE TYPE "energy_level_v2_enum" AS ENUM ('low', 'moderate', 'high', 'vibrant');
+CREATE TYPE "soreness_level_enum" AS ENUM ('none', 'mild', 'moderate', 'severe');
+CREATE TYPE "activity_yesterday_level_enum" AS ENUM ('rest', 'light', 'moderate', 'strenuous');
+
+-- Profiles Table: Stores all user-specific settings and calculated data.
+CREATE TABLE "profiles" (
+  "id" uuid NOT NULL PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE,
+  "updated_at" timestamp with time zone,
+  "name" text,
+  "email" text UNIQUE,
+  "macro_targets" jsonb,
+  "dietary_preferences" text[],
+  "allergens" text[],
+  "meal_structure" jsonb,
+  "height_cm" real,
+  "weight_kg" real,
+  "age" integer,
+  "sex" sex_enum,
+  "activity_level" activity_level_enum,
+  "training_experience_level" training_experience_enum,
+  "body_fat_percentage" real,
+  "athlete_type" athlete_type_enum,
+  "primary_goal" primary_goal_enum,
+  "tdee" integer,
+  "lean_body_mass_kg" real,
+  "neck_circumference_cm" real,
+  "abdomen_circumference_cm" real,
+  "waist_circumference_cm" real,
+  "hip_circumference_cm" real,
+  "favorite_recipe_ids" integer[],
+  "dashboard_settings" jsonb,
+  "has_accepted_terms" boolean DEFAULT false,
+  "last_check_in_date" date,
+  "target_weight_change_rate_kg" real
 );
 
--- RLS Policies for profiles
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view their own profile." ON profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can insert their own profile." ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
-CREATE POLICY "Users can update their own profile." ON profiles FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Users can delete their own profile." ON profiles FOR DELETE USING (auth.uid() = id);
+-- Row Level Security for profiles
+ALTER TABLE "profiles" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can only see and manage their own profile."
+ON "profiles" FOR ALL
+USING (auth.uid() = id)
+WITH CHECK (auth.uid() = id);
 
-
---
--- User-Created Custom Recipes Table
---
-CREATE TABLE user_recipes (
-  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-  name TEXT NOT NULL,
-  description TEXT,
-  image TEXT,
-  servings REAL NOT NULL,
-  prep_time TEXT,
-  cook_time TEXT,
-  chill_time TEXT,
-  ingredients TEXT[] NOT NULL,
-  instructions TEXT[] NOT NULL,
-  macros_per_serving JSONB NOT NULL,
-  micronutrients_per_serving JSONB,
-  tags TEXT[]
-);
-
--- RLS Policies for user_recipes
-ALTER TABLE user_recipes ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can manage their own recipes." ON user_recipes FOR ALL USING (auth.uid() = user_id);
-
-
---
--- Favorite Recipes Junction Table
--- Links users to their favorite recipes (both static and custom).
---
-CREATE TABLE favorite_recipes (
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  recipe_id BIGINT NOT NULL, -- Can reference both static and user_recipes
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-  PRIMARY KEY (user_id, recipe_id)
-);
-
--- RLS Policies for favorite_recipes
-ALTER TABLE favorite_recipes ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can manage their own favorite recipes." ON favorite_recipes FOR ALL USING (auth.uid() = user_id);
-
-
---
--- Planned Meals Table
--- Stores meals planned by the user for specific dates.
---
-CREATE TABLE planned_meals (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-  recipe_id BIGINT NOT NULL,
-  date DATE NOT NULL,
-  meal_type TEXT NOT NULL,
-  servings REAL NOT NULL,
-  status TEXT NOT NULL DEFAULT 'planned' -- 'planned' or 'eaten'
-);
-
--- RLS Policies for planned_meals
-ALTER TABLE planned_meals ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can manage their own meal plans." ON planned_meals FOR ALL USING (auth.uid() = user_id);
-
-
---
--- Pantry Items Table
--- Tracks ingredients the user has on hand.
---
-CREATE TABLE pantry_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-  name TEXT NOT NULL,
-  quantity REAL NOT NULL,
-  unit TEXT NOT NULL,
-  category TEXT NOT NULL,
-  expiry_date DATE
-);
-
--- RLS Policies for pantry_items
-ALTER TABLE pantry_items ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can manage their own pantry items." ON pantry_items FOR ALL USING (auth.uid() = user_id);
-
-
---
--- Daily Weight Log Table
---
-CREATE TABLE daily_weight_logs (
-    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    date DATE NOT NULL,
-    weight_kg REAL NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
-    UNIQUE(user_id, date)
-);
-
--- RLS Policies for daily_weight_logs
-ALTER TABLE daily_weight_logs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can manage their own weight logs." ON daily_weight_logs FOR ALL USING (auth.uid() = user_id);
-
-
---
--- Daily Vitals Log Table
---
-CREATE TABLE daily_vitals_logs (
-    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    date DATE NOT NULL,
-    sleep_quality REAL,
-    energy_level TEXT,
-    cravings_level REAL,
-    muscle_soreness TEXT,
-    activity_yesterday TEXT,
-    notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
-    UNIQUE(user_id, date)
-);
-
--- RLS Policies for daily_vitals_logs
-ALTER TABLE daily_vitals_logs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can manage their own vitals logs." ON daily_vitals_logs FOR ALL USING (auth.uid() = user_id);
-
-
---
--- Daily Manual Macros Log Table
---
-CREATE TABLE daily_manual_macros_logs (
-    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    date DATE NOT NULL,
-    macros JSONB NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
-    UNIQUE(user_id, date)
-);
-
--- RLS Policies for daily_manual_macros_logs
-ALTER TABLE daily_manual_macros_logs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can manage their own manual macro logs." ON daily_manual_macros_logs FOR ALL USING (auth.uid() = user_id);
-
-
---
--- Function to create a user profile automatically on new user sign-up.
---
+-- Function to create a profile for a new user.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -204,18 +80,113 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
---
--- Trigger to execute the function after a new user is created.
---
+-- Trigger to call the function when a new user signs up.
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
--- Set up Storage for user avatars (optional)
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('avatars', 'avatars', TRUE)
-ON CONFLICT (id) DO NOTHING;
+-- User Recipes Table: Stores custom recipes created by users.
+CREATE TABLE "user_recipes" (
+  "id" bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  "user_id" uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  "created_at" timestamp with time zone DEFAULT now(),
+  "recipe_data" jsonb NOT NULL
+);
 
-CREATE POLICY "Avatar images are publicly accessible." ON storage.objects FOR SELECT USING (bucket_id = 'avatars');
-CREATE POLICY "Authenticated users can upload an avatar." ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'avatars' AND auth.role() = 'authenticated');
-CREATE POLICY "Users can update their own avatar." ON storage.objects FOR UPDATE USING (auth.uid() = owner) WITH CHECK (bucket_id = 'avatars');
+-- Row Level Security for user_recipes
+ALTER TABLE "user_recipes" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own custom recipes."
+ON "user_recipes" FOR ALL
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Pantry Items Table
+CREATE TABLE "pantry_items" (
+  "id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+  "user_id" uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  "created_at" timestamp with time zone DEFAULT now(),
+  "name" text NOT NULL,
+  "quantity" real NOT NULL,
+  "unit" text,
+  "category" text,
+  "expiry_date" date
+);
+
+-- Row Level Security for pantry_items
+ALTER TABLE "pantry_items" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own pantry items."
+ON "pantry_items" FOR ALL
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Planned Meals Table
+CREATE TABLE "planned_meals" (
+  "id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+  "user_id" uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  "created_at" timestamp with time zone DEFAULT now(),
+  "recipe_id" integer NOT NULL,
+  "date" date NOT NULL,
+  "meal_type" meal_type_enum,
+  "servings" real,
+  "status" meal_status_enum
+);
+
+-- Row Level Security for planned_meals
+ALTER TABLE "planned_meals" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own meal plans."
+ON "planned_meals" FOR ALL
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Daily Weight Logs Table
+CREATE TABLE "daily_weight_logs" (
+    "id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    "user_id" uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+    "date" date NOT NULL,
+    "weight_kg" real NOT NULL,
+    UNIQUE(user_id, date)
+);
+
+-- Row Level Security for daily_weight_logs
+ALTER TABLE "daily_weight_logs" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own weight logs."
+ON "daily_weight_logs" FOR ALL
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Daily Vitals Log Table
+CREATE TABLE "daily_vitals_log" (
+    "id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    "user_id" uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+    "date" date NOT NULL,
+    "sleep_quality" smallint,
+    "energy_level" energy_level_v2_enum,
+    "cravings_level" smallint,
+    "muscle_soreness" soreness_level_enum,
+    "activity_yesterday" activity_yesterday_level_enum,
+    "notes" text,
+    UNIQUE(user_id, date)
+);
+
+-- Row Level Security for daily_vitals_log
+ALTER TABLE "daily_vitals_log" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own vitals logs."
+ON "daily_vitals_log" FOR ALL
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Daily Manual Macros Log
+CREATE TABLE "daily_manual_macros_log" (
+    "id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    "user_id" uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+    "date" date NOT NULL,
+    "macros" jsonb,
+    UNIQUE(user_id, date)
+);
+
+-- Row Level Security for daily_manual_macros_log
+ALTER TABLE "daily_manual_macros_log" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own manual macro logs."
+ON "daily_manual_macros_log" FOR ALL
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
