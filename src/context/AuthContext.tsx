@@ -3,59 +3,11 @@
 
 import { createContext, useState, useEffect, useContext, ReactNode, useMemo, useCallback } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import type { UserProfileSettings, Sex, ActivityLevel, RDA } from '@/types';
+import type { UserProfileSettings } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
-import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 
-// --- Calculation Helpers ---
-const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
-  if (weightKg && weightKg > 0 && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
-    const lbm = weightKg * (1 - bodyFatPercentage / 100);
-    if (isNaN(lbm) || !isFinite(lbm) || lbm <= 0) return null;
-    return parseFloat(lbm.toFixed(1));
-  }
-  return null;
-};
+const isOnlineMode = () => process.env.NEXT_PUBLIC_SERVICE_STATUS === 'online';
 
-const calculateTDEE = (
-  weightKg: number | null,
-  heightCm: number | null,
-  age: number | null,
-  sex: Sex | null,
-  activityLevel: ActivityLevel | null
-): number | null => {
-  if (!weightKg || !heightCm || !age || !sex || !activityLevel) return null;
-  let bmr: number;
-  if (sex === 'male') bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
-  else bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
-  const activity = ACTIVITY_LEVEL_OPTIONS.find(opt => opt.value === activityLevel);
-  if (activity) {
-    const tdee = bmr * activity.multiplier;
-    if (isNaN(tdee) || !isFinite(tdee) || tdee <= 0) return null;
-    return Math.round(tdee);
-  }
-  return null;
-};
-
-const getRdaProfile = (sex: Sex | null | undefined, age: number | null | undefined): RDA | null => {
-    if (!sex || !age) {
-        return null;
-    }
-    // Simplified RDA values for demonstration. A real app would use a more complex table.
-    // Values are for adults aged 19-50.
-    if (age >= 19 && age <= 50) {
-        if (sex === 'male') {
-            return { iron: 8, calcium: 1000, potassium: 3400, vitaminA: 900, vitaminC: 90, vitaminD: 15 };
-        } else { // female
-            return { iron: 18, calcium: 1000, potassium: 2600, vitaminA: 700, vitaminC: 75, vitaminD: 15 };
-        }
-    }
-    // Default for other age groups for now
-    return { iron: 10, calcium: 1200, potassium: 3000, vitaminA: 800, vitaminC: 80, vitaminD: 15 };
-};
-
-
-// The Profile type here will be a subset of UserProfileSettings.
 export interface Profile extends UserProfileSettings {
   id: string;
 }
@@ -79,32 +31,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const processProfile = (profileData: UserProfileSettings | Profile): Profile => {
-    const p = { ...profileData } as Profile;
-    p.tdee = calculateTDEE(p.weightKg, p.heightCm, p.age, p.sex, p.activityLevel);
-    p.leanBodyMassKg = calculateLBM(p.weightKg, p.bodyFatPercentage);
-    p.rda = getRdaProfile(p.sex, p.age);
-    return p;
-  };
-
   const updateUserProfileInDb = useCallback(async (updates: Partial<UserProfileSettings>) => {
-    if (!user || !profile) return;
+    if (!isOnlineMode() || !user || !profile) return;
     
-    // Create a new profile object with updates to calculate derived values
-    const updatedProfileData = { ...profile, ...updates };
-    const processedUpdates = processProfile(updatedProfileData);
-    
-    // We only want to save the raw fields to the DB, not our calculated ones
-    const dbUpdates: Partial<Profile> = {
-        ...updates,
-        tdee: processedUpdates.tdee,
-        leanBodyMassKg: processedUpdates.leanBodyMassKg,
-        rda: processedUpdates.rda,
-    };
-
     const { data, error } = await supabase
       .from('profiles')
-      .update(dbUpdates)
+      .update(updates)
       .eq('id', user.id)
       .select()
       .single();
@@ -112,16 +44,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (error) {
       console.error("Error updating profile in Supabase:", error);
     } else if (data) {
-      setProfile(processProfile(data as Profile)); // Update local state with newly processed profile
+      setProfile(data as Profile);
     }
   }, [user, profile]);
 
   const acceptTerms = useCallback(async () => {
     if (!profile) return;
     await updateUserProfileInDb({ hasAcceptedTerms: true });
+    setProfile(p => p ? { ...p, hasAcceptedTerms: true } : null); // Update local state immediately
   }, [profile, updateUserProfileInDb]);
   
   const fetchAndSetProfile = useCallback(async (user: User) => {
+      if (!isOnlineMode()) {
+        setProfile(null);
+        return;
+      }
       try {
         const { data: profileData, error } = await supabase
             .from('profiles')
@@ -134,7 +71,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         if (profileData) {
-            setProfile(processProfile(profileData as Profile));
+            setProfile(profileData as Profile);
         } else {
             // Profile doesn't exist, create it with defaults
             const newProfile: Partial<Profile> = {
@@ -151,7 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     { id: '4', name: 'Snack', type: 'Snack' },
                 ],
                 hasAcceptedTerms: false,
-                // other fields are null by default
+                dashboardSettings: { showMacros: true, showMenu: true, showFeaturedRecipe: true, showQuickRecipes: true },
             };
             const { data: createdProfile, error: insertError } = await supabase
                 .from('profiles')
@@ -160,7 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 .single();
             
             if (insertError) throw insertError;
-            setProfile(processProfile(createdProfile as Profile));
+            setProfile(createdProfile as Profile);
         }
       } catch(e) {
           console.error("Error fetching or creating profile:", e);
@@ -170,6 +107,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     setIsLoading(true);
+    if (!isOnlineMode()) {
+        setIsLoading(false);
+        return;
+    }
+
     const getActiveSession = async () => {
       const { data: { session: activeSession } } = await supabase.auth.getSession();
       setSession(activeSession);
@@ -203,6 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   const signOut = async () => {
+    if (!isOnlineMode()) return;
     const { error } = await supabase.auth.signOut();
     if (error) console.error("Error signing out:", error);
   };

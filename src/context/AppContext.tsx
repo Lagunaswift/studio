@@ -15,10 +15,13 @@ import {
   DailyWeightLog,
   DailyVitalsLog,
   DailyManualMacrosLog,
+  Sex,
+  ActivityLevel,
+  RDA,
 } from '@/types';
+import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
 import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-coach-flow';
-import { suggestMicronutrients } from '@/ai/flows/suggest-micronutrients-flow';
 import { format, subDays, differenceInDays } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
 import { loadState, saveState } from '@/lib/localStorage';
@@ -26,11 +29,68 @@ import { loadState, saveState } from '@/lib/localStorage';
 // Helper to determine if we should use Supabase or fallback to local storage
 const isOnlineMode = () => process.env.NEXT_PUBLIC_SERVICE_STATUS === 'online';
 
+// --- Calculation Helpers ---
+const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
+  if (weightKg && weightKg > 0 && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
+    const lbm = weightKg * (1 - bodyFatPercentage / 100);
+    if (isNaN(lbm) || !isFinite(lbm) || lbm <= 0) return null;
+    return parseFloat(lbm.toFixed(1));
+  }
+  return null;
+};
+
+const calculateTDEE = (
+  weightKg: number | null,
+  heightCm: number | null,
+  age: number | null,
+  sex: Sex | null,
+  activityLevel: ActivityLevel | null
+): number | null => {
+  if (!weightKg || !heightCm || !age || !sex || !activityLevel) return null;
+  let bmr: number;
+  if (sex === 'male') bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
+  else bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
+  const activity = ACTIVITY_LEVEL_OPTIONS.find(opt => opt.value === activityLevel);
+  if (activity) {
+    const tdee = bmr * activity.multiplier;
+    if (isNaN(tdee) || !isFinite(tdee) || tdee <= 0) return null;
+    return Math.round(tdee);
+  }
+  return null;
+};
+
+const getRdaProfile = (sex: Sex | null | undefined, age: number | null | undefined): RDA | null => {
+    if (!sex || !age) {
+        return null;
+    }
+    // Simplified RDA values for demonstration. A real app would use a more complex table.
+    // Values are for adults aged 19-50.
+    if (age >= 19 && age <= 50) {
+        if (sex === 'male') {
+            return { iron: 8, calcium: 1000, potassium: 3400, vitaminA: 900, vitaminC: 90, vitaminD: 15 };
+        } else { // female
+            return { iron: 18, calcium: 1000, potassium: 2600, vitaminA: 700, vitaminC: 75, vitaminD: 15 };
+        }
+    }
+    // Default for other age groups for now
+    return { iron: 10, calcium: 1200, potassium: 3000, vitaminA: 800, vitaminC: 80, vitaminD: 15 };
+};
+
+const processProfile = (profileData: UserProfileSettings): UserProfileSettings => {
+    const p = { ...profileData };
+    p.tdee = calculateTDEE(p.weightKg, p.heightCm, p.age, p.sex, p.activityLevel);
+    p.leanBodyMassKg = calculateLBM(p.weightKg, p.bodyFatPercentage);
+    p.rda = getRdaProfile(p.sex, p.age);
+    return p;
+};
+
+
 interface AppContextType {
   // State
   mealPlan: PlannedMeal[];
   shoppingList: ShoppingListItem[];
   pantryItems: PantryItem[];
+  userProfile: UserProfileSettings | null;
   userRecipes: Recipe[];
   allRecipesCache: Recipe[];
   favoriteRecipeIds: number[];
@@ -59,6 +119,12 @@ interface AppContextType {
   updatePantryItemQuantity: (itemId: string, newQuantity: number) => Promise<void>;
   addCustomRecipe: (recipeData: RecipeFormData) => Promise<void>;
   runWeeklyCheckin: () => Promise<{ success: boolean; message: string; recommendation?: PreppyOutput | null }>;
+  setUserInformation: (updates: Partial<UserProfileSettings>) => Promise<void>;
+  setMacroTargets: (targets: Macros) => Promise<void>;
+  setDietaryPreferences: (preferences: string[]) => Promise<void>;
+  setAllergens: (allergens: string[]) => Promise<void>;
+  setMealStructure: (structure: MealSlotConfig[]) => Promise<void>;
+  setDashboardSettings: (settings: Partial<DashboardSettings>) => Promise<void>;
 
   // Getters
   getConsumedMacrosForDate: (date: string) => Macros;
@@ -72,8 +138,9 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, profile, isLoading: isAuthLoading, setProfile } = useAuth();
+  const { user, profile: authProfile, isLoading: isAuthLoading, updateUserProfileInDb } = useAuth();
   
+  const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
   const { 
     mealPlan, pantryItems, userRecipes, favoriteRecipeIds, 
     dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog, 
@@ -103,7 +170,67 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsRecipeCacheLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    if (isOnlineMode()) {
+        if (authProfile) {
+            setUserProfile(processProfile(authProfile));
+        } else if (!isAuthLoading) {
+            setUserProfile(null);
+        }
+    } else if (!isAuthLoading) {
+        const localProfile = loadState<UserProfileSettings>('userProfile');
+        if (localProfile) {
+            setUserProfile(processProfile(localProfile));
+        } else {
+             setUserProfile({
+                macroTargets: { calories: 2000, protein: 150, carbs: 200, fat: 60 },
+                dietaryPreferences: [],
+                allergens: [],
+                mealStructure: [
+                    { id: '1', name: 'Breakfast', type: 'Breakfast' },
+                    { id: '2', name: 'Lunch', type: 'Lunch' },
+                    { id: '3', name: 'Dinner', type: 'Dinner' },
+                    { id: '4', name: 'Snack', type: 'Snack' },
+                ],
+                hasAcceptedTerms: false,
+             } as UserProfileSettings);
+        }
+    }
+  }, [authProfile, isAuthLoading]);
   
+  const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
+    const newProfile = { ...(userProfile || {}), ...updates } as UserProfileSettings;
+    const processed = processProfile(newProfile);
+    setUserProfile(processed);
+    if (isOnlineMode()) {
+        await updateUserProfileInDb(updates);
+    } else {
+        saveState('userProfile', processed);
+    }
+  }, [userProfile, updateUserProfileInDb]);
+  
+  const setMacroTargets = useCallback(async (targets: Macros) => {
+    await setUserInformation({ macroTargets: targets });
+  }, [setUserInformation]);
+
+  const setDietaryPreferences = useCallback(async (preferences: string[]) => {
+    await setUserInformation({ dietaryPreferences: preferences });
+  }, [setUserInformation]);
+
+  const setAllergens = useCallback(async (allergens: string[]) => {
+    await setUserInformation({ allergens });
+  }, [setUserInformation]);
+
+  const setMealStructure = useCallback(async (structure: MealSlotConfig[]) => {
+    await setUserInformation({ mealStructure: structure });
+  }, [setUserInformation]);
+  
+  const setDashboardSettings = useCallback(async (settings: Partial<DashboardSettings>) => {
+    const newSettings = { ...(userProfile?.dashboardSettings || {}), ...settings };
+    await setUserInformation({ dashboardSettings: newSettings });
+  }, [userProfile, setUserInformation]);
+
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
     const newPlannedMeal = { 
       id: `meal_${Date.now()}`,
@@ -261,12 +388,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
         } catch(e) {
             console.error("Supabase failed. Cannot update favorite.", e);
-            // Don't modify local state if Supabase fails to keep it consistent
             return; 
         }
     }
     
-    // Always update local state for immediate UI feedback or for local mode
     const newFavoriteIds = isCurrentlyFavorite ? favoriteRecipeIds.filter(id => id !== recipeId) : [...favoriteRecipeIds, recipeId];
     setFavoriteRecipeIds(newFavoriteIds);
     if (!isOnlineMode()) {
@@ -291,13 +416,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 if (error) throw error;
                 if(data) setPantryItems(prev => prev.map(p => p.id === existingItem.id ? data : p));
             } else {
-                const { data, error } = await supabase.from('pantry_items').insert({ ...newItem, user_id: user.id }).select().single();
+                const { data, error } = await supabase.from('pantry_items').insert({ ...newItem, user_id: user.id, item_name: name, expiration_date: expiryDate }).select().single();
                 if (error) throw error;
                 if (data) setPantryItems(prev => [...prev, data]);
             }
         } catch (e) {
             console.error("Supabase failed. Falling back to local storage.", e);
-            // Fallback logic
             setPantryItems(prev => {
                 const existing = prev.find(p => p.name.toLowerCase() === name.toLowerCase() && p.unit === unit);
                 const newState = existing ? prev.map(p => p.id === existing.id ? { ...p, quantity: p.quantity + quantity } : p) : [...prev, newItem];
@@ -430,8 +554,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return newState;
         });
     }
-    setProfile(p => p ? ({ ...p, weightKg }) : null);
-  }, [user, setDailyWeightLog, setProfile]);
+    await setUserInformation({ weightKg });
+  }, [user, setDailyWeightLog, setUserInformation]);
 
   const logVitals = useCallback(async (date: string, vitals: Omit<DailyVitalsLog, 'date' | 'id' | 'user_id' | 'created_at'>) => {
     if (isOnlineMode() && user) {
@@ -507,11 +631,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const assignIngredientCategory = useCallback((ingredientName: string) => assignCategoryUtil(ingredientName), []);
   const toggleShoppingListItem = useCallback(async (itemId: string) => { 
       // This is a client-side only operation for now
-      // setShoppingList(prev => prev.map(item => item.id === itemId ? {...item, purchased: !item.purchased} : item));
   }, []);
 
   const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: PreppyOutput | null }> => {
-    if (!profile || !dailyWeightLog || dailyWeightLog.length < 14) {
+    if (!userProfile || !dailyWeightLog || dailyWeightLog.length < 14) {
       return { success: false, message: "At least 14 days of weight and calorie data are needed for an accurate calculation." };
     }
     
@@ -563,39 +686,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     
     const preppyInput: PreppyInput = {
-      primaryGoal: profile.primaryGoal || 'maintenance',
-      targetWeightChangeRateKg: profile.targetWeightChangeRateKg || 0,
+      primaryGoal: userProfile.primaryGoal || 'maintenance',
+      targetWeightChangeRateKg: userProfile.targetWeightChangeRateKg || 0,
       dynamicTdee: newDynamicTDEE,
       actualAvgCalories: averageDailyCalories,
       actualWeeklyWeightChangeKg: actualWeeklyWeightChangeKg,
-      currentProteinTarget: profile.macroTargets?.protein || 0,
-      currentFatTarget: profile.macroTargets?.fat || 0,
+      currentProteinTarget: userProfile.macroTargets?.protein || 0,
+      currentFatTarget: userProfile.macroTargets?.fat || 0,
     };
 
     const recommendation = await runPreppy(preppyInput);
     
-    setProfile(p => p ? ({ ...p, tdee: newDynamicTDEE, lastCheckInDate: format(new Date(), 'yyyy-MM-dd') }) : null);
+    await setUserInformation({ tdee: newDynamicTDEE, lastCheckInDate: format(new Date(), 'yyyy-MM-dd') });
 
     return { success: true, message: "Check-in complete!", recommendation };
-  }, [profile, allRecipesCache, getConsumedMacrosForDate, setProfile, dailyWeightLog]);
+  }, [userProfile, dailyWeightLog, getConsumedMacrosForDate, setUserInformation]);
 
   const contextValue = useMemo(() => ({
-    mealPlan, shoppingList, pantryItems, userProfile: profile, userRecipes, allRecipesCache,
+    mealPlan, shoppingList, pantryItems, userProfile, userRecipes, allRecipesCache,
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, getConsumedMacrosForDate,
     toggleShoppingListItem, clearMealPlanForDate, getMealsForDate,
     isRecipeCacheLoading, isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe,
     isRecipeFavorite, addPantryItem, removePantryItem, updatePantryItemQuantity,
     parseIngredient, assignIngredientCategory, addCustomRecipe, 
     updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin, logVitals,
-    logManualMacros, clearEntireMealPlan, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog
+    logManualMacros, clearEntireMealPlan, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog,
+    setUserInformation, setMacroTargets, setDietaryPreferences, setAllergens, setMealStructure, setDashboardSettings
   }), [
-    mealPlan, shoppingList, pantryItems, profile, userRecipes, allRecipesCache, addMealToPlan, removeMealFromPlan,
+    mealPlan, shoppingList, pantryItems, userProfile, userRecipes, allRecipesCache, addMealToPlan, removeMealFromPlan,
     updatePlannedMealServings, getConsumedMacrosForDate, toggleShoppingListItem,
     clearMealPlanForDate, getMealsForDate, isRecipeCacheLoading,
     isAppDataLoading, favoriteRecipeIds, toggleFavoriteRecipe, isRecipeFavorite,
     addPantryItem, removePantryItem, updatePantryItemQuantity, parseIngredient, assignIngredientCategory,
     addCustomRecipe, updateMealStatus, logWeight, getPlannedMacrosForDate, runWeeklyCheckin, logVitals,
-    logManualMacros, clearEntireMealPlan, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog
+    logManualMacros, clearEntireMealPlan, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog,
+    setUserInformation, setMacroTargets, setDietaryPreferences, setAllergens, setMealStructure, setDashboardSettings
   ]);
   
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
@@ -633,13 +758,13 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
                     if (mealPlanRes.error) throw mealPlanRes.error;
                     setMealPlan(mealPlanRes.data || []);
                     if (pantryRes.error) throw pantryRes.error;
-                    setPantryItems(pantryRes.data || []);
+                    setPantryItems(pantryRes.data.map(p => ({...p, name: p.item_name, expiryDate: p.expiration_date})) || []);
                     if (userRecipesRes.error) throw userRecipesRes.error;
                     setUserRecipes(userRecipesRes.data || []);
                     if (favoritesRes.error) throw favoritesRes.error;
                     setFavoriteRecipeIds(favoritesRes.data?.map(f => f.recipe_id) || []);
                     if (weightLogsRes.error) throw weightLogsRes.error;
-                    setDailyWeightLog(weightLogsRes.data || []);
+                    setDailyWeightLog(weightLogsRes.data.map(l => ({...l, weightKg: l.weight_kg})) || []);
                     if (vitalsLogsRes.error) throw vitalsLogsRes.error;
                     setDailyVitalsLog(vitalsLogsRes.data || []);
                     if (manualMacrosLogsRes.error) throw manualMacrosLogsRes.error;
@@ -647,7 +772,6 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
 
                 } catch (error) {
                     console.error("Supabase fetch failed, falling back to local storage.", error);
-                    // If any Supabase fetch fails, load everything from local storage
                     setMealPlan(loadState('mealPlan') || []);
                     setPantryItems(loadState('pantryItems') || []);
                     setUserRecipes(loadState('userRecipes') || []);
@@ -658,7 +782,7 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
                 }
             };
             fetchData();
-        } else if (!isAuthLoading) { // Offline mode or logged out
+        } else if (!isAuthLoading) {
             setMealPlan(loadState('mealPlan') || []);
             setPantryItems(loadState('pantryItems') || []);
             setUserRecipes(loadState('userRecipes') || []);
