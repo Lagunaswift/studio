@@ -1,13 +1,13 @@
 
 'use client';
 
-import { createContext, useState, useEffect, useContext, ReactNode, useMemo } from 'react';
+import { createContext, useState, useEffect, useContext, ReactNode, useMemo, useCallback } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import type { UserProfileSettings } from '@/types';
-import { supabase } from '@/lib/supabaseClient'; // Import the singleton client
+import { supabase } from '@/lib/supabaseClient'; 
 
 // The Profile type here will be a subset of UserProfileSettings.
-interface Profile extends UserProfileSettings {
+export interface Profile extends UserProfileSettings {
   id: string;
   email: string;
   name: string | null;
@@ -21,6 +21,8 @@ interface AuthContextType {
   isLoading: boolean;
   signOut: () => Promise<void>;
   setProfile: React.Dispatch<React.SetStateAction<Profile | null>>;
+  acceptTerms: () => Promise<void>;
+  updateUserProfileInDb: (updates: Partial<UserProfileSettings>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,6 +33,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const updateUserProfileInDb = useCallback(async (updates: Partial<UserProfileSettings>) => {
+    if (!user || !profile) return;
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error updating profile in Supabase:", error);
+      // Optionally re-throw or handle the error in UI
+    } else if (data) {
+      setProfile(data as Profile); // Update profile in AuthContext
+    }
+  }, [user, profile]);
+
+  const acceptTerms = useCallback(async () => {
+    if (!profile) return;
+    await updateUserProfileInDb({ hasAcceptedTerms: true });
+    // Manually update the local state immediately after the DB call succeeds.
+    setProfile(prevProfile => prevProfile ? { ...prevProfile, hasAcceptedTerms: true } : null);
+  }, [profile, updateUserProfileInDb]);
+  
   useEffect(() => {
     const getActiveSession = async () => {
       try {
@@ -51,9 +78,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchAndSetProfile(session.user);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      
+      if (currentUser) {
+        // If user is same, don't refetch profile to avoid overwriting local changes.
+        // Let other parts of the app handle profile updates.
+        if (currentUser.id !== profile?.id) {
+           await fetchAndSetProfile(currentUser);
+        }
       } else {
         setProfile(null);
       }
@@ -63,7 +96,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [profile?.id]); // Rerun if profile id changes
   
   const fetchAndSetProfile = async (user: User) => {
       try {
@@ -83,9 +116,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // Profile doesn't exist, create it
             const newProfile: Partial<Profile> = {
                 id: user.id,
-                email: user.email,
+                email: user.email!,
                 name: user.user_metadata?.name || user.email,
-                // Set default values for other UserProfileSettings fields here if needed
             };
             const { data: createdProfile, error: insertError } = await supabase
                 .from('profiles')
@@ -106,11 +138,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) console.error("Error signing out:", error);
-    // The onAuthStateChange listener will handle setting user and profile to null
   };
 
-  const value = useMemo(() => ({ supabase, session, user, profile, isLoading, signOut, setProfile }), 
-    [session, user, profile, isLoading]
+  const value = useMemo(() => ({ session, user, profile, isLoading, signOut, setProfile, acceptTerms, updateUserProfileInDb }), 
+    [session, user, profile, isLoading, signOut, acceptTerms, updateUserProfileInDb]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
