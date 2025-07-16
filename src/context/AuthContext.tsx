@@ -119,7 +119,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const acceptTerms = useCallback(async () => {
     if (!profile) return;
     await updateUserProfileInDb({ hasAcceptedTerms: true });
-    setProfile(prevProfile => prevProfile ? { ...prevProfile, hasAcceptedTerms: true } : null);
   }, [profile, updateUserProfileInDb]);
   
   const fetchAndSetProfile = useCallback(async (user: User) => {
