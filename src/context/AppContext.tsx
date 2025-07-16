@@ -126,6 +126,7 @@ interface AppContextType {
   setMealStructure: (structure: MealSlotConfig[]) => Promise<void>;
   setDashboardSettings: (settings: Partial<DashboardSettings>) => Promise<void>;
   acceptTerms: () => Promise<void>;
+  assignIngredientCategory: (ingredientName: string) => UKSupermarketCategory;
 
   // Getters
   getConsumedMacrosForDate: (date: string) => Macros;
@@ -141,7 +142,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   // --- Live queries to keep UI in sync with the database ---
   const userProfile = useLiveQuery(
-    () => user ? getOrCreateUserProfile(user.id).then(processProfile) : Promise.resolve(null),
+    () => getOrCreateUserProfile(user?.id || 'local-user').then(processProfile),
     [user?.id], // Rerun when user ID changes
     null
   );
@@ -155,7 +156,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [staticRecipes, setStaticRecipes] = useState<Recipe[]>([]);
   const [isStaticRecipeLoading, setIsStaticRecipeLoading] = useState(true);
 
-  const isAppDataLoading = isAuthLoading || isStaticRecipeLoading || userProfile === undefined;
+  const isAppDataLoading = isAuthLoading || isStaticRecipeLoading || userProfile === null;
 
   // --- Load static recipes from data file ---
   useEffect(() => {
@@ -192,29 +193,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- ACTIONS ---
 
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
-    if (!user) return;
-    await updateUserProfile(user.id, updates);
+    const userId = user?.id || 'local-user';
+    await updateUserProfile(userId, updates);
   }, [user]);
 
   const acceptTerms = useCallback(async () => {
-    if (!user) return;
-    await updateUserProfile(user.id, { hasAcceptedTerms: true });
+    const userId = user?.id || 'local-user';
+    await updateUserProfile(userId, { hasAcceptedTerms: true });
   }, [user]);
 
   const setMacroTargets = useCallback(async (targets: Macros) => {
-    if (!user) return;
-    await updateUserProfile(user.id, { macroTargets: targets });
+    const userId = user?.id || 'local-user';
+    await updateUserProfile(userId, { macroTargets: targets });
   }, [user]);
   
   const setMealStructure = useCallback(async (structure: MealSlotConfig[]) => {
-    if (!user) return;
-    await updateUserProfile(user.id, { mealStructure: structure });
+    const userId = user?.id || 'local-user';
+    await updateUserProfile(userId, { mealStructure: structure });
   }, [user]);
 
   const setDashboardSettings = useCallback(async (settings: Partial<DashboardSettings>) => {
-    if (!user) return;
+    const userId = user?.id || 'local-user';
     const newSettings = { ...(userProfile?.dashboardSettings || {}), ...settings };
-    await updateUserProfile(user.id, { dashboardSettings: newSettings });
+    await updateUserProfile(userId, { dashboardSettings: newSettings });
   }, [user, userProfile]);
 
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
@@ -251,15 +252,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const toggleFavoriteRecipe = useCallback(async (recipeId: number) => {
-    if (!user) return;
+    const userId = user?.id || 'local-user';
     const currentFavorites = userProfile?.favorite_recipe_ids || [];
     const isCurrentlyFavorite = currentFavorites.includes(recipeId);
     const newFavorites = isCurrentlyFavorite
       ? currentFavorites.filter(id => id !== recipeId)
       : [...currentFavorites, recipeId];
-    await updateUserProfile(user.id, { favorite_recipe_ids: newFavorites });
+    await updateUserProfile(userId, { favorite_recipe_ids: newFavorites });
   }, [user, userProfile]);
   
+  const assignIngredientCategory = useCallback((ingredientName: string): UKSupermarketCategory => {
+    return assignCategoryUtil(ingredientName);
+  }, []);
+
   const addPantryItem = useCallback(async (name: string, quantity: number, unit: string, category: string, expiryDate?: string) => {
     const existingItem = await db.pantryItems
       .where('name').equalsIgnoreCase(name)
@@ -295,6 +300,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [removePantryItem]);
 
   const addCustomRecipe = useCallback(async (recipeData: RecipeFormData) => {
+    const userId = user?.id; // Custom recipes are tied to users
     const newRecipe: Recipe = {
         id: Date.now(), // Use timestamp for unique local ID
         name: recipeData.name,
@@ -306,19 +312,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         chillTime: recipeData.chillTime,
         ingredients: recipeData.ingredients.map(ing => ing.value),
         macrosPerServing: { calories: recipeData.calories, protein: recipeData.protein, carbs: recipeData.carbs, fat: recipeData.fat },
+        micronutrientsPerServing: null,
         instructions: recipeData.instructions.map(inst => inst.value),
         tags: recipeData.tags,
         isCustom: true,
-        user_id: user?.id
+        user_id: userId
     };
     await db.recipes.add(newRecipe);
   }, [user]);
 
   const logWeight = useCallback(async (date: string, weightKg: number) => {
-    if (!user) return;
+    const userId = user?.id || 'local-user';
     const newLog: DailyWeightLog = { date, weightKg };
     await db.dailyWeightLog.put(newLog); // put will add or update based on primary key 'date'
-    await updateUserProfile(user.id, { weightKg });
+    await updateUserProfile(userId, { weightKg });
   }, [user]);
 
   const logVitals = useCallback(async (date: string, vitals: Omit<DailyVitalsLog, 'id' | 'date' >) => {
@@ -420,9 +427,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const recommendation = await runPreppy(preppyInput);
     
-    if (user) {
-        await updateUserProfile(user.id, { tdee: newDynamicTDEE, lastCheckInDate: format(new Date(), 'yyyy-MM-dd') });
-    }
+    const userId = user?.id || 'local-user';
+    await updateUserProfile(userId, { tdee: newDynamicTDEE, lastCheckInDate: format(new Date(), 'yyyy-MM-dd') });
 
     return { success: true, message: "Check-in complete!", recommendation };
   }, [userProfile, dailyWeightLog, getConsumedMacrosForDate, user]);
@@ -437,6 +443,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
     addCustomRecipe, runWeeklyCheckin,
     setUserInformation, setMacroTargets, setMealStructure, setDashboardSettings, acceptTerms,
+    assignIngredientCategory,
     getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
   }), [
     mealPlan, pantryItems, userRecipes, userProfile, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog,
@@ -445,7 +452,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logWeight, logVitals, logManualMacros, toggleShoppingListItem, clearMealPlanForDate,
     clearEntireMealPlan, toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
     addCustomRecipe, runWeeklyCheckin, setUserInformation, setMacroTargets, setMealStructure,
-    setDashboardSettings, acceptTerms, getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
+    setDashboardSettings, acceptTerms, assignIngredientCategory, getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
   ]);
   
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
