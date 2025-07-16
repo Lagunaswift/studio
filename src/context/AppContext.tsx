@@ -4,7 +4,6 @@
 import type React from 'react';
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
-import { supabase } from '@/lib/supabaseClient'; // Import the singleton client
 import type {
   PlannedMeal,
   ShoppingListItem,
@@ -111,12 +110,11 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, profile: authProfile, setProfile: setAuthProfile, isLoading: isAuthLoading } = useAuth();
+  const { user, profile: authProfile, isLoading: isAuthLoading, acceptTerms, updateUserProfileInDb } = useAuth();
   
   const [mealPlan, setMealPlan] = useState<PlannedMeal[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
-  // userProfile is now derived from authProfile
   const userProfile = authProfile;
   const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
   const [favoriteRecipeIds, setFavoriteRecipeIds] = useState<number[]>([]);
@@ -141,7 +139,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Load data from localStorage when user is available
   useEffect(() => {
-    if (user && !isAuthLoading && authProfile) { // Check for authProfile too
+    if (user && !isAuthLoading && authProfile) { 
       const userId = user.id;
       setMealPlan(loadState(`mealPlan_${userId}`) || []);
       setPantryItems(loadState(`pantryItems_${userId}`) || []);
@@ -202,29 +200,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMealPlan([]);
   }, [user]);
 
-  const updateUserProfileInDb = useCallback(async (updates: Partial<UserProfileSettings>) => {
-    if (!user || !authProfile) return;
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', user.id)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Error updating profile in Supabase:", error);
-      // Optionally re-throw or handle the error in UI
-    } else if (data) {
-      setAuthProfile(data); // Update profile in AuthContext
-    }
-}, [user, authProfile, setAuthProfile]);
-
-
-  const acceptTerms = useCallback(async () => {
-    await updateUserProfileInDb({ hasAcceptedTerms: true });
-  }, [updateUserProfileInDb]);
-
   const setMacroTargets = useCallback((targets: MacroTargets) => updateUserProfileInDb({ macroTargets: targets }), [updateUserProfileInDb]);
   const setDietaryPreferences = useCallback((preferences: string[]) => updateUserProfileInDb({ dietaryPreferences: preferences }), [updateUserProfileInDb]);
   const setAllergens = useCallback((allergens: string[]) => updateUserProfileInDb({ allergens }), [updateUserProfileInDb]);
@@ -258,8 +233,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!user) return;
     const newFavs = favoriteRecipeIds.includes(recipeId) ? favoriteRecipeIds.filter(id => id !== recipeId) : [...favoriteRecipeIds, recipeId];
     setFavoriteRecipeIds(newFavs);
-    // Note: To persist this to Supabase, we would need a 'favorite_recipe_ids' column in the profiles table
-    // or a separate 'favorite_recipes' table. For now, it remains in localStorage.
   }, [user, favoriteRecipeIds]);
   
   const isRecipeFavorite = useCallback((recipeId: number): boolean => favoriteRecipeIds.includes(recipeId), [favoriteRecipeIds]);
@@ -338,8 +311,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPantryItems([]);
     setUserRecipes([]);
     setFavoriteRecipeIds([]);
-    // Clearing profile is now handled by Supabase, maybe a reset function there is needed
-    // For now, we only clear local data
     const userId = user.id;
     localStorage.removeItem(`mealPlan_${userId}`);
     localStorage.removeItem(`pantryItems_${userId}`);
@@ -350,10 +321,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const logData = useCallback(async (logType: 'dailyWeightLog' | 'dailyVitalsLog' | 'dailyManualMacrosLog', date: string, data: any) => {
         if (!userProfile || !user) return;
         
-        const newLogEntry = { date, ...data };
+        let newLogEntry = { date, ...data };
         if (logType === 'dailyManualMacrosLog') {
-             newLogEntry.macros = data;
-             delete newLogEntry.date;
+             newLogEntry = { date, macros: data };
         }
 
 
@@ -381,7 +351,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const logWeight = (date: string, weightKg: number) => logData('dailyWeightLog', date, { weightKg });
     const logVitals = (date: string, vitals: Omit<DailyVitalsLog, 'date'>) => logData('dailyVitalsLog', date, vitals);
-    const logManualMacros = (date: string, macros: Macros) => logData('dailyManualMacrosLog', date, { macros });
+    const logManualMacros = (date: string, macros: Macros) => logData('dailyManualMacrosLog', date, macros);
     const logWellness = (date: string, mood: Mood, energy: Energy) => { /* Deprecated, use logVitals */ };
 
 
