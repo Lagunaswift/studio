@@ -34,36 +34,6 @@ import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-c
 import { suggestMicronutrients } from '@/ai/flows/suggest-micronutrients-flow';
 import { format, subDays, differenceInDays } from 'date-fns';
 
-const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
-  if (weightKg && weightKg > 0 && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
-    const lbm = weightKg * (1 - bodyFatPercentage / 100);
-    if (isNaN(lbm) || !isFinite(lbm) || lbm <= 0) return null;
-    return parseFloat(lbm.toFixed(1));
-  }
-  return null;
-};
-
-const calculateTDEE = (
-  weightKg: number | null,
-  heightCm: number | null,
-  age: number | null,
-  sex: Sex | null,
-  activityLevel: ActivityLevel | null
-): number | null => {
-  if (!weightKg || !heightCm || !age || !sex || !activityLevel) return null;
-  let bmr: number;
-  if (sex === 'male') bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
-  else bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
-  const activity = ACTIVITY_LEVEL_OPTIONS.find(opt => opt.value === activityLevel);
-  if (activity) {
-    const tdee = bmr * activity.multiplier;
-    if (isNaN(tdee) || !isFinite(tdee) || tdee <= 0) return null;
-    return Math.round(tdee);
-  }
-  return null;
-};
-
-
 interface AppContextType {
   mealPlan: PlannedMeal[];
   shoppingList: ShoppingListItem[];
@@ -208,25 +178,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   const setUserInformation = useCallback(async (info: Partial<UserProfileSettings>) => {
     if (!user || !userProfile) return;
-    
-    // Merge new info with existing profile
-    const newProfileData = { ...userProfile, ...info } as UserProfileSettings;
-
-    // Recalculate derived values
-    const finalBodyFatPercentage = newProfileData.bodyFatPercentage;
-    const finalLbm = calculateLBM(newProfileData.weightKg, finalBodyFatPercentage);
-    const finalTdee = calculateTDEE(newProfileData.weightKg, newProfileData.heightCm, newProfileData.age, newProfileData.sex, newProfileData.activityLevel);
-    const finalRda = getRdaProfile(newProfileData.sex, newProfileData.age);
-
-    const updatesForDb: Partial<UserProfileSettings> = {
-      ...info,
-      tdee: finalTdee,
-      leanBodyMassKg: finalLbm,
-      rda: finalRda
-    };
-    
-    await updateUserProfileInDb(updatesForDb);
-
+    await updateUserProfileInDb(info);
   }, [user, userProfile, updateUserProfileInDb]);
   
   const toggleFavoriteRecipe = useCallback(async (recipeId: number) => {
