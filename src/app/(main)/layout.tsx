@@ -30,7 +30,7 @@ import { SheetTitle } from '@/components/ui/sheet';
 import { 
   UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, 
   PanelLeft, Target, Leaf, ListChecks, UserCog, UserCircle2, 
-  BookOpen, Archive, Bot, SlidersHorizontal, Search, LogOut, FileText, Shield, CheckSquare, Settings, TrendingUp, ChefHat, ClipboardList
+  BookOpen, Archive, Bot, SlidersHorizontal, Search, LogOut, FileText, Shield, CheckSquare, Settings, TrendingUp, ChefHat, ClipboardList, AlertTriangle
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -151,6 +151,22 @@ function LogoutButton() {
     </SidebarMenuItem>
   );
 }
+
+function ServiceStatusBanner() {
+  const isDegraded = process.env.NEXT_PUBLIC_SERVICE_STATUS !== 'online';
+
+  if (!isDegraded) {
+    return null;
+  }
+
+  return (
+    <div className="bg-yellow-500 text-center p-2 text-black text-sm font-semibold flex items-center justify-center">
+      <AlertTriangle className="h-4 w-4 mr-2" />
+      We are performing system maintenance. The app is in offline mode; your data is saved locally and will not sync across devices for now.
+    </div>
+  );
+}
+
 
 // Inner component to use hooks within SidebarProvider context
 function LayoutContent({ children }: { children: React.ReactNode }) {
@@ -315,6 +331,7 @@ export default function MainLayout({
     <SidebarProvider defaultOpen={true} collapsible="icon">
        <TooltipProvider>
           <div className="flex flex-col min-h-screen">
+            <ServiceStatusBanner />
             <LayoutContent>{children}</LayoutContent>
             <Footer />
           </div>
