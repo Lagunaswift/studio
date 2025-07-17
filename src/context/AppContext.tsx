@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useMemo, useCallback, useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from './AuthContext';
-import { db, getOrCreateUserProfile, updateUserProfile } from '@/lib/db';
+import { db, getOrCreateUserProfile, updateUserProfile, clearAllLocalData, bulkAddRecipes, bulkAddPlannedMeals, bulkAddPantryItems, bulkAddDailyWeightLogs, bulkAddDailyVitals, bulkAddManualMacros } from '@/lib/db';
 import type {
   PlannedMeal,
   ShoppingListItem,
@@ -27,6 +27,18 @@ import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
 import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { format, subDays, differenceInDays } from 'date-fns';
+import { supabase } from '@/lib/supabaseClient';
+
+const isOnline = process.env.NEXT_PUBLIC_SERVICE_STATUS === 'online';
+
+const processProfile = (profileData: UserProfileSettings | undefined): UserProfileSettings | null => {
+    if (!profileData) return null;
+    const p = { ...profileData };
+    p.tdee = calculateTDEE(p.weightKg, p.heightCm, p.age, p.sex, p.activityLevel);
+    p.leanBodyMassKg = calculateLBM(p.weightKg, p.bodyFatPercentage);
+    p.rda = getRdaProfile(p.sex, p.age);
+    return p;
+};
 
 // --- Calculation Helpers ---
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
@@ -75,14 +87,6 @@ const getRdaProfile = (sex: Sex | null | undefined, age: number | null | undefin
     return { iron: 10, calcium: 1200, potassium: 3000, vitaminA: 800, vitaminC: 80, vitaminD: 15 };
 };
 
-const processProfile = (profileData: UserProfileSettings | undefined): UserProfileSettings | null => {
-    if (!profileData) return null;
-    const p = { ...profileData };
-    p.tdee = calculateTDEE(p.weightKg, p.heightCm, p.age, p.sex, p.activityLevel);
-    p.leanBodyMassKg = calculateLBM(p.weightKg, p.bodyFatPercentage);
-    p.rda = getRdaProfile(p.sex, p.age);
-    return p;
-};
 
 interface AppContextType {
   // State from DB (via useLiveQuery)
@@ -94,6 +98,7 @@ interface AppContextType {
   // Computed State
   allRecipesCache: Recipe[];
   shoppingList: ShoppingListItem[];
+  isOnline: boolean;
 
   // Loaders
   isRecipeCacheLoading: boolean;
@@ -328,11 +333,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       runWeeklyCheckin
   } = useAppData(user?.id, isAuthLoading);
 
+  const userId = user?.id || 'local-user';
+
+  const withLogging = async <T extends (...args: any[]) => any>(
+    fn: T, 
+    ...args: Parameters<T>
+  ): Promise<ReturnType<T>> => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Supabase] Attempting to call ${fn.name} for user: ${userId}`);
+    }
+    try {
+      const result = await fn(...args);
+      if (process.env.NODE_ENV === 'development') {
+         console.log(`[Supabase] Successfully called ${fn.name}.`);
+      }
+      return result;
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error(`[Supabase] Error calling ${fn.name}:`, error.message);
+      }
+      throw error; // Re-throw the error to be handled by the caller
+    }
+  };
+
+
   // --- ACTIONS ---
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
-    const userId = user?.id || 'local-user';
-    await updateUserProfile(userId, updates);
-  }, [user]);
+    if (!isOnline) {
+      return await updateUserProfile(userId, updates);
+    }
+    await withLogging(updateUserProfile, userId, updates);
+  }, [userId]);
 
   const acceptTerms = useCallback(async () => {
     await setUserInformation({ hasAcceptedTerms: true });
@@ -360,28 +391,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       servings,
       status: 'planned',
     };
-    await db.plannedMeals.add(newPlannedMeal);
+    if (!isOnline) {
+      return await db.plannedMeals.add(newPlannedMeal);
+    }
+    await withLogging(db.plannedMeals.add.bind(db.plannedMeals), newPlannedMeal);
   }, []);
 
   const removeMealFromPlan = useCallback(async (plannedMealId: string) => {
-    await db.plannedMeals.delete(plannedMealId);
+    if (!isOnline) {
+      return await db.plannedMeals.delete(plannedMealId);
+    }
+    await withLogging(db.plannedMeals.delete.bind(db.plannedMeals), plannedMealId);
   }, []);
 
   const updatePlannedMealServings = useCallback(async (plannedMealId: string, newServings: number) => {
-    await db.plannedMeals.update(plannedMealId, { servings: newServings });
+    if (!isOnline) {
+      return await db.plannedMeals.update(plannedMealId, { servings: newServings });
+    }
+    await withLogging(db.plannedMeals.update.bind(db.plannedMeals), plannedMealId, { servings: newServings });
   }, []);
 
   const updateMealStatus = useCallback(async (plannedMealId: string, status: 'planned' | 'eaten') => {
-    await db.plannedMeals.update(plannedMealId, { status });
+    if (!isOnline) {
+      return await db.plannedMeals.update(plannedMealId, { status });
+    }
+    await withLogging(db.plannedMeals.update.bind(db.plannedMeals), plannedMealId, { status });
   }, []);
 
   const clearMealPlanForDate = useCallback(async (date: string) => {
     const mealsToDelete = await db.plannedMeals.where('date').equals(date).primaryKeys();
-    await db.plannedMeals.bulkDelete(mealsToDelete);
+    if (!isOnline) {
+      return await db.plannedMeals.bulkDelete(mealsToDelete);
+    }
+    await withLogging(db.plannedMeals.bulkDelete.bind(db.plannedMeals), mealsToDelete);
   }, []);
 
   const clearEntireMealPlan = useCallback(async () => {
-    await db.plannedMeals.clear();
+    if (!isOnline) {
+      return await db.plannedMeals.clear();
+    }
+    await withLogging(db.plannedMeals.clear.bind(db.plannedMeals));
   }, []);
 
   const toggleFavoriteRecipe = useCallback(async (recipeId: number) => {
@@ -404,10 +453,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .first();
 
     if (existingItem) {
-      await db.pantryItems.update(existingItem.id, { 
+      const updateData = { 
         quantity: existingItem.quantity + quantity,
         expiryDate: expiryDate // Optionally update expiry date
-      });
+      };
+      if (!isOnline) {
+        return await db.pantryItems.update(existingItem.id, updateData);
+      }
+      return await withLogging(db.pantryItems.update.bind(db.pantryItems), existingItem.id, updateData);
     } else {
       const newItem: PantryItem = {
         id: `pantry_${Date.now()}`,
@@ -415,26 +468,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         category: category as UKSupermarketCategory, 
         expiryDate
       };
-      await db.pantryItems.add(newItem);
+      if (!isOnline) {
+        return await db.pantryItems.add(newItem);
+      }
+      return await withLogging(db.pantryItems.add.bind(db.pantryItems), newItem);
     }
   }, []);
 
   const removePantryItem = useCallback(async (itemId: string) => {
-    await db.pantryItems.delete(itemId);
+    if (!isOnline) {
+      return await db.pantryItems.delete(itemId);
+    }
+    await withLogging(db.pantryItems.delete.bind(db.pantryItems), itemId);
   }, []);
 
   const updatePantryItemQuantity = useCallback(async (itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
-      await removePantryItem(itemId);
+      return removePantryItem(itemId);
     } else {
-      await db.pantryItems.update(itemId, { quantity: newQuantity });
+      if (!isOnline) {
+        return await db.pantryItems.update(itemId, { quantity: newQuantity });
+      }
+      return await withLogging(db.pantryItems.update.bind(db.pantryItems), itemId, { quantity: newQuantity });
     }
   }, [removePantryItem]);
 
   const addCustomRecipe = useCallback(async (recipeData: RecipeFormData) => {
-    const userId = user?.id; // Custom recipes are tied to users
     const newRecipe: Recipe = {
-        id: Date.now(), // Use timestamp for unique local ID
+        id: Date.now(),
         name: recipeData.name,
         description: recipeData.description,
         image: recipeData.image || `https://placehold.co/600x400.png?text=${encodeURIComponent(recipeData.name)}`,
@@ -450,44 +511,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isCustom: true,
         user_id: userId
     };
-    await db.recipes.add(newRecipe);
-  }, [user]);
+    if (!isOnline) {
+      return await db.recipes.add(newRecipe);
+    }
+    await withLogging(db.recipes.add.bind(db.recipes), newRecipe);
+  }, [userId]);
 
   const logWeight = useCallback(async (date: string, weightKg: number) => {
-    const userId = user?.id || 'local-user';
     const newLog: DailyWeightLog = { date, weightKg };
-    await db.dailyWeightLog.put(newLog); // put will add or update based on primary key 'date'
-    
-    // Also update the main weightKg field on the profile
-    const existingProfile = await db.userProfile.get(userId);
-    if (existingProfile) {
-        const currentLog = existingProfile.dailyWeightLog || [];
-        const logIndex = currentLog.findIndex(l => l.date === date);
-        if (logIndex > -1) {
-            currentLog[logIndex] = newLog;
-        } else {
-            currentLog.push(newLog);
-        }
-        // Keep the log sorted and trimmed if necessary, although Dexie query does this.
-        currentLog.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        
-        await updateUserProfile(userId, { weightKg: weightKg, dailyWeightLog: currentLog });
+    if (!isOnline) {
+      await db.dailyWeightLog.put(newLog);
+      return await updateUserProfile(userId, { weightKg: weightKg });
     }
-  }, [user, setUserInformation]);
+    await withLogging(db.dailyWeightLog.put.bind(db.dailyWeightLog), newLog);
+    await withLogging(updateUserProfile, userId, { weightKg: weightKg });
+  }, [userId]);
 
   const logVitals = useCallback(async (date: string, vitals: Omit<DailyVitalsLog, 'date' >) => {
     const newLog: DailyVitalsLog = { date, ...vitals };
-    await db.dailyVitalsLog.put(newLog);
+    if (!isOnline) {
+      return await db.dailyVitalsLog.put(newLog);
+    }
+    await withLogging(db.dailyVitalsLog.put.bind(db.dailyVitalsLog), newLog);
   }, []);
   
   const logManualMacros = useCallback(async (date: string, macros: Macros) => {
     const newLog: DailyManualMacrosLog = { date, macros };
-    await db.dailyManualMacrosLog.put(newLog);
+    if (!isOnline) {
+      return await db.dailyManualMacrosLog.put(newLog);
+    }
+    await withLogging(db.dailyManualMacrosLog.put.bind(db.dailyManualMacrosLog), newLog);
   }, []);
 
   const contextValue = useMemo(() => ({
     mealPlan, pantryItems, userRecipes, userProfile,
-    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading,
+    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading, isOnline,
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus, 
     logWeight, logVitals, logManualMacros,
     clearMealPlanForDate, clearEntireMealPlan,
@@ -498,7 +556,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
   }), [
     mealPlan, pantryItems, userRecipes, userProfile,
-    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading,
+    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading, isOnline,
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus,
     logWeight, logVitals, logManualMacros, clearMealPlanForDate,
     clearEntireMealPlan, toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
