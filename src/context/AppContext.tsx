@@ -27,8 +27,9 @@ import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
 import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { format, subDays, differenceInDays } from 'date-fns';
+import { supabase } from '@/lib/supabaseClient';
 
-const isOnline = process.env.NEXT_PUBLIC_SERVICE_STATUS === 'online';
+const isOnline = !!supabase;
 
 // --- Calculation Helpers ---
 const processProfile = (profileData: UserProfileSettings | undefined | null): UserProfileSettings | null => {
@@ -145,15 +146,13 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
 
     // Use a READ-ONLY query to get profile data.
     const rawProfile = useLiveQuery(async () => {
-        if (isAuthLoading && !userId) return undefined;
+        if (isAuthLoading) return undefined;
         return await db.userProfile.get(idToUse);
     }, [idToUse, isAuthLoading]);
 
     // Effect to CREATE profile if it doesn't exist. This runs separately.
     useEffect(() => {
         if (!isAuthLoading && rawProfile === undefined) {
-             console.log(`No profile found for ${idToUse}, creating one...`);
-            // getOrCreateUserProfile handles the write transaction.
             getOrCreateUserProfile(idToUse).catch(err => {
                  console.error("Error ensuring user profile exists:", err);
             });
@@ -371,16 +370,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- ACTIONS ---
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
-    const currentProfile = await getOrCreateUserProfile(userId);
-    const updatedProfile = { ...currentProfile, ...updates };
-    const processed = processProfile(updatedProfile);
-    
-    const profileToSave = processed as UserProfileSettings;
-    if (isOnline) {
-      await withLogging(updateUserProfile, userId, profileToSave);
-    } else {
-      await db.userProfile.put(profileToSave);
-    }
+      const currentProfile = await getOrCreateUserProfile(userId);
+      const updatedProfile = { ...currentProfile, ...updates };
+      const processed = processProfile(updatedProfile);
+      
+      const profileToSave = processed as UserProfileSettings;
+      
+      const updateFn = async () => {
+          if (isOnline) {
+              await updateUserProfile(userId, profileToSave);
+          } else {
+              await db.userProfile.put(profileToSave);
+          }
+      };
+
+      await withLogging(updateFn);
   }, [userId]);
 
 
