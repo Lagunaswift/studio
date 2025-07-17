@@ -30,6 +30,7 @@ import { format, subDays, differenceInDays } from 'date-fns';
 
 const isOnline = process.env.NEXT_PUBLIC_SERVICE_STATUS === 'online';
 
+// --- Calculation Helpers ---
 const processProfile = (profileData: UserProfileSettings | undefined): UserProfileSettings | null => {
     if (!profileData) return null;
     const p = { ...profileData };
@@ -39,7 +40,6 @@ const processProfile = (profileData: UserProfileSettings | undefined): UserProfi
     return p;
 };
 
-// --- Calculation Helpers ---
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
   if (weightKg && weightKg > 0 && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
     const lbm = weightKg * (1 - bodyFatPercentage / 100);
@@ -141,17 +141,11 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     const [staticRecipes, setStaticRecipes] = useState<Recipe[]>([]);
     const [isStaticRecipeLoading, setIsStaticRecipeLoading] = useState(true);
 
-    const dbProfile = useLiveQuery(() => {
+    const profileData = useLiveQuery(async () => {
+        if (isAuthLoading && !userId) return undefined;
         const idToUse = userId || 'local-user';
-        if (isAuthLoading && !userId) return undefined; // Prevent query with undefined id during auth loading
-        return db.userProfile.get(idToUse);
-    }, [userId, isAuthLoading]);
-
-    useEffect(() => {
-        const idToUse = userId || 'local-user';
-        if (!isAuthLoading) {
-            getOrCreateUserProfile(idToUse);
-        }
+        const profile = await getOrCreateUserProfile(idToUse);
+        return processProfile(profile);
     }, [userId, isAuthLoading]);
     
     const userRecipes = useLiveQuery(() => db.recipes.where({ isCustom: 1 }).toArray(), [], []);
@@ -162,15 +156,14 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     const dailyManualMacrosLog = useLiveQuery(() => db.dailyManualMacrosLog.orderBy('date').reverse().toArray(), [], []);
 
     const userProfile = useMemo(() => {
-      if (!dbProfile) return null;
-      const processed = processProfile(dbProfile);
-      if (processed) {
-        processed.dailyWeightLog = dailyWeightLog;
-        processed.dailyVitalsLog = dailyVitalsLog;
-        processed.dailyManualMacrosLog = dailyManualMacrosLog;
-      }
-      return processed;
-    }, [dbProfile, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog]);
+      if (!profileData) return null;
+      return {
+        ...profileData,
+        dailyWeightLog,
+        dailyVitalsLog,
+        dailyManualMacrosLog,
+      };
+    }, [profileData, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog]);
 
 
     useEffect(() => {
@@ -196,7 +189,7 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
         loadStaticRecipes();
     }, []);
     
-    const isAppDataLoading = isAuthLoading || isStaticRecipeLoading || dbProfile === undefined;
+    const isAppDataLoading = isAuthLoading || isStaticRecipeLoading || profileData === undefined;
 
     const allRecipesCache = useMemo(() => {
         const combined = [...staticRecipes, ...(userRecipes || [])];
@@ -302,7 +295,7 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
         mealPlan: mealPlan || [],
         pantryItems: pantryItems || [],
         userRecipes: userRecipes || [],
-        userProfile,
+        userProfile: userProfile || null,
         isAppDataLoading,
         allRecipesCache,
         isRecipeCacheLoading: isStaticRecipeLoading,
@@ -363,13 +356,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- ACTIONS ---
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
-    const updatedProfile = { ...(userProfile || {}), ...updates };
-    const processed = processProfile(updatedProfile as UserProfileSettings);
+    const currentProfile = await getOrCreateUserProfile(userId);
+    const updatedProfile = { ...currentProfile, ...updates };
+    const processed = processProfile(updatedProfile);
+    
     if (!isOnline) {
       return await db.userProfile.put(processed as UserProfileSettings);
     }
+    
+    // Pass the function itself to withLogging
     await withLogging(db.userProfile.put.bind(db.userProfile), processed as UserProfileSettings);
-  }, [userId, userProfile]);
+  }, [userId]);
+
 
   const acceptTerms = useCallback(async () => {
     await setUserInformation({ hasAcceptedTerms: true });
@@ -527,11 +525,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newLog: DailyWeightLog = { date, weightKg };
     if (!isOnline) {
         await db.dailyWeightLog.put(newLog);
-        return await db.userProfile.update(userId, { weightKg: weightKg, dailyWeightLog: [...(userProfile?.dailyWeightLog || []), newLog] });
+        return await db.userProfile.update(userId, { weightKg: weightKg });
     }
     await withLogging(db.dailyWeightLog.put.bind(db.dailyWeightLog), newLog);
-    await withLogging(updateUserProfile, userId, { weightKg: weightKg, dailyWeightLog: [...(userProfile?.dailyWeightLog || []), newLog] });
-  }, [userId, userProfile]);
+    await withLogging(updateUserProfile, userId, { weightKg: weightKg });
+  }, [userId]);
 
   const logVitals = useCallback(async (date: string, vitals: Omit<DailyVitalsLog, 'date' >) => {
     const newLog: DailyVitalsLog = { date, ...vitals };
