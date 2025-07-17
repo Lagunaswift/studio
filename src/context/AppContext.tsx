@@ -75,7 +75,8 @@ const getRdaProfile = (sex: Sex | null | undefined, age: number | null | undefin
     return { iron: 10, calcium: 1200, potassium: 3000, vitaminA: 800, vitaminC: 80, vitaminD: 15 };
 };
 
-const processProfile = (profileData: UserProfileSettings): UserProfileSettings => {
+const processProfile = (profileData: UserProfileSettings | undefined): UserProfileSettings | null => {
+    if (!profileData) return null;
     const p = { ...profileData };
     p.tdee = calculateTDEE(p.weightKg, p.heightCm, p.age, p.sex, p.activityLevel);
     p.leanBodyMassKg = calculateLBM(p.weightKg, p.bodyFatPercentage);
@@ -136,11 +137,9 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     const [staticRecipes, setStaticRecipes] = useState<Recipe[]>([]);
     const [isStaticRecipeLoading, setIsStaticRecipeLoading] = useState(true);
 
-    const userProfile = useLiveQuery(
-      () => getOrCreateUserProfile(userId || 'local-user').then(processProfile),
-      [userId],
-      null
-    );
+    const dbProfile = useLiveQuery(() => db.userProfile.get(userId || 'local-user'), [userId]);
+    const userProfile = useMemo(() => processProfile(dbProfile), [dbProfile]);
+
     const userRecipes = useLiveQuery(() => db.recipes.where({ isCustom: 1 }).toArray(), [], []);
     const mealPlan = useLiveQuery(() => db.plannedMeals.toArray(), [], []);
     const pantryItems = useLiveQuery(() => db.pantryItems.toArray(), [], []);
@@ -149,27 +148,39 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     const dailyManualMacrosLog = useLiveQuery(() => db.dailyManualMacrosLog.orderBy('date').reverse().toArray(), [], []);
 
     useEffect(() => {
+        const userIdToUse = userId || 'local-user';
+        if (!isAuthLoading) {
+            getOrCreateUserProfile(userIdToUse); // This now handles the check and potential write separately.
+        }
+    }, [userId, isAuthLoading]);
+
+    useEffect(() => {
         async function loadStaticRecipes() {
             setIsStaticRecipeLoading(true);
-            const recipes = await getAllRecipesFromDataFile();
-            await db.transaction('rw', db.recipes, async () => {
-                for (const recipe of recipes) {
-                    const exists = await db.recipes.get(recipe.id);
-                    if (!exists) {
-                        await db.recipes.add(recipe);
+            try {
+                const recipes = await getAllRecipesFromDataFile();
+                await db.transaction('rw', db.recipes, async () => {
+                    for (const recipe of recipes) {
+                        const exists = await db.recipes.get(recipe.id);
+                        if (!exists) {
+                            await db.recipes.add(recipe);
+                        }
                     }
-                }
-            });
-            setStaticRecipes(recipes);
-            setIsStaticRecipeLoading(false);
+                });
+                setStaticRecipes(recipes);
+            } catch (error) {
+                console.error("Failed to load or save static recipes:", error);
+            } finally {
+                setIsStaticRecipeLoading(false);
+            }
         }
         loadStaticRecipes();
     }, []);
-
+    
     const isAppDataLoading = isAuthLoading || isStaticRecipeLoading || userProfile === null;
 
     const allRecipesCache = useMemo(() => {
-        const combined = [...staticRecipes, ...userRecipes];
+        const combined = [...staticRecipes, ...(userRecipes || [])];
         const uniqueRecipes = Array.from(new Map(combined.map(recipe => [recipe.id, recipe])).values());
         return uniqueRecipes;
     }, [staticRecipes, userRecipes]);
