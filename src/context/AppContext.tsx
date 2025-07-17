@@ -138,7 +138,6 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     const [isStaticRecipeLoading, setIsStaticRecipeLoading] = useState(true);
 
     const dbProfile = useLiveQuery(() => db.userProfile.get(userId || 'local-user'), [userId]);
-    const userProfile = useMemo(() => processProfile(dbProfile), [dbProfile]);
 
     const userRecipes = useLiveQuery(() => db.recipes.where({ isCustom: 1 }).toArray(), [], []);
     const mealPlan = useLiveQuery(() => db.plannedMeals.toArray(), [], []);
@@ -150,9 +149,21 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     useEffect(() => {
         const userIdToUse = userId || 'local-user';
         if (!isAuthLoading) {
-            getOrCreateUserProfile(userIdToUse); // This now handles the check and potential write separately.
+            getOrCreateUserProfile(userIdToUse);
         }
     }, [userId, isAuthLoading]);
+
+    const userProfile = useMemo(() => {
+      if (!dbProfile) return null;
+      const processed = processProfile(dbProfile);
+      if (processed) {
+        processed.dailyWeightLog = dailyWeightLog;
+        processed.dailyVitalsLog = dailyVitalsLog;
+        processed.dailyManualMacrosLog = dailyManualMacrosLog;
+      }
+      return processed;
+    }, [dbProfile, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog]);
+
 
     useEffect(() => {
         async function loadStaticRecipes() {
@@ -177,7 +188,7 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
         loadStaticRecipes();
     }, []);
     
-    const isAppDataLoading = isAuthLoading || isStaticRecipeLoading || userProfile === null;
+    const isAppDataLoading = isAuthLoading || isStaticRecipeLoading || !dbProfile;
 
     const allRecipesCache = useMemo(() => {
         const combined = [...staticRecipes, ...(userRecipes || [])];
@@ -443,10 +454,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [user]);
 
   const logWeight = useCallback(async (date: string, weightKg: number) => {
+    const userId = user?.id || 'local-user';
     const newLog: DailyWeightLog = { date, weightKg };
     await db.dailyWeightLog.put(newLog); // put will add or update based on primary key 'date'
-    await setUserInformation({ weightKg });
-  }, [setUserInformation]);
+    
+    // Also update the main weightKg field on the profile
+    const existingProfile = await db.userProfile.get(userId);
+    if (existingProfile) {
+        const currentLog = existingProfile.dailyWeightLog || [];
+        const logIndex = currentLog.findIndex(l => l.date === date);
+        if (logIndex > -1) {
+            currentLog[logIndex] = newLog;
+        } else {
+            currentLog.push(newLog);
+        }
+        // Keep the log sorted and trimmed if necessary, although Dexie query does this.
+        currentLog.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        await updateUserProfile(userId, { weightKg: weightKg, dailyWeightLog: currentLog });
+    }
+  }, [user, setUserInformation]);
 
   const logVitals = useCallback(async (date: string, vitals: Omit<DailyVitalsLog, 'date' >) => {
     const newLog: DailyVitalsLog = { date, ...vitals };
