@@ -151,12 +151,12 @@ export default function UserInfoPage() {
   }, [userProfile, form]);
 
   const onSubmit: SubmitHandler<UserInfoFormValues> = (data) => {
-    setUserInformation(data); // AppContext will handle recalculating LBM/TDEE
+    setUserInformation(data); 
     toast({
       title: "User Information Saved",
       description: "Your profile details have been updated.",
     });
-    form.reset(data); // Reset form with saved data to clear dirty state
+    form.reset(data, { keepDirty: false, keepValues: true });
   };
 
   const handleCalculateBodyFat = () => {

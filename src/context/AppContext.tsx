@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useMemo, useCallback, useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from './AuthContext';
-import { db, getOrCreateUserProfile, updateUserProfile, clearAllLocalData, bulkAddRecipes, bulkAddPlannedMeals, bulkAddPantryItems, bulkAddDailyWeightLogs, bulkAddDailyVitals, bulkAddManualMacros } from '@/lib/db';
+import { db, getOrCreateUserProfile, updateUserProfile } from '@/lib/db';
 import type {
   PlannedMeal,
   ShoppingListItem,
@@ -27,7 +27,6 @@ import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
 import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { format, subDays, differenceInDays } from 'date-fns';
-import { supabase } from '@/lib/supabaseClient';
 
 const isOnline = process.env.NEXT_PUBLIC_SERVICE_STATUS === 'online';
 
@@ -142,21 +141,25 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     const [staticRecipes, setStaticRecipes] = useState<Recipe[]>([]);
     const [isStaticRecipeLoading, setIsStaticRecipeLoading] = useState(true);
 
-    const dbProfile = useLiveQuery(() => db.userProfile.get(userId || 'local-user'), [userId]);
+    const dbProfile = useLiveQuery(() => {
+        const idToUse = userId || 'local-user';
+        if (isAuthLoading && !userId) return undefined; // Prevent query with undefined id during auth loading
+        return db.userProfile.get(idToUse);
+    }, [userId, isAuthLoading]);
 
+    useEffect(() => {
+        const idToUse = userId || 'local-user';
+        if (!isAuthLoading) {
+            getOrCreateUserProfile(idToUse);
+        }
+    }, [userId, isAuthLoading]);
+    
     const userRecipes = useLiveQuery(() => db.recipes.where({ isCustom: 1 }).toArray(), [], []);
     const mealPlan = useLiveQuery(() => db.plannedMeals.toArray(), [], []);
     const pantryItems = useLiveQuery(() => db.pantryItems.toArray(), [], []);
     const dailyWeightLog = useLiveQuery(() => db.dailyWeightLog.orderBy('date').reverse().toArray(), [], []);
     const dailyVitalsLog = useLiveQuery(() => db.dailyVitalsLog.orderBy('date').reverse().toArray(), [], []);
     const dailyManualMacrosLog = useLiveQuery(() => db.dailyManualMacrosLog.orderBy('date').reverse().toArray(), [], []);
-
-    useEffect(() => {
-        const userIdToUse = userId || 'local-user';
-        if (!isAuthLoading) {
-            getOrCreateUserProfile(userIdToUse);
-        }
-    }, [userId, isAuthLoading]);
 
     const userProfile = useMemo(() => {
       if (!dbProfile) return null;
@@ -193,7 +196,7 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
         loadStaticRecipes();
     }, []);
     
-    const isAppDataLoading = isAuthLoading || isStaticRecipeLoading || !dbProfile;
+    const isAppDataLoading = isAuthLoading || isStaticRecipeLoading || dbProfile === undefined;
 
     const allRecipesCache = useMemo(() => {
         const combined = [...staticRecipes, ...(userRecipes || [])];
@@ -339,19 +342,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fn: T, 
     ...args: Parameters<T>
   ): Promise<ReturnType<T>> => {
-    if (process.env.NODE_ENV === 'development') {
+    if (isOnline && process.env.NODE_ENV === 'development') {
       console.log(`[Supabase] Attempting to call ${fn.name} for user: ${userId}`);
     }
     try {
       const result = await fn(...args);
-      if (process.env.NODE_ENV === 'development') {
+      if (isOnline && process.env.NODE_ENV === 'development') {
          console.log(`[Supabase] Successfully called ${fn.name}.`);
       }
       return result;
     } catch (error: any) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error(`[Supabase] Error calling ${fn.name}:`, error.message);
+      if (isOnline && process.env.NODE_ENV === 'development') {
+        console.error(`[Supabase] Error calling ${fn.name} for user ${userId}:`, error.message);
       }
+      // Fallback logic could be added here if needed
       throw error; // Re-throw the error to be handled by the caller
     }
   };
@@ -359,11 +363,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- ACTIONS ---
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
+    const updatedProfile = { ...(userProfile || {}), ...updates };
+    const processed = processProfile(updatedProfile as UserProfileSettings);
     if (!isOnline) {
-      return await updateUserProfile(userId, updates);
+      return await db.userProfile.put(processed as UserProfileSettings);
     }
-    await withLogging(updateUserProfile, userId, updates);
-  }, [userId]);
+    await withLogging(db.userProfile.put.bind(db.userProfile), processed as UserProfileSettings);
+  }, [userId, userProfile]);
 
   const acceptTerms = useCallback(async () => {
     await setUserInformation({ hasAcceptedTerms: true });
@@ -384,7 +390,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
     const newPlannedMeal: PlannedMeal = { 
-      id: `meal_${Date.now()}`,
+      id: `meal_${Date.now()}_${Math.random()}`,
       recipeId: recipe.id, 
       date, 
       mealType, 
@@ -463,7 +469,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return await withLogging(db.pantryItems.update.bind(db.pantryItems), existingItem.id, updateData);
     } else {
       const newItem: PantryItem = {
-        id: `pantry_${Date.now()}`,
+        id: `pantry_${Date.now()}_${Math.random()}`,
         name, quantity, unit, 
         category: category as UKSupermarketCategory, 
         expiryDate
@@ -520,12 +526,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logWeight = useCallback(async (date: string, weightKg: number) => {
     const newLog: DailyWeightLog = { date, weightKg };
     if (!isOnline) {
-      await db.dailyWeightLog.put(newLog);
-      return await updateUserProfile(userId, { weightKg: weightKg });
+        await db.dailyWeightLog.put(newLog);
+        return await db.userProfile.update(userId, { weightKg: weightKg, dailyWeightLog: [...(userProfile?.dailyWeightLog || []), newLog] });
     }
     await withLogging(db.dailyWeightLog.put.bind(db.dailyWeightLog), newLog);
-    await withLogging(updateUserProfile, userId, { weightKg: weightKg });
-  }, [userId]);
+    await withLogging(updateUserProfile, userId, { weightKg: weightKg, dailyWeightLog: [...(userProfile?.dailyWeightLog || []), newLog] });
+  }, [userId, userProfile]);
 
   const logVitals = useCallback(async (date: string, vitals: Omit<DailyVitalsLog, 'date' >) => {
     const newLog: DailyVitalsLog = { date, ...vitals };
@@ -556,7 +562,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
   }), [
     mealPlan, pantryItems, userRecipes, userProfile,
-    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading, isOnline,
+    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading,
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus,
     logWeight, logVitals, logManualMacros, clearMealPlanForDate,
     clearEntireMealPlan, toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
