@@ -31,7 +31,7 @@ import { format, subDays, differenceInDays } from 'date-fns';
 const isOnline = process.env.NEXT_PUBLIC_SERVICE_STATUS === 'online';
 
 // --- Calculation Helpers ---
-const processProfile = (profileData: UserProfileSettings | undefined): UserProfileSettings | null => {
+const processProfile = (profileData: UserProfileSettings | undefined | null): UserProfileSettings | null => {
     if (!profileData) return null;
     const p = { ...profileData };
     p.tdee = calculateTDEE(p.weightKg, p.heightCm, p.age, p.sex, p.activityLevel);
@@ -141,13 +141,28 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     const [staticRecipes, setStaticRecipes] = useState<Recipe[]>([]);
     const [isStaticRecipeLoading, setIsStaticRecipeLoading] = useState(true);
 
-    const profileData = useLiveQuery(async () => {
+    const idToUse = useMemo(() => userId || 'local-user', [userId]);
+
+    // Use a READ-ONLY query to get profile data.
+    const rawProfile = useLiveQuery(async () => {
         if (isAuthLoading && !userId) return undefined;
-        const idToUse = userId || 'local-user';
-        const profile = await getOrCreateUserProfile(idToUse);
-        return processProfile(profile);
-    }, [userId, isAuthLoading]);
+        return await db.userProfile.get(idToUse);
+    }, [idToUse, isAuthLoading]);
+
+    // Effect to CREATE profile if it doesn't exist. This runs separately.
+    useEffect(() => {
+        if (!isAuthLoading && rawProfile === undefined) {
+             console.log(`No profile found for ${idToUse}, creating one...`);
+            // getOrCreateUserProfile handles the write transaction.
+            getOrCreateUserProfile(idToUse).catch(err => {
+                 console.error("Error ensuring user profile exists:", err);
+            });
+        }
+    }, [isAuthLoading, rawProfile, idToUse]);
     
+    // Process the read data into the final userProfile object.
+    const processedProfile = useMemo(() => processProfile(rawProfile), [rawProfile]);
+
     const userRecipes = useLiveQuery(() => db.recipes.where({ isCustom: 1 }).toArray(), [], []);
     const mealPlan = useLiveQuery(() => db.plannedMeals.toArray(), [], []);
     const pantryItems = useLiveQuery(() => db.pantryItems.toArray(), [], []);
@@ -156,14 +171,14 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     const dailyManualMacrosLog = useLiveQuery(() => db.dailyManualMacrosLog.orderBy('date').reverse().toArray(), [], []);
 
     const userProfile = useMemo(() => {
-      if (!profileData) return null;
+      if (!processedProfile) return null;
       return {
-        ...profileData,
+        ...processedProfile,
         dailyWeightLog,
         dailyVitalsLog,
         dailyManualMacrosLog,
       };
-    }, [profileData, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog]);
+    }, [processedProfile, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog]);
 
 
     useEffect(() => {
@@ -189,7 +204,7 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
         loadStaticRecipes();
     }, []);
     
-    const isAppDataLoading = isAuthLoading || isStaticRecipeLoading || profileData === undefined;
+    const isAppDataLoading = isAuthLoading || isStaticRecipeLoading || rawProfile === undefined;
 
     const allRecipesCache = useMemo(() => {
         const combined = [...staticRecipes, ...(userRecipes || [])];
@@ -360,12 +375,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedProfile = { ...currentProfile, ...updates };
     const processed = processProfile(updatedProfile);
     
-    if (!isOnline) {
-      return await db.userProfile.put(processed as UserProfileSettings);
+    const profileToSave = processed as UserProfileSettings;
+    if (isOnline) {
+      await withLogging(updateUserProfile, userId, profileToSave);
+    } else {
+      await db.userProfile.put(profileToSave);
     }
-    
-    // Pass the function itself to withLogging
-    await withLogging(db.userProfile.put.bind(db.userProfile), processed as UserProfileSettings);
   }, [userId]);
 
 
@@ -523,12 +538,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const logWeight = useCallback(async (date: string, weightKg: number) => {
     const newLog: DailyWeightLog = { date, weightKg };
-    if (!isOnline) {
+    if (isOnline) {
+        await withLogging(db.dailyWeightLog.put.bind(db.dailyWeightLog), newLog);
+        await withLogging(updateUserProfile, userId, { weightKg: weightKg });
+    } else {
         await db.dailyWeightLog.put(newLog);
-        return await db.userProfile.update(userId, { weightKg: weightKg });
+        await db.userProfile.update(userId, { weightKg: weightKg });
     }
-    await withLogging(db.dailyWeightLog.put.bind(db.dailyWeightLog), newLog);
-    await withLogging(updateUserProfile, userId, { weightKg: weightKg });
   }, [userId]);
 
   const logVitals = useCallback(async (date: string, vitals: Omit<DailyVitalsLog, 'date' >) => {
