@@ -335,15 +335,15 @@ function DailyWeightLog() {
     const weightLogForm = useForm<WeightLogFormValues>({
         resolver: zodResolver(weightLogSchema),
         defaultValues: {
-            weightKg: userProfile?.weightKg || ''
+            weightKg: userProfile?.weightKg || 0
         }
     });
 
     useEffect(() => {
-        if (userProfile) {
-            weightLogForm.reset({ weightKg: userProfile.weightKg || '' });
+        if (userProfile?.weightKg) {
+            weightLogForm.setValue('weightKg', userProfile.weightKg);
         }
-    }, [userProfile, weightLogForm]);
+    }, [userProfile?.weightKg, weightLogForm]);
 
     const handleLogWeight: SubmitHandler<WeightLogFormValues> = async (data) => {
         if (clientTodayDate) {
@@ -355,6 +355,10 @@ function DailyWeightLog() {
         }
     };
     
+    const recentWeightEntries = useMemo(() => {
+      return userProfile?.dailyWeightLog?.slice(0, 7) || [];
+    }, [userProfile?.dailyWeightLog]);
+
     return (
         <Card className="shadow-md">
             <CardHeader>
@@ -386,9 +390,9 @@ function DailyWeightLog() {
                 </Form>
                 <div className="mt-6">
                     <h4 className="font-semibold mb-2 text-muted-foreground">Recent Entries:</h4>
-                    {userProfile?.dailyWeightLog && userProfile.dailyWeightLog.length > 0 ? (
+                    {recentWeightEntries.length > 0 ? (
                         <ul className="space-y-2 text-sm">
-                            {userProfile.dailyWeightLog.slice(0, 7).map(log => (
+                            {recentWeightEntries.map(log => (
                                 <li key={log.date} className="flex justify-between p-2 bg-muted/30 rounded-md">
                                     <span>{format(parseISO(log.date), 'dd MMMM, yyyy')}</span>
                                     <span className="font-semibold">{log.weightKg} kg</span>
@@ -419,6 +423,20 @@ function ManualMacroLog() {
         defaultValues: todayLog || { calories: 0, protein: 0, carbs: 0, fat: 0 },
     });
     
+    const proteinValue = form.watch("protein");
+    const carbsValue = form.watch("carbs");
+    const fatValue = form.watch("fat");
+
+    useEffect(() => {
+        const p = parseFloat(proteinValue as any) || 0;
+        const c = parseFloat(carbsValue as any) || 0;
+        const f = parseFloat(fatValue as any) || 0;
+        const calculatedCalories = p * 4 + c * 4 + f * 9;
+        if (form.getValues("calories") !== Math.round(calculatedCalories)) {
+             form.setValue("calories", Math.round(calculatedCalories), { shouldValidate: true });
+        }
+    }, [proteinValue, carbsValue, fatValue, form]);
+    
     useEffect(() => {
         if (todayLog) {
             form.reset(todayLog);
@@ -445,14 +463,7 @@ function ManualMacroLog() {
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
-                            <FormField control={form.control} name="calories" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Calories</FormLabel>
-                                    <FormControl><Input type="number" placeholder="kcal" {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                            <FormField control={form.control} name="protein" render={({ field }) => (
+                             <FormField control={form.control} name="protein" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Protein (g)</FormLabel>
                                     <FormControl><Input type="number" placeholder="grams" {...field} /></FormControl>
@@ -470,6 +481,13 @@ function ManualMacroLog() {
                                 <FormItem>
                                     <FormLabel>Fat (g)</FormLabel>
                                     <FormControl><Input type="number" placeholder="grams" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                             <FormField control={form.control} name="calories" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Calories (kcal)</FormLabel>
+                                    <FormControl><Input type="number" placeholder="kcal" {...field} readOnly className="bg-muted/50 cursor-not-allowed"/></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )} />
@@ -589,8 +607,12 @@ export default function DailyLogPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <DailyWeightLog />
                 <DailyVitalsCheckin />
-                <ManualMacroLog />
-                <VitalsHistoryCharts />
+                <div className="md:col-span-2">
+                    <ManualMacroLog />
+                </div>
+                <div className="md:col-span-2">
+                    <VitalsHistoryCharts />
+                </div>
             </div>
         </PageWrapper>
     );
