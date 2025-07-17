@@ -13,13 +13,13 @@ export class AppDatabase extends Dexie {
   dailyManualMacrosLog!: Table<DailyManualMacrosLog>;
 
   constructor() {
-    super('MealPlannerProDB');
-    this.version(3).stores({
-      recipes: '++id, name, *tags, isCustom', // Use auto-incrementing primary key for recipes
+    super('MealPlannerProDB_v2'); // Renamed database to force a reset
+    this.version(1).stores({ // Reset to version 1 for the new database
+      recipes: '++id, name, *tags, isCustom', 
       plannedMeals: 'id, date, mealType, recipeId',
       pantryItems: 'id, name, category',
       dailyWeightLog: 'date',
-      userProfile: 'id', // Assuming a single user profile with a static ID
+      userProfile: 'id', 
       dailyVitalsLog: 'date',
       dailyManualMacrosLog: 'date'
     });
