@@ -24,13 +24,13 @@ import type {
   MealSlotConfig,
   DashboardSettings,
   SubscriptionStatus,
+  UKSupermarketCategory
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
 import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { format, subDays, differenceInDays } from 'date-fns';
 
-const isOnline = typeof window !== 'undefined';
 
 // --- Calculation Helpers ---
 const processProfile = (profileData: UserProfileSettings | undefined | null): UserProfileSettings | null => {
@@ -343,6 +343,13 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoading: isAuthLoading } = useAuth();
   
+  const [isOnline, setIsOnline] = useState(false);
+
+  useEffect(() => {
+    // This code runs only on the client, after the component has mounted.
+    setIsOnline(true);
+  }, []); // The empty array ensures this effect runs only once.
+  
   const {
       mealPlan,
       pantryItems,
@@ -424,28 +431,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return await db.plannedMeals.add(newPlannedMeal);
     }
     await withLogging('addMealToPlan', db.plannedMeals.add.bind(db.plannedMeals), newPlannedMeal);
-  }, []);
+  }, [isOnline]);
 
   const removeMealFromPlan = useCallback(async (plannedMealId: string) => {
     if (!isOnline) {
       return await db.plannedMeals.delete(plannedMealId);
     }
     await withLogging('removeMealFromPlan', db.plannedMeals.delete.bind(db.plannedMeals), plannedMealId);
-  }, []);
+  }, [isOnline]);
 
   const updatePlannedMealServings = useCallback(async (plannedMealId: string, newServings: number) => {
     if (!isOnline) {
       return await db.plannedMeals.update(plannedMealId, { servings: newServings });
     }
     await withLogging('updatePlannedMealServings', db.plannedMeals.update.bind(db.plannedMeals), plannedMealId, { servings: newServings });
-  }, []);
+  }, [isOnline]);
 
   const updateMealStatus = useCallback(async (plannedMealId: string, status: 'planned' | 'eaten') => {
     if (!isOnline) {
       return await db.plannedMeals.update(plannedMealId, { status });
     }
     await withLogging('updateMealStatus', db.plannedMeals.update.bind(db.plannedMeals), plannedMealId, { status });
-  }, []);
+  }, [isOnline]);
 
   const clearMealPlanForDate = useCallback(async (date: string) => {
     const mealsToDelete = await db.plannedMeals.where('date').equals(date).primaryKeys();
@@ -453,14 +460,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return await db.plannedMeals.bulkDelete(mealsToDelete);
     }
     await withLogging('clearMealPlanForDate', db.plannedMeals.bulkDelete.bind(db.plannedMeals), mealsToDelete);
-  }, []);
+  }, [isOnline]);
 
   const clearEntireMealPlan = useCallback(async () => {
     if (!isOnline) {
       return await db.plannedMeals.clear();
     }
     await withLogging('clearEntireMealPlan', db.plannedMeals.clear.bind(db.plannedMeals));
-  }, []);
+  }, [isOnline]);
 
   const toggleFavoriteRecipe = useCallback(async (recipeId: number) => {
     const currentFavorites = userProfile?.favorite_recipe_ids || [];
@@ -502,14 +509,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return await withLogging('addPantryItem', db.pantryItems.add.bind(db.pantryItems), newItem);
     }
-  }, []);
+  }, [isOnline]);
 
   const removePantryItem = useCallback(async (itemId: string) => {
     if (!isOnline) {
       return await db.pantryItems.delete(itemId);
     }
     await withLogging('removePantryItem', db.pantryItems.delete.bind(db.pantryItems), itemId);
-  }, []);
+  }, [isOnline]);
 
   const updatePantryItemQuantity = useCallback(async (itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -520,7 +527,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return await withLogging('updatePantryItemQuantity', db.pantryItems.update.bind(db.pantryItems), itemId, { quantity: newQuantity });
     }
-  }, [removePantryItem]);
+  }, [removePantryItem, isOnline]);
 
   const addCustomRecipe = useCallback(async (recipeData: RecipeFormData) => {
     const newRecipe: Recipe = {
@@ -544,7 +551,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return await db.recipes.add(newRecipe);
     }
     await withLogging('addCustomRecipe', db.recipes.add.bind(db.recipes), newRecipe);
-  }, [userId]);
+  }, [userId, isOnline]);
 
   const logWeight = useCallback(async (date: string, weightKg: number) => {
     const newLog: DailyWeightLog = { date, weightKg };
@@ -555,7 +562,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await db.dailyWeightLog.put(newLog);
         await db.userProfile.update(userId, { weightKg: weightKg });
     }
-  }, [userId]);
+  }, [userId, isOnline]);
 
   const logVitals = useCallback(async (date: string, vitals: Omit<DailyVitalsLog, 'date' >) => {
     const newLog: DailyVitalsLog = { date, ...vitals };
@@ -563,7 +570,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return await db.dailyVitalsLog.put(newLog);
     }
     await withLogging('logVitals', db.dailyVitalsLog.put.bind(db.dailyVitalsLog), newLog);
-  }, []);
+  }, [isOnline]);
   
   const logManualMacros = useCallback(async (date: string, macros: Macros) => {
     const newLog: DailyManualMacrosLog = { date, macros };
@@ -571,7 +578,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return await db.dailyManualMacrosLog.put(newLog);
     }
     await withLogging('logManualMacros', db.dailyManualMacrosLog.put.bind(db.dailyManualMacrosLog), newLog);
-  }, []);
+  }, [isOnline]);
 
   const contextValue = useMemo(() => ({
     mealPlan, pantryItems, userRecipes, userProfile,
@@ -605,3 +612,6 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
+
+    
