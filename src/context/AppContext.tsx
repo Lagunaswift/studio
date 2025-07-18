@@ -1,3 +1,4 @@
+
 //src/context/AppContext.tsx
 "use client";
 
@@ -28,9 +29,8 @@ import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
 import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { format, subDays, differenceInDays } from 'date-fns';
-import { supabase } from '@/lib/supabaseClient';
 
-const isOnline = typeof window !== 'undefined' && !!supabase;
+const isOnline = typeof window !== 'undefined';
 
 // --- Calculation Helpers ---
 const processProfile = (profileData: UserProfileSettings | undefined | null): UserProfileSettings | null => {
@@ -586,7 +586,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
   }), [
     mealPlan, pantryItems, userRecipes, userProfile,
-    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading, isSubscribed,
+    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading, isOnline, isSubscribed,
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus,
     logWeight, logVitals, logManualMacros, clearMealPlanForDate,
     clearEntireMealPlan, toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
