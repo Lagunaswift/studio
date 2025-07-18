@@ -46,6 +46,8 @@ export default function LoginPage() {
       return;
     }
 
+    console.log('Attempting to sign in with:', data.email); 
+
     form.clearErrors(); 
     try {
       const { error } = await supabase.auth.signInWithPassword({
