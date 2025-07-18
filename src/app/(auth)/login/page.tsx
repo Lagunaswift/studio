@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -12,8 +11,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Mail, Lock, LogIn, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/context/AuthContext';
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -24,7 +23,6 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const { toast } = useToast();
-  const { supabase } = useAuth();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -43,7 +41,7 @@ export default function LoginPage() {
 
   const onSubmit: SubmitHandler<LoginFormValues> = async (data) => {
     if (!supabase) {
-      toast({ title: "Error", description: "Authentication service not ready. Please wait and try again.", variant: "destructive"});
+      toast({ title: "Error", description: "Authentication service not available.", variant: "destructive"});
       return;
     }
 
