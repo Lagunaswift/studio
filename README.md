@@ -81,7 +81,7 @@ Fine-tune every aspect of your nutrition journey.
 - **Styling**: Tailwind CSS
 - **UI Components**: shadcn/ui
 - **AI/Generative Features**: Google AI with Genkit
-- **Database/Auth**: Uses browser local storage for a serverless, "local mode" experience.
+- **Database/Auth**: Uses browser local storage for a serverless, "local mode" experience, and superbase for cross platform datasaving.
 
 ---
 
