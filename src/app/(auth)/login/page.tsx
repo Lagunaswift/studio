@@ -13,7 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Mail, Lock, LogIn, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -27,6 +27,12 @@ export default function LoginPage() {
   const { supabase } = useAuth();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -37,7 +43,7 @@ export default function LoginPage() {
 
   const onSubmit: SubmitHandler<LoginFormValues> = async (data) => {
     if (!supabase) {
-      toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive"});
+      toast({ title: "Error", description: "Authentication service not ready. Please wait and try again.", variant: "destructive"});
       return;
     }
 
@@ -71,6 +77,8 @@ export default function LoginPage() {
     }
   };
 
+  const isFormDisabled = form.formState.isSubmitting || !isClient;
+
   return (
     <Card className="shadow-2xl">
       <CardHeader className="text-center">
@@ -89,7 +97,7 @@ export default function LoginPage() {
                 <FormItem>
                   <FormLabel className="flex items-center"><Mail className="mr-2 h-4 w-4 text-muted-foreground" />Email</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="you@example.com" {...field} />
+                    <Input type="email" placeholder="you@example.com" {...field} disabled={isFormDisabled} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -103,12 +111,13 @@ export default function LoginPage() {
                   <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-muted-foreground" />Password</FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <Input type={showPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
+                      <Input type={showPassword ? 'text' : 'password'} placeholder="••••••••" {...field} disabled={isFormDisabled} />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-primary"
                         aria-label={showPassword ? "Hide password" : "Show password"}
+                        disabled={isFormDisabled}
                       >
                         {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </button>
@@ -120,7 +129,7 @@ export default function LoginPage() {
             />
           </CardContent>
           <CardFooter className="flex flex-col items-center space-y-4">
-            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={form.formState.isSubmitting}>
+            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isFormDisabled}>
               {form.formState.isSubmitting ? 'Signing In...' : 'Sign In'}
             </Button>
             <div className="text-sm text-center w-full">

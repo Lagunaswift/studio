@@ -49,7 +49,7 @@ export default function SignUpPage() {
 
   const onSubmit: SubmitHandler<SignUpFormValues> = async (data) => {
     if (!supabase) {
-       toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive"});
+       toast({ title: "Error", description: "Authentication service not ready. Please wait and try again.", variant: "destructive"});
        return;
     }
 
@@ -107,6 +107,8 @@ export default function SignUpPage() {
     }
   };
 
+  const isFormDisabled = form.formState.isSubmitting || !isClient;
+
   return (
     <Card className="shadow-2xl">
       <CardHeader className="text-center">
@@ -125,7 +127,7 @@ export default function SignUpPage() {
                 <FormItem>
                   <FormLabel className="flex items-center"><Mail className="mr-2 h-4 w-4 text-muted-foreground" />Email</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="you@example.com" {...field} />
+                    <Input type="email" placeholder="you@example.com" {...field} disabled={isFormDisabled} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -139,12 +141,13 @@ export default function SignUpPage() {
                   <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-muted-foreground" />Password</FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <Input type={showPassword ? 'text' : 'password'} placeholder="Minimum 8 characters" {...field} />
+                      <Input type={showPassword ? 'text' : 'password'} placeholder="Minimum 8 characters" {...field} disabled={isFormDisabled} />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-primary"
                         aria-label={showPassword ? "Hide password" : "Show password"}
+                        disabled={isFormDisabled}
                       >
                         {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </button>
@@ -162,12 +165,13 @@ export default function SignUpPage() {
                   <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-muted-foreground" />Confirm Password</FormLabel>
                   <FormControl>
                      <div className="relative">
-                      <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="Re-type your password" {...field} />
+                      <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="Re-type your password" {...field} disabled={isFormDisabled} />
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                         className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-primary"
                         aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                        disabled={isFormDisabled}
                       >
                         {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </button>
@@ -179,7 +183,7 @@ export default function SignUpPage() {
             />
           </CardContent>
           <CardFooter className="flex flex-col items-center space-y-4">
-            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={form.formState.isSubmitting}>
+            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isFormDisabled}>
               Create Account
             </Button>
             <div className="text-sm text-center w-full">

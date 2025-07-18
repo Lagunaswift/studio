@@ -39,7 +39,7 @@ export default function ResetPasswordPage() {
   const onSubmit: SubmitHandler<ResetPasswordFormValues> = async (data) => {
     form.clearErrors();
     if (!isClient || !supabase) {
-       toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive"});
+       toast({ title: "Error", description: "Authentication service not ready. Please wait and try again.", variant: "destructive"});
       return;
     }
 
@@ -72,6 +72,8 @@ export default function ResetPasswordPage() {
       });
     }
   };
+  
+  const isFormDisabled = form.formState.isSubmitting || !isClient;
 
   return (
     <Card className="shadow-2xl">
@@ -91,7 +93,7 @@ export default function ResetPasswordPage() {
                 <FormItem>
                   <FormLabel className="flex items-center"><Mail className="mr-2 h-4 w-4 text-muted-foreground" />Email</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="you@example.com" {...field} />
+                    <Input type="email" placeholder="you@example.com" {...field} disabled={isFormDisabled} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -99,7 +101,7 @@ export default function ResetPasswordPage() {
             />
           </CardContent>
           <CardFooter className="flex flex-col items-center space-y-4">
-            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={form.formState.isSubmitting}>
+            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isFormDisabled}>
               Send Reset Link
             </Button>
             <div className="text-sm text-center w-full">
