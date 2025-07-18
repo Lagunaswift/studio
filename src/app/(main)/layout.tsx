@@ -203,7 +203,7 @@ function DevStatusIndicator() {
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { userProfile, acceptTerms, isAppDataLoading } = useAppContext();
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
 
   const getCurrentPageTitle = () => {
     // Specific titles for AI pages
@@ -322,7 +322,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                 </SidebarMenuItem>
               );
             })}
-            {user && <LogoutButton />}
+            {!isAuthLoading && user && <LogoutButton />}
           </SidebarMenu>
         </SidebarContent>
       </Sidebar>
