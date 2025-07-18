@@ -1,4 +1,4 @@
-
+//src/lib/supabaseClient.ts
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 // Read variables from the environment (Vercel will provide these)
