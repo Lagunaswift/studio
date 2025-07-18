@@ -6,7 +6,7 @@ import { PageWrapper } from '@/components/layout/PageWrapper';
 import { suggestRecipesByIngredients, type SuggestRecipesByIngredientsInput, type SuggestRecipesByIngredientsOutput, type RecipeWithIngredients } from '@/ai/flows/suggest-recipes-by-ingredients-flow';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Bot, Info, CookingPot, BadgePercent, CheckCircle2, AlertTriangle, Search } from 'lucide-react';
+import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Bot, Info, CookingPot, BadgePercent, CheckCircle2, AlertTriangle, Search, Lock } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -14,9 +14,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { ProFeature } from '@/components/shared/ProFeature';
 
 export default function AIRecipeFinderPage() {
-  const { allRecipesCache, isRecipeCacheLoading, userProfile } = useAppContext();
+  const { allRecipesCache, isRecipeCacheLoading, userProfile, isSubscribed } = useAppContext();
   const { toast } = useToast();
 
   const [ingredients, setIngredients] = useState('');
@@ -81,6 +82,14 @@ export default function AIRecipeFinderPage() {
       setIsGenerating(false);
     }
   };
+
+  if (!isSubscribed) {
+    return (
+      <PageWrapper title="Preppy: Pantry Chef">
+        <ProFeature featureName="The Pantry Chef" description="Let our AI, Preppy, suggest recipes you can make right now based on the ingredients you have on hand. No more wondering what's for dinner!" />
+      </PageWrapper>
+    )
+  }
 
   if (isRecipeCacheLoading) {
     return (

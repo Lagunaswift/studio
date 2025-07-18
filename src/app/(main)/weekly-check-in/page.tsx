@@ -7,15 +7,16 @@ import { useAppContext } from '@/context/AppContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Sparkles, CheckSquare, Info, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
+import { Loader2, Sparkles, CheckSquare, Info, AlertTriangle, TrendingUp, TrendingDown, Lock } from 'lucide-react';
 import type { PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { ProFeature } from '@/components/shared/ProFeature';
 
 export default function WeeklyCheckinPage() {
-  const { userProfile, runWeeklyCheckin, setMacroTargets, isAppDataLoading } = useAppContext();
+  const { userProfile, runWeeklyCheckin, setMacroTargets, isAppDataLoading, isSubscribed } = useAppContext();
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +50,14 @@ export default function WeeklyCheckinPage() {
   };
 
   const isCheckinDisabled = !userProfile?.dailyWeightLog || userProfile.dailyWeightLog.length < 14;
+
+  if (!isSubscribed) {
+    return (
+        <PageWrapper title="Preppy: Weekly Check-in">
+            <ProFeature featureName="Weekly Check-in" description="This is the core of our adaptive coaching. Preppy analyzes your weight trend and calorie intake to calculate your true energy expenditure, then provides optimized macro targets to ensure you stay on track with your goals." />
+        </PageWrapper>
+    );
+  }
 
   if (isAppDataLoading) {
      return (
