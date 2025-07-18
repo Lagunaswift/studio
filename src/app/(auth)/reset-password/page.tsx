@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -11,8 +10,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Mail, KeyRound, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/context/AuthContext';
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 
 const resetPasswordSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -22,7 +21,6 @@ type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
 export default function ResetPasswordPage() {
   const { toast } = useToast();
-  const { supabase } = useAuth();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
