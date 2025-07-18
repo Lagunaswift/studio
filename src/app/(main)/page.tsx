@@ -3,12 +3,13 @@
 
 import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation'; // <-- Import useRouter
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Target, Edit, Star, Loader2, CalendarCheck, PlusCircle, UtensilsCrossed, Zap, SlidersHorizontal, Scale, Save, Frown, Meh, Smile, BatteryLow, BatteryMedium, BatteryFull, CheckCircle2, Moon, Sun, Utensils, Droplets, BookOpen, BrainCircuit } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext'; // <-- Import useAuth
 import { format, parseISO, isValid } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -50,7 +51,9 @@ const chartConfig = {
 
 
 export default function HomePage() {
-  const { user, isLoading: isAuthLoading, profile: authProfile } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const router = useRouter();
+
   const {
     getConsumedMacrosForDate,
     setMacroTargets,
@@ -67,7 +70,7 @@ export default function HomePage() {
   const [quickRecipe, setQuickRecipe] = useState<Recipe | null>(null);
 
   const currentMacroTargets = appContextUserProfile?.macroTargets;
-  const welcomeName = appContextUserProfile?.name || appContextUserProfile?.email || authProfile?.name || authProfile?.email || user?.email || 'User';
+  const welcomeName = appContextUserProfile?.name || appContextUserProfile?.email || user?.email || 'User';
 
   const {
     showMacros = true,
@@ -75,6 +78,16 @@ export default function HomePage() {
     showFeaturedRecipe = true,
     showQuickRecipes = true,
   } = appContextUserProfile?.dashboardSettings || {};
+
+  useEffect(() => {
+    // --- ADDED REDIRECT LOGIC ---
+    // Wait until the authentication check is complete
+    if (!isAuthLoading && !user) {
+      // If the check is done and there is no user, redirect to login
+      router.push('/login');
+    }
+  }, [user, isAuthLoading, router]);
+
 
   useEffect(() => {
     const today = new Date();
@@ -163,12 +176,13 @@ export default function HomePage() {
   ] : [];
 
 
-  if (isAuthLoading || (isAppRecipeCacheLoading && !user && !authProfile)) {
+  // --- ADDED LOADING STATE ---
+  // If still loading or no user, show a loading state to prevent flashing content
+  if (isAuthLoading || !user) {
     return (
-      <PageWrapper title={`Welcome, ${welcomeName}!`}>
-        <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
-          <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
-          <p className="text-lg">Loading dashboard data...</p>
+      <PageWrapper title="Loading Dashboard...">
+        <div className="flex justify-center items-center min-h-[300px]">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
         </div>
       </PageWrapper>
     );
@@ -394,3 +408,5 @@ export default function HomePage() {
     </PageWrapper>
   );
 }
+
+    
