@@ -169,13 +169,12 @@ function ServiceStatusBanner() {
 }
 
 function DevStatusIndicator() {
-  // This component will only render in development environments
+  const { isOnline } = useAppContext();
+
   if (process.env.NODE_ENV !== 'development') {
     return null;
   }
   
-  const { isOnline } = useAppContext();
-
   return (
     <div className="fixed bottom-2 left-2 z-50">
       <TooltipProvider>

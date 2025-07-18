@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { createContext, useState, useEffect, useContext, ReactNode, useMemo, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useContext, ReactNode, useMemo } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -21,19 +21,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const getActiveSession = async () => {
+      // Fetch session on initial load
       const { data: { session: activeSession } } = await supabase.auth.getSession();
       setSession(activeSession);
       setUser(activeSession?.user ?? null);
-      setIsLoading(false);
+      setIsLoading(false); // Set loading to false once session is fetched
     };
     
     getActiveSession();
 
+    // Listen for auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if(event === 'INITIAL_SESSION') {
+      setUser(session?.user ?? null);
+      // Ensure loading is false after the initial check is complete
+      if (event === 'INITIAL_SESSION') {
         setIsLoading(false);
       }
     });
@@ -48,7 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const value = useMemo(() => ({ session, user, isLoading, signOut }), 
-    [session, user, isLoading, signOut]
+    [session, user, isLoading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

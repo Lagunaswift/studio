@@ -144,22 +144,24 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
 
     const idToUse = useMemo(() => userId || 'local-user', [userId]);
 
-    // Use a READ-ONLY query to get profile data.
-    const rawProfile = useLiveQuery(async () => {
+    const rawProfile = useLiveQuery(
+      async () => {
         if (isAuthLoading) return undefined;
-        return await db.userProfile.get(idToUse);
-    }, [idToUse, isAuthLoading]);
-
-    // Effect to CREATE profile if it doesn't exist. This runs separately.
-    useEffect(() => {
-        if (!isAuthLoading && rawProfile === undefined) {
-            getOrCreateUserProfile(idToUse).catch(err => {
-                 console.error("Error ensuring user profile exists:", err);
-            });
-        }
-    }, [isAuthLoading, rawProfile, idToUse]);
+        return db.userProfile.get(idToUse);
+      },
+      [idToUse, isAuthLoading], 
+      undefined 
+    );
     
-    // Process the read data into the final userProfile object.
+    useEffect(() => {
+      const ensureProfileExists = async () => {
+        if (!isAuthLoading && rawProfile === undefined) {
+          await getOrCreateUserProfile(idToUse);
+        }
+      };
+      ensureProfileExists();
+    }, [isAuthLoading, rawProfile, idToUse]);
+
     const processedProfile = useMemo(() => processProfile(rawProfile), [rawProfile]);
 
     const userRecipes = useLiveQuery(() => db.recipes.where({ isCustom: 1 }).toArray(), [], []);
@@ -346,45 +348,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const userId = user?.id || 'local-user';
 
   const withLogging = async <T extends (...args: any[]) => any>(
-    fn: T, 
+    fnName: string,
+    dbCall: T,
     ...args: Parameters<T>
   ): Promise<ReturnType<T>> => {
     if (isOnline && process.env.NODE_ENV === 'development') {
-      console.log(`[Supabase] Attempting to call ${fn.name} for user: ${userId}`);
+      console.log(`[Supabase] Attempting to call ${fnName} for user: ${userId}`);
     }
     try {
-      const result = await fn(...args);
+      const result = await dbCall(...args);
       if (isOnline && process.env.NODE_ENV === 'development') {
-         console.log(`[Supabase] Successfully called ${fn.name}.`);
+         console.log(`[Supabase] Successfully called ${fnName}.`);
       }
       return result;
     } catch (error: any) {
       if (isOnline && process.env.NODE_ENV === 'development') {
-        console.error(`[Supabase] Error calling ${fn.name} for user ${userId}:`, error.message);
+        console.error(`[Supabase] Error calling ${fnName} for user ${userId}:`, error.message);
       }
-      // Fallback logic could be added here if needed
-      throw error; // Re-throw the error to be handled by the caller
+      throw error;
     }
   };
 
 
   // --- ACTIONS ---
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
-      const currentProfile = await getOrCreateUserProfile(userId);
-      const updatedProfile = { ...currentProfile, ...updates };
-      const processed = processProfile(updatedProfile);
-      
-      const profileToSave = processed as UserProfileSettings;
-      
       const updateFn = async () => {
-          if (isOnline) {
-              await updateUserProfile(userId, profileToSave);
-          } else {
-              await db.userProfile.put(profileToSave);
-          }
+        if (isOnline) {
+          await updateUserProfile(userId, updates);
+        } else {
+          await db.userProfile.update(userId, updates);
+        }
       };
-
-      await withLogging(updateFn);
+      await withLogging('setUserInformation', updateFn);
   }, [userId]);
 
 
@@ -417,28 +412,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!isOnline) {
       return await db.plannedMeals.add(newPlannedMeal);
     }
-    await withLogging(db.plannedMeals.add.bind(db.plannedMeals), newPlannedMeal);
+    await withLogging('addMealToPlan', db.plannedMeals.add.bind(db.plannedMeals), newPlannedMeal);
   }, []);
 
   const removeMealFromPlan = useCallback(async (plannedMealId: string) => {
     if (!isOnline) {
       return await db.plannedMeals.delete(plannedMealId);
     }
-    await withLogging(db.plannedMeals.delete.bind(db.plannedMeals), plannedMealId);
+    await withLogging('removeMealFromPlan', db.plannedMeals.delete.bind(db.plannedMeals), plannedMealId);
   }, []);
 
   const updatePlannedMealServings = useCallback(async (plannedMealId: string, newServings: number) => {
     if (!isOnline) {
       return await db.plannedMeals.update(plannedMealId, { servings: newServings });
     }
-    await withLogging(db.plannedMeals.update.bind(db.plannedMeals), plannedMealId, { servings: newServings });
+    await withLogging('updatePlannedMealServings', db.plannedMeals.update.bind(db.plannedMeals), plannedMealId, { servings: newServings });
   }, []);
 
   const updateMealStatus = useCallback(async (plannedMealId: string, status: 'planned' | 'eaten') => {
     if (!isOnline) {
       return await db.plannedMeals.update(plannedMealId, { status });
     }
-    await withLogging(db.plannedMeals.update.bind(db.plannedMeals), plannedMealId, { status });
+    await withLogging('updateMealStatus', db.plannedMeals.update.bind(db.plannedMeals), plannedMealId, { status });
   }, []);
 
   const clearMealPlanForDate = useCallback(async (date: string) => {
@@ -446,14 +441,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!isOnline) {
       return await db.plannedMeals.bulkDelete(mealsToDelete);
     }
-    await withLogging(db.plannedMeals.bulkDelete.bind(db.plannedMeals), mealsToDelete);
+    await withLogging('clearMealPlanForDate', db.plannedMeals.bulkDelete.bind(db.plannedMeals), mealsToDelete);
   }, []);
 
   const clearEntireMealPlan = useCallback(async () => {
     if (!isOnline) {
       return await db.plannedMeals.clear();
     }
-    await withLogging(db.plannedMeals.clear.bind(db.plannedMeals));
+    await withLogging('clearEntireMealPlan', db.plannedMeals.clear.bind(db.plannedMeals));
   }, []);
 
   const toggleFavoriteRecipe = useCallback(async (recipeId: number) => {
@@ -483,7 +478,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!isOnline) {
         return await db.pantryItems.update(existingItem.id, updateData);
       }
-      return await withLogging(db.pantryItems.update.bind(db.pantryItems), existingItem.id, updateData);
+      return await withLogging('updatePantryItem', db.pantryItems.update.bind(db.pantryItems), existingItem.id, updateData);
     } else {
       const newItem: PantryItem = {
         id: `pantry_${Date.now()}_${Math.random()}`,
@@ -494,7 +489,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!isOnline) {
         return await db.pantryItems.add(newItem);
       }
-      return await withLogging(db.pantryItems.add.bind(db.pantryItems), newItem);
+      return await withLogging('addPantryItem', db.pantryItems.add.bind(db.pantryItems), newItem);
     }
   }, []);
 
@@ -502,7 +497,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!isOnline) {
       return await db.pantryItems.delete(itemId);
     }
-    await withLogging(db.pantryItems.delete.bind(db.pantryItems), itemId);
+    await withLogging('removePantryItem', db.pantryItems.delete.bind(db.pantryItems), itemId);
   }, []);
 
   const updatePantryItemQuantity = useCallback(async (itemId: string, newQuantity: number) => {
@@ -512,7 +507,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!isOnline) {
         return await db.pantryItems.update(itemId, { quantity: newQuantity });
       }
-      return await withLogging(db.pantryItems.update.bind(db.pantryItems), itemId, { quantity: newQuantity });
+      return await withLogging('updatePantryItemQuantity', db.pantryItems.update.bind(db.pantryItems), itemId, { quantity: newQuantity });
     }
   }, [removePantryItem]);
 
@@ -537,14 +532,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!isOnline) {
       return await db.recipes.add(newRecipe);
     }
-    await withLogging(db.recipes.add.bind(db.recipes), newRecipe);
+    await withLogging('addCustomRecipe', db.recipes.add.bind(db.recipes), newRecipe);
   }, [userId]);
 
   const logWeight = useCallback(async (date: string, weightKg: number) => {
     const newLog: DailyWeightLog = { date, weightKg };
     if (isOnline) {
-        await withLogging(db.dailyWeightLog.put.bind(db.dailyWeightLog), newLog);
-        await withLogging(updateUserProfile, userId, { weightKg: weightKg });
+        await withLogging('logWeight', db.dailyWeightLog.put.bind(db.dailyWeightLog), newLog);
+        await withLogging('updateUserProfileWeight', updateUserProfile, userId, { weightKg: weightKg });
     } else {
         await db.dailyWeightLog.put(newLog);
         await db.userProfile.update(userId, { weightKg: weightKg });
@@ -556,7 +551,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!isOnline) {
       return await db.dailyVitalsLog.put(newLog);
     }
-    await withLogging(db.dailyVitalsLog.put.bind(db.dailyVitalsLog), newLog);
+    await withLogging('logVitals', db.dailyVitalsLog.put.bind(db.dailyVitalsLog), newLog);
   }, []);
   
   const logManualMacros = useCallback(async (date: string, macros: Macros) => {
@@ -564,7 +559,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!isOnline) {
       return await db.dailyManualMacrosLog.put(newLog);
     }
-    await withLogging(db.dailyManualMacrosLog.put.bind(db.dailyManualMacrosLog), newLog);
+    await withLogging('logManualMacros', db.dailyManualMacrosLog.put.bind(db.dailyManualMacrosLog), newLog);
   }, []);
 
   const contextValue = useMemo(() => ({
