@@ -30,7 +30,7 @@ import { SheetTitle } from '@/components/ui/sheet';
 import { 
   UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, 
   PanelLeft, Target, Leaf, ListChecks, UserCog, UserCircle2, 
-  BookOpen, Archive, Bot, SlidersHorizontal, Search, LogOut, FileText, Shield, CheckSquare, Settings, TrendingUp, ChefHat, ClipboardList, AlertTriangle
+  BookOpen, Archive, Bot, SlidersHorizontal, Search, LogOut, FileText, Shield, CheckSquare, Settings, TrendingUp, ChefHat, ClipboardList, AlertTriangle, Database, WifiOff
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -154,9 +154,9 @@ function LogoutButton() {
 }
 
 function ServiceStatusBanner() {
-  const isDegraded = process.env.NEXT_PUBLIC_SERVICE_STATUS !== 'online';
+  const { isOnline } = useAppContext();
 
-  if (!isDegraded) {
+  if (isOnline) {
     return null;
   }
 
@@ -168,12 +168,42 @@ function ServiceStatusBanner() {
   );
 }
 
+function DevStatusIndicator() {
+  const { isOnline } = useAppContext();
+
+  if (process.env.NODE_ENV !== 'development') {
+    return null;
+  }
+  
+  return (
+    <div className="fixed bottom-2 left-2 z-50">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className={cn(
+              "flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-lg",
+              isOnline ? "bg-green-600" : "bg-orange-500"
+            )}>
+              {isOnline ? <Database className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
+              <span>{isOnline ? "Supabase Mode" : "Local Mode"}</span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            <p>{isOnline ? "Data is being sent to Supabase." : "Data is being saved to local browser storage."}</p>
+            <p className="text-muted-foreground">This indicator is only visible in development.</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+  );
+}
+
 
 // Inner component to use hooks within SidebarProvider context
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { userProfile, acceptTerms, isAppDataLoading } = useAppContext();
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
 
   const getCurrentPageTitle = () => {
     // Specific titles for AI pages
@@ -292,7 +322,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                 </SidebarMenuItem>
               );
             })}
-            {user && <LogoutButton />}
+            {!isAuthLoading && user && <LogoutButton />}
           </SidebarMenu>
         </SidebarContent>
       </Sidebar>
@@ -314,6 +344,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </SidebarInset>
+      <DevStatusIndicator />
       <PreppyHelp /> {/* Add the help component */}
       <TermsAcceptanceModal
         isOpen={!isAppDataLoading && !!userProfile && !userProfile.hasAcceptedTerms}

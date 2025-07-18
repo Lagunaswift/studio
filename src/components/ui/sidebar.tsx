@@ -54,6 +54,7 @@ const SidebarProvider = React.forwardRef<
     defaultOpen?: boolean
     open?: boolean
     onOpenChange?: (open: boolean) => void
+    collapsible?: "icon" | "offcanvas" | "none" // Added collapsible prop
   }
 >(
   (
@@ -64,6 +65,7 @@ const SidebarProvider = React.forwardRef<
       className,
       style,
       children,
+      collapsible = "icon", // Default value
       ...props
     },
     ref
@@ -171,6 +173,11 @@ const Sidebar = React.forwardRef<
     ref
   ) => {
     const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+    const [isMounted, setIsMounted] = React.useState(false);
+
+    React.useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     if (collapsible === "none") {
       return (
@@ -187,7 +194,7 @@ const Sidebar = React.forwardRef<
       )
     }
 
-    if (isMobile) {
+    if (isMobile && isMounted) {
       return (
         <Sheet open={openMobile} onOpenChange={setOpenMobile}>
           <SheetContent
