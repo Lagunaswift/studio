@@ -1,4 +1,4 @@
-
+//src/app/(auth)/signup/page.tsx
 "use client";
 
 import Link from 'next/link';
