@@ -1,4 +1,4 @@
-
+//studio/supabase/schema.sq
 -- Create a table for public user profiles
 create table profiles (
   id uuid references auth.users not null primary key,

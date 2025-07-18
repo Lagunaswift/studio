@@ -1,4 +1,4 @@
-
+//src/context/AppContext.tsx
 "use client";
 
 import React, { createContext, useContext, useMemo, useCallback, useState, useEffect } from 'react';
@@ -22,13 +22,26 @@ import type {
   RDA,
   MealSlotConfig,
   DashboardSettings,
+  SubscriptionStatus,
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
 import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { format, subDays, differenceInDays } from 'date-fns';
+import { supabase } from '@/lib/supabaseClient';
+
+const isOnline = !!supabase;
 
 // --- Calculation Helpers ---
+const processProfile = (profileData: UserProfileSettings | undefined | null): UserProfileSettings | null => {
+    if (!profileData) return null;
+    const p = { ...profileData };
+    p.tdee = calculateTDEE(p.weightKg, p.heightCm, p.age, p.sex, p.activityLevel);
+    p.leanBodyMassKg = calculateLBM(p.weightKg, p.bodyFatPercentage);
+    p.rda = getRdaProfile(p.sex, p.age);
+    return p;
+};
+
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
   if (weightKg && weightKg > 0 && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
     const lbm = weightKg * (1 - bodyFatPercentage / 100);
@@ -75,14 +88,6 @@ const getRdaProfile = (sex: Sex | null | undefined, age: number | null | undefin
     return { iron: 10, calcium: 1200, potassium: 3000, vitaminA: 800, vitaminC: 80, vitaminD: 15 };
 };
 
-const processProfile = (profileData: UserProfileSettings | undefined): UserProfileSettings | null => {
-    if (!profileData) return null;
-    const p = { ...profileData };
-    p.tdee = calculateTDEE(p.weightKg, p.heightCm, p.age, p.sex, p.activityLevel);
-    p.leanBodyMassKg = calculateLBM(p.weightKg, p.bodyFatPercentage);
-    p.rda = getRdaProfile(p.sex, p.age);
-    return p;
-};
 
 interface AppContextType {
   // State from DB (via useLiveQuery)
@@ -94,6 +99,8 @@ interface AppContextType {
   // Computed State
   allRecipesCache: Recipe[];
   shoppingList: ShoppingListItem[];
+  isOnline: boolean;
+  isSubscribed: boolean;
 
   // Loaders
   isRecipeCacheLoading: boolean;
@@ -137,7 +144,27 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     const [staticRecipes, setStaticRecipes] = useState<Recipe[]>([]);
     const [isStaticRecipeLoading, setIsStaticRecipeLoading] = useState(true);
 
-    const dbProfile = useLiveQuery(() => db.userProfile.get(userId || 'local-user'), [userId]);
+    const idToUse = useMemo(() => userId || 'local-user', [userId]);
+
+    const rawProfile = useLiveQuery(
+      async () => {
+        if (isAuthLoading) return undefined;
+        return db.userProfile.get(idToUse);
+      },
+      [idToUse, isAuthLoading], 
+      undefined 
+    );
+    
+    useEffect(() => {
+      const ensureProfileExists = async () => {
+        if (!isAuthLoading && rawProfile === undefined) {
+          await getOrCreateUserProfile(idToUse);
+        }
+      };
+      ensureProfileExists();
+    }, [isAuthLoading, rawProfile, idToUse]);
+
+    const processedProfile = useMemo(() => processProfile(rawProfile), [rawProfile]);
 
     const userRecipes = useLiveQuery(() => db.recipes.where({ isCustom: 1 }).toArray(), [], []);
     const mealPlan = useLiveQuery(() => db.plannedMeals.toArray(), [], []);
@@ -146,23 +173,17 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     const dailyVitalsLog = useLiveQuery(() => db.dailyVitalsLog.orderBy('date').reverse().toArray(), [], []);
     const dailyManualMacrosLog = useLiveQuery(() => db.dailyManualMacrosLog.orderBy('date').reverse().toArray(), [], []);
 
-    useEffect(() => {
-        const userIdToUse = userId || 'local-user';
-        if (!isAuthLoading) {
-            getOrCreateUserProfile(userIdToUse);
-        }
-    }, [userId, isAuthLoading]);
-
     const userProfile = useMemo(() => {
-      if (!dbProfile) return null;
-      const processed = processProfile(dbProfile);
-      if (processed) {
-        processed.dailyWeightLog = dailyWeightLog;
-        processed.dailyVitalsLog = dailyVitalsLog;
-        processed.dailyManualMacrosLog = dailyManualMacrosLog;
-      }
-      return processed;
-    }, [dbProfile, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog]);
+      if (!processedProfile) return null;
+      return {
+        ...processedProfile,
+        dailyWeightLog,
+        dailyVitalsLog,
+        dailyManualMacrosLog,
+      };
+    }, [processedProfile, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog]);
+
+    const isSubscribed = useMemo(() => userProfile?.subscription_status === 'active', [userProfile?.subscription_status]);
 
 
     useEffect(() => {
@@ -188,13 +209,22 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
         loadStaticRecipes();
     }, []);
     
-    const isAppDataLoading = isAuthLoading || isStaticRecipeLoading || !dbProfile;
+    const isAppDataLoading = isAuthLoading || isStaticRecipeLoading || rawProfile === undefined;
 
     const allRecipesCache = useMemo(() => {
-        const combined = [...staticRecipes, ...(userRecipes || [])];
-        const uniqueRecipes = Array.from(new Map(combined.map(recipe => [recipe.id, recipe])).values());
-        return uniqueRecipes;
-    }, [staticRecipes, userRecipes]);
+        let recipes = [...staticRecipes, ...(userRecipes || [])];
+        recipes = Array.from(new Map(recipes.map(recipe => [recipe.id, recipe])).values());
+        
+        // --- RECIPE ACCESS LOGIC ---
+        if (isSubscribed) {
+          return recipes;
+        } else {
+          const freeRecipes = recipes.filter(r => !r.isCustom).slice(0, 15);
+          const customRecipes = recipes.filter(r => r.isCustom);
+          return [...freeRecipes, ...customRecipes];
+        }
+
+    }, [staticRecipes, userRecipes, isSubscribed]);
 
     const favoriteRecipeIds = useMemo(() => userProfile?.favorite_recipe_ids || [], [userProfile]);
 
@@ -294,8 +324,9 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
         mealPlan: mealPlan || [],
         pantryItems: pantryItems || [],
         userRecipes: userRecipes || [],
-        userProfile,
+        userProfile: userProfile || null,
         isAppDataLoading,
+        isSubscribed,
         allRecipesCache,
         isRecipeCacheLoading: isStaticRecipeLoading,
         shoppingList,
@@ -318,6 +349,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userRecipes,
       userProfile,
       isAppDataLoading,
+      isSubscribed,
       allRecipesCache,
       isRecipeCacheLoading,
       shoppingList,
@@ -328,11 +360,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       runWeeklyCheckin
   } = useAppData(user?.id, isAuthLoading);
 
+  const userId = user?.id || 'local-user';
+
+  const withLogging = async <T extends (...args: any[]) => any>(
+    fnName: string,
+    dbCall: T,
+    ...args: Parameters<T>
+  ): Promise<ReturnType<T>> => {
+    if (isOnline && process.env.NODE_ENV === 'development') {
+      console.log(`[Supabase] Attempting to call ${fnName} for user: ${userId}`);
+    }
+    try {
+      const result = await dbCall(...args);
+      if (isOnline && process.env.NODE_ENV === 'development') {
+         console.log(`[Supabase] Successfully called ${fnName}.`);
+      }
+      return result;
+    } catch (error: any) {
+      if (isOnline && process.env.NODE_ENV === 'development') {
+        console.error(`[Supabase] Error calling ${fnName} for user ${userId}:`, error.message);
+      }
+      throw error;
+    }
+  };
+
+
   // --- ACTIONS ---
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
-    const userId = user?.id || 'local-user';
-    await updateUserProfile(userId, updates);
-  }, [user]);
+      const updateFn = async () => {
+        await updateUserProfile(userId, updates);
+      };
+      await withLogging('setUserInformation', updateFn);
+  }, [userId]);
+
 
   const acceptTerms = useCallback(async () => {
     await setUserInformation({ hasAcceptedTerms: true });
@@ -353,35 +413,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
     const newPlannedMeal: PlannedMeal = { 
-      id: `meal_${Date.now()}`,
+      id: `meal_${Date.now()}_${Math.random()}`,
       recipeId: recipe.id, 
       date, 
       mealType, 
       servings,
       status: 'planned',
     };
-    await db.plannedMeals.add(newPlannedMeal);
+    if (!isOnline) {
+      return await db.plannedMeals.add(newPlannedMeal);
+    }
+    await withLogging('addMealToPlan', db.plannedMeals.add.bind(db.plannedMeals), newPlannedMeal);
   }, []);
 
   const removeMealFromPlan = useCallback(async (plannedMealId: string) => {
-    await db.plannedMeals.delete(plannedMealId);
+    if (!isOnline) {
+      return await db.plannedMeals.delete(plannedMealId);
+    }
+    await withLogging('removeMealFromPlan', db.plannedMeals.delete.bind(db.plannedMeals), plannedMealId);
   }, []);
 
   const updatePlannedMealServings = useCallback(async (plannedMealId: string, newServings: number) => {
-    await db.plannedMeals.update(plannedMealId, { servings: newServings });
+    if (!isOnline) {
+      return await db.plannedMeals.update(plannedMealId, { servings: newServings });
+    }
+    await withLogging('updatePlannedMealServings', db.plannedMeals.update.bind(db.plannedMeals), plannedMealId, { servings: newServings });
   }, []);
 
   const updateMealStatus = useCallback(async (plannedMealId: string, status: 'planned' | 'eaten') => {
-    await db.plannedMeals.update(plannedMealId, { status });
+    if (!isOnline) {
+      return await db.plannedMeals.update(plannedMealId, { status });
+    }
+    await withLogging('updateMealStatus', db.plannedMeals.update.bind(db.plannedMeals), plannedMealId, { status });
   }, []);
 
   const clearMealPlanForDate = useCallback(async (date: string) => {
     const mealsToDelete = await db.plannedMeals.where('date').equals(date).primaryKeys();
-    await db.plannedMeals.bulkDelete(mealsToDelete);
+    if (!isOnline) {
+      return await db.plannedMeals.bulkDelete(mealsToDelete);
+    }
+    await withLogging('clearMealPlanForDate', db.plannedMeals.bulkDelete.bind(db.plannedMeals), mealsToDelete);
   }, []);
 
   const clearEntireMealPlan = useCallback(async () => {
-    await db.plannedMeals.clear();
+    if (!isOnline) {
+      return await db.plannedMeals.clear();
+    }
+    await withLogging('clearEntireMealPlan', db.plannedMeals.clear.bind(db.plannedMeals));
   }, []);
 
   const toggleFavoriteRecipe = useCallback(async (recipeId: number) => {
@@ -404,37 +482,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .first();
 
     if (existingItem) {
-      await db.pantryItems.update(existingItem.id, { 
+      const updateData = { 
         quantity: existingItem.quantity + quantity,
         expiryDate: expiryDate // Optionally update expiry date
-      });
+      };
+      if (!isOnline) {
+        return await db.pantryItems.update(existingItem.id, updateData);
+      }
+      return await withLogging('updatePantryItem', db.pantryItems.update.bind(db.pantryItems), existingItem.id, updateData);
     } else {
       const newItem: PantryItem = {
-        id: `pantry_${Date.now()}`,
+        id: `pantry_${Date.now()}_${Math.random()}`,
         name, quantity, unit, 
         category: category as UKSupermarketCategory, 
         expiryDate
       };
-      await db.pantryItems.add(newItem);
+      if (!isOnline) {
+        return await db.pantryItems.add(newItem);
+      }
+      return await withLogging('addPantryItem', db.pantryItems.add.bind(db.pantryItems), newItem);
     }
   }, []);
 
   const removePantryItem = useCallback(async (itemId: string) => {
-    await db.pantryItems.delete(itemId);
+    if (!isOnline) {
+      return await db.pantryItems.delete(itemId);
+    }
+    await withLogging('removePantryItem', db.pantryItems.delete.bind(db.pantryItems), itemId);
   }, []);
 
   const updatePantryItemQuantity = useCallback(async (itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
-      await removePantryItem(itemId);
+      return removePantryItem(itemId);
     } else {
-      await db.pantryItems.update(itemId, { quantity: newQuantity });
+      if (!isOnline) {
+        return await db.pantryItems.update(itemId, { quantity: newQuantity });
+      }
+      return await withLogging('updatePantryItemQuantity', db.pantryItems.update.bind(db.pantryItems), itemId, { quantity: newQuantity });
     }
   }, [removePantryItem]);
 
   const addCustomRecipe = useCallback(async (recipeData: RecipeFormData) => {
-    const userId = user?.id; // Custom recipes are tied to users
     const newRecipe: Recipe = {
-        id: Date.now(), // Use timestamp for unique local ID
+        id: Date.now(),
         name: recipeData.name,
         description: recipeData.description,
         image: recipeData.image || `https://placehold.co/600x400.png?text=${encodeURIComponent(recipeData.name)}`,
@@ -450,44 +540,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isCustom: true,
         user_id: userId
     };
-    await db.recipes.add(newRecipe);
-  }, [user]);
+    if (!isOnline) {
+      return await db.recipes.add(newRecipe);
+    }
+    await withLogging('addCustomRecipe', db.recipes.add.bind(db.recipes), newRecipe);
+  }, [userId]);
 
   const logWeight = useCallback(async (date: string, weightKg: number) => {
-    const userId = user?.id || 'local-user';
     const newLog: DailyWeightLog = { date, weightKg };
-    await db.dailyWeightLog.put(newLog); // put will add or update based on primary key 'date'
-    
-    // Also update the main weightKg field on the profile
-    const existingProfile = await db.userProfile.get(userId);
-    if (existingProfile) {
-        const currentLog = existingProfile.dailyWeightLog || [];
-        const logIndex = currentLog.findIndex(l => l.date === date);
-        if (logIndex > -1) {
-            currentLog[logIndex] = newLog;
-        } else {
-            currentLog.push(newLog);
-        }
-        // Keep the log sorted and trimmed if necessary, although Dexie query does this.
-        currentLog.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        
-        await updateUserProfile(userId, { weightKg: weightKg, dailyWeightLog: currentLog });
+    if (isOnline) {
+        await withLogging('logWeight', db.dailyWeightLog.put.bind(db.dailyWeightLog), newLog);
+        await withLogging('updateUserProfileWeight', updateUserProfile, userId, { weightKg: weightKg });
+    } else {
+        await db.dailyWeightLog.put(newLog);
+        await db.userProfile.update(userId, { weightKg: weightKg });
     }
-  }, [user, setUserInformation]);
+  }, [userId]);
 
   const logVitals = useCallback(async (date: string, vitals: Omit<DailyVitalsLog, 'date' >) => {
     const newLog: DailyVitalsLog = { date, ...vitals };
-    await db.dailyVitalsLog.put(newLog);
+    if (!isOnline) {
+      return await db.dailyVitalsLog.put(newLog);
+    }
+    await withLogging('logVitals', db.dailyVitalsLog.put.bind(db.dailyVitalsLog), newLog);
   }, []);
   
   const logManualMacros = useCallback(async (date: string, macros: Macros) => {
     const newLog: DailyManualMacrosLog = { date, macros };
-    await db.dailyManualMacrosLog.put(newLog);
+    if (!isOnline) {
+      return await db.dailyManualMacrosLog.put(newLog);
+    }
+    await withLogging('logManualMacros', db.dailyManualMacrosLog.put.bind(db.dailyManualMacrosLog), newLog);
   }, []);
 
   const contextValue = useMemo(() => ({
     mealPlan, pantryItems, userRecipes, userProfile,
-    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading,
+    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading, isOnline, isSubscribed,
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus, 
     logWeight, logVitals, logManualMacros,
     clearMealPlanForDate, clearEntireMealPlan,
@@ -498,7 +586,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
   }), [
     mealPlan, pantryItems, userRecipes, userProfile,
-    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading,
+    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading, isSubscribed,
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus,
     logWeight, logVitals, logManualMacros, clearMealPlanForDate,
     clearEntireMealPlan, toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
