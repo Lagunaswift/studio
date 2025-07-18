@@ -30,7 +30,7 @@ import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-c
 import { format, subDays, differenceInDays } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
 
-const isOnline = !!supabase;
+const isOnline = typeof window !== 'undefined' && !!supabase;
 
 // --- Calculation Helpers ---
 const processProfile = (profileData: UserProfileSettings | undefined | null): UserProfileSettings | null => {
