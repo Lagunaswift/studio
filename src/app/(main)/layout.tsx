@@ -322,7 +322,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                 </SidebarMenuItem>
               );
             })}
-            {!isAuthLoading && user && <LogoutButton />}
+            {user && <LogoutButton />}
           </SidebarMenu>
         </SidebarContent>
       </Sidebar>
