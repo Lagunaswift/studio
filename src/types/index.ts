@@ -1,5 +1,6 @@
 
 
+
 export interface Macros {
   protein: number; // in grams
   carbs: number; // in grams
@@ -184,6 +185,7 @@ export interface DailyManualMacrosLog {
 }
 
 export interface UserProfileSettings {
+  id: string; // Added to ensure profile always has an id
   name?: string | null;
   email?: string | null;
   macroTargets: MacroTargets | null;

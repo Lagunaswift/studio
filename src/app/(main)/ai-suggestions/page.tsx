@@ -6,7 +6,7 @@ import { PageWrapper } from '@/components/layout/PageWrapper';
 import { suggestMealPlan, type SuggestMealPlanInput, type SuggestMealPlanOutput, type RecipeForAI, type MealSlotForAI } from '@/ai/flows/suggest-meal-plan';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Settings, Info, PlusCircle } from 'lucide-react';
+import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Settings, Info, PlusCircle, Lock } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import type { Recipe, Macros, MealSlotConfig } from '@/types';
@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { ProFeature } from '@/components/shared/ProFeature';
 
 export default function AISuggestionsPage() {
   const {
@@ -24,6 +25,7 @@ export default function AISuggestionsPage() {
     allRecipesCache,
     isRecipeCacheLoading: isAppRecipeCacheLoading,
     userProfile,
+    isSubscribed
   } = useAppContext();
 
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -133,6 +135,14 @@ export default function AISuggestionsPage() {
       description: `The suggested meal plan has been added to your calendar for ${format(date, 'PPP')}.`,
     });
   };
+  
+  if (!isSubscribed) {
+    return (
+        <PageWrapper title="Preppy: Plan Generator">
+            <ProFeature featureName="The Plan Generator" description="Let our AI, Preppy, automatically generate a full day's meal plan based on your macro targets, preferences, and available recipes. Takes the guesswork out of hitting your goals!" />
+        </PageWrapper>
+    );
+  }
 
   if (isAuthLoading || isAppRecipeCacheLoading) {
     return (

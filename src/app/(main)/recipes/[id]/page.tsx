@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info, Heart, Minus, Plus, Bot, Sparkles, Save, AlertTriangle } from 'lucide-react';
+import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info, Heart, Minus, Plus, Bot, Sparkles, Save, AlertTriangle, Lock } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
@@ -27,6 +27,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from '@/lib/utils';
 import { suggestRecipeModification, type SuggestRecipeModificationInput, type SuggestRecipeModificationOutput } from '@/ai/flows/suggest-recipe-modification-flow';
 import Link from 'next/link';
+import { ProFeature } from '@/components/shared/ProFeature';
 
 
 export default function RecipeDetailPage() {
@@ -38,7 +39,7 @@ export default function RecipeDetailPage() {
   const [recipe, setRecipe] = useState<RecipeType | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null); 
-  const { addMealToPlan, toggleFavoriteRecipe, isRecipeFavorite, addCustomRecipe } = useAppContext();
+  const { addMealToPlan, toggleFavoriteRecipe, isRecipeFavorite, addCustomRecipe, isSubscribed } = useAppContext();
   const { toast } = useToast();
   
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
@@ -306,6 +307,35 @@ export default function RecipeDetailPage() {
   const defaultPlaceholder = `https://placehold.co/600x400.png`;
   const imageSrc = imageLoadError ? defaultPlaceholder : dynamicImageSrc;
 
+  const renderRecipeTweaker = () => {
+    if (!isSubscribed) {
+      return (
+          <ProFeature featureName="The Recipe Tweaker" description="Ask Preppy to modify this recipe to suit your needs! For example, 'make this vegetarian' or 'what can I use instead of almonds?'." hideWrapper />
+      );
+    }
+    return (
+      <>
+        <CardDescription>
+            Want to change something? Ask me to modify this recipe for you.
+        </CardDescription>
+        <CardContent className="space-y-4 pt-6">
+            <Textarea
+            placeholder="e.g., Make this vegetarian, replace mushrooms, suggest a low-carb side dish..."
+            rows={3}
+            value={tweakRequest}
+            onChange={(e) => setTweakRequest(e.target.value)}
+            disabled={isTweaking}
+            />
+            <Button onClick={handleTweakRecipe} disabled={isTweaking || !tweakRequest.trim()} className="bg-primary hover:bg-primary/90">
+            {isTweaking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+            Tweak Recipe
+            </Button>
+        </CardContent>
+      </>
+    );
+  };
+
+
   return (
     <PageWrapper>
       <Button onClick={() => router.back()} variant="outline" className="mb-6">
@@ -452,23 +482,8 @@ export default function RecipeDetailPage() {
             <Bot className="w-6 h-6 mr-2 text-accent" />
             Preppy: Recipe Tweaker
           </CardTitle>
-          <CardDescription>
-            Want to change something? Ask me to modify this recipe for you.
-          </CardDescription>
+          {renderRecipeTweaker()}
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea
-            placeholder="e.g., Make this vegetarian, replace mushrooms, suggest a low-carb side dish..."
-            rows={3}
-            value={tweakRequest}
-            onChange={(e) => setTweakRequest(e.target.value)}
-            disabled={isTweaking}
-          />
-          <Button onClick={handleTweakRecipe} disabled={isTweaking || !tweakRequest.trim()} className="bg-primary hover:bg-primary/90">
-            {isTweaking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-            Tweak Recipe
-          </Button>
-        </CardContent>
       </Card>
       
       {isTweaking && (

@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Scale, Save, Loader2, BrainCircuit, CheckCircle2, TrendingUp, Edit, CalculatorIcon } from 'lucide-react';
+import { Scale, Save, Loader2, BrainCircuit, CheckCircle2, TrendingUp, Edit, CalculatorIcon, Lock } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { format, parseISO } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ProFeature } from '@/components/shared/ProFeature';
 
 import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -101,7 +102,7 @@ function DailyVitalsCheckin() {
   
   const sorenessOptions: { value: SorenessLevel, label: string }[] = [
     { value: 'none', label: 'None' }, { value: 'mild', label: 'Mild' },
-    { value: 'moderate', label: 'Moderate' }, { value: 'severe', label: 'Severe (DOMS)' },
+    { value: 'moderate', label: 'Moderate' }, { value: 'severe', label: 'DOMS' },
   ];
   
   const activityOptions: { value: ActivityYesterdayLevel, label: string }[] = [
@@ -509,7 +510,7 @@ function ManualMacroLog() {
 }
 
 function VitalsHistoryCharts() {
-  const { userProfile } = useAppContext();
+  const { userProfile, isSubscribed } = useAppContext();
   
   const vitalsData = useMemo(() => {
     if (!userProfile?.dailyVitalsLog || userProfile.dailyVitalsLog.length === 0) {
@@ -530,6 +531,14 @@ function VitalsHistoryCharts() {
       activityValue: activityMap[log.activityYesterday] || 0,
     }));
   }, [userProfile?.dailyVitalsLog]);
+  
+  if (!isSubscribed) {
+    return (
+        <div className="md:col-span-2">
+            <ProFeature featureName="Detailed Vitals History" description="Unlock historical charts to visualize your trends in sleep quality, energy levels, recovery, and more. Spot patterns and optimize your performance over time." />
+        </div>
+    )
+  }
 
   if (vitalsData.length < 2) {
     return (

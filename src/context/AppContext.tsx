@@ -22,6 +22,7 @@ import type {
   RDA,
   MealSlotConfig,
   DashboardSettings,
+  SubscriptionStatus,
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
@@ -99,6 +100,7 @@ interface AppContextType {
   allRecipesCache: Recipe[];
   shoppingList: ShoppingListItem[];
   isOnline: boolean;
+  isSubscribed: boolean;
 
   // Loaders
   isRecipeCacheLoading: boolean;
@@ -181,6 +183,8 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
       };
     }, [processedProfile, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog]);
 
+    const isSubscribed = useMemo(() => userProfile?.subscription_status === 'active', [userProfile?.subscription_status]);
+
 
     useEffect(() => {
         async function loadStaticRecipes() {
@@ -208,10 +212,19 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     const isAppDataLoading = isAuthLoading || isStaticRecipeLoading || rawProfile === undefined;
 
     const allRecipesCache = useMemo(() => {
-        const combined = [...staticRecipes, ...(userRecipes || [])];
-        const uniqueRecipes = Array.from(new Map(combined.map(recipe => [recipe.id, recipe])).values());
-        return uniqueRecipes;
-    }, [staticRecipes, userRecipes]);
+        let recipes = [...staticRecipes, ...(userRecipes || [])];
+        recipes = Array.from(new Map(recipes.map(recipe => [recipe.id, recipe])).values());
+        
+        // --- RECIPE ACCESS LOGIC ---
+        if (isSubscribed) {
+          return recipes;
+        } else {
+          const freeRecipes = recipes.filter(r => !r.isCustom).slice(0, 15);
+          const customRecipes = recipes.filter(r => r.isCustom);
+          return [...freeRecipes, ...customRecipes];
+        }
+
+    }, [staticRecipes, userRecipes, isSubscribed]);
 
     const favoriteRecipeIds = useMemo(() => userProfile?.favorite_recipe_ids || [], [userProfile]);
 
@@ -313,6 +326,7 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
         userRecipes: userRecipes || [],
         userProfile: userProfile || null,
         isAppDataLoading,
+        isSubscribed,
         allRecipesCache,
         isRecipeCacheLoading: isStaticRecipeLoading,
         shoppingList,
@@ -335,6 +349,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userRecipes,
       userProfile,
       isAppDataLoading,
+      isSubscribed,
       allRecipesCache,
       isRecipeCacheLoading,
       shoppingList,
@@ -373,11 +388,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- ACTIONS ---
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
       const updateFn = async () => {
-        if (isOnline) {
-          await updateUserProfile(userId, updates);
-        } else {
-          await db.userProfile.update(userId, updates);
-        }
+        await updateUserProfile(userId, updates);
       };
       await withLogging('setUserInformation', updateFn);
   }, [userId]);
@@ -564,7 +575,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const contextValue = useMemo(() => ({
     mealPlan, pantryItems, userRecipes, userProfile,
-    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading, isOnline,
+    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading, isOnline, isSubscribed,
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus, 
     logWeight, logVitals, logManualMacros,
     clearMealPlanForDate, clearEntireMealPlan,
@@ -575,7 +586,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
   }), [
     mealPlan, pantryItems, userRecipes, userProfile,
-    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading,
+    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading, isSubscribed,
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus,
     logWeight, logVitals, logManualMacros, clearMealPlanForDate,
     clearEntireMealPlan, toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
