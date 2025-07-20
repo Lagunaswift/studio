@@ -1,3 +1,4 @@
+
 import type { PlannedMeal, Recipe, PantryItem, ShoppingListItem, UKSupermarketCategory, Macros, MealType, DailyWeightLog, Sex, RDA } from '@/types';
 import { RecipeSchema, UserProfileSettingsSchema } from '@/types'; // Import the Zod schema
 import { getAllRecipes as getAllRecipesFromRegistry } from '@/features/recipes/recipeRegistry';
@@ -76,19 +77,16 @@ export const parseIngredientString = (ingredientString: string): { name: string;
         return { name: 'Unknown', quantity: 0, unit: '' };
     }
 
-    // 1. Pre-process the string for better matching
     let workingString = ingredientString.toLowerCase().trim()
-        .replace(/[\u00BC-\u00BE\u2150-\u215E]/g, match => ` ${unicodeFractionToNumber(match)} `) // Handle unicode fractions
-        .replace(/\b(tbsp|tsp)\./g, '$1') // Handle tbsp. tsp.
-        .split(',')[0] // Take only the part before the first comma
-        .trim()
-        .replace(/\s+/g, ' '); // Standardize spacing
+        .replace(/[\u00BC-\u00BE\u2150-\u215E]/g, match => ` ${unicodeFractionToNumber(match)} `)
+        .replace(/\b(tbsp|tsp)\./g, '$1')
+        .replace(/\((.*?)\)/g, '') // Remove parenthetical content
+        .trim();
 
-    if (workingString.includes('to taste') || workingString.includes('if needed') || workingString.includes('to serve')) {
+    if (workingString.includes('to taste') || workingString.includes('if needed') || workingString.includes('to serve') || workingString.includes('for garnish')) {
         return { name: 'non-item', quantity: 0, unit: '' };
     }
-    
-    // 2. Define units and descriptors
+
     const unitMap: { [key: string]: string } = {
         'gram': 'g', 'grams': 'g', 'g': 'g',
         'kilogram': 'kg', 'kilograms': 'kg', 'kg': 'kg',
@@ -103,30 +101,39 @@ export const parseIngredientString = (ingredientString: string): { name: string;
         'clove': 'clove', 'cloves': 'clove',
         'slice': 'slice', 'slices': 'slice',
         'can': 'can', 'cans': 'can',
-        'small': 'small', 'medium': 'medium', 'large': 'large',
+        'stalk': 'stalk', 'stalks': 'stalk',
+        'sprig': 'sprig', 'sprigs': 'sprig',
+        'head': 'head', 'heads': 'head',
     };
     const units = Object.keys(unitMap);
-    const descriptors = ['chopped', 'frozen', 'sliced', 'peeled', 'drained', 'in water', 'finely', 'minced', 'thinly', 'grated', 'natural', 'lean', 'ground', 'fresh', 'smoked', 'liquid', 'mashed', 'plant or dairy', 'peel only', 'rinsed and', 'cooked', 'cut into cubes', 'cut into pieces', 'halved', 'lightly beaten', 'packed', 'softened', 'white', 'unsalted'];
-
-    // 3. The main parsing Regex - with word boundaries `\b` for units
+    
+    // Regex to capture quantity (including mixed numbers), unit, and the rest as the name
     const regex = new RegExp(
-        `^(\\d*\\s*\\d/\\d|\\d+\\.\\d+|\\d+)?\\s*(\\b(?:${units.join('|')})\\b)?\\s*(.*)$`
+        `^(\\d+\\s+\\d/\\d|\\d+/\\d|\\d+\\.\\d+|\\d+)?\\s*(\\b(?:${units.join('|')})\\b)?\\s*(.*)$`
     );
     let match = workingString.match(regex);
 
     if (!match) {
-        return { name: ingredientString.trim(), quantity: 1, unit: 'item' };
+        return { name: workingString.trim(), quantity: 1, unit: 'item' };
     }
 
     let [, quantityStr, unitStr, nameStr] = match;
 
-    // 4. Extract and clean up parts
     let quantity: number = 1;
     if (quantityStr && quantityStr.trim()) {
         const trimmedQty = quantityStr.trim();
-        if (trimmedQty.includes('/')) {
+        if (trimmedQty.includes(' ')) { // Handle mixed numbers like "1 1/2"
             const parts = trimmedQty.split(' ');
-            quantity = parts.reduce((acc, part) => acc + eval(part), 0);
+            quantity = parts.reduce((acc, part) => {
+                if (part.includes('/')) {
+                    const [num, den] = part.split('/');
+                    return acc + (parseInt(num, 10) / parseInt(den, 10));
+                }
+                return acc + parseFloat(part);
+            }, 0);
+        } else if (trimmedQty.includes('/')) { // Handle simple fractions like "1/2"
+             const [num, den] = trimmedQty.split('/');
+             quantity = parseInt(num, 10) / parseInt(den, 10);
         } else {
             quantity = parseFloat(trimmedQty);
         }
@@ -134,26 +141,30 @@ export const parseIngredientString = (ingredientString: string): { name: string;
     
     let unit = unitStr ? unitMap[unitStr] : 'item';
     let name = nameStr.trim();
-    
-    // If no unit was found but the name is plural (like 'eggs'), singularize it.
-    if (unit === 'item' && name.endsWith('s')) {
-        name = name.slice(0, -1);
-    }
-    
-    // Remove descriptors from the name
-    const descriptorRegex = new RegExp(`\\b(${descriptors.join('|')})\\b`, 'g');
-    name = name.replace(descriptorRegex, '').replace(/^of\s+/, '').trim();
 
-    // 5. Standardize the final ingredient name for grouping
+    const descriptors = ['chopped', 'diced', 'frozen', 'sliced', 'peeled', 'drained', 'in water', 'in oil', 'finely', 'minced', 'thinly', 'grated', 'natural', 'lean', 'ground', 'fresh', 'smoked', 'liquid', 'mashed', 'plant or dairy', 'peel only', 'rinsed and', 'cooked', 'cut into', 'halved', 'lightly beaten', 'packed', 'softened', 'white', 'unsalted', 'raw', 'boneless', 'skinless', 'ripe', 'large', 'medium', 'small'];
+    const descriptorRegex = new RegExp(`\\b(${descriptors.join('|')})\\b`, 'gi');
+    name = name.replace(descriptorRegex, '').replace(/\s*,\s*/g, ' ').replace(/^of\s+/, '').replace(/\s+/g, ' ').trim();
+
+    // Standardize names
     const nameMap: { [key: string]: string } = {
-        'egg': 'egg', 'potato': 'potato', 'onion': 'onion', 'zucchini': 'zucchini',
-        'olive oil': 'olive oil', 'cottage cheese': 'cottage cheese',
-        'watercress': 'watercress', 'lemon': 'lemon', 'soy milk': 'soy milk',
-        'mixed herbs': 'mixed herbs', 'coconut oil': 'oil', 'oil': 'oil',
-        'salmon': 'smoked salmon',
+      'eggs': 'egg',
+      'potatoes': 'potato',
+      'onions': 'onion',
+      'tomatoes': 'tomato',
+      'bell peppers': 'bell pepper',
+      'chili peppers': 'chili pepper',
+      'chicken breast': 'chicken breast', 'chicken breasts': 'chicken breast',
+      'chicken thigh': 'chicken thigh', 'chicken thighs': 'chicken thigh',
+      'olive oil': 'olive oil', 'extra virgin olive oil': 'olive oil',
+      'almonds': 'almond', 'pecans': 'pecan', 'walnuts': 'walnut',
+      'berries': 'berry', 'blueberries': 'blueberry', 'raspberries': 'raspberry', 'strawberries': 'strawberry',
     };
-
-    const standardizedName = name; // Simplified for now
+    
+    let standardizedName = nameMap[name] || name;
+    if (unit === 'item' && standardizedName.endsWith('s')) {
+        standardizedName = standardizedName.slice(0, -1);
+    }
    
     return {
         name: standardizedName.charAt(0).toUpperCase() + standardizedName.slice(1),
@@ -207,17 +218,17 @@ export const generateShoppingList = (
     });
     
     const shoppingList: ShoppingListItem[] = [];
-    const wholeUnitItems = ['egg', 'banana', 'apple', 'avocado', 'onion', 'tomato', 'potato', 'zucchini', 'pepper', 'lemon', 'lime'];
+    const wholeUnitItems = ['egg', 'banana', 'apple', 'avocado', 'onion', 'tomato', 'potato', 'zucchini', 'pepper', 'lemon', 'lime', 'courgette', 'carrot', 'celery stick', 'bell pepper', 'chili pepper'];
     
     ingredientMap.forEach((value, key) => {
         if (value.quantity <= 0) return;
 
         const [name, unit] = key.split('|');
         
-        const isWholeUnit = wholeUnitItems.some(item => name.toLowerCase().includes(item)) && unit === 'item';
+        const isWholeUnit = wholeUnitItems.some(item => name.toLowerCase().includes(item));
         const finalQuantity = isWholeUnit ? Math.ceil(value.quantity) : value.quantity;
 
-        const displayQuantity = finalQuantity % 1 !== 0 && !isWholeUnit
+        const displayQuantity = (finalQuantity % 1 !== 0) && !isWholeUnit
             ? parseFloat(finalQuantity.toFixed(2))
             : Math.round(finalQuantity);
 
