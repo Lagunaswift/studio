@@ -1,5 +1,5 @@
 import type { PlannedMeal, Recipe, PantryItem, ShoppingListItem, UKSupermarketCategory, Macros, MealType, DailyWeightLog, Sex, RDA } from '@/types';
-import { RecipeSchema } from '@/types'; // Import the Zod schema
+import { RecipeSchema, UserProfileSettingsSchema } from '@/types'; // Import the Zod schema
 import { getAllRecipes as getAllRecipesFromRegistry } from '@/features/recipes/recipeRegistry';
 
 // Helper function to map registry recipes to the full Recipe type
@@ -106,7 +106,7 @@ export const parseIngredientString = (ingredientString: string): { name: string;
         'small': 'small', 'medium': 'medium', 'large': 'large',
     };
     const units = Object.keys(unitMap);
-    const descriptors = ['chopped', 'frozen', 'sliced', 'peeled', 'drained', 'in water', 'finely', 'minced', 'thinly', 'grated', 'natural', 'lean', 'ground', 'fresh', 'smoked', 'liquid', 'mashed', 'plant or dairy', 'peel only', 'rinsed and', 'cooked', 'cut in cubes', 'cut into pieces', 'halved', 'lightly beaten', 'packed', 'softened', 'white', 'unsalted'];
+    const descriptors = ['chopped', 'frozen', 'sliced', 'peeled', 'drained', 'in water', 'finely', 'minced', 'thinly', 'grated', 'natural', 'lean', 'ground', 'fresh', 'smoked', 'liquid', 'mashed', 'plant or dairy', 'peel only', 'rinsed and', 'cooked', 'cut into cubes', 'cut into pieces', 'halved', 'lightly beaten', 'packed', 'softened', 'white', 'unsalted'];
 
     // 3. The main parsing Regex - with word boundaries `\b` for units
     const regex = new RegExp(
