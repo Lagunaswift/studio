@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, useEffect } from 'react';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/context/AuthContext';
 import { useAppContext } from '@/context/AppContext';
@@ -202,8 +202,22 @@ function DevStatusIndicator() {
 // Inner component to use hooks within SidebarProvider context
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { userProfile, acceptTerms, isAppDataLoading } = useAppContext();
+  const { userProfile, acceptTerms: acceptTermsContext, isAppDataLoading } = useAppContext();
   const { user, isLoading: isAuthLoading } = useAuth();
+  const [showTerms, setShowTerms] = useState(false);
+
+  useEffect(() => {
+    if (!isAppDataLoading && userProfile && !userProfile.hasAcceptedTerms) {
+      setShowTerms(true);
+    } else {
+      setShowTerms(false);
+    }
+  }, [userProfile, isAppDataLoading]);
+
+  const handleAcceptTerms = async () => {
+      await acceptTermsContext();
+      setShowTerms(false);
+  };
 
   const getCurrentPageTitle = () => {
     // Specific titles for AI pages
@@ -347,8 +361,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
       <DevStatusIndicator />
       <PreppyHelp /> {/* Add the help component */}
       <TermsAcceptanceModal
-        isOpen={!isAppDataLoading && !!userProfile && !userProfile.hasAcceptedTerms}
-        onAccept={acceptTerms}
+        isOpen={showTerms}
+        onAccept={handleAcceptTerms}
       />
     </div>
   );
