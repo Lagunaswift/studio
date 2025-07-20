@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, Suspense } from 'react';
@@ -12,7 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Lock, KeyRound, AlertTriangle, ArrowLeft, Eye, EyeOff } from 'lucide-react'; 
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client';
 
 const updatePasswordSchema = z.object({
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),
@@ -32,6 +33,7 @@ function UpdatePasswordFormComponent() {
   const [isCheckingToken, setIsCheckingToken] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const supabase = createClient();
 
   useEffect(() => {
     if (!supabase) return;

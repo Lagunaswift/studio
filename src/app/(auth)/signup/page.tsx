@@ -13,7 +13,7 @@ import { Mail, Lock, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client';
 
 const signUpSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -47,6 +47,7 @@ export default function SignUpPage() {
   });
 
   const onSubmit: SubmitHandler<SignUpFormValues> = async (data) => {
+    const supabase = createClient();
     if (!supabase) {
        toast({ title: "Error", description: "Authentication service not available.", variant: "destructive"});
        return;
