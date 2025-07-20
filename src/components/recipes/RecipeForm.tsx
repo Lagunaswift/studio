@@ -2,6 +2,7 @@
 "use client";
 
 import { useForm, useFieldArray, Controller, type SubmitHandler } from 'react-hook-form';
+import { useTransition } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import type { RecipeFormData } from '@/types';
@@ -37,11 +38,13 @@ const recipeFormSchema = z.object({
 });
 
 interface RecipeFormProps {
-  onSubmit: SubmitHandler<RecipeFormData>;
+  onSubmit: (data: RecipeFormData) => Promise<void>;
   initialData?: Partial<RecipeFormData>; // For future edit functionality
 }
 
 export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
+  const [isPending, startTransition] = useTransition();
+
   const form = useForm<RecipeFormData>({
     resolver: zodResolver(recipeFormSchema),
     defaultValues: initialData ? {
@@ -75,9 +78,15 @@ export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
     name: "instructions",
   });
 
+  const handleFormSubmit: SubmitHandler<RecipeFormData> = (data) => {
+    startTransition(() => {
+        onSubmit(data);
+    });
+  };
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-8">
         <Card>
           <CardHeader>
             <CardTitle className="font-headline text-primary">Recipe Details</CardTitle>
@@ -290,8 +299,8 @@ export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
         </Card>
 
         <div className="flex justify-end">
-          <Button type="submit" className="bg-accent hover:bg-accent/90 text-accent-foreground" disabled={form.formState.isSubmitting}>
-            <Save className="mr-2 h-4 w-4" /> {form.formState.isSubmitting ? "Saving Recipe..." : "Save Recipe"}
+          <Button type="submit" className="bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isPending}>
+            <Save className="mr-2 h-4 w-4" /> {isPending ? "Saving Recipe..." : "Save Recipe"}
           </Button>
         </div>
       </form>
