@@ -79,7 +79,7 @@ export const parseIngredientString = (ingredientString: string): { name: string;
 
     let workingString = ingredientString.toLowerCase().trim()
         .replace(/[\u00BC-\u00BE\u2150-\u215E]/g, match => ` ${unicodeFractionToNumber(match)} `)
-        .replace(/\b(tbsp|tsp)\./g, '$1')
+        .replace(/\b(tbsp|tsp|g|kg|ml|l|oz|lb)\./g, '$1') // remove periods after abbreviations
         .replace(/\((.*?)\)/g, '') // Remove parenthetical content
         .trim();
 
@@ -96,6 +96,7 @@ export const parseIngredientString = (ingredientString: string): { name: string;
         'tbsp': 'tbsp', 'tablespoon': 'tbsp', 'tablespoons': 'tbsp',
         'cup': 'cup', 'cups': 'cup',
         'oz': 'oz', 'ounce': 'oz', 'ounces': 'oz',
+        'lb': 'lb', 'lbs': 'lb', 'pound': 'lb', 'pounds': 'lb',
         'pinch': 'pinch', 'pinches': 'pinch',
         'handful': 'handful', 'handfuls': 'handful',
         'clove': 'clove', 'cloves': 'clove',
@@ -104,10 +105,11 @@ export const parseIngredientString = (ingredientString: string): { name: string;
         'stalk': 'stalk', 'stalks': 'stalk',
         'sprig': 'sprig', 'sprigs': 'sprig',
         'head': 'head', 'heads': 'head',
+        'bunch': 'bunch',
+        'pkt': 'packet', 'packet': 'packet',
     };
     const units = Object.keys(unitMap);
     
-    // Regex to capture quantity (including mixed numbers), unit, and the rest as the name
     const regex = new RegExp(
         `^(\\d+\\s+\\d/\\d|\\d+/\\d|\\d+\\.\\d+|\\d+)?\\s*(\\b(?:${units.join('|')})\\b)?\\s*(.*)$`
     );
@@ -142,23 +144,34 @@ export const parseIngredientString = (ingredientString: string): { name: string;
     let unit = unitStr ? unitMap[unitStr] : 'item';
     let name = nameStr.trim();
 
-    const descriptors = ['chopped', 'diced', 'frozen', 'sliced', 'peeled', 'drained', 'in water', 'in oil', 'finely', 'minced', 'thinly', 'grated', 'natural', 'lean', 'ground', 'fresh', 'smoked', 'liquid', 'mashed', 'plant or dairy', 'peel only', 'rinsed and', 'cooked', 'cut into', 'halved', 'lightly beaten', 'packed', 'softened', 'white', 'unsalted', 'raw', 'boneless', 'skinless', 'ripe', 'large', 'medium', 'small'];
+    const descriptors = ['chopped', 'diced', 'frozen', 'sliced', 'peeled', 'drained', 'in water', 'in oil', 'finely', 'minced', 'thinly', 'grated', 'natural', 'lean', 'ground', 'fresh', 'smoked', 'liquid', 'mashed', 'plant or dairy', 'peel only', 'rinsed and', 'cooked', 'cut into', 'halved', 'lightly beaten', 'packed', 'softened', 'white', 'unsalted', 'raw', 'boneless', 'skinless', 'ripe', 'large', 'medium', 'small', 'all-purpose', 'unsweetened', 'unpeeled', 'with skin on', 'bone-in', 'whole', 'all purpose', 'pitted', 'de-seeded', 'unpeeled', 'canned', 'dried', 'roasted', 'leaf', 'leaves', 'trimmed', 'ends trimmed', 'room temperature', 'cored'];
     const descriptorRegex = new RegExp(`\\b(${descriptors.join('|')})\\b`, 'gi');
     name = name.replace(descriptorRegex, '').replace(/\s*,\s*/g, ' ').replace(/^of\s+/, '').replace(/\s+/g, ' ').trim();
 
-    // Standardize names
     const nameMap: { [key: string]: string } = {
-      'eggs': 'egg',
-      'potatoes': 'potato',
-      'onions': 'onion',
-      'tomatoes': 'tomato',
-      'bell peppers': 'bell pepper',
-      'chili peppers': 'chili pepper',
-      'chicken breast': 'chicken breast', 'chicken breasts': 'chicken breast',
-      'chicken thigh': 'chicken thigh', 'chicken thighs': 'chicken thigh',
-      'olive oil': 'olive oil', 'extra virgin olive oil': 'olive oil',
-      'almonds': 'almond', 'pecans': 'pecan', 'walnuts': 'walnut',
-      'berries': 'berry', 'blueberries': 'blueberry', 'raspberries': 'raspberry', 'strawberries': 'strawberry',
+        'eggs': 'egg', 'egg white': 'egg white', 'egg whites': 'egg white', 'egg yolk': 'egg yolk',
+        'potatoes': 'potato', 'baby potatoes': 'potato', 'white potato': 'potato',
+        'onions': 'onion', 'red onion': 'onion', 'yellow onion': 'onion', 'white onion': 'onion', 'spring onion': 'spring onion', 'green onion': 'green onion',
+        'tomatoes': 'tomato', 'cherry tomatoes': 'tomato', 'plum tomatoes': 'tomato', 'diced tomatoes': 'tomato',
+        'bell peppers': 'bell pepper', 'red bell pepper': 'bell pepper', 'green bell pepper': 'bell pepper', 'yellow bell pepper': 'bell pepper',
+        'chili peppers': 'chili pepper', 'chili': 'chili pepper', 'chili pepper': 'chili pepper', 'jalapeño pepper': 'jalapeño pepper',
+        'chicken breast': 'chicken breast', 'chicken breasts': 'chicken breast', 'chicken breast fillets': 'chicken breast',
+        'chicken thigh': 'chicken thigh', 'chicken thighs': 'chicken thigh',
+        'olive oil': 'olive oil', 'extra virgin olive oil': 'olive oil',
+        'almonds': 'almond', 'slivered almonds': 'almond',
+        'pecans': 'pecan',
+        'walnuts': 'walnut',
+        'berries': 'berry', 'blueberries': 'blueberry', 'raspberries': 'raspberry', 'strawberries': 'strawberry',
+        'courgette': 'zucchini',
+        'coriander': 'cilantro',
+        'parmesan cheese': 'parmesan', 'parmigiano reggiano': 'parmesan',
+        'cheddar cheese': 'cheddar',
+        'goat\'s cheese': 'goat cheese',
+        'ground beef': 'beef mince',
+        'ground chicken': 'chicken mince',
+        'ground pork': 'pork mince',
+        'pork tenderloin': 'pork loin',
+        'salmon fillet': 'salmon',
     };
     
     let standardizedName = nameMap[name] || name;
@@ -218,14 +231,14 @@ export const generateShoppingList = (
     });
     
     const shoppingList: ShoppingListItem[] = [];
-    const wholeUnitItems = ['egg', 'banana', 'apple', 'avocado', 'onion', 'tomato', 'potato', 'zucchini', 'pepper', 'lemon', 'lime', 'courgette', 'carrot', 'celery stick', 'bell pepper', 'chili pepper'];
+    const wholeUnitItems = ['egg', 'banana', 'apple', 'avocado', 'onion', 'tomato', 'potato', 'zucchini', 'pepper', 'lemon', 'lime', 'courgette', 'carrot', 'celery stick', 'bell pepper', 'chili pepper', 'can', 'slice', 'head', 'bunch', 'sprig', 'stalk', 'cob'];
     
     ingredientMap.forEach((value, key) => {
         if (value.quantity <= 0) return;
 
         const [name, unit] = key.split('|');
         
-        const isWholeUnit = wholeUnitItems.some(item => name.toLowerCase().includes(item));
+        const isWholeUnit = wholeUnitItems.some(item => name.toLowerCase().includes(item) || unit === item);
         const finalQuantity = isWholeUnit ? Math.ceil(value.quantity) : value.quantity;
 
         const displayQuantity = (finalQuantity % 1 !== 0) && !isWholeUnit
@@ -255,15 +268,15 @@ export const generateShoppingList = (
 export function assignCategory(ingredientName: string): UKSupermarketCategory {
   const name = ingredientName.toLowerCase();
   const categoryMap: { [category in UKSupermarketCategory]: string[] } = {
-    'Fresh Fruit & Vegetables': ['apple', 'avocado', 'banana', 'berries', 'lettuce', 'onion', 'tomato', 'peaches', 'garlic', 'radishes', 'potato', 'zucchini', 'bell pepper', 'salad leaves', 'lemon', 'spinach', 'asparagus', 'cherry tomatoes', 'dill', 'watercress', 'parsley', 'kale', 'pomegranate', 'fig', 'kiwi', 'mango', 'squash', 'pumpkin', 'beetroot', 'celery', 'cabbage', 'edamame beans', 'bok choy', 'bean sprouts', 'lemongrass', 'kaffir lime leaves', 'cucumber'],
-    'Dairy, Butter & Eggs': ['butter', 'cheese', 'egg', 'milk', 'yogurt', 'parmesan', 'feta cheese', 'cottage cheese', 'soy milk', 'almond milk', 'cream cheese', 'quark', 'burrata', 'goat cheese', 'sour cream'],
-    'Meat & Poultry': ['bacon', 'chicken', 'turkey', 'pork', 'beef', 'lamb', 'sausage', 'ham', 'steak', 'mince', 'ground turkey', 'ribs', 'drumsticks', 'tenderloin', 'pork shoulder', 'chicken breast', 'chicken thighs'],
+    'Fresh Fruit & Vegetables': ['apple', 'avocado', 'banana', 'berries', 'lettuce', 'onion', 'tomato', 'peaches', 'garlic', 'radishes', 'potato', 'zucchini', 'bell pepper', 'salad leaves', 'lemon', 'spinach', 'asparagus', 'cherry tomatoes', 'dill', 'watercress', 'parsley', 'kale', 'pomegranate', 'fig', 'kiwi', 'mango', 'squash', 'pumpkin', 'beetroot', 'celery', 'cabbage', 'edamame beans', 'bok choy', 'bean sprouts', 'lemongrass', 'kaffir lime leaves', 'cucumber', 'leek', 'shallot', 'grapefruit', 'pineapple', 'herbs'],
+    'Dairy, Butter & Eggs': ['butter', 'cheese', 'egg', 'milk', 'yogurt', 'parmesan', 'feta cheese', 'cottage cheese', 'soy milk', 'almond milk', 'cream cheese', 'quark', 'burrata', 'goat cheese', 'sour cream', 'cheddar', 'mozzarella', 'ricotta'],
+    'Meat & Poultry': ['bacon', 'chicken', 'turkey', 'pork', 'beef', 'lamb', 'sausage', 'ham', 'steak', 'mince', 'ground turkey', 'ribs', 'drumsticks', 'tenderloin', 'pork shoulder', 'chicken breast', 'chicken thighs', 'prosciutto', 'pancetta'],
     'Fish & Seafood': ['salmon', 'tuna', 'cod', 'haddock', 'mackerel', 'prawns', 'shrimp', 'scallops', 'mussels', 'fish', 'smoked salmon', 'sea bass', 'halibut', 'anchovies'],
-    'Food Cupboard': ['beans', 'broth', 'cereal', 'chocolate', 'honey', 'jam', 'lentils', 'nuts', 'oil', 'olives', 'oregano', 'pasta', 'pesto', 'protein powder', 'rice', 'sauce', 'spices', 'stock', 'sugar', 'syrup', 'vanilla', 'vinegar', 'chili flakes', 'olive oil', 'lemon juice', 'chopped tomatoes', 'kidney beans', 'sweet corn', 'vegetable broth', 'mixed herbs', 'coconut oil', 'cumin', 'tinned tomatoes', 'canned tomatoes', 'tinned beans', 'canned beans', 'chickpeas', 'stock cube', 'bouillon', 'peanut butter', 'almond butter', 'cashew butter', 'oats', 'biscuits', 'crackers', 'tea', 'coffee', 'hot chocolate', 'soy sauce', 'tamari', 'ketchup', 'mayonnaise', 'mustard', 'dried fruit', 'whey powder', 'miso paste', 'tahini', 'curry paste', 'fish sauce', 'oyster sauce', 'hoisin sauce', 'ketjap manis', 'sriracha', 'sambal oelek', 'capers', 'coconut milk', 'cornflour', 'potato starch', 'baking powder', 'baking soda', 'cocoa powder', 'chocolate chips', 'dates', 'desiccated coconut', 'almond meal', 'coconut flour', 'nutritional yeast', 'vermicelli rice noodles', 'rice noodles', 'egg noodles', 'polenta', 'graham crackers', 'sun-dried tomatoes', 'dijon mustard', 'red wine vinegar', 'lime juice', 'quinoa', 'walnuts'],
-    'Bakery': ['bagel', 'bread', 'croissant', 'tortilla', 'wrap', 'panko breadcrumbs'],
-    'Drinks': ['coffee', 'juice', 'tea', 'water', 'coconut water', 'carrot juice'],
+    'Food Cupboard': ['beans', 'broth', 'cereal', 'chocolate', 'honey', 'jam', 'lentils', 'nuts', 'oil', 'olives', 'oregano', 'pasta', 'pesto', 'protein powder', 'rice', 'sauce', 'spices', 'stock', 'sugar', 'syrup', 'vanilla', 'vinegar', 'chili flakes', 'olive oil', 'lemon juice', 'chopped tomatoes', 'kidney beans', 'sweet corn', 'vegetable broth', 'mixed herbs', 'coconut oil', 'cumin', 'tinned tomatoes', 'canned tomatoes', 'tinned beans', 'canned beans', 'chickpeas', 'stock cube', 'bouillon', 'peanut butter', 'almond butter', 'cashew butter', 'oats', 'biscuits', 'crackers', 'soy sauce', 'tamari', 'ketchup', 'mayonnaise', 'mustard', 'dried fruit', 'whey powder', 'miso paste', 'tahini', 'curry paste', 'fish sauce', 'oyster sauce', 'hoisin sauce', 'ketjap manis', 'sriracha', 'sambal oelek', 'capers', 'coconut milk', 'cornflour', 'potato starch', 'baking powder', 'baking soda', 'cocoa powder', 'chocolate chips', 'dates', 'desiccated coconut', 'almond meal', 'coconut flour', 'nutritional yeast', 'vermicelli rice noodles', 'rice noodles', 'egg noodles', 'polenta', 'graham crackers', 'sun-dried tomatoes', 'dijon mustard', 'red wine vinegar', 'lime juice', 'quinoa', 'walnuts', 'almond', 'cashew', 'pecan', 'seeds', 'peanut', 'flour', 'panko breadcrumbs', 'breadcrumbs', 'couscous', 'bulgur'],
+    'Bakery': ['bagel', 'bread', 'croissant', 'tortilla', 'wrap', 'burger buns', 'puff pastry'],
+    'Drinks': ['coffee', 'juice', 'tea', 'water', 'coconut water', 'carrot juice', 'wine'],
     'Frozen': ['frozen berries', 'ice cream', 'blueberries', 'frozen peas', 'frozen corn', 'frozen green beans', 'frozen mangoes'],
-    'Other Food Items': ['cilantro', 'chives', 'basil', 'mint', 'nori sheets', 'bay leaves', 'thyme', 'rosemary', 'saffron', 'za\'atar', 'coriander']
+    'Other Food Items': ['cilantro', 'chives', 'basil', 'mint', 'nori sheets', 'bay leaves', 'thyme', 'rosemary', 'saffron', 'za\'atar', 'coriander', 'tarragon']
   };
 
   for (const category in categoryMap) {
