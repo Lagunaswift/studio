@@ -1,124 +1,199 @@
-//studio/supabase/schema.sq
--- Create a table for public user profiles
-create table profiles (
-  id uuid references auth.users not null primary key,
-  updated_at timestamp with time zone,
-  name text,
-  email text unique,
-  height_cm numeric,
-  weight_kg numeric,
-  age int,
-  sex text,
-  activity_level text,
-  body_fat_percentage numeric,
-  athlete_type text,
-  primary_goal text,
-  macro_targets jsonb,
-  dietary_preferences text[],
-  allergens text[],
-  meal_structure jsonb,
-  dashboard_settings jsonb,
-  favorite_recipe_ids int[],
-  subscription_status text,
-  plan_name text,
-  subscription_start_date timestamp with time zone,
-  subscription_end_date timestamp with time zone,
-  subscription_duration text,
-  
-  constraint email_length check (char_length(email) >= 3)
+
+-- Drop existing tables and types if they exist to ensure a clean slate.
+DROP TABLE IF EXISTS "public"."daily_manual_macros_logs" CASCADE;
+DROP TABLE IF EXISTS "public"."daily_vitals_logs" CASCADE;
+DROP TABLE IF EXISTS "public"."daily_weight_logs" CASCADE;
+DROP TABLE IF EXISTS "public"."user_recipes" CASCADE;
+DROP TABLE IF EXISTS "public"."pantry_items" CASCADE;
+DROP TABLE IF EXISTS "public"."planned_meals" CASCADE;
+DROP TABLE IF EXISTS "public"."favorite_recipes" CASCADE;
+DROP TABLE IF EXISTS "public"."profiles" CASCADE;
+
+DROP TYPE IF EXISTS "public"."meal_type";
+DROP TYPE IF EXISTS "public"."sex_type";
+DROP TYPE IF EXISTS "public"."activity_level_type";
+DROP TYPE IF EXISTS "public"."athlete_type";
+DROP TYPE IF EXISTS "public"."primary_goal_type";
+DROP TYPE IF EXISTS "public"."training_experience_level_type";
+DROP TYPE IF EXISTS "public"."subscription_status_type";
+DROP TYPE IF EXISTS "public"."energy_level_v2_type";
+DROP TYPE IF EXISTS "public"."soreness_level_type";
+DROP TYPE IF EXISTS "public"."activity_yesterday_level_type";
+
+
+-- Create custom ENUM types
+CREATE TYPE "public"."meal_type" AS ENUM ('Breakfast', 'Lunch', 'Dinner', 'Snack');
+CREATE TYPE "public"."sex_type" AS ENUM ('male', 'female', 'notSpecified');
+CREATE TYPE "public"."activity_level_type" AS ENUM ('sedentary', 'light', 'moderate', 'active', 'veryActive');
+CREATE TYPE "public"."athlete_type" AS ENUM ('endurance', 'strengthPower', 'generalFitness', 'notSpecified');
+CREATE TYPE "public"."primary_goal_type" AS ENUM ('fatLoss', 'muscleGain', 'maintenance', 'notSpecified');
+CREATE TYPE "public"."training_experience_level_type" AS ENUM ('beginner', 'intermediate', 'advanced', 'veryAdvanced', 'notSpecified');
+CREATE TYPE "public"."subscription_status_type" AS ENUM ('active', 'inactive', 'none');
+CREATE TYPE "public"."energy_level_v2_type" AS ENUM ('low', 'moderate', 'high', 'vibrant');
+CREATE TYPE "public"."soreness_level_type" AS ENUM ('none', 'mild', 'moderate', 'severe');
+CREATE TYPE "public"."activity_yesterday_level_type" AS ENUM ('rest', 'light', 'moderate', 'strenuous');
+
+
+-- Profiles Table
+-- Stores all user-specific settings and calculated data.
+CREATE TABLE "public"."profiles" (
+    "id" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone,
+    "name" "text",
+    "email" "text",
+    "macro_targets" "jsonb",
+    "dietary_preferences" "text"[],
+    "allergens" "text"[],
+    "meal_structure" "jsonb",
+    "height_cm" real,
+    "weight_kg" real,
+    "age" smallint,
+    "sex" "public"."sex_type",
+    "activity_level" "public"."activity_level_type",
+    "training_experience_level" "public"."training_experience_level_type",
+    "body_fat_percentage" real,
+    "athlete_type" "public"."athlete_type",
+    "primary_goal" "public"."primary_goal_type",
+    "tdee" integer,
+    "lean_body_mass_kg" real,
+    "rda" "jsonb",
+    "neck_circumference_cm" real,
+    "abdomen_circumference_cm" real,
+    "waist_circumference_cm" real,
+    "hip_circumference_cm" real,
+    "dashboard_settings" "jsonb",
+    "subscription_status" "public"."subscription_status_type" DEFAULT 'none'::public.subscription_status_type,
+    "plan_name" "text",
+    "subscription_start_date" timestamp with time zone,
+    "subscription_end_date" timestamp with time zone,
+    "subscription_duration" "text",
+    "has_accepted_terms" boolean DEFAULT false,
+    "last_check_in_date" "date",
+    "target_weight_change_rate_kg" real,
+    CONSTRAINT "profiles_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "profiles_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE
 );
+ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable read access for authenticated users" ON "public"."profiles" FOR SELECT TO "authenticated" USING (auth.uid() = id);
+CREATE POLICY "Enable update for users based on user_id" ON "public"."profiles" FOR UPDATE TO "authenticated" USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+CREATE POLICY "Enable insert for authenticated users" ON "public"."profiles" FOR INSERT TO "authenticated" WITH CHECK (auth.uid() = id);
 
--- Set up Row Level Security (RLS)
--- See https://supabase.com/docs/guides/auth/row-level-security
-alter table profiles
-  enable row level security;
 
-create policy "Public profiles are viewable by everyone." on profiles
-  for select using (true);
-
-create policy "Users can insert their own profile." on profiles
-  for insert with check (auth.uid() = id);
-
-create policy "Users can update own profile." on profiles
-  for update using (auth.uid() = id);
-
--- This trigger automatically creates a profile entry when a new user signs up.
--- See https://supabase.com/docs/guides/auth/managing-user-data#using-triggers for more details.
-create function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, email, name)
-  values (new.id, new.email, new.raw_user_meta_data->>'full_name');
-  return new;
-end;
-$$ language plpgsql security definer;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
-
--- Table for user-created custom recipes
-create table recipes (
-  id bigint generated by default as identity primary key,
-  user_id uuid references auth.users not null,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  name text not null,
-  description text,
-  image text,
-  servings integer not null default 1,
-  prep_time text,
-  cook_time text,
-  chill_time text,
-  ingredients text[] not null,
-  macros_per_serving jsonb,
-  instructions text[] not null,
-  tags text[]
+-- Planned Meals Table
+-- Stores meals planned by users for specific dates.
+CREATE TABLE "public"."planned_meals" (
+    "id" "uuid" PRIMARY KEY DEFAULT "gen_random_uuid"(),
+    "user_id" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "recipe_id" integer NOT NULL,
+    "date" "date" NOT NULL,
+    "meal_type" "public"."meal_type" NOT NULL,
+    "servings" real NOT NULL,
+    "status" "text" DEFAULT 'planned'::text NOT NULL,
+    CONSTRAINT "planned_meals_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE
 );
-alter table recipes enable row level security;
-create policy "Users can view their own recipes." on recipes for select using (auth.uid() = user_id);
-create policy "Users can insert their own recipes." on recipes for insert with check (auth.uid() = user_id);
-create policy "Users can update their own recipes." on recipes for update using (auth.uid() = user_id);
-create policy "Users can delete their own recipes." on recipes for delete using (auth.uid() = user_id);
+ALTER TABLE "public"."planned_meals" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable CRUD for users based on user_id" ON "public"."planned_meals" FOR ALL TO "authenticated" USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
--- Table for meal plan entries
-create table meal_plan_entries (
-    id uuid primary key default gen_random_uuid(),
-    user_id uuid references auth.users not null,
-    created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-    recipe_id bigint not null,
-    meal_date date not null,
-    meal_type text not null,
-    servings numeric not null
-);
-alter table meal_plan_entries enable row level security;
-create policy "Users can manage their own meal plan." on meal_plan_entries for all using (auth.uid() = user_id);
 
--- Table for pantry items
-create table pantry_items (
-    id uuid primary key default gen_random_uuid(),
-    user_id uuid references auth.users not null,
-    created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-    name text not null,
-    quantity numeric not null,
-    unit text not null,
-    category text,
-    expiry_date date,
-    constraint pantry_items_user_id_name_unit_key unique (user_id, name, unit)
+-- Pantry Items Table
+-- Stores ingredients the user has in their pantry.
+CREATE TABLE "public"."pantry_items" (
+    "id" "uuid" PRIMARY KEY DEFAULT "gen_random_uuid"(),
+    "user_id" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone,
+    "name" "text" NOT NULL,
+    "quantity" real NOT NULL,
+    "unit" "text",
+    "category" "text",
+    "expiry_date" "date",
+    CONSTRAINT "pantry_items_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE
 );
-alter table pantry_items enable row level security;
-create policy "Users can manage their own pantry." on pantry_items for all using (auth.uid() = user_id);
+ALTER TABLE "public"."pantry_items" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable CRUD for users based on user_id" ON "public"."pantry_items" FOR ALL TO "authenticated" USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
--- Table for shopping list items
-create table shopping_list_items (
-    id uuid primary key default gen_random_uuid(),
-    user_id uuid references auth.users not null,
-    created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-    name text not null,
-    quantity numeric not null,
-    unit text not null,
-    category text,
-    purchased boolean default false,
-    recipes jsonb,
-    constraint shopping_list_items_user_id_name_unit_key unique (user_id, name, unit)
+
+-- User Recipes Table
+-- Stores custom recipes created by users.
+CREATE TABLE "public"."user_recipes" (
+    "id" SERIAL PRIMARY KEY,
+    "user_id" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "name" "text" NOT NULL,
+    "description" "text",
+    "image" "text",
+    "servings" real,
+    "prep_time" "text",
+    "cook_time" "text",
+    "chill_time" "text",
+    "ingredients" "text"[],
+    "macros_per_serving" "jsonb",
+    "micronutrients_per_serving" "jsonb",
+    "instructions" "text"[],
+    "tags" "text"[],
+    CONSTRAINT "user_recipes_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE
 );
-alter table shopping_list_items enable row level security;
-create policy "Users can manage their own shopping list." on shopping_list_items for all using (auth.uid() = user_id);
+ALTER TABLE "public"."user_recipes" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable CRUD for users based on user_id" ON "public"."user_recipes" FOR ALL TO "authenticated" USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+
+-- Favorite Recipes Table
+-- Stores the relationship between users and their favorited recipes.
+CREATE TABLE "public"."favorite_recipes" (
+    "user_id" "uuid" NOT NULL,
+    "recipe_id" integer NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    PRIMARY KEY ("user_id", "recipe_id"),
+    CONSTRAINT "favorite_recipes_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE
+);
+ALTER TABLE "public"."favorite_recipes" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable CRUD for users based on user_id" ON "public"."favorite_recipes" FOR ALL TO "authenticated" USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+
+-- Daily Weight Logs Table
+CREATE TABLE "public"."daily_weight_logs" (
+    "id" "uuid" PRIMARY KEY DEFAULT "gen_random_uuid"(),
+    "user_id" "uuid" NOT NULL,
+    "date" "date" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "weight_kg" real NOT NULL,
+    UNIQUE ("user_id", "date"),
+    CONSTRAINT "daily_weight_logs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE
+);
+ALTER TABLE "public"."daily_weight_logs" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable CRUD for users based on user_id" ON "public"."daily_weight_logs" FOR ALL TO "authenticated" USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+
+-- Daily Vitals Logs Table
+CREATE TABLE "public"."daily_vitals_logs" (
+    "id" "uuid" PRIMARY KEY DEFAULT "gen_random_uuid"(),
+    "user_id" "uuid" NOT NULL,
+    "date" "date" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "sleep_quality" smallint,
+    "energy_level" "public"."energy_level_v2_type",
+    "cravings_level" smallint,
+    "muscle_soreness" "public"."soreness_level_type",
+    "activity_yesterday" "public"."activity_yesterday_level_type",
+    "notes" "text",
+    UNIQUE ("user_id", "date"),
+    CONSTRAINT "daily_vitals_logs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE
+);
+ALTER TABLE "public"."daily_vitals_logs" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable CRUD for users based on user_id" ON "public"."daily_vitals_logs" FOR ALL TO "authenticated" USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+
+-- Daily Manual Macros Logs Table
+CREATE TABLE "public"."daily_manual_macros_logs" (
+    "id" "uuid" PRIMARY KEY DEFAULT "gen_random_uuid"(),
+    "user_id" "uuid" NOT NULL,
+    "date" "date" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "macros" "jsonb",
+    UNIQUE ("user_id", "date"),
+    CONSTRAINT "daily_manual_macros_logs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE
+);
+ALTER TABLE "public"."daily_manual_macros_logs" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable CRUD for users based on user_id" ON "public"."daily_manual_macros_logs" FOR ALL TO "authenticated" USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);

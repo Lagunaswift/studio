@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { PageWrapper } from '@/components/layout/PageWrapper';
@@ -159,17 +160,17 @@ export default function DietaryTargetsPage() {
   }, [userProfile?.weightKg, userProfile?.tdee, lossPercentage]);
   
   const muscleGainCalculation = useMemo(() => {
-    if (!userProfile?.tdee || !userProfile.sex || !userProfile.trainingExperienceLevel) {
+    if (!userProfile?.tdee || !userProfile.sex || !userProfile.training_experience_level) {
       return { monthlyGainKg: 0, calorieTarget: 0, enabled: false, reason: "Please specify your sex and training experience in your User Info to get a muscle gain target." };
     }
-    const monthlyGainKg = getMonthlyGainKg(userProfile.sex, userProfile.trainingExperienceLevel);
+    const monthlyGainKg = getMonthlyGainKg(userProfile.sex, userProfile.training_experience_level);
     if (monthlyGainKg === 0) {
         return { monthlyGainKg: 0, calorieTarget: 0, enabled: false, reason: "Please specify your sex and training experience in your User Info to get a muscle gain target." };
     }
     const dailySurplus = (monthlyGainKg * 7700) / 30.44; // Avg days in month
     const calorieTarget = Math.round(userProfile.tdee + dailySurplus);
     return { monthlyGainKg, calorieTarget, enabled: true };
-  }, [userProfile?.tdee, userProfile?.sex, userProfile?.trainingExperienceLevel]);
+  }, [userProfile?.tdee, userProfile?.sex, userProfile?.training_experience_level]);
 
 
   const handleApplyCalorieTarget = (calorieTarget: number) => {
@@ -208,7 +209,7 @@ export default function DietaryTargetsPage() {
     
     setUserInformation({
       macroTargets: data,
-      targetWeightChangeRateKg: newTargetRateKg
+      target_weight_change_rate_kg: newTargetRateKg
     });
 
     toast({

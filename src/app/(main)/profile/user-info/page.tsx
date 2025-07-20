@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -69,30 +70,30 @@ const userInfoSchema = z.object({
   age: z.coerce.number().min(1, "Age must be at least 1").max(120, "Age must be at most 120").nullable().optional(),
   sex: z.enum(SEX_OPTIONS).nullable().optional(),
   activityLevel: z.enum(ACTIVITY_LEVEL_OPTIONS.map(o => o.value) as [ActivityLevel, ...ActivityLevel[]]).nullable().optional(),
-  trainingExperienceLevel: z.enum(TRAINING_EXPERIENCE_OPTIONS.map(o => o.value) as [TrainingExperienceLevel, ...TrainingExperienceLevel[]]).nullable().optional(),
+  training_experience_level: z.enum(TRAINING_EXPERIENCE_OPTIONS.map(o => o.value) as [TrainingExperienceLevel, ...TrainingExperienceLevel[]]).nullable().optional(),
   bodyFatPercentage: z.coerce.number().min(1, "Body fat % must be at least 1").max(70, "Body fat % must be at most 70").nullable().optional(),
   athleteType: z.enum(ATHLETE_TYPE_OPTIONS.map(o => o.value) as [AthleteType, ...AthleteType[]]).nullable().optional(),
   primaryGoal: z.enum(PRIMARY_GOAL_OPTIONS.map(o => o.value) as [PrimaryGoal, ...PrimaryGoal[]]).nullable().optional(),
-  neckCircumferenceCm: z.coerce.number().min(1, "Neck circumference must be positive").nullable().optional(),
-  abdomenCircumferenceCm: z.coerce.number().min(1, "Abdomen circumference must be positive").nullable().optional(), // Male
-  waistCircumferenceCm: z.coerce.number().min(1, "Waist circumference must be positive").nullable().optional(),   // Female
-  hipCircumferenceCm: z.coerce.number().min(1, "Hip circumference must be positive").nullable().optional(),     // Female
+  neck_circumference_cm: z.coerce.number().min(1, "Neck circumference must be positive").nullable().optional(),
+  abdomen_circumference_cm: z.coerce.number().min(1, "Abdomen circumference must be positive").nullable().optional(), // Male
+  waist_circumference_cm: z.coerce.number().min(1, "Waist circumference must be positive").nullable().optional(),   // Female
+  hip_circumference_cm: z.coerce.number().min(1, "Hip circumference must be positive").nullable().optional(),     // Female
 }).refine(data => { // Ensure abdomen > neck for males if both are provided
-  if (data.sex === 'male' && data.abdomenCircumferenceCm && data.neckCircumferenceCm) {
-    return data.abdomenCircumferenceCm > data.neckCircumferenceCm;
+  if (data.sex === 'male' && data.abdomen_circumference_cm && data.neck_circumference_cm) {
+    return data.abdomen_circumference_cm > data.neck_circumference_cm;
   }
   return true;
 }, {
   message: "Abdomen circumference must be greater than neck circumference for males.",
-  path: ["abdomenCircumferenceCm"],
+  path: ["abdomen_circumference_cm"],
 }).refine(data => { // Ensure waist + hip > neck for females if all are provided
-    if (data.sex === 'female' && data.waistCircumferenceCm && data.hipCircumferenceCm && data.neckCircumferenceCm) {
-        return (data.waistCircumferenceCm + data.hipCircumferenceCm) > data.neckCircumferenceCm;
+    if (data.sex === 'female' && data.waist_circumference_cm && data.hip_circumference_cm && data.neck_circumference_cm) {
+        return (data.waist_circumference_cm + data.hip_circumference_cm) > data.neck_circumference_cm;
     }
     return true;
 }, {
     message: "For females, the sum of waist and hip circumferences must be greater than neck circumference.",
-    path: ["hipCircumferenceCm"], // Or waistCircumferenceCm
+    path: ["hip_circumference_cm"], // Or waist_circumference_cm
 });
 
 
@@ -115,14 +116,14 @@ export default function UserInfoPage() {
       age: userProfile?.age || null,
       sex: userProfile?.sex || null,
       activityLevel: userProfile?.activityLevel || null,
-      trainingExperienceLevel: userProfile?.trainingExperienceLevel || null,
+      training_experience_level: userProfile?.training_experience_level || null,
       bodyFatPercentage: userProfile?.bodyFatPercentage || null,
       athleteType: userProfile?.athleteType || 'notSpecified',
       primaryGoal: userProfile?.primaryGoal || 'notSpecified',
-      neckCircumferenceCm: userProfile?.neckCircumferenceCm || null,
-      abdomenCircumferenceCm: userProfile?.abdomenCircumferenceCm || null,
-      waistCircumferenceCm: userProfile?.waistCircumferenceCm || null,
-      hipCircumferenceCm: userProfile?.hipCircumferenceCm || null,
+      neck_circumference_cm: userProfile?.neck_circumference_cm || null,
+      abdomen_circumference_cm: userProfile?.abdomen_circumference_cm || null,
+      waist_circumference_cm: userProfile?.waist_circumference_cm || null,
+      hip_circumference_cm: userProfile?.hip_circumference_cm || null,
     },
   });
 
@@ -138,14 +139,14 @@ export default function UserInfoPage() {
         age: userProfile.age || null,
         sex: userProfile.sex || null,
         activityLevel: userProfile.activityLevel || null,
-        trainingExperienceLevel: userProfile.trainingExperienceLevel || null,
+        training_experience_level: userProfile.training_experience_level || null,
         bodyFatPercentage: userProfile.bodyFatPercentage || null,
         athleteType: userProfile.athleteType || 'notSpecified',
         primaryGoal: userProfile.primaryGoal || 'notSpecified',
-        neckCircumferenceCm: userProfile.neckCircumferenceCm || null,
-        abdomenCircumferenceCm: userProfile.abdomenCircumferenceCm || null,
-        waistCircumferenceCm: userProfile.waistCircumferenceCm || null,
-        hipCircumferenceCm: userProfile.hipCircumferenceCm || null,
+        neck_circumference_cm: userProfile.neck_circumference_cm || null,
+        abdomen_circumference_cm: userProfile.abdomen_circumference_cm || null,
+        waist_circumference_cm: userProfile.waist_circumference_cm || null,
+        hip_circumference_cm: userProfile.hip_circumference_cm || null,
       });
     }
   }, [userProfile, form]);
@@ -162,9 +163,9 @@ export default function UserInfoPage() {
   const handleCalculateBodyFat = () => {
     setCalculationMessage(null);
     setCalculationError(false);
-    const { heightCm, sex, neckCircumferenceCm, abdomenCircumferenceCm, waistCircumferenceCm, hipCircumferenceCm } = form.getValues();
+    const { heightCm, sex, neck_circumference_cm, abdomen_circumference_cm, waist_circumference_cm, hip_circumference_cm } = form.getValues();
 
-    if (!sex || !heightCm || !neckCircumferenceCm) {
+    if (!sex || !heightCm || !neck_circumference_cm) {
       setCalculationMessage("Sex, Height, and Neck circumference are required for body fat calculation.");
       setCalculationError(true);
       toast({ title: "Missing Information", description: "Sex, Height, and Neck circumference are required.", variant: "destructive"});
@@ -173,26 +174,26 @@ export default function UserInfoPage() {
 
     let calculatedBFP: number | null = null;
     if (sex === 'male') {
-        if (!abdomenCircumferenceCm) {
+        if (!abdomen_circumference_cm) {
             setCalculationMessage("Abdomen circumference is required for male body fat calculation.");
             setCalculationError(true);
             toast({ title: "Missing Information", description: "Abdomen circumference is required for males.", variant: "destructive"});
             return;
         }
-         if (abdomenCircumferenceCm <= neckCircumferenceCm) {
+         if (abdomen_circumference_cm <= neck_circumference_cm) {
             setCalculationMessage("For males, abdomen circumference must be greater than neck circumference.");
             setCalculationError(true);
             toast({ title: "Invalid Measurements", description: "Abdomen must be greater than neck for males.", variant: "destructive"});
             return;
         }
     } else if (sex === 'female') {
-        if (!waistCircumferenceCm || !hipCircumferenceCm) {
+        if (!waist_circumference_cm || !hip_circumference_cm) {
             setCalculationMessage("Waist and Hip circumferences are required for female body fat calculation.");
             setCalculationError(true);
             toast({ title: "Missing Information", description: "Waist and Hip circumferences are required for females.", variant: "destructive"});
             return;
         }
-        if ((waistCircumferenceCm + hipCircumferenceCm) <= neckCircumferenceCm) {
+        if ((waist_circumference_cm + hip_circumference_cm) <= neck_circumference_cm) {
             setCalculationMessage("For females, (Waist + Hip) must be greater than Neck circumference.");
             setCalculationError(true);
             toast({ title: "Invalid Measurements", description: "For females, (Waist + Hip) must be > Neck.", variant: "destructive"});
@@ -204,10 +205,10 @@ export default function UserInfoPage() {
     calculatedBFP = calculateNavyBodyFatPercentage(
       sex,
       heightCm,
-      neckCircumferenceCm,
-      abdomenCircumferenceCm,
-      waistCircumferenceCm,
-      hipCircumferenceCm
+      neck_circumference_cm,
+      abdomen_circumference_cm,
+      waist_circumference_cm,
+      hip_circumference_cm
     );
 
     if (calculatedBFP !== null && !isNaN(calculatedBFP)) {
@@ -323,10 +324,10 @@ export default function UserInfoPage() {
                                 controllerField.onChange(value as Sex);
                                 // Reset gender-specific fields when sex changes
                                 if (value === 'male') {
-                                  form.setValue('waistCircumferenceCm', null, {shouldValidate: true});
-                                  form.setValue('hipCircumferenceCm', null, {shouldValidate: true});
+                                  form.setValue('waist_circumference_cm', null, {shouldValidate: true});
+                                  form.setValue('hip_circumference_cm', null, {shouldValidate: true});
                                 } else if (value === 'female') {
-                                  form.setValue('abdomenCircumferenceCm', null, {shouldValidate: true});
+                                  form.setValue('abdomen_circumference_cm', null, {shouldValidate: true});
                                 }
                               }}
                               value={controllerField.value ?? undefined}
@@ -352,7 +353,7 @@ export default function UserInfoPage() {
                  <div className="grid sm:grid-cols-2 gap-6">
                    <FormField
                     control={form.control}
-                    name="trainingExperienceLevel"
+                    name="training_experience_level"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="flex items-center"><Award className="mr-2 h-4 w-4 text-muted-foreground"/>Training Experience</FormLabel>
@@ -402,7 +403,7 @@ export default function UserInfoPage() {
                     </h4>
                     <FormField
                         control={form.control}
-                        name="neckCircumferenceCm"
+                        name="neck_circumference_cm"
                         render={({ field }) => (
                         <FormItem>
                             <FormLabel>Neck Circumference (cm)</FormLabel>
@@ -416,7 +417,7 @@ export default function UserInfoPage() {
                     {watchedSex === 'male' && (
                         <FormField
                             control={form.control}
-                            name="abdomenCircumferenceCm"
+                            name="abdomen_circumference_cm"
                             render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Abdomen Circumference (cm)</FormLabel>
@@ -432,7 +433,7 @@ export default function UserInfoPage() {
                         <>
                         <FormField
                             control={form.control}
-                            name="waistCircumferenceCm"
+                            name="waist_circumference_cm"
                             render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Waist Circumference (cm)</FormLabel>
@@ -445,7 +446,7 @@ export default function UserInfoPage() {
                         />
                         <FormField
                             control={form.control}
-                            name="hipCircumferenceCm"
+                            name="hip_circumference_cm"
                             render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Hip Circumference (cm)</FormLabel>

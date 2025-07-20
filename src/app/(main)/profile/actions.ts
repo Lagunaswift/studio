@@ -15,14 +15,42 @@ export async function updateUserProfile(updates: Partial<UserProfileSettings>) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Authentication required.' }
   
-  // Ensure we are using snake_case for the database column
+  // Map camelCase keys from the app to snake_case keys for the DB
   const dbUpdates: { [key: string]: any } = {};
   for (const key in updates) {
       if (Object.prototype.hasOwnProperty.call(updates, key)) {
-          if (key === 'hasAcceptedTerms') {
-              dbUpdates['has_accepted_terms'] = (updates as any)[key];
-          } else {
-              dbUpdates[key] = (updates as any)[key];
+          const value = (updates as any)[key];
+          switch (key) {
+              case 'trainingExperienceLevel':
+                  dbUpdates['training_experience_level'] = value;
+                  break;
+              case 'neckCircumferenceCm':
+                  dbUpdates['neck_circumference_cm'] = value;
+                  break;
+              case 'abdomenCircumferenceCm':
+                  dbUpdates['abdomen_circumference_cm'] = value;
+                  break;
+              case 'waistCircumferenceCm':
+                  dbUpdates['waist_circumference_cm'] = value;
+                  break;
+              case 'hipCircumferenceCm':
+                  dbUpdates['hip_circumference_cm'] = value;
+                  break;
+              case 'lastCheckInDate':
+                  dbUpdates['last_check_in_date'] = value;
+                  break;
+              case 'targetWeightChangeRateKg':
+                  dbUpdates['target_weight_change_rate_kg'] = value;
+                  break;
+              case 'favorite_recipe_ids':
+                  dbUpdates['favorite_recipe_ids'] = value;
+                  break;
+              case 'has_accepted_terms':
+                  dbUpdates['has_accepted_terms'] = value;
+                  break;
+              // Add other direct mappings here if they don't have a case change
+              default:
+                  dbUpdates[key] = value;
           }
       }
   }
