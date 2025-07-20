@@ -53,6 +53,7 @@ export interface PlannedMeal {
   servings: number;
   status: 'planned' | 'eaten';
   recipeDetails?: Recipe;
+  syncStatus?: 'synced' | 'pending';
 }
 
 export type UKSupermarketCategory =
@@ -84,6 +85,7 @@ export interface PantryItem {
   unit: string;
   category: UKSupermarketCategory;
   expiryDate?: string; 
+  syncStatus?: 'synced' | 'pending' | 'deleted';
 }
 
 
@@ -104,11 +106,12 @@ export interface MealSlotConfig {
   type: MealType;
 }
 
-export type Sex = 'male' | 'female';
-export const SEX_OPTIONS: Sex[] = ['male', 'female'];
+export type Sex = 'male' | 'female' | 'notSpecified';
+export const SEX_OPTIONS: Sex[] = ['male', 'female', 'notSpecified'];
 
-export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'veryActive';
+export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'veryActive' | 'notSpecified';
 export const ACTIVITY_LEVEL_OPTIONS: { value: ActivityLevel; label: string; multiplier: number }[] = [
+  { value: 'notSpecified', label: 'Not Specified', multiplier: 1.2 },
   { value: 'sedentary', label: 'Sedentary (little or no exercise)', multiplier: 1.2 },
   { value: 'light', label: 'Lightly active (light exercise/sports 1-3 days/week)', multiplier: 1.375 },
   { value: 'moderate', label: 'Moderately active (moderate exercise/sports 3-5 days/week)', multiplier: 1.55 },
@@ -154,6 +157,7 @@ export interface DailyWeightLog {
   date: string; // YYYY-MM-DD
   weightKg: number;
   trendWeightKg?: number;
+  syncStatus?: 'synced' | 'pending';
 }
 
 export type Mood = 'stressed' | 'okay' | 'great';
@@ -177,11 +181,15 @@ export interface DailyVitalsLog {
   muscleSoreness: SorenessLevel;
   activityYesterday: ActivityYesterdayLevel;
   notes?: string;
+  syncStatus?: 'synced' | 'pending';
 }
 
 export interface DailyManualMacrosLog {
+    id: string;
     date: string; // YYYY-MM-DD
     macros: Macros;
+    user_id: string;
+    syncStatus?: 'synced' | 'pending';
 }
 
 export interface UserProfileSettings {
@@ -222,6 +230,7 @@ export interface UserProfileSettings {
   hasAcceptedTerms?: boolean;
   lastCheckInDate?: string | null; 
   targetWeightChangeRateKg?: number | null; 
+  syncStatus?: 'synced' | 'pending';
 }
 
 export interface RecipeFormData {

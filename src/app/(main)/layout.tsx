@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import Link from 'next/link';
@@ -163,7 +164,7 @@ function ServiceStatusBanner() {
   return (
     <div className="bg-yellow-500 text-center p-2 text-black text-sm font-semibold flex items-center justify-center">
       <AlertTriangle className="h-4 w-4 mr-2" />
-      We are performing system maintenance. The app is in offline mode; your data is saved locally and will not sync across devices for now.
+      You are currently offline. Changes are being saved locally and will sync when you reconnect.
     </div>
   );
 }
@@ -185,7 +186,7 @@ function DevStatusIndicator() {
               isOnline ? "bg-green-600" : "bg-orange-500"
             )}>
               {isOnline ? <Database className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
-              <span>{isOnline ? "Supabase Mode" : "Local Mode"}</span>
+              <span>{isOnline ? "Online" : "Offline"}</span>
             </div>
           </TooltipTrigger>
           <TooltipContent side="right">
