@@ -3,33 +3,33 @@
 
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { RecipeForm } from '@/components/recipes/RecipeForm';
-import { useAppContext } from '@/context/AppContext';
 import type { RecipeFormData } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { addRecipe } from '../actions'; // Import the new server action
 
 export default function AddRecipePage() {
-  const { addCustomRecipe } = useAppContext();
   const { toast } = useToast();
   const router = useRouter();
 
-  const handleSubmit = (data: RecipeFormData) => {
-    try {
-      addCustomRecipe(data);
-      toast({
-        title: "Recipe Added!",
-        description: `${data.name} has been added to your recipes.`,
-      });
-      router.push('/recipes'); // Redirect to recipes list after adding
-    } catch (error) {
-      console.error("Error adding custom recipe:", error);
-      toast({
-        title: "Error",
-        description: "Could not add your recipe. Please try again.",
-        variant: "destructive",
-      });
+  const handleSubmit = async (data: RecipeFormData) => {
+    const result = await addRecipe(data);
+
+    if (result?.error) {
+        toast({
+            title: "Error",
+            description: result.error,
+            variant: "destructive",
+        });
+    } else {
+        toast({
+            title: "Recipe Added!",
+            description: `${data.name} has been added to your recipes.`,
+        });
+        // The server action now handles the redirect, but we could also do it here if needed.
+        // router.push('/recipes');
     }
   };
 
