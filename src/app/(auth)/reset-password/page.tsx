@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -11,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Mail, KeyRound, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client';
 
 const resetPasswordSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -36,6 +37,7 @@ export default function ResetPasswordPage() {
 
   const onSubmit: SubmitHandler<ResetPasswordFormValues> = async (data) => {
     form.clearErrors();
+    const supabase = createClient();
     if (!isClient || !supabase) {
        toast({ title: "Error", description: "Authentication service not ready. Please wait and try again.", variant: "destructive"});
       return;

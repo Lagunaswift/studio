@@ -2,8 +2,8 @@
 'use client';
 
 import { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { supabase } from '@/lib/supabaseClient'; // Make sure this is imported
-import type { Session, User } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
+import type { Session, User, SupabaseClient } from '@supabase/supabase-js';
 import type { UserProfileSettings } from '@/types';
 
 // The Profile type here will be a subset of UserProfileSettings.
@@ -15,6 +15,7 @@ interface Profile extends Partial<UserProfileSettings> {
 }
 
 interface AuthContextType {
+  supabase: SupabaseClient;
   session: Session | null;
   user: User | null;
   profile: Profile | null;
@@ -25,6 +26,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const supabase = createClient();
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -68,7 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // The onAuthStateChange listener will handle setting user/session to null
   };
 
-  const value = { session, user, profile, isLoading, signOut };
+  const value = { supabase, session, user, profile, isLoading, signOut };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

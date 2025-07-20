@@ -13,7 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Mail, Lock, LogIn, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -41,6 +41,7 @@ export default function LoginPage() {
   });
 
   const onSubmit: SubmitHandler<LoginFormValues> = async (data) => {
+    const supabase = createClient();
     if (!supabase) {
       toast({ title: "Error", description: "Authentication service not available.", variant: "destructive"});
       return;
