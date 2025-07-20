@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -12,7 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { PlusCircle, MinusCircle, Trash2, Archive, CheckCircle, XCircle, CalendarIcon, AlertTriangle, Info } from 'lucide-react';
+import { PlusCircle, MinusCircle, Trash2, Archive, CheckCircle, XCircle, CalendarIcon, AlertTriangle, Info, Loader2 } from 'lucide-react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -42,7 +43,7 @@ const pantryItemSchema = z.object({
 type PantryItemFormValues = z.infer<typeof pantryItemSchema>;
 
 export default function PantryPage() {
-  const { pantryItems, addPantryItem, removePantryItem, updatePantryItemQuantity, assignIngredientCategory } = useAppContext();
+  const { pantryItems, addPantryItem, removePantryItem, updatePantryItemQuantity, assignIngredientCategory, isAppDataLoading } = useAppContext();
   const { toast } = useToast();
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingQuantity, setEditingQuantity] = useState<number>(0);
@@ -156,11 +157,23 @@ export default function PantryPage() {
 
 
   const groupedPantryItems: { [category: string]: PantryItem[] } = pantryItems.reduce((acc, item) => {
-    (acc[item.category] = acc[item.category] || []).push(item);
+    if (item.syncStatus !== 'deleted') { // Do not show deleted items
+      (acc[item.category] = acc[item.category] || []).push(item);
+    }
     return acc;
   }, {} as { [category: string]: PantryItem[] });
 
   const sortedCategories = Object.keys(groupedPantryItems).sort();
+
+  if (isAppDataLoading) {
+    return (
+        <PageWrapper title="Manage Your Pantry">
+            <div className="flex justify-center items-center h-64">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        </PageWrapper>
+    );
+  }
 
   return (
     <PageWrapper title="Manage Your Pantry">
@@ -373,7 +386,10 @@ export default function PantryPage() {
                         {groupedPantryItems[category].map((item) => (
                           <li key={item.id} className="flex items-center justify-between p-3 rounded-md bg-card hover:bg-muted/50 transition-colors">
                             <div className="flex-grow">
-                              <span className="font-medium">{item.name}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{item.name}</span>
+                                {item.syncStatus === 'pending' && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" title="Sync pending"/>}
+                              </div>
                               {editingItemId === item.id ? (
                                 <div className="flex items-center gap-2 mt-1">
                                   <Input
@@ -433,4 +449,3 @@ export default function PantryPage() {
     </PageWrapper>
   );
 }
-

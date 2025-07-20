@@ -1,4 +1,5 @@
 
+
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
@@ -85,9 +86,11 @@ export async function addOrUpdateMealPlan(mealData: Omit<PlannedMeal, 'user_id' 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Authentication required.' }
 
+    const { syncStatus, ...restOfMealData } = mealData;
+
     const dataToUpsert = {
-        ...mealData,
-        id: mealData.id || `meal_${Date.now()}_${Math.random()}`,
+        ...restOfMealData,
+        id: restOfMealData.id || `meal_${Date.now()}_${Math.random()}`,
         user_id: user.id,
     };
     
@@ -134,7 +137,8 @@ export async function addOrUpdatePantryItem(itemData: Omit<PantryItem, 'user_id'
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Authentication required.' }
 
-    const dataToUpsert = { ...itemData, user_id: user.id };
+    const { syncStatus, ...restOfItemData } = itemData;
+    const dataToUpsert = { ...restOfItemData, user_id: user.id };
 
     const { data, error } = await supabase
         .from('pantry_items')
@@ -179,7 +183,8 @@ export async function addOrUpdateVitalsLog(vitalsData: Omit<DailyVitalsLog, 'use
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Authentication required.' }
 
-  const dataToUpsert = { ...vitalsData, user_id: user.id };
+  const { syncStatus, ...restOfVitalsData } = vitalsData;
+  const dataToUpsert = { ...restOfVitalsData, user_id: user.id };
 
   const { data, error } = await supabase
     .from('daily_vitals_logs')
@@ -196,16 +201,19 @@ export async function addOrUpdateVitalsLog(vitalsData: Omit<DailyVitalsLog, 'use
   return { success: true, data }
 }
 
-export async function addOrUpdateWeightLog(date: string, weight_kg: number) {
+export async function addOrUpdateWeightLog(logData: Omit<DailyWeightLog, 'user_id' | 'trendWeightKg'>) {
   const cookieStore = cookies()
   const supabase = createClient(cookieStore)
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Authentication required.' }
 
+  const { syncStatus, ...restOfLogData } = logData;
+  const dataToUpsert = { user_id: user.id, ...restOfLogData };
+
   const { data, error } = await supabase
     .from('daily_weight_logs')
-    .upsert({ user_id: user.id, date, weight_kg }, { onConflict: 'date, user_id' })
+    .upsert(dataToUpsert, { onConflict: 'date, user_id' })
     .select()
     .single()
 
@@ -215,27 +223,30 @@ export async function addOrUpdateWeightLog(date: string, weight_kg: number) {
   }
 
   // Also update the main profile weight
-  await supabase.from('profiles').update({ weightKg: weight_kg }).eq('id', user.id);
+  await supabase.from('profiles').update({ weightKg: logData.weightKg }).eq('id', user.id);
 
   revalidatePath('/daily-log')
   revalidatePath('/profile/user-info')
   return { success: true, data }
 }
 
-export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacrosLog, 'user_id' | 'id'>) {
+export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacrosLog, 'user_id'>) {
     const cookieStore = cookies()
     const supabase = createClient(cookieStore)
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Authentication required.' }
 
+    const { syncStatus, ...restOfMacroData } = macroData;
+    const { macros, ...rest } = restOfMacroData;
+
     const dataToUpsert = {
+        ...rest,
         user_id: user.id,
-        date: macroData.date,
-        calories: macroData.macros.calories,
-        protein: macroData.macros.protein,
-        carbs: macroData.macros.carbs,
-        fat: macroData.macros.fat,
+        calories: macros.calories,
+        protein: macros.protein,
+        carbs: macros.carbs,
+        fat: macros.fat,
     };
 
     const { data, error } = await supabase
@@ -259,6 +270,7 @@ export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacr
             fat: data.fat,
         },
         user_id: data.user_id,
+        syncStatus: 'synced',
     };
 
     revalidatePath('/daily-log')
