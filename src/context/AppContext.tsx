@@ -111,9 +111,6 @@ interface AppContextType {
   removeMealFromPlan: (plannedMealId: string) => Promise<void>;
   updatePlannedMealServings: (plannedMealId: string, newServings: number) => Promise<void>;
   updateMealStatus: (plannedMealId: string, status: 'planned' | 'eaten') => Promise<void>;
-  logWeight: (date: string, weightKg: number) => Promise<void>;
-  logVitals: (date: string, vitals: Omit<DailyVitalsLog, 'date' >) => Promise<void>;
-  logManualMacros: (date: string, macros: Macros) => Promise<void>;
   clearMealPlanForDate: (date: string) => Promise<void>;
   clearEntireMealPlan: () => Promise<void>;
   toggleFavoriteRecipe: (recipeId: number) => Promise<void>;
@@ -553,38 +550,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await withLogging('addCustomRecipe', db.recipes.add.bind(db.recipes), newRecipe);
   }, [userId, isOnline]);
 
-  const logWeight = useCallback(async (date: string, weightKg: number) => {
-    const newLog: DailyWeightLog = { date, weightKg };
-    if (isOnline) {
-        await withLogging('logWeight', db.dailyWeightLog.put.bind(db.dailyWeightLog), newLog);
-        await withLogging('updateUserProfileWeight', updateUserProfile, userId, { weightKg: weightKg });
-    } else {
-        await db.dailyWeightLog.put(newLog);
-        await db.userProfile.update(userId, { weightKg: weightKg });
-    }
-  }, [userId, isOnline]);
-
-  const logVitals = useCallback(async (date: string, vitals: Omit<DailyVitalsLog, 'date' >) => {
-    const newLog: DailyVitalsLog = { date, ...vitals };
-    if (!isOnline) {
-      return await db.dailyVitalsLog.put(newLog);
-    }
-    await withLogging('logVitals', db.dailyVitalsLog.put.bind(db.dailyVitalsLog), newLog);
-  }, [isOnline]);
-  
-  const logManualMacros = useCallback(async (date: string, macros: Macros) => {
-    const newLog: DailyManualMacrosLog = { date, macros };
-    if (!isOnline) {
-      return await db.dailyManualMacrosLog.put(newLog);
-    }
-    await withLogging('logManualMacros', db.dailyManualMacrosLog.put.bind(db.dailyManualMacrosLog), newLog);
-  }, [isOnline]);
-
   const contextValue = useMemo(() => ({
     mealPlan, pantryItems, userRecipes, userProfile,
     allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading, isOnline, isSubscribed,
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus, 
-    logWeight, logVitals, logManualMacros,
     clearMealPlanForDate, clearEntireMealPlan,
     toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
     addCustomRecipe, runWeeklyCheckin,
@@ -595,8 +564,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     mealPlan, pantryItems, userRecipes, userProfile,
     allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading, isOnline, isSubscribed,
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus,
-    logWeight, logVitals, logManualMacros, clearMealPlanForDate,
-    clearEntireMealPlan, toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
+    clearMealPlanForDate, clearEntireMealPlan, 
+    toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
     addCustomRecipe, runWeeklyCheckin, setUserInformation, setMacroTargets, setMealStructure,
     setDashboardSettings, acceptTerms, assignIngredientCategory, getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
   ]);
@@ -612,6 +581,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-
-
-    

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useTransition } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -33,6 +33,9 @@ import {
   type ChartConfig
 } from "@/components/ui/chart";
 
+import { addOrUpdateWeightLog, addOrUpdateVitalsLog, addOrUpdateManualMacrosLog } from '../profile/actions';
+import { db } from '@/lib/db';
+
 
 const weightLogSchema = z.object({
   weightKg: z.coerce.number().positive("Weight must be a positive number.").min(20, "Weight must be at least 20kg").max(500, "Weight must be at most 500kg"),
@@ -58,9 +61,10 @@ const vitalsSchema = z.object({
 type VitalsFormValues = z.infer<typeof vitalsSchema>;
 
 function DailyVitalsCheckin() {
-  const { userProfile, logVitals } = useAppContext();
+  const { userProfile } = useAppContext();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const clientTodayDate = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   
   const todayLog = useMemo(() => 
@@ -87,12 +91,29 @@ function DailyVitalsCheckin() {
   }, [todayLog, form]);
 
   const onSubmit: SubmitHandler<VitalsFormValues> = async (data) => {
-    await logVitals(clientTodayDate, data);
-    toast({
-      title: "Vitals Logged",
-      description: "Your daily vitals have been saved. Preppy will use this to provide better insights!",
+    const vitalsData = { date: clientTodayDate, ...data };
+    
+    startTransition(async () => {
+        const result = await addOrUpdateVitalsLog(vitalsData);
+
+        if (result.error) {
+            toast({ title: "Error Saving Vitals", description: result.error, variant: "destructive" });
+        } else {
+            console.log('✅ Vitals saved to Supabase!');
+            try {
+                await db.dailyVitalsLog.put(result.data);
+                console.log('✅ Vitals synced to local cache!');
+                toast({
+                  title: "Vitals Logged",
+                  description: "Your daily vitals have been saved.",
+                });
+                setIsOpen(false);
+            } catch (dexieError) {
+                console.error('🔥 Failed to sync vitals to Dexie:', dexieError);
+                toast({ title: "Local Sync Error", description: "Could not save vitals to local cache.", variant: "destructive" });
+            }
+        }
     });
-    setIsOpen(false);
   };
 
   const energyOptions: { value: EnergyLevelV2, label: string }[] = [
@@ -110,7 +131,7 @@ function DailyVitalsCheckin() {
     { value: 'moderate', label: 'Moderate Exercise (e.g., gym)' }, { value: 'strenuous', label: 'Strenuous Exercise (e.g., HIIT)' },
   ];
 
-  if (todayLog) {
+  if (todayLog && !isOpen) {
     return (
       <Card className="shadow-md">
         <CardHeader>
@@ -312,8 +333,8 @@ function DailyVitalsCheckin() {
                <DialogClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
               </DialogClose>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4"/>}
+              <Button type="submit" disabled={isPending}>
+                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4"/>}
                 Log Vitals
               </Button>
             </DialogFooter>
@@ -325,9 +346,10 @@ function DailyVitalsCheckin() {
 }
 
 function DailyWeightLog() {
-    const { userProfile, logWeight } = useAppContext();
+    const { userProfile } = useAppContext();
     const { toast } = useToast();
     const [clientTodayDate, setClientTodayDate] = useState<string>('');
+    const [isPending, startTransition] = useTransition();
 
     useEffect(() => {
         setClientTodayDate(format(new Date(), 'yyyy-MM-dd'));
@@ -347,13 +369,29 @@ function DailyWeightLog() {
     }, [userProfile?.weightKg, weightLogForm]);
 
     const handleLogWeight: SubmitHandler<WeightLogFormValues> = async (data) => {
-        if (clientTodayDate) {
-            await logWeight(clientTodayDate, data.weightKg);
-            toast({
-                title: "Weight Logged",
-                description: `Weight of ${data.weightKg}kg logged for today.`,
-            });
-        }
+        if (!clientTodayDate) return;
+
+        startTransition(async () => {
+            const result = await addOrUpdateWeightLog(clientTodayDate, data.weightKg);
+
+            if (result.error) {
+                toast({ title: "Error Saving Weight", description: result.error, variant: "destructive" });
+            } else {
+                console.log('✅ Weight saved to Supabase!');
+                try {
+                    await db.dailyWeightLog.put(result.data);
+                    await db.userProfile.update(userProfile!.id, { weightKg: data.weightKg });
+                    console.log('✅ Weight synced to local cache!');
+                    toast({
+                        title: "Weight Logged",
+                        description: `Weight of ${data.weightKg}kg logged for today.`,
+                    });
+                } catch (dexieError) {
+                    console.error('🔥 Failed to sync weight to Dexie:', dexieError);
+                    toast({ title: "Local Sync Error", description: "Could not save weight to local cache.", variant: "destructive" });
+                }
+            }
+        });
     };
     
     const recentWeightEntries = useMemo(() => {
@@ -384,8 +422,9 @@ function DailyWeightLog() {
                             </FormItem>
                         )}
                         />
-                        <Button type="submit" className="w-full" disabled={weightLogForm.formState.isSubmitting}>
-                            <Save className="mr-2 h-4 w-4"/> Log Weight
+                        <Button type="submit" className="w-full" disabled={isPending}>
+                            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4"/>}
+                             Log Weight
                         </Button>
                     </form>
                 </Form>
@@ -410,8 +449,9 @@ function DailyWeightLog() {
 }
 
 function ManualMacroLog() {
-    const { userProfile, logManualMacros } = useAppContext();
+    const { userProfile } = useAppContext();
     const { toast } = useToast();
+    const [isPending, startTransition] = useTransition();
     const clientTodayDate = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
 
     const todayLog = useMemo(() => 
@@ -445,10 +485,26 @@ function ManualMacroLog() {
     }, [todayLog, form]);
 
     const onSubmit: SubmitHandler<ManualMacroLogFormValues> = async (data) => {
-        await logManualMacros(clientTodayDate, data);
-        toast({
-            title: "Macros Logged",
-            description: "Your manually entered macros have been saved for today.",
+        const macroData = { date: clientTodayDate, macros: data };
+
+        startTransition(async () => {
+            const result = await addOrUpdateManualMacrosLog(macroData);
+            if (result.error) {
+                toast({ title: "Error Saving Macros", description: result.error, variant: "destructive" });
+            } else {
+                console.log('✅ Manual macros saved to Supabase!');
+                try {
+                    await db.dailyManualMacrosLog.put(result.data);
+                    console.log('✅ Manual macros synced to local cache!');
+                    toast({
+                        title: "Macros Logged",
+                        description: "Your manually entered macros have been saved for today.",
+                    });
+                } catch (dexieError) {
+                    console.error('🔥 Failed to sync manual macros to Dexie:', dexieError);
+                    toast({ title: "Local Sync Error", description: "Could not save manual macros to local cache.", variant: "destructive" });
+                }
+            }
         });
     };
 
@@ -493,8 +549,9 @@ function ManualMacroLog() {
                                 </FormItem>
                             )} />
                         </div>
-                        <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                            <Save className="mr-2 h-4 w-4"/> {todayLog ? 'Update' : 'Log'} Daily Macros
+                        <Button type="submit" className="w-full" disabled={isPending}>
+                            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4"/>}
+                             {todayLog ? 'Update' : 'Log'} Daily Macros
                         </Button>
                     </form>
                 </Form>
