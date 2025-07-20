@@ -5,25 +5,26 @@ import React, { createContext, useContext, useMemo, useCallback, useState, useEf
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from './AuthContext';
 import { db, getOrCreateUserProfile } from '@/lib/db';
-import type {
-  PlannedMeal,
-  ShoppingListItem,
-  PantryItem,
-  Recipe,
-  MealType,
-  Macros,
-  UserProfileSettings,
-  RecipeFormData,
-  DailyWeightLog,
-  DailyVitalsLog,
-  DailyManualMacrosLog,
-  Sex,
-  ActivityLevel,
-  RDA,
-  MealSlotConfig,
-  DashboardSettings,
-  SubscriptionStatus,
-  UKSupermarketCategory
+import {
+  UserProfileSettingsSchema,
+  type PlannedMeal,
+  type ShoppingListItem,
+  type PantryItem,
+  type Recipe,
+  type MealType,
+  type Macros,
+  type UserProfileSettings,
+  type RecipeFormData,
+  type DailyWeightLog,
+  type DailyVitalsLog,
+  type DailyManualMacrosLog,
+  type Sex,
+  type ActivityLevel,
+  type RDA,
+  type MealSlotConfig,
+  type DashboardSettings,
+  type SubscriptionStatus,
+  type UKSupermarketCategory
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
@@ -35,7 +36,15 @@ import { addOrUpdateMealPlan, deleteMealFromPlan, addOrUpdatePantryItem, deleteP
 // --- Calculation Helpers ---
 const processProfile = (profileData: UserProfileSettings | undefined | null): UserProfileSettings | null => {
     if (!profileData) return null;
-    const p = { ...profileData };
+
+    const validation = UserProfileSettingsSchema.safeParse(profileData);
+    if (!validation.success) {
+      console.warn("Invalid user profile data found in Dexie, using defaults. Errors:", validation.error.flatten());
+      // Return a default or partially valid profile if you want the app to still function
+      return null;
+    }
+
+    const p = { ...validation.data };
     p.tdee = calculateTDEE(p.weightKg, p.heightCm, p.age, p.sex, p.activityLevel);
     p.leanBodyMassKg = calculateLBM(p.weightKg, p.bodyFatPercentage);
     p.rda = getRdaProfile(p.sex, p.age);
@@ -311,7 +320,6 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     
         const recommendation = await runPreppy(preppyInput);
         
-        // This should also be a server action now.
         const result = await updateUserProfile({ tdee: newDynamicTDEE, lastCheckInDate: format(new Date(), 'yyyy-MM-dd') });
         if (result.success && result.data) {
            await db.userProfile.put(result.data);
@@ -348,8 +356,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isOnline, setIsOnline] = useState(false);
 
   useEffect(() => {
+    // This code runs only on the client, after the component has mounted.
     setIsOnline(true);
-  }, []); 
+  }, []); // The empty array ensures this effect runs only once.
   
   const {
       mealPlan,
