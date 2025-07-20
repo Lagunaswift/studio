@@ -6,14 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import Link from 'next/link';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
 
 interface TermsAcceptanceModalProps {
   isOpen: boolean;
   onAccept: () => void;
+  isPending: boolean;
 }
 
-export function TermsAcceptanceModal({ isOpen, onAccept }: TermsAcceptanceModalProps) {
+export function TermsAcceptanceModal({ isOpen, onAccept, isPending }: TermsAcceptanceModalProps) {
   const [isChecked, setIsChecked] = useState(false);
 
   return (
@@ -70,9 +71,10 @@ export function TermsAcceptanceModal({ isOpen, onAccept }: TermsAcceptanceModalP
         <DialogFooter>
           <Button 
             onClick={onAccept} 
-            disabled={!isChecked}
+            disabled={!isChecked || isPending}
             className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
           >
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Continue to the App
           </Button>
         </DialogFooter>

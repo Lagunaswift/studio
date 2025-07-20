@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useState, type FormEvent, useEffect } from 'react';
+import { useState, type FormEvent, useEffect, useTransition } from 'react';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/context/AuthContext';
 import { useAppContext } from '@/context/AppContext';
@@ -205,19 +205,24 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { userProfile, acceptTerms: acceptTermsContext, isAppDataLoading } = useAppContext();
   const { user, isLoading: isAuthLoading } = useAuth();
+  const [isPending, startTransition] = useTransition();
+
   const [showTerms, setShowTerms] = useState(false);
 
   useEffect(() => {
-    if (!isAppDataLoading && userProfile && !userProfile.hasAcceptedTerms) {
+    // Only show the modal if data is loaded, there is a user profile, and terms have not been accepted.
+    if (!isAppDataLoading && userProfile && !userProfile.has_accepted_terms) {
       setShowTerms(true);
     } else {
       setShowTerms(false);
     }
   }, [userProfile, isAppDataLoading]);
 
-  const handleAcceptTerms = async () => {
-      await acceptTermsContext();
-      setShowTerms(false);
+  const handleAcceptTerms = () => {
+      startTransition(async () => {
+          await acceptTermsContext();
+          setShowTerms(false); // This will now run after the context update succeeds.
+      });
   };
 
   const getCurrentPageTitle = () => {
@@ -364,6 +369,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
       <TermsAcceptanceModal
         isOpen={showTerms}
         onAccept={handleAcceptTerms}
+        isPending={isPending}
       />
     </div>
   );

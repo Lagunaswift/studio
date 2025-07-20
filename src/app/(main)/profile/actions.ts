@@ -5,7 +5,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
-import type { DailyVitalsLog, DailyManualMacrosLog, Macros, PlannedMeal, PantryItem, RecipeFormData, UserProfileSettings } from '@/types';
+import type { DailyVitalsLog, DailyManualMacrosLog, DailyWeightLog, PlannedMeal, PantryItem, RecipeFormData, UserProfileSettings } from '@/types';
 
 // --- User Profile Actions ---
 export async function updateUserProfile(updates: Partial<UserProfileSettings>) {
@@ -14,20 +14,33 @@ export async function updateUserProfile(updates: Partial<UserProfileSettings>) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Authentication required.' }
+  
+  // Ensure we are using snake_case for the database column
+  const dbUpdates: { [key: string]: any } = {};
+  for (const key in updates) {
+      if (Object.prototype.hasOwnProperty.call(updates, key)) {
+          if (key === 'hasAcceptedTerms') {
+              dbUpdates['has_accepted_terms'] = (updates as any)[key];
+          } else {
+              dbUpdates[key] = (updates as any)[key];
+          }
+      }
+  }
 
   const { data, error } = await supabase
     .from('profiles')
-    .update(updates)
+    .update(dbUpdates)
     .eq('id', user.id)
     .select()
     .single();
 
   if (error) {
     console.error('Error updating profile:', error)
-    return { error: 'Could not update your profile.' }
+    return { error: `Could not update your profile. DB error: ${error.message}` }
   }
 
   revalidatePath('/profile', 'layout')
+  revalidatePath('/', 'layout') // Revalidate home page as well
   return { success: true, data }
 }
 
@@ -79,7 +92,7 @@ export async function addRecipe(recipeData: RecipeFormData) {
 
 
 // --- Meal Plan Actions ---
-export async function addOrUpdateMealPlan(mealData: Omit<PlannedMeal, 'user_id' | 'recipeDetails'>) {
+export async function addOrUpdateMealPlan(mealData: Omit<PlannedMeal, 'recipeDetails'>) {
     const cookieStore = cookies()
     const supabase = createClient(cookieStore)
 
@@ -96,7 +109,7 @@ export async function addOrUpdateMealPlan(mealData: Omit<PlannedMeal, 'user_id' 
     
     const { data, error } = await supabase
         .from('planned_meals')
-        .upsert(dataToUpsert, { onConflict: 'id, user_id' })
+        .upsert(dataToUpsert, { onConflict: 'id' })
         .select()
         .single();
 
@@ -142,7 +155,7 @@ export async function addOrUpdatePantryItem(itemData: Omit<PantryItem, 'user_id'
 
     const { data, error } = await supabase
         .from('pantry_items')
-        .upsert(dataToUpsert, { onConflict: 'id, user_id' })
+        .upsert(dataToUpsert, { onConflict: 'id' })
         .select()
         .single();
     
@@ -251,7 +264,7 @@ export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacr
 
     const { data, error } = await supabase
       .from('daily_manual_macros_logs')
-      .upsert(dataToUpsert, { onConflict: 'date, user_id' })
+      .upsert(dataToUpsert, { onConflict: 'id' })
       .select()
       .single()
 

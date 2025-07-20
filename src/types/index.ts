@@ -42,25 +42,6 @@ export interface Ingredient {
   unit: string;
 }
 
-export interface Recipe {
-  id: number;
-  name: string;
-  description?: string;
-  image: string;
-  servings: number;
-  prepTime: string;
-  cookTime: string;
-  chillTime?: string;
-  ingredients: string[]; 
-  macrosPerServing: Macros;
-  micronutrientsPerServing: Micronutrients | null;
-  instructions: string[];
-  tags?: string[];
-  isCustom?: boolean;
-  user_id?: string | null;
-  is_favorite?: boolean;
-}
-
 export const RecipeSchema = z.object({
   id: z.number(),
   name: z.string().min(1),
@@ -79,6 +60,7 @@ export const RecipeSchema = z.object({
   user_id: z.string().nullable().optional(),
   is_favorite: z.boolean().optional(),
 });
+export type Recipe = z.infer<typeof RecipeSchema>;
 
 
 export type MealType = "Breakfast" | "Lunch" | "Dinner" | "Snack";
@@ -92,19 +74,28 @@ export interface PlannedMeal {
   status: 'planned' | 'eaten';
   recipeDetails?: Recipe;
   syncStatus?: 'synced' | 'pending';
+  user_id?: string;
 }
 
 export type UKSupermarketCategory =
-  | "Fresh Fruit & Vegetables"
-  | "Bakery"
-  | "Meat & Poultry"
-  | "Fish & Seafood"
-  | "Dairy, Butter & Eggs"
-  | "Chilled Foods"
-  | "Frozen Foods"
-  | "Food Cupboard"
-  | "Drinks"
-  | "Other Food Items";
+  | 'Fresh Fruit & Vegetables'
+  | 'Bakery'
+  | 'Meat & Poultry'
+  | 'Fish & Seafood'
+  | 'Dairy, Butter & Eggs'
+  | 'Chilled Foods'
+  | 'Frozen Foods'
+  | 'Food Cupboard'
+  | 'Drinks'
+  | 'Other Food Items'
+  | 'Herbs & Spices'
+  | 'Condiments & Sauces'
+  | 'Baking Goods'
+  | 'Pasta, Rice & Grains'
+  | 'Canned Goods'
+  | 'Snacks & Confectionery'
+  | 'Frozen';
+
 
 export interface ShoppingListItem {
   id: string;
@@ -124,6 +115,7 @@ export interface PantryItem {
   category: UKSupermarketCategory;
   expiryDate?: string; 
   syncStatus?: 'synced' | 'pending' | 'deleted';
+  user_id?: string;
 }
 
 
@@ -199,6 +191,7 @@ export const DailyWeightLogSchema = z.object({
     weightKg: z.number(),
     trendWeightKg: z.number().optional(),
     syncStatus: z.enum(['synced', 'pending']).optional(),
+    user_id: z.string().optional(),
 });
 export type DailyWeightLog = z.infer<typeof DailyWeightLogSchema>;
 
@@ -225,6 +218,7 @@ export const DailyVitalsLogSchema = z.object({
   activityYesterday: z.enum(['rest', 'light', 'moderate', 'strenuous']),
   notes: z.string().optional(),
   syncStatus: z.enum(['synced', 'pending']).optional(),
+  user_id: z.string().optional(),
 });
 export type DailyVitalsLog = z.infer<typeof DailyVitalsLogSchema>;
 
@@ -271,7 +265,7 @@ export const UserProfileSettingsSchema = z.object({
   subscription_start_date: z.string().nullable().optional(),
   subscription_end_date: z.string().nullable().optional(),
   subscription_duration: z.string().nullable().optional(),
-  hasAcceptedTerms: z.boolean().optional(),
+  has_accepted_terms: z.boolean().optional(),
   lastCheckInDate: z.string().nullable().optional(),
   targetWeightChangeRateKg: z.number().nullable().optional(),
   syncStatus: z.enum(['synced', 'pending']).optional(),
