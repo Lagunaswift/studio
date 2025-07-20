@@ -4,7 +4,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
 import type { DailyVitalsLog, DailyManualMacrosLog, Macros, PlannedMeal, PantryItem, RecipeFormData, UserProfileSettings } from '@/types';
 
 // --- User Profile Actions ---
@@ -79,7 +78,7 @@ export async function addRecipe(recipeData: RecipeFormData) {
 
 
 // --- Meal Plan Actions ---
-export async function addOrUpdateMealPlan(mealData: Omit<PlannedMeal, 'user_id'>) {
+export async function addOrUpdateMealPlan(mealData: Omit<PlannedMeal, 'user_id' | 'recipeDetails'>) {
     const cookieStore = cookies()
     const supabase = createClient(cookieStore)
 
@@ -91,12 +90,10 @@ export async function addOrUpdateMealPlan(mealData: Omit<PlannedMeal, 'user_id'>
         id: mealData.id || `meal_${Date.now()}_${Math.random()}`,
         user_id: user.id,
     };
-    // Supabase doesn't need recipeDetails
-    delete (dataToUpsert as any).recipeDetails;
-
+    
     const { data, error } = await supabase
         .from('planned_meals')
-        .upsert(dataToUpsert, { onConflict: 'id' })
+        .upsert(dataToUpsert, { onConflict: 'id, user_id' })
         .select()
         .single();
 
@@ -104,7 +101,7 @@ export async function addOrUpdateMealPlan(mealData: Omit<PlannedMeal, 'user_id'>
         console.error('Error saving meal plan item:', error)
         return { error: 'Could not save your meal plan item.' }
     }
-    revalidatePath('/meal-plan');
+    revalidatePath('/meal-plan', 'layout');
     return { success: true, data };
 }
 
@@ -125,13 +122,13 @@ export async function deleteMealFromPlan(plannedMealId: string) {
         console.error('Error deleting meal plan item:', error);
         return { error: 'Could not remove meal from plan.' };
     }
-    revalidatePath('/meal-plan');
+    revalidatePath('/meal-plan', 'layout');
     return { success: true };
 }
 
 
 // --- Pantry Actions ---
-export async function addOrUpdatePantryItem(itemData: PantryItem) {
+export async function addOrUpdatePantryItem(itemData: Omit<PantryItem, 'user_id'>) {
     const cookieStore = cookies()
     const supabase = createClient(cookieStore)
     const { data: { user } } = await supabase.auth.getUser()
@@ -141,7 +138,7 @@ export async function addOrUpdatePantryItem(itemData: PantryItem) {
 
     const { data, error } = await supabase
         .from('pantry_items')
-        .upsert(dataToUpsert, { onConflict: 'id' })
+        .upsert(dataToUpsert, { onConflict: 'id, user_id' })
         .select()
         .single();
     
