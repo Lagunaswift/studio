@@ -1,51 +1,37 @@
 import type { PlannedMeal, Recipe, PantryItem, ShoppingListItem, UKSupermarketCategory, Macros, MealType, DailyWeightLog, Sex, RDA } from '@/types';
+import { RecipeSchema } from '@/types'; // Import the Zod schema
 import { getAllRecipes as getAllRecipesFromRegistry } from '@/features/recipes/recipeRegistry';
 
 // Helper function to map registry recipes to the full Recipe type
-const mapToFullRecipe = (rawRecipe: any): Recipe => {
-  if (typeof rawRecipe.id !== 'number' || !rawRecipe.name || typeof rawRecipe.name !== 'string') {
-    console.warn('Skipping invalid raw recipe data:', rawRecipe);
-    return {
-        id: -1, name: 'Invalid Recipe Data',
-        servings: 0, ingredients: [], instructions: [], prepTime: '', cookTime: '',
-        macrosPerServing: { calories: 0, protein: 0, carbs: 0, fat: 0 },
-        micronutrientsPerServing: null,
-        image: 'https://placehold.co/600x400/007bff/ffffff.png?text=Error',
-        description: "This recipe data was invalid and could not be loaded."
-    } as Recipe;
-  }
-
-  const servings = typeof rawRecipe.servings === 'number' && rawRecipe.servings > 0 ? rawRecipe.servings : 1;
-  const totalCalories = typeof rawRecipe.calories === 'number' ? rawRecipe.calories : 0;
-  const totalProtein = typeof rawRecipe.protein === 'number' ? rawRecipe.protein : 0;
-  const totalCarbs = typeof rawRecipe.carbs === 'number' ? rawRecipe.carbs : 0;
-  const totalFat = typeof rawRecipe.fat === 'number' ? rawRecipe.fat : 0;
-
-  return {
-    id: rawRecipe.id,
-    name: rawRecipe.name,
-    servings: servings,
-    ingredients: Array.isArray(rawRecipe.ingredients) ? rawRecipe.ingredients : [],
-    tags: Array.isArray(rawRecipe.tags) ? rawRecipe.tags : [],
-    prepTime: typeof rawRecipe.prepTime === 'string' ? rawRecipe.prepTime : "N/A",
-    cookTime: typeof rawRecipe.cookTime === 'string' ? rawRecipe.cookTime : "N/A",
-    chillTime: typeof rawRecipe.chillTime === 'string' ? rawRecipe.chillTime : undefined,
-    instructions: Array.isArray(rawRecipe.instructions) ? rawRecipe.instructions : [],
+const mapToFullRecipe = (rawRecipe: any): Recipe | null => {
+  const validation = RecipeSchema.safeParse({
+    ...rawRecipe,
     macrosPerServing: {
-      calories: totalCalories,
-      protein: totalProtein,
-      carbs: totalCarbs,
-      fat: totalFat,
+        calories: rawRecipe.calories,
+        protein: rawRecipe.protein,
+        carbs: rawRecipe.carbs,
+        fat: rawRecipe.fat,
     },
     micronutrientsPerServing: null, // Default to null for now
-    image: rawRecipe.image || `https://placehold.co/600x400.png?text=${encodeURIComponent(rawRecipe.name)}`,
-    description: rawRecipe.description || "No description available.",
+  });
+
+  if (!validation.success) {
+    console.warn(`Skipping invalid raw recipe data (ID: ${rawRecipe.id}):`, validation.error.flatten().fieldErrors);
+    return null;
+  }
+  
+  const servings = typeof validation.data.servings === 'number' && validation.data.servings > 0 ? validation.data.servings : 1;
+  
+  return {
+    ...validation.data,
+    servings,
+    image: validation.data.image || `https://placehold.co/600x400.png?text=${encodeURIComponent(validation.data.name)}`,
   };
 };
 
 const allRecipesCache: Recipe[] = getAllRecipesFromRegistry()
   .map(mapToFullRecipe)
-  .filter(recipe => recipe.id !== -1);
+  .filter((recipe): recipe is Recipe => recipe !== null);
 
 
 export const MEAL_TYPES: MealType[] = ["Breakfast", "Lunch", "Dinner", "Snack"];

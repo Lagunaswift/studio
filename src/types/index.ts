@@ -1,5 +1,6 @@
 
 
+import { z } from 'zod';
 
 export interface Macros {
   protein: number; // in grams
@@ -7,6 +8,13 @@ export interface Macros {
   fat: number; // in grams
   calories: number;
 }
+
+export const MacrosSchema = z.object({
+  protein: z.number().nonnegative(),
+  carbs: z.number().nonnegative(),
+  fat: z.number().nonnegative(),
+  calories: z.number().nonnegative(),
+});
 
 export interface Micronutrients {
   iron: number | null;
@@ -16,6 +24,15 @@ export interface Micronutrients {
   vitaminC: number | null;
   vitaminD: number | null;
 }
+
+export const MicronutrientsSchema = z.object({
+  iron: z.number().nullable(),
+  calcium: z.number().nullable(),
+  potassium: z.number().nullable(),
+  vitaminA: z.number().nullable(),
+  vitaminC: z.number().nullable(),
+  vitaminD: z.number().nullable(),
+});
 
 export type RDA = Micronutrients;
 
@@ -41,7 +58,28 @@ export interface Recipe {
   tags?: string[];
   isCustom?: boolean;
   user_id?: string | null;
+  is_favorite?: boolean;
 }
+
+export const RecipeSchema = z.object({
+  id: z.number(),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  image: z.string().optional(),
+  servings: z.number().positive(),
+  prepTime: z.string().optional(),
+  cookTime: z.string().optional(),
+  chillTime: z.string().optional(),
+  ingredients: z.array(z.string()),
+  macrosPerServing: MacrosSchema,
+  micronutrientsPerServing: MicronutrientsSchema.nullable(),
+  instructions: z.array(z.string()),
+  tags: z.array(z.string()).optional(),
+  isCustom: z.boolean().optional(),
+  user_id: z.string().nullable().optional(),
+  is_favorite: z.boolean().optional(),
+});
+
 
 export type MealType = "Breakfast" | "Lunch" | "Dinner" | "Snack";
 
@@ -100,11 +138,13 @@ export interface MacroTargets {
   fat: number;
 }
 
-export interface MealSlotConfig {
-  id: string;
-  name: string;
-  type: MealType;
-}
+export const MealSlotConfigSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.enum(["Breakfast", "Lunch", "Dinner", "Snack"]),
+});
+export type MealSlotConfig = z.infer<typeof MealSlotConfigSchema>;
+
 
 export type Sex = 'male' | 'female' | 'notSpecified';
 export const SEX_OPTIONS: Sex[] = ['male', 'female', 'notSpecified'];
@@ -146,19 +186,22 @@ export const TRAINING_EXPERIENCE_OPTIONS: { value: TrainingExperienceLevel; labe
 
 export type SubscriptionStatus = 'active' | 'inactive' | 'none' | null;
 
-export interface DashboardSettings {
-  showMacros: boolean;
-  showMenu: boolean;
-  showFeaturedRecipe: boolean;
-  showQuickRecipes: boolean;
-}
+export const DashboardSettingsSchema = z.object({
+  showMacros: z.boolean().default(true),
+  showMenu: z.boolean().default(true),
+  showFeaturedRecipe: z.boolean().default(true),
+  showQuickRecipes: z.boolean().default(true),
+});
+export type DashboardSettings = z.infer<typeof DashboardSettingsSchema>;
 
-export interface DailyWeightLog {
-  date: string; // YYYY-MM-DD
-  weightKg: number;
-  trendWeightKg?: number;
-  syncStatus?: 'synced' | 'pending';
-}
+export const DailyWeightLogSchema = z.object({
+    date: z.string(),
+    weightKg: z.number(),
+    trendWeightKg: z.number().optional(),
+    syncStatus: z.enum(['synced', 'pending']).optional(),
+});
+export type DailyWeightLog = z.infer<typeof DailyWeightLogSchema>;
+
 
 export type Mood = 'stressed' | 'okay' | 'great';
 export type Energy = 'low' | 'medium' | 'high';
@@ -173,65 +216,67 @@ export type EnergyLevelV2 = 'low' | 'moderate' | 'high' | 'vibrant';
 export type SorenessLevel = 'none' | 'mild' | 'moderate' | 'severe';
 export type ActivityYesterdayLevel = 'rest' | 'light' | 'moderate' | 'strenuous';
 
-export interface DailyVitalsLog {
-  date: string; // YYYY-MM-DD
-  sleepQuality: number; // 1-10
-  energyLevel: EnergyLevelV2;
-  cravingsLevel: number; // 1-10
-  muscleSoreness: SorenessLevel;
-  activityYesterday: ActivityYesterdayLevel;
-  notes?: string;
-  syncStatus?: 'synced' | 'pending';
-}
+export const DailyVitalsLogSchema = z.object({
+  date: z.string(),
+  sleepQuality: z.number().min(1).max(10),
+  energyLevel: z.enum(['low', 'moderate', 'high', 'vibrant']),
+  cravingsLevel: z.number().min(1).max(10),
+  muscleSoreness: z.enum(['none', 'mild', 'moderate', 'severe']),
+  activityYesterday: z.enum(['rest', 'light', 'moderate', 'strenuous']),
+  notes: z.string().optional(),
+  syncStatus: z.enum(['synced', 'pending']).optional(),
+});
+export type DailyVitalsLog = z.infer<typeof DailyVitalsLogSchema>;
 
-export interface DailyManualMacrosLog {
-    id: string;
-    date: string; // YYYY-MM-DD
-    macros: Macros;
-    user_id: string;
-    syncStatus?: 'synced' | 'pending';
-}
+export const DailyManualMacrosLogSchema = z.object({
+    id: z.string(),
+    date: z.string(),
+    macros: MacrosSchema,
+    user_id: z.string(),
+    syncStatus: z.enum(['synced', 'pending']).optional(),
+});
+export type DailyManualMacrosLog = z.infer<typeof DailyManualMacrosLogSchema>;
 
-export interface UserProfileSettings {
-  id: string; // Added to ensure profile always has an id
-  name?: string | null;
-  email?: string | null;
-  macroTargets: MacroTargets | null;
-  dietaryPreferences: string[];
-  allergens: string[];
-  mealStructure: MealSlotConfig[];
-  heightCm: number | null;
-  weightKg: number | null;
-  age: number | null;
-  sex: Sex | null;
-  activityLevel: ActivityLevel | null;
-  trainingExperienceLevel: TrainingExperienceLevel | null;
-  bodyFatPercentage: number | null;
-  athleteType: AthleteType | null;
-  primaryGoal: PrimaryGoal | null;
-  tdee: number | null;
-  leanBodyMassKg: number | null;
-  rda: RDA | null;
-  neckCircumferenceCm?: number | null;
-  abdomenCircumferenceCm?: number | null; // Male
-  waistCircumferenceCm?: number | null;   // Female
-  hipCircumferenceCm?: number | null;     // Female
-  dailyWeightLog?: DailyWeightLog[];
-  dailyWellnessLog?: DailyWellnessLog[];
-  dailyVitalsLog?: DailyVitalsLog[];
-  dailyManualMacrosLog?: DailyManualMacrosLog[]; // Added for new feature
-  dashboardSettings?: DashboardSettings;
-  favorite_recipe_ids?: number[];
-  subscription_status: SubscriptionStatus;
-  plan_name?: string | null;
-  subscription_start_date?: string | null;
-  subscription_end_date?: string | null;
-  subscription_duration?: string | null;
-  hasAcceptedTerms?: boolean;
-  lastCheckInDate?: string | null; 
-  targetWeightChangeRateKg?: number | null; 
-  syncStatus?: 'synced' | 'pending';
-}
+export const UserProfileSettingsSchema = z.object({
+  id: z.string(),
+  name: z.string().nullable().optional(),
+  email: z.string().email().nullable().optional(),
+  macroTargets: MacrosSchema.nullable(),
+  dietaryPreferences: z.array(z.string()),
+  allergens: z.array(z.string()),
+  mealStructure: z.array(MealSlotConfigSchema),
+  heightCm: z.number().positive().nullable(),
+  weightKg: z.number().positive().nullable(),
+  age: z.number().positive().nullable(),
+  sex: z.enum(SEX_OPTIONS).nullable(),
+  activityLevel: z.enum(ACTIVITY_LEVEL_OPTIONS.map(o => o.value) as [ActivityLevel, ...ActivityLevel[]]).nullable(),
+  trainingExperienceLevel: z.enum(TRAINING_EXPERIENCE_OPTIONS.map(o => o.value) as [TrainingExperienceLevel, ...TrainingExperienceLevel[]]).nullable(),
+  bodyFatPercentage: z.number().min(1).max(70).nullable(),
+  athleteType: z.enum(ATHLETE_TYPE_OPTIONS.map(o => o.value) as [AthleteType, ...AthleteType[]]).nullable(),
+  primaryGoal: z.enum(PRIMARY_GOAL_OPTIONS.map(o => o.value) as [PrimaryGoal, ...PrimaryGoal[]]).nullable(),
+  tdee: z.number().nullable(),
+  leanBodyMassKg: z.number().nullable(),
+  rda: MicronutrientsSchema.nullable(),
+  neckCircumferenceCm: z.number().positive().nullable().optional(),
+  abdomenCircumferenceCm: z.number().positive().nullable().optional(),
+  waistCircumferenceCm: z.number().positive().nullable().optional(),
+  hipCircumferenceCm: z.number().positive().nullable().optional(),
+  dailyWeightLog: z.array(DailyWeightLogSchema).optional(),
+  dailyVitalsLog: z.array(DailyVitalsLogSchema).optional(),
+  dailyManualMacrosLog: z.array(DailyManualMacrosLogSchema).optional(),
+  dashboardSettings: DashboardSettingsSchema.optional(),
+  favorite_recipe_ids: z.array(z.number()).optional(),
+  subscription_status: z.enum(['active', 'inactive', 'none']).nullable(),
+  plan_name: z.string().nullable().optional(),
+  subscription_start_date: z.string().nullable().optional(),
+  subscription_end_date: z.string().nullable().optional(),
+  subscription_duration: z.string().nullable().optional(),
+  hasAcceptedTerms: z.boolean().optional(),
+  lastCheckInDate: z.string().nullable().optional(),
+  targetWeightChangeRateKg: z.number().nullable().optional(),
+  syncStatus: z.enum(['synced', 'pending']).optional(),
+});
+export type UserProfileSettings = z.infer<typeof UserProfileSettingsSchema>;
 
 export interface RecipeFormData {
   name: string;
