@@ -4,36 +4,185 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
-import type { DailyVitalsLog, DailyManualMacrosLog, Macros } from '@/types';
+import { redirect } from 'next/navigation'
+import type { DailyVitalsLog, DailyManualMacrosLog, Macros, PlannedMeal, PantryItem, RecipeFormData, UserProfileSettings } from '@/types';
 
-// Define the shape of the vitals data
-type VitalsData = {
-  date: string; // e.g., '2025-07-20'
-  sleepQuality?: number;
-  energyLevel?: string;
-  muscleSoreness?: string;
-  cravingsLevel?: number;
-  activityYesterday?: string;
-  notes?: string;
-}
-
-export async function addOrUpdateVitalsLog(vitalsData: VitalsData) {
+// --- User Profile Actions ---
+export async function updateUserProfile(updates: Partial<UserProfileSettings>) {
   const cookieStore = cookies()
   const supabase = createClient(cookieStore)
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Authentication required.' }
 
-  const dataToUpsert = {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(updates)
+    .eq('id', user.id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating profile:', error)
+    return { error: 'Could not update your profile.' }
+  }
+
+  revalidatePath('/profile', 'layout')
+  return { success: true, data }
+}
+
+// --- Recipe Actions ---
+export async function addRecipe(recipeData: RecipeFormData) {
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'You must be logged in to add a recipe.' }
+  }
+
+  const dataToInsert = {
+    name: recipeData.name,
+    description: recipeData.description,
+    image: recipeData.image || `https://placehold.co/600x400.png?text=${encodeURIComponent(recipeData.name)}`,
+    servings: recipeData.servings,
+    prepTime: recipeData.prepTime,
+    cookTime: recipeData.cookTime,
+    chillTime: recipeData.chillTime,
+    ingredients: recipeData.ingredients.map(ing => ing.value),
+    macrosPerServing: { 
+        calories: recipeData.calories, 
+        protein: recipeData.protein, 
+        carbs: recipeData.carbs, 
+        fat: recipeData.fat 
+    },
+    instructions: recipeData.instructions.map(inst => inst.value),
+    tags: recipeData.tags,
+    isCustom: true,
     user_id: user.id,
-    date: vitalsData.date,
-    sleepQuality: vitalsData.sleepQuality,
-    energyLevel: vitalsData.energyLevel,
-    cravingsLevel: vitalsData.cravingsLevel,
-    muscleSoreness: vitalsData.muscleSoreness,
-    activityYesterday: vitalsData.activityYesterday,
-    notes: vitalsData.notes,
   };
+
+  const { data, error } = await supabase
+    .from('recipes')
+    .insert(dataToInsert)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error adding recipe:', error)
+    return { error: 'Failed to save the recipe.' }
+  }
+
+  revalidatePath('/recipes')
+  return { success: true, data }
+}
+
+
+// --- Meal Plan Actions ---
+export async function addOrUpdateMealPlan(mealData: Omit<PlannedMeal, 'user_id'>) {
+    const cookieStore = cookies()
+    const supabase = createClient(cookieStore)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Authentication required.' }
+
+    const dataToUpsert = {
+        ...mealData,
+        id: mealData.id || `meal_${Date.now()}_${Math.random()}`,
+        user_id: user.id,
+    };
+    // Supabase doesn't need recipeDetails
+    delete (dataToUpsert as any).recipeDetails;
+
+    const { data, error } = await supabase
+        .from('planned_meals')
+        .upsert(dataToUpsert, { onConflict: 'id' })
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error saving meal plan item:', error)
+        return { error: 'Could not save your meal plan item.' }
+    }
+    revalidatePath('/meal-plan');
+    return { success: true, data };
+}
+
+export async function deleteMealFromPlan(plannedMealId: string) {
+    const cookieStore = cookies()
+    const supabase = createClient(cookieStore)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Authentication required.' }
+
+    const { error } = await supabase
+        .from('planned_meals')
+        .delete()
+        .eq('id', plannedMealId)
+        .eq('user_id', user.id);
+    
+    if (error) {
+        console.error('Error deleting meal plan item:', error);
+        return { error: 'Could not remove meal from plan.' };
+    }
+    revalidatePath('/meal-plan');
+    return { success: true };
+}
+
+
+// --- Pantry Actions ---
+export async function addOrUpdatePantryItem(itemData: PantryItem) {
+    const cookieStore = cookies()
+    const supabase = createClient(cookieStore)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Authentication required.' }
+
+    const dataToUpsert = { ...itemData, user_id: user.id };
+
+    const { data, error } = await supabase
+        .from('pantry_items')
+        .upsert(dataToUpsert, { onConflict: 'id' })
+        .select()
+        .single();
+    
+    if (error) {
+        console.error('Error saving pantry item:', error);
+        return { error: 'Could not save item to pantry.' };
+    }
+    revalidatePath('/pantry');
+    return { success: true, data };
+}
+
+export async function deletePantryItem(itemId: string) {
+    const cookieStore = cookies()
+    const supabase = createClient(cookieStore)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Authentication required.' }
+
+    const { error } = await supabase
+        .from('pantry_items')
+        .delete()
+        .eq('id', itemId)
+        .eq('user_id', user.id);
+
+    if (error) {
+        console.error('Error deleting pantry item:', error);
+        return { error: 'Could not remove item from pantry.' };
+    }
+    revalidatePath('/pantry');
+    return { success: true };
+}
+
+
+// --- Daily Log Actions ---
+export async function addOrUpdateVitalsLog(vitalsData: Omit<DailyVitalsLog, 'user_id'>) {
+  const cookieStore = cookies()
+  const supabase = createClient(cookieStore)
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Authentication required.' }
+
+  const dataToUpsert = { ...vitalsData, user_id: user.id };
 
   const { data, error } = await supabase
     .from('daily_vitals_logs')
@@ -50,7 +199,6 @@ export async function addOrUpdateVitalsLog(vitalsData: VitalsData) {
   return { success: true, data }
 }
 
-
 export async function addOrUpdateWeightLog(date: string, weight_kg: number) {
   const cookieStore = cookies()
   const supabase = createClient(cookieStore)
@@ -60,11 +208,7 @@ export async function addOrUpdateWeightLog(date: string, weight_kg: number) {
 
   const { data, error } = await supabase
     .from('daily_weight_logs')
-    .upsert({
-      user_id: user.id,
-      date: date,
-      weight_kg: weight_kg
-    }, { onConflict: 'date, user_id' })
+    .upsert({ user_id: user.id, date, weight_kg }, { onConflict: 'date, user_id' })
     .select()
     .single()
 
@@ -73,16 +217,15 @@ export async function addOrUpdateWeightLog(date: string, weight_kg: number) {
     return { error: 'Could not save your weight.' }
   }
 
+  // Also update the main profile weight
+  await supabase.from('profiles').update({ weightKg: weight_kg }).eq('id', user.id);
+
   revalidatePath('/daily-log')
+  revalidatePath('/profile/user-info')
   return { success: true, data }
 }
 
-type ManualMacroData = {
-    date: string;
-    macros: Macros;
-}
-
-export async function addOrUpdateManualMacrosLog(macroData: ManualMacroData) {
+export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacrosLog, 'user_id' | 'id'>) {
     const cookieStore = cookies()
     const supabase = createClient(cookieStore)
 
@@ -109,8 +252,8 @@ export async function addOrUpdateManualMacrosLog(macroData: ManualMacroData) {
       return { error: 'Could not save your manual macros.' }
     }
     
-    // Convert back to nested structure for Dexie
-    const resultData = {
+    const resultData: DailyManualMacrosLog = {
+        id: data.id,
         date: data.date,
         macros: {
             calories: data.calories,
@@ -119,9 +262,7 @@ export async function addOrUpdateManualMacrosLog(macroData: ManualMacroData) {
             fat: data.fat,
         },
         user_id: data.user_id,
-        id: data.id,
     };
-
 
     revalidatePath('/daily-log')
     return { success: true, data: resultData }

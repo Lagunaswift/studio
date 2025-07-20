@@ -39,7 +39,7 @@ export default function RecipeDetailPage() {
   const [recipe, setRecipe] = useState<RecipeType | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null); 
-  const { addMealToPlan, toggleFavoriteRecipe, isRecipeFavorite, addCustomRecipe, isSubscribed } = useAppContext();
+  const { addMealToPlan, toggleFavoriteRecipe, isRecipeFavorite, addCustomRecipe, isSubscribed, allRecipesCache } = useAppContext();
   const { toast } = useToast();
   
   const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
@@ -72,7 +72,7 @@ export default function RecipeDetailPage() {
       setImageLoadError(false);
       
       try {
-        const foundRecipe = await getRecipeById(recipeId);
+        const foundRecipe = allRecipesCache.find(r => r.id === recipeId);
         if (foundRecipe) {
           setRecipe(foundRecipe);
           setDisplayServings(foundRecipe.servings || 1);
@@ -90,16 +90,13 @@ export default function RecipeDetailPage() {
       }
     }
     fetchRecipe();
-  }, [recipeId]);
+  }, [recipeId, allRecipesCache]);
 
   useEffect(() => {
     if (!recipe) return;
 
-    // This is the number of servings the user wants to see
     const currentDisplayServings = (!isNaN(displayServings) && displayServings > 0) ? displayServings : (recipe.servings || 1);
 
-    // --- CORRECTED MACRO CALCULATION ---
-    // recipe.macrosPerServing is ALREADY per one serving. We just multiply by the desired servings.
     const newMacros = {
         calories: recipe.macrosPerServing.calories * currentDisplayServings,
         protein: recipe.macrosPerServing.protein * currentDisplayServings,
@@ -108,18 +105,14 @@ export default function RecipeDetailPage() {
     };
     setScaledMacros(newMacros);
     
-    // --- CORRECTED INGREDIENT SCALING ---
     const newIngredients = recipe.ingredients.map(ingString => {
         const parsed = parseIngredientString(ingString);
         if (!parsed.name || parsed.name.toLowerCase() === 'non-item' || parsed.quantity <= 0) {
-            return null; // Filter out non-items or ingredients with no quantity
+            return null;
         }
 
-        // 1. Get quantity for a SINGLE serving from the original recipe data
-        // The `parsed.quantity` is for the entire recipe's servings count (e.g., 6 eggs for 2 servings)
-        const quantityPerServing = parsed.quantity / (recipe.servings || 1);
-
-        // 2. Scale it by the number of servings the user wants to see
+        const recipeBaseServings = recipe.servings > 0 ? recipe.servings : 1;
+        const quantityPerServing = parsed.quantity / recipeBaseServings;
         const newQuantity = quantityPerServing * currentDisplayServings;
         
         const formattedQuantity = newQuantity % 1 !== 0 ? parseFloat(newQuantity.toFixed(2)) : newQuantity;
@@ -145,14 +138,22 @@ export default function RecipeDetailPage() {
     }
   };
 
-  const handleAddToMealPlan = () => {
+  const handleAddToMealPlan = async () => {
     if (recipe && planDate && planMealType && planServings > 0) {
-      addMealToPlan(recipe, format(planDate, 'yyyy-MM-dd'), planMealType, planServings);
-      toast({
-        title: "Meal Added",
-        description: `${recipe.name} added to your meal plan for ${format(planDate, 'PPP')} (${planMealType}).`,
-      });
-      setShowAddToPlanDialog(false);
+        try {
+            await addMealToPlan(recipe, format(planDate, 'yyyy-MM-dd'), planMealType, planServings);
+            toast({
+                title: "Meal Added",
+                description: `${recipe.name} added to your meal plan for ${format(planDate, 'PPP')} (${planMealType}).`,
+            });
+            setShowAddToPlanDialog(false);
+        } catch (error: any) {
+             toast({
+                title: "Error adding meal",
+                description: error.message || "Could not add meal to plan.",
+                variant: 'destructive',
+            });
+        }
     } else {
        toast({
         title: "Error",
@@ -162,14 +163,18 @@ export default function RecipeDetailPage() {
     }
   };
   
-  const handleFavoriteToggle = (e: React.MouseEvent) => {
+  const handleFavoriteToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (recipe) {
-      toggleFavoriteRecipe(recipe.id);
-      toast({
-        title: !isFavorited ? "Recipe Favorited!" : "Recipe Unfavorited",
-        description: !isFavorited ? `${recipe.name} added to your favorites.` : `${recipe.name} removed from your favorites.`,
-      });
+      try {
+        await toggleFavoriteRecipe(recipe.id);
+        toast({
+            title: !isFavorited ? "Recipe Favorited!" : "Recipe Unfavorited",
+            description: !isFavorited ? `${recipe.name} added to your favorites.` : `${recipe.name} removed from your favorites.`,
+        });
+      } catch (error: any) {
+         toast({ title: "Error", description: error.message || "Could not update favorites.", variant: "destructive" });
+      }
     }
   };
 
@@ -226,7 +231,7 @@ export default function RecipeDetailPage() {
     }
   };
   
-  const handleSaveTweak = () => {
+  const handleSaveTweak = async () => {
     if (!tweakSuggestion || !recipe) return;
 
     const recipeFormData: RecipeFormData = {
@@ -246,7 +251,8 @@ export default function RecipeDetailPage() {
     };
 
     try {
-        addCustomRecipe(recipeFormData);
+        const result = await addCustomRecipe(recipeFormData);
+        if (result.error) throw new Error(result.error);
         toast({
             title: "New Recipe Saved!",
             description: `"${tweakSuggestion.newName}" has been added to your recipes.`,
