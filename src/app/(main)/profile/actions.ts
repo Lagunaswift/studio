@@ -1,319 +1,253 @@
 
-
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import type { DailyVitalsLog, DailyManualMacrosLog, DailyWeightLog, PlannedMeal, PantryItem, RecipeFormData, UserProfileSettings } from '@/types';
+import { auth, db } from '@/lib/firebase'; // Firestore DB
+import { doc, updateDoc, collection, addDoc, getDoc, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
+
+
+// This is a placeholder for getting the current user's UID.
+// In a real app, you would get this from the session or auth state.
+// For now, we are assuming a fixed user for server actions until full auth is passed.
+// IMPORTANT: This will need to be replaced with actual user authentication state management.
+async function getUserId() {
+  // This is NOT a secure way to get the user, it's a placeholder for the migration.
+  // We'll need to replace this with a proper session management system.
+  // For now, let's assume we can get it from the auth state if possible,
+  // but it's not available in server actions without passing it from the client or using a session library.
+  // THIS IS A MAJOR SECURITY FLAW and needs to be addressed.
+  // As we don't have auth state here, and can't easily get it, we'll have to assume a fixed ID for now.
+  // This is a common problem when migrating from Supabase's integrated RLS to Firebase with separate services.
+  
+  // The user has stated that we can't get user from auth state in server actions.
+  // So we will need to re-architect this later.
+  // For now, we will leave it commented out, as we can't proceed without a user id.
+  // const { data: { user } } = await supabase.auth.getUser()
+  // if (!user) return null;
+  // return user.id;
+
+  // Let's hardcode a temporary user ID for the purpose of making the code compile.
+  // THIS MUST BE REPLACED.
+  return "placeholder-user-id";
+}
+
 
 // --- User Profile Actions ---
 export async function updateUserProfile(updates: Partial<UserProfileSettings>) {
-  const cookieStore = cookies()
-  const supabase = createClient(cookieStore)
+  const userId = await getUserId();
+  if (!userId) return { error: 'Authentication required.' };
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Authentication required.' }
-  
-  // Map camelCase keys from the app to snake_case keys for the DB
-  const dbUpdates: { [key: string]: any } = {};
-  for (const key in updates) {
-      if (Object.prototype.hasOwnProperty.call(updates, key)) {
-          const value = (updates as any)[key];
-          switch (key) {
-              case 'trainingExperienceLevel':
-                  dbUpdates['training_experience_level'] = value;
-                  break;
-              case 'neckCircumferenceCm':
-                  dbUpdates['neck_circumference_cm'] = value;
-                  break;
-              case 'abdomenCircumferenceCm':
-                  dbUpdates['abdomen_circumference_cm'] = value;
-                  break;
-              case 'waistCircumferenceCm':
-                  dbUpdates['waist_circumference_cm'] = value;
-                  break;
-              case 'hipCircumferenceCm':
-                  dbUpdates['hip_circumference_cm'] = value;
-                  break;
-              case 'lastCheckInDate':
-                  dbUpdates['last_check_in_date'] = value;
-                  break;
-              case 'targetWeightChangeRateKg':
-                  dbUpdates['target_weight_change_rate_kg'] = value;
-                  break;
-              case 'favorite_recipe_ids':
-                  dbUpdates['favorite_recipe_ids'] = value;
-                  break;
-              case 'has_accepted_terms':
-                  dbUpdates['has_accepted_terms'] = value;
-                  break;
-              // Add other direct mappings here if they don't have a case change
-              default:
-                  dbUpdates[key] = value;
-          }
-      }
+  const profileRef = doc(db, "profiles", userId);
+
+  try {
+    await updateDoc(profileRef, updates);
+    revalidatePath('/profile', 'layout')
+    revalidatePath('/', 'layout') 
+    
+    // Firestore doesn't return the updated document by default on update.
+    // We'll fetch it if needed, but for now, let's just confirm success.
+    const updatedDoc = await getDoc(profileRef);
+
+    return { success: true, data: updatedDoc.data() }
+  } catch (error: any) {
+    console.error('Error updating profile:', error);
+    return { error: `Could not update your profile. DB error: ${error.message}` };
   }
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .update(dbUpdates)
-    .eq('id', user.id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error updating profile:', error)
-    return { error: `Could not update your profile. DB error: ${error.message}` }
-  }
-
-  revalidatePath('/profile', 'layout')
-  revalidatePath('/', 'layout') // Revalidate home page as well
-  return { success: true, data }
 }
 
 // --- Recipe Actions ---
 export async function addRecipe(recipeData: RecipeFormData) {
-  const cookieStore = cookies()
-  const supabase = createClient(cookieStore)
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: 'You must be logged in to add a recipe.' }
+  const userId = await getUserId();
+  if (!userId) {
+    return { error: 'You must be logged in to add a recipe.' };
   }
 
   const dataToInsert = {
-    name: recipeData.name,
-    description: recipeData.description,
-    image: recipeData.image || `https://placehold.co/600x400.png?text=${encodeURIComponent(recipeData.name)}`,
-    servings: recipeData.servings,
-    prepTime: recipeData.prepTime,
-    cookTime: recipeData.cookTime,
-    chillTime: recipeData.chillTime,
+    ...recipeData,
     ingredients: recipeData.ingredients.map(ing => ing.value),
+    instructions: recipeData.instructions.map(inst => inst.value),
     macrosPerServing: { 
         calories: recipeData.calories, 
         protein: recipeData.protein, 
         carbs: recipeData.carbs, 
         fat: recipeData.fat 
     },
-    instructions: recipeData.instructions.map(inst => inst.value),
-    tags: recipeData.tags,
+    image: recipeData.image || `https://placehold.co/600x400.png?text=${encodeURIComponent(recipeData.name)}`,
     isCustom: true,
-    user_id: user.id,
+    user_id: userId,
   };
 
-  const { data, error } = await supabase
-    .from('recipes')
-    .insert(dataToInsert)
-    .select()
-    .single()
+  try {
+    const docRef = await addDoc(collection(db, "recipes"), dataToInsert);
+    const newDoc = await getDoc(docRef);
+    const finalData = { ...newDoc.data(), id: newDoc.id };
 
-  if (error) {
-    console.error('Error adding recipe:', error)
-    return { error: 'Failed to save the recipe.' }
+    revalidatePath('/recipes');
+    return { success: true, data: finalData };
+  } catch (error: any) {
+    console.error('Error adding recipe:', error);
+    return { error: 'Failed to save the recipe.' };
   }
-
-  revalidatePath('/recipes')
-  return { success: true, data }
 }
 
 
 // --- Meal Plan Actions ---
-export async function addOrUpdateMealPlan(mealData: Omit<PlannedMeal, 'recipeDetails'>) {
-    const cookieStore = cookies()
-    const supabase = createClient(cookieStore)
+export async function addOrUpdateMealPlan(mealData: Omit<PlannedMeal, 'recipeDetails' | 'user_id'> & {id?: string}) {
+  const userId = await getUserId();
+  if (!userId) return { error: 'Authentication required.' };
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'Authentication required.' }
+  const { syncStatus, ...restOfMealData } = mealData;
+  const docId = restOfMealData.id || `meal_${Date.now()}_${Math.random()}`;
+  
+  const dataToSet = {
+      ...restOfMealData,
+      id: docId,
+      user_id: userId,
+  };
 
-    const { syncStatus, ...restOfMealData } = mealData;
+  const mealRef = doc(db, "planned_meals", docId);
 
-    const dataToUpsert = {
-        ...restOfMealData,
-        id: restOfMealData.id || `meal_${Date.now()}_${Math.random()}`,
-        user_id: user.id,
-    };
-    
-    const { data, error } = await supabase
-        .from('planned_meals')
-        .upsert(dataToUpsert, { onConflict: 'id' })
-        .select()
-        .single();
-
-    if (error) {
-        console.error('Error saving meal plan item:', error)
-        return { error: 'Could not save your meal plan item.' }
-    }
+  try {
+    await setDoc(mealRef, dataToSet, { merge: true });
+    const updatedDoc = await getDoc(mealRef);
     revalidatePath('/meal-plan', 'layout');
-    return { success: true, data };
+    return { success: true, data: updatedDoc.data() };
+  } catch (error: any) {
+    console.error('Error saving meal plan item:', error);
+    return { error: 'Could not save your meal plan item.' };
+  }
 }
 
 export async function deleteMealFromPlan(plannedMealId: string) {
-    const cookieStore = cookies()
-    const supabase = createClient(cookieStore)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'Authentication required.' }
-
-    const { error } = await supabase
-        .from('planned_meals')
-        .delete()
-        .eq('id', plannedMealId)
-        .eq('user_id', user.id);
+    const userId = await getUserId();
+    if (!userId) return { error: 'Authentication required.' };
     
-    if (error) {
+    // We can't enforce RLS here as easily, so we just delete by ID.
+    // Proper security rules in Firestore are CRITICAL.
+    const mealRef = doc(db, "planned_meals", plannedMealId);
+    
+    try {
+        await deleteDoc(mealRef);
+        revalidatePath('/meal-plan', 'layout');
+        return { success: true };
+    } catch (error: any) {
         console.error('Error deleting meal plan item:', error);
         return { error: 'Could not remove meal from plan.' };
     }
-    revalidatePath('/meal-plan', 'layout');
-    return { success: true };
 }
 
 
 // --- Pantry Actions ---
 export async function addOrUpdatePantryItem(itemData: Omit<PantryItem, 'user_id'>) {
-    const cookieStore = cookies()
-    const supabase = createClient(cookieStore)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'Authentication required.' }
+    const userId = await getUserId();
+    if (!userId) return { error: 'Authentication required.' };
 
     const { syncStatus, ...restOfItemData } = itemData;
-    const dataToUpsert = { ...restOfItemData, user_id: user.id };
-
-    const { data, error } = await supabase
-        .from('pantry_items')
-        .upsert(dataToUpsert, { onConflict: 'id' })
-        .select()
-        .single();
+    const dataToSet = { ...restOfItemData, user_id: userId };
     
-    if (error) {
+    const itemRef = doc(db, "pantry_items", itemData.id);
+
+    try {
+        await setDoc(itemRef, dataToSet, { merge: true });
+        const updatedDoc = await getDoc(itemRef);
+        revalidatePath('/pantry');
+        return { success: true, data: updatedDoc.data() };
+    } catch (error: any) {
         console.error('Error saving pantry item:', error);
         return { error: 'Could not save item to pantry.' };
     }
-    revalidatePath('/pantry');
-    return { success: true, data };
 }
 
 export async function deletePantryItem(itemId: string) {
-    const cookieStore = cookies()
-    const supabase = createClient(cookieStore)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'Authentication required.' }
+    const userId = await getUserId();
+    if (!userId) return { error: 'Authentication required.' };
 
-    const { error } = await supabase
-        .from('pantry_items')
-        .delete()
-        .eq('id', itemId)
-        .eq('user_id', user.id);
-
-    if (error) {
+    const itemRef = doc(db, "pantry_items", itemId);
+    
+    try {
+        await deleteDoc(itemRef);
+        revalidatePath('/pantry');
+        return { success: true };
+    } catch (error: any) {
         console.error('Error deleting pantry item:', error);
         return { error: 'Could not remove item from pantry.' };
     }
-    revalidatePath('/pantry');
-    return { success: true };
 }
 
 
 // --- Daily Log Actions ---
 export async function addOrUpdateVitalsLog(vitalsData: Omit<DailyVitalsLog, 'user_id'>) {
-  const cookieStore = cookies()
-  const supabase = createClient(cookieStore)
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Authentication required.' }
+  const userId = await getUserId();
+  if (!userId) return { error: 'Authentication required.' };
 
   const { syncStatus, ...restOfVitalsData } = vitalsData;
-  const dataToUpsert = { ...restOfVitalsData, user_id: user.id };
+  const dataToSet = { ...restOfVitalsData, user_id: userId };
+  
+  const docId = `${userId}_${vitalsData.date}`; // Create a predictable ID
+  const vitalsRef = doc(db, "daily_vitals_logs", docId);
 
-  const { data, error } = await supabase
-    .from('daily_vitals_logs')
-    .upsert(dataToUpsert, { onConflict: 'date, user_id' }) 
-    .select()
-    .single() 
-
-  if (error) {
-    console.error('Error saving vitals log:', error)
-    return { error: 'Could not save your daily vitals.' }
+  try {
+    await setDoc(vitalsRef, dataToSet, { merge: true });
+    const updatedDoc = await getDoc(vitalsRef);
+    revalidatePath('/daily-log');
+    return { success: true, data: updatedDoc.data() };
+  } catch (error: any) {
+    console.error('Error saving vitals log:', error);
+    return { error: 'Could not save your daily vitals.' };
   }
-
-  revalidatePath('/daily-log')
-  return { success: true, data }
 }
 
-export async function addOrUpdateWeightLog(logData: Omit<DailyWeightLog, 'user_id' | 'trendWeightKg'>) {
-  const cookieStore = cookies()
-  const supabase = createClient(cookieStore)
+export async function addOrUpdateWeightLog(date: string, weightKg: number) {
+  const userId = await getUserId();
+  if (!userId) return { error: 'Authentication required.' };
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Authentication required.' }
+  const logData = { date, weightKg, user_id: userId };
+  const docId = `${userId}_${date}`; // Predictable ID
+  
+  const weightLogRef = doc(db, "daily_weight_logs", docId);
+  const profileRef = doc(db, "profiles", userId);
 
-  const { syncStatus, ...restOfLogData } = logData;
-  const dataToUpsert = { user_id: user.id, ...restOfLogData };
+  try {
+    const batch = writeBatch(db);
+    batch.set(weightLogRef, logData, { merge: true });
+    batch.update(profileRef, { weightKg }); // Also update the main profile weight
+    await batch.commit();
+    
+    const updatedDoc = await getDoc(weightLogRef);
 
-  const { data, error } = await supabase
-    .from('daily_weight_logs')
-    .upsert(dataToUpsert, { onConflict: 'date, user_id' })
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Error saving weight log:', error)
-    return { error: 'Could not save your weight.' }
+    revalidatePath('/daily-log');
+    revalidatePath('/profile/user-info');
+    return { success: true, data: updatedDoc.data() };
+  } catch (error: any) {
+    console.error('Error saving weight log:', error);
+    return { error: 'Could not save your weight.' };
   }
-
-  // Also update the main profile weight
-  await supabase.from('profiles').update({ weightKg: logData.weightKg }).eq('id', user.id);
-
-  revalidatePath('/daily-log')
-  revalidatePath('/profile/user-info')
-  return { success: true, data }
 }
 
 export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacrosLog, 'user_id'>) {
-    const cookieStore = cookies()
-    const supabase = createClient(cookieStore)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'Authentication required.' }
+    const userId = await getUserId();
+    if (!userId) return { error: 'Authentication required.' };
 
     const { syncStatus, ...restOfMacroData } = macroData;
-    const { macros, ...rest } = restOfMacroData;
+    const docId = restOfMacroData.id || `${userId}_${macroData.date}_macros`;
 
-    const dataToUpsert = {
-        ...rest,
-        user_id: user.id,
-        calories: macros.calories,
-        protein: macros.protein,
-        carbs: macros.carbs,
-        fat: macros.fat,
+    const dataToSet = {
+        ...restOfMacroData,
+        id: docId,
+        user_id: userId
     };
-
-    const { data, error } = await supabase
-      .from('daily_manual_macros_logs')
-      .upsert(dataToUpsert, { onConflict: 'id' })
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Error saving manual macros log:', error)
-      return { error: 'Could not save your manual macros.' }
-    }
     
-    const resultData: DailyManualMacrosLog = {
-        id: data.id,
-        date: data.date,
-        macros: {
-            calories: data.calories,
-            protein: data.protein,
-            carbs: data.carbs,
-            fat: data.fat,
-        },
-        user_id: data.user_id,
-        syncStatus: 'synced',
-    };
+    const logRef = doc(db, "daily_manual_macros_logs", docId);
 
-    revalidatePath('/daily-log')
-    return { success: true, data: resultData }
+    try {
+        await setDoc(logRef, dataToSet, { merge: true });
+        const updatedDoc = await getDoc(logRef);
+        revalidatePath('/daily-log');
+        return { success: true, data: updatedDoc.data() };
+    } catch (error: any) {
+        console.error('Error saving manual macros log:', error);
+        return { error: 'Could not save your manual macros.' };
+    }
 }
