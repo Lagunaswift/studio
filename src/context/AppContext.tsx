@@ -182,7 +182,16 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
       // User Profile
       unsubscribes.push(onSnapshot(doc(db, "profiles", idToUse), (doc) => {
         const data = doc.data() as UserProfileSettings | undefined;
-        const processed = processProfile(data);
+        
+        // Combine logs from subcollections into the profile object
+        const fullProfileData = {
+          ...data,
+          dailyWeightLog,
+          dailyVitalsLog,
+          dailyManualMacrosLog,
+        };
+
+        const processed = processProfile(fullProfileData as UserProfileSettings);
         setUserProfile(processed);
       }));
 
@@ -206,7 +215,7 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
 
       return () => unsubscribes.forEach(unsub => unsub());
 
-    }, [idToUse]);
+    }, [idToUse, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog]); // Add logs as dependencies
 
     const isSubscribed = useMemo(() => userProfile?.subscription_status === 'active', [userProfile?.subscription_status]);
 
@@ -347,10 +356,23 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoading: isAuthLoading } = useAuth();
   
-  const [isOnline, setIsOnline] = useState(false);
+  const [isOnline, setIsOnline] = useState(true); // Assume online by default on client
 
   useEffect(() => {
-    setIsOnline(true);
+    // Check online status
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    // Set initial status
+    setIsOnline(navigator.onLine);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
   
   const {
@@ -387,7 +409,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [userProfile?.dashboardSettings, setUserInformation]);
 
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
-    const newPlannedMeal: Omit<PlannedMeal, 'id' | 'user_id'> & { id?: string } = { 
+    const newPlannedMeal: Omit<PlannedMeal, 'id' | 'user_id' | 'recipeDetails'> = { 
       recipeId: recipe.id, 
       date, 
       mealType, 
@@ -405,7 +427,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const meal = mealPlan.find(m => m.id === plannedMealId);
       if (!meal) throw new Error("Meal not found locally.");
       
-      const updatedMealData = { ...meal, ...updates };
+      const { recipeDetails, ...restOfMeal } = meal;
+      const updatedMealData = { ...restOfMeal, ...updates };
 
       await addOrUpdateMealPlan(updatedMealData);
   }, [mealPlan]);
@@ -444,7 +467,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         item.name.toLowerCase() === name.toLowerCase() && item.unit === unit
     );
 
-    let itemToSave: PantryItem;
+    let itemToSave: Omit<PantryItem, 'user_id'>;
     if (existingItem) {
         itemToSave = {
             ...existingItem,

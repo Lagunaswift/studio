@@ -14,7 +14,7 @@ export class AppDatabase extends Dexie {
   dailyManualMacrosLog!: Table<DailyManualMacrosLog>;
 
   constructor() {
-    super('MealPlannerProDB_v3');
+    super('MealPlannerProDB_v3_Firebase'); // New DB name for clean migration
     this.version(1).stores({ 
         recipes: '++id, name, *tags, isCustom', 
         plannedMeals: 'id, date, mealType, recipeId',
@@ -22,7 +22,7 @@ export class AppDatabase extends Dexie {
         dailyWeightLog: 'date',
         userProfile: 'id', 
         dailyVitalsLog: 'date',
-        dailyManualMacrosLog: 'date'
+        dailyManualMacrosLog: 'id' // Using id which is now predictable
     });
   }
 }
