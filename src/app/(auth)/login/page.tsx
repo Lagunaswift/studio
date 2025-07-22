@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -13,7 +12,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Mail, Lock, LogIn, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/context/AuthContext';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -27,10 +28,14 @@ export default function LoginPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     setIsClient(true);
-  }, []);
+    if (user) {
+      router.push('/');
+    }
+  }, [user, router]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -41,39 +46,23 @@ export default function LoginPage() {
   });
 
   const onSubmit: SubmitHandler<LoginFormValues> = async (data) => {
-    const supabase = createClient();
-    if (!supabase) {
-      toast({ title: "Error", description: "Authentication service not available.", variant: "destructive"});
-      return;
-    }
-
-    console.log('Attempting to sign in with:', data.email); 
-
     form.clearErrors(); 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      });
-
-      if (error) {
-        toast({
-          title: "Login Failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Login Successful!",
-          description: "Welcome back!",
-        });
-        router.push('/'); // Redirect to homepage or dashboard
-        router.refresh(); // Refresh to update server-side session state if needed
-      }
-    } catch (e: any) {
+      await signInWithEmailAndPassword(auth, data.email, data.password);
       toast({
-        title: "Login Error",
-        description: e.message || "An unexpected error occurred.",
+        title: "Login Successful!",
+        description: "Welcome back!",
+      });
+      router.push('/');
+    } catch (error: any) {
+      const errorCode = error.code;
+      let description = "An unexpected error occurred.";
+      if (errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password' || errorCode === 'auth/invalid-credential') {
+        description = "Invalid email or password. Please try again.";
+      }
+      toast({
+        title: "Login Failed",
+        description,
         variant: "destructive",
       });
     }

@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -12,7 +11,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Mail, KeyRound, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 const resetPasswordSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -37,37 +37,18 @@ export default function ResetPasswordPage() {
 
   const onSubmit: SubmitHandler<ResetPasswordFormValues> = async (data) => {
     form.clearErrors();
-    const supabase = createClient();
-    if (!isClient || !supabase) {
-       toast({ title: "Error", description: "Authentication service not ready. Please wait and try again.", variant: "destructive"});
-      return;
-    }
-
+    
     try {
-      const origin = window.location.origin.trim();
-      const redirectTo = `${origin}/update-password`;
-
-      const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-        redirectTo: redirectTo,
+      await sendPasswordResetEmail(auth, data.email);
+      toast({
+        title: "Password Reset Email Sent",
+        description: `If an account exists for ${data.email}, a password reset link has been sent. Please check your inbox.`,
       });
-
-      if (error) {
-        toast({
-          title: "Password Reset Failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Password Reset Email Sent",
-          description: `If an account exists for ${data.email}, a password reset link has been sent. Please check your inbox.`,
-        });
-        form.reset();
-      }
-    } catch (e: any) {
+      form.reset();
+    } catch (error: any) {
       toast({
         title: "Password Reset Error",
-        description: e.message || "An unexpected error occurred.",
+        description: error.message || "An unexpected error occurred.",
         variant: "destructive",
       });
     }

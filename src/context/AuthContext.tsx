@@ -1,24 +1,11 @@
-//studio/src/context/AuthContext.tsx
-'use client';
+"use client";
 
 import { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import type { Session, User, SupabaseClient } from '@supabase/supabase-js';
-import type { UserProfileSettings } from '@/types';
-
-// The Profile type here will be a subset of UserProfileSettings.
-interface Profile extends Partial<UserProfileSettings> {
-  id: string;
-  email?: string;
-  name?: string | null;
-  updated_at?: string;
-}
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged, signOut as firebaseSignOut, type User } from 'firebase/auth';
 
 interface AuthContextType {
-  supabase: SupabaseClient;
-  session: Session | null;
   user: User | null;
-  profile: Profile | null;
   isLoading: boolean;
   signOut: () => Promise<void>;
 }
@@ -26,51 +13,23 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const supabase = createClient();
-  const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // This is the REAL Supabase authentication listener
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSession(session);
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-
-      if (currentUser) {
-        // Fetch the user's profile from the 'profiles' table
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', currentUser.id)
-          .single();
-
-        if (error) {
-          console.error('Error fetching profile:', error.message);
-          setProfile(null);
-        } else {
-          setProfile(data);
-        }
-      } else {
-        setProfile(null);
-      }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
       setIsLoading(false);
     });
 
-    // Clean up the listener when the component unmounts
-    return () => {
-      authListener?.subscription.unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    // The onAuthStateChange listener will handle setting user/session to null
+    await firebaseSignOut(auth);
   };
 
-  const value = { supabase, session, user, profile, isLoading, signOut };
+  const value = { user, isLoading, signOut };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

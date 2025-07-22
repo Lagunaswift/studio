@@ -1,8 +1,7 @@
-
 "use client";
 
 import { useEffect, useState, Suspense } from 'react';
-import { useRouter }  from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -13,7 +12,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Lock, KeyRound, AlertTriangle, ArrowLeft, Eye, EyeOff } from 'lucide-react'; 
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
+import { confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 const updatePasswordSchema = z.object({
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),
@@ -28,30 +28,35 @@ type UpdatePasswordFormValues = z.infer<typeof updatePasswordSchema>;
 function UpdatePasswordFormComponent() {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [isTokenValid, setIsTokenValid] = useState(false); 
   const [isCheckingToken, setIsCheckingToken] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const supabase = createClient();
+  const [actionCode, setActionCode] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!supabase) return;
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setIsTokenValid(true);
-      } else {
-        if (!session) setIsTokenValid(false);
-      }
+    const oobCode = searchParams.get('oobCode');
+    if (!oobCode) {
+      setError("Invalid or missing password reset link.");
       setIsCheckingToken(false);
-    });
+      return;
+    }
+    setActionCode(oobCode);
     
-    return () => {
-        subscription.unsubscribe();
-    };
-  }, []);
-
+    verifyPasswordResetCode(auth, oobCode)
+      .then(() => {
+        setIsTokenValid(true);
+      })
+      .catch((error) => {
+        setError("Your password reset link is invalid or has expired. Please request a new one.");
+        setIsTokenValid(false);
+      })
+      .finally(() => {
+        setIsCheckingToken(false);
+      });
+  }, [searchParams]);
 
   const form = useForm<UpdatePasswordFormValues>({
     resolver: zodResolver(updatePasswordSchema),
@@ -65,47 +70,23 @@ function UpdatePasswordFormComponent() {
     form.clearErrors();
     setError(null);
     
-    if (!supabase) {
-       toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive"});
-       return;
-    }
-
-    if (!isTokenValid) {
-      const msg = "Password recovery token is not valid or session has expired. Please request a new reset link.";
-      setError(msg);
-      toast({
-        title: "Update Not Allowed",
-        description: msg,
-        variant: "destructive",
-      });
+    if (!actionCode) {
+      toast({ title: "Error", description: "Action code is missing.", variant: "destructive"});
       return;
     }
 
     try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: data.password,
+      await confirmPasswordReset(auth, actionCode, data.password);
+      toast({
+        title: "Password Updated Successfully!",
+        description: "You can now sign in with your new password.",
       });
-
-      if (updateError) {
-        setError(updateError.message);
-        toast({
-          title: "Password Update Failed",
-          description: updateError.message,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Password Updated Successfully!",
-          description: "You can now sign in with your new password.",
-        });
-        await supabase.auth.signOut(); 
-        router.push('/login');
-      }
+      router.push('/login');
     } catch (e: any) {
-      setError(e.message || "An unexpected error occurred.");
+      setError("Failed to update password. The link may have expired.");
       toast({
         title: "Update Error",
-        description: e.message || "An unexpected error occurred.",
+        description: "Failed to update password. The link may have expired.",
         variant: "destructive",
       });
     }
