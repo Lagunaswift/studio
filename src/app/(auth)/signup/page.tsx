@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -13,7 +12,8 @@ import { Mail, Lock, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 const signUpSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -47,61 +47,28 @@ export default function SignUpPage() {
   });
 
   const onSubmit: SubmitHandler<SignUpFormValues> = async (data) => {
-    const supabase = createClient();
-    if (!supabase) {
-       toast({ title: "Error", description: "Authentication service not available.", variant: "destructive"});
-       return;
-    }
-
     form.clearErrors(); 
     
-    let emailRedirectToPath = '/login'; 
-    
     try {
-      const { data: signUpData, error } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          emailRedirectTo: isClient ? `${window.location.origin}${emailRedirectToPath}` : undefined, 
-        }
-      });
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      await sendEmailVerification(userCredential.user);
 
-      if (error) {
-        toast({
-          title: "Sign Up Failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else if (signUpData.user && signUpData.user.identities && signUpData.user.identities.length === 0) {
-        toast({
-          title: "Confirmation Sent or Account Exists",
-          description: "If you're new, please check your email to confirm your account. If you've signed up before, please log in.",
-          variant: "default",
-        });
-        form.reset();
-      } else if (signUpData.user?.id && !signUpData.session) {
-         toast({
-          title: "Sign Up Successful!",
-          description: "Please check your email to confirm your account and complete the sign up process.",
-        });
-        form.reset();
-      } else if (signUpData.user && signUpData.session) {
-         toast({
-          title: "Sign Up Successful!",
-          description: "Your account is ready. You can now log in.",
-        });
-        form.reset();
-        router.push('/login'); 
-      } else {
-         toast({
-          title: "Sign Up Attempted",
-          description: "Please check your email for a confirmation link. If you encounter issues, try logging in or resetting your password.",
-        });
-      }
-    } catch (e: any) {
       toast({
-        title: "Sign Up Error",
-        description: e.message || "An unexpected error occurred.",
+        title: "Sign Up Successful!",
+        description: "Please check your email to verify your account and complete the sign up process.",
+      });
+      form.reset();
+      router.push('/login'); 
+
+    } catch (error: any) {
+      const errorCode = error.code;
+      let description = "An unexpected error occurred.";
+      if (errorCode === 'auth/email-already-in-use') {
+        description = "This email is already in use. Please log in or use a different email.";
+      }
+      toast({
+        title: "Sign Up Failed",
+        description,
         variant: "destructive",
       });
     }
