@@ -179,23 +179,15 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
 
       const unsubscribes: (() => void)[] = [];
 
-      // User Profile
+      // User Profile - Only depend on idToUse for the profile
       unsubscribes.push(onSnapshot(doc(db, "profiles", idToUse), (doc) => {
         const data = doc.data() as UserProfileSettings | undefined;
-        
-        // Combine logs from subcollections into the profile object
-        const fullProfileData = {
-          ...data,
-          dailyWeightLog,
-          dailyVitalsLog,
-          dailyManualMacrosLog,
-        };
-
-        const processed = processProfile(fullProfileData as UserProfileSettings);
+        // Do NOT combine log states here. Process only the profile document's direct data.
+        const processed = processProfile(data as UserProfileSettings); 
         setUserProfile(processed);
       }));
 
-      // User-specific collections
+      // User-specific collections - These subscriptions are independent
       const collections: {name: string, setter: React.Dispatch<any>}[] = [
         { name: "recipes", setter: setUserRecipes },
         { name: "planned_meals", setter: setMealPlan },
@@ -215,7 +207,7 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
 
       return () => unsubscribes.forEach(unsub => unsub());
 
-    }, [idToUse, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog]); // Add logs as dependencies
+    }, [idToUse]); // Removed dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog from dependencies here.
 
     const isSubscribed = useMemo(() => userProfile?.subscription_status === 'active', [userProfile?.subscription_status]);
 
@@ -344,8 +336,18 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
         return { success: true, message: "Check-in complete!", recommendation };
     }, [userProfile, dailyWeightLog, getConsumedMacrosForDate]);
 
+    const fullUserProfile = useMemo(() => {
+        if (!userProfile) return null;
+        return {
+            ...userProfile,
+            dailyWeightLog,
+            dailyVitalsLog,
+            dailyManualMacrosLog
+        }
+    }, [userProfile, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog]);
+
     return {
-        mealPlan, pantryItems, userRecipes, userProfile,
+        mealPlan, pantryItems, userRecipes, userProfile: fullUserProfile,
         isAppDataLoading, isSubscribed, allRecipesCache,
         shoppingList, getConsumedMacrosForDate, getPlannedMacrosForDate,
         getMealsForDate, isRecipeFavorite, runWeeklyCheckin
@@ -535,3 +537,5 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
+    
