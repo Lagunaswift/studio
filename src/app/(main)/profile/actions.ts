@@ -5,7 +5,8 @@ import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import type { DailyVitalsLog, DailyManualMacrosLog, DailyWeightLog, PlannedMeal, PantryItem, RecipeFormData, UserProfileSettings } from '@/types';
 import { auth, db } from '@/lib/firebase'; // Firestore DB
-import { doc, updateDoc, collection, addDoc, getDoc, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
+import { doc, updateDoc, collection, addDoc, getDoc, setDoc, deleteDoc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { processBugReport, type BugReportInput, type BugReportOutput } from '@/ai/flows/report-bug-flow';
 
 
 // This is a placeholder for getting the current user's UID.
@@ -14,15 +15,7 @@ import { doc, updateDoc, collection, addDoc, getDoc, setDoc, deleteDoc, writeBat
 // IMPORTANT: This will need to be replaced with actual user authentication state management.
 async function getUserId() {
   // This is NOT a secure way to get the user, it's a placeholder for the migration.
-  // We'll need to replace this with a proper session management system.
-  // For now, let's assume we can get it from the auth state if possible,
-  // but it's not available in server actions without passing it from the client or using a session library.
-  // THIS IS A MAJOR SECURITY FLAW and needs to be addressed.
-  // As we don't have auth state here, and can't easily get it, we'll have to assume a fixed ID for now.
-  // This is a common problem when migrating from Supabase's integrated RLS to Firebase with separate services.
-  
-  // The user has stated that we can't get user from auth state in server actions.
-  // So we will need to re-architect this later.
+  // We'll need to re-architect this later.
   // For now, we will leave it commented out, as we can't proceed without a user id.
   // const { data: { user } } = await supabase.auth.getUser()
   // if (!user) return null;
@@ -249,5 +242,39 @@ export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacr
     } catch (error: any) {
         console.error('Error saving manual macros log:', error);
         return { error: 'Could not save your manual macros.' };
+    }
+}
+
+// --- Bug Reporting Action ---
+export async function reportBug(description: string): Promise<{ success: boolean, error?: string, data?: BugReportOutput }> {
+    const userId = await getUserId();
+    if (!userId) return { error: 'Authentication required to report a bug.' };
+
+    try {
+        // 1. Process the bug report with AI
+        const aiInput: BugReportInput = {
+            description,
+            userId,
+            appVersion: "1.0.0" // This could be dynamic in a real app
+        };
+        const processedReport = await processBugReport(aiInput);
+
+        // 2. Save the structured report to Firestore
+        const bugReportData = {
+            ...processedReport,
+            originalDescription: description,
+            userId: userId,
+            createdAt: serverTimestamp(),
+            status: 'new' // 'new', 'in-progress', 'resolved'
+        };
+
+        await addDoc(collection(db, "bug_reports"), bugReportData);
+
+        revalidatePath('/updates');
+        return { success: true, data: processedReport };
+
+    } catch (error: any) {
+        console.error('Error reporting bug:', error);
+        return { success: false, error: 'Failed to submit bug report. Please try again later.' };
     }
 }
