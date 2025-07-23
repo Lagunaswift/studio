@@ -97,44 +97,6 @@ const allNavItems = [
     ...helpNavItems,
 ];
 
-// Search Component for the Sidebar
-function SidebarSearch() {
-  const [search, setSearch] = useState('');
-  const router = useRouter();
-  const { setOpenMobile, isMobile } = useSidebar();
-
-  const handleSearch = (e: FormEvent) => {
-    e.preventDefault();
-    if (!search.trim()) return;
-    router.push(`/recipes?q=${encodeURIComponent(search.trim())}`);
-    if (isMobile) {
-      setOpenMobile(false);
-    }
-    setSearch('');
-  };
-
-  return (
-    <div className="px-3 py-2 group-data-[collapsible=icon]:px-2">
-      <form onSubmit={handleSearch} className="relative">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search..."
-                className="w-full pl-8 h-9 bg-sidebar-accent/50 border-sidebar-border group-data-[collapsible=icon]:pl-2 group-data-[collapsible=icon]:text-center"
-              />
-            </TooltipTrigger>
-            <TooltipContent side="right" align="center" className="group-data-[state=expanded]:hidden">
-              Search recipes
-            </TooltipContent>
-          </Tooltip>
-      </form>
-    </div>
-  );
-}
-
 function LogoutButton() {
   const { signOut } = useAuth();
   const router = useRouter();
@@ -145,12 +107,17 @@ function LogoutButton() {
   };
 
   return (
-    <SidebarMenuItem>
-      <SidebarMenuButton onClick={handleLogout} tooltip={{ children: "Log Out", side: 'right', align: 'center' }}>
-        <LogOut />
-        <span className="group-data-[collapsible=icon]:hidden">Log Out</span>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
+    <Tooltip>
+        <TooltipTrigger asChild>
+            <SidebarMenuItem>
+              <SidebarMenuButton onClick={handleLogout}>
+                <LogOut />
+                <span className="group-data-[collapsible=icon]:hidden">Log Out</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+        </TooltipTrigger>
+        <TooltipContent side="right" align="center">Log Out</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -178,23 +145,13 @@ function DevStatusIndicator() {
   
   return (
     <div className="fixed bottom-2 left-2 z-50">
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className={cn(
-              "flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-lg",
-              isOnline ? "bg-green-600" : "bg-orange-500"
-            )}>
-              {isOnline ? <Database className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
-              <span>{isOnline ? "Online" : "Offline"}</span>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="right">
-            <p>{isOnline ? "Data is being sent to Supabase." : "Data is being saved to local browser storage."}</p>
-            <p className="text-muted-foreground">This indicator is only visible in development.</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+        <div title={isOnline ? "Data is being sent to Firebase." : "Data is being saved to local browser storage."} className={cn(
+          "flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-lg",
+          isOnline ? "bg-green-600" : "bg-orange-500"
+        )}>
+          {isOnline ? <Database className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
+          <span>{isOnline ? "Online" : "Offline"}</span>
+        </div>
     </div>
   );
 }
@@ -271,17 +228,21 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           </Link>
         </SidebarHeader>
-        <SidebarSearch />
         <SidebarContent className="flex flex-col justify-between">
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === dashboardNavItem.href} tooltip={{ children: dashboardNavItem.label, side: 'right', align: 'center' }}>
-                <Link href={dashboardNavItem.href}>
-                  <dashboardNavItem.icon />
-                  <span className="group-data-[collapsible=icon]:hidden">{dashboardNavItem.label}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname === dashboardNavItem.href}>
+                        <Link href={dashboardNavItem.href}>
+                          <dashboardNavItem.icon />
+                          <span className="group-data-[collapsible=icon]:hidden">{dashboardNavItem.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </TooltipTrigger>
+                <TooltipContent side="right" align="center">{dashboardNavItem.label}</TooltipContent>
+            </Tooltip>
             
             <Accordion type="multiple" className="w-full space-y-0 px-2 group-data-[collapsible=icon]:hidden">
               {mainSections.map(section => (
@@ -315,14 +276,19 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
             <div className="hidden flex-col gap-1 group-data-[collapsible=icon]:flex">
               {mainSections.map(section => (
-                <SidebarMenuItem key={`collapsed-${section.label}`}>
-                    <SidebarMenuButton asChild isActive={section.items.some(item => pathname.startsWith(item.href))} tooltip={{ children: section.label, side: 'right', align: 'center' }}>
-                      <Link href={section.items[0].href}>
-                        <section.icon />
-                        <span className="group-data-[collapsible=icon]:hidden">{section.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
+                <Tooltip key={`collapsed-${section.label}`}>
+                    <TooltipTrigger asChild>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton asChild isActive={section.items.some(item => pathname.startsWith(item.href))}>
+                              <Link href={section.items[0].href}>
+                                <section.icon />
+                                <span className="group-data-[collapsible=icon]:hidden">{section.label}</span>
+                              </Link>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" align="center">{section.label}</TooltipContent>
+                </Tooltip>
               ))}
             </div>
 
@@ -332,14 +298,19 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
              {helpNavItems.map((item) => {
               const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
               return (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={isActive} tooltip={{ children: item.label, side: 'right', align: 'center' }}>
-                    <Link href={item.href}>
-                      <item.icon />
-                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <Tooltip key={item.href}>
+                    <TooltipTrigger asChild>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild isActive={isActive}>
+                            <Link href={item.href}>
+                              <item.icon />
+                              <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" align="center">{item.label}</TooltipContent>
+                </Tooltip>
               );
             })}
             {!isAuthLoading && user && <LogoutButton />}
