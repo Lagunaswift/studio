@@ -1,3 +1,4 @@
+
 //src/context/AppContext.tsx
 "use client";
 
@@ -117,7 +118,6 @@ interface AppContextType {
   isSubscribed: boolean;
 
   // Loaders
-  isRecipeCacheLoading: boolean;
   isAppDataLoading: boolean;
 
   // Actions
@@ -346,7 +346,7 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
 
     return {
         mealPlan, pantryItems, userRecipes, userProfile,
-        isAppDataLoading, isSubscribed, allRecipesCache, isRecipeCacheLoading,
+        isAppDataLoading, isSubscribed, allRecipesCache,
         shoppingList, getConsumedMacrosForDate, getPlannedMacrosForDate,
         getMealsForDate, isRecipeFavorite, runWeeklyCheckin
     };
@@ -377,7 +377,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   const {
       mealPlan, pantryItems, userRecipes, userProfile,
-      isAppDataLoading, isSubscribed, allRecipesCache, isRecipeCacheLoading,
+      isAppDataLoading, isSubscribed, allRecipesCache,
       shoppingList, getConsumedMacrosForDate, getPlannedMacrosForDate,
       getMealsForDate, isRecipeFavorite, runWeeklyCheckin
   } = useAppData(user?.uid, isAuthLoading);
@@ -506,7 +506,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const contextValue = useMemo(() => ({
     mealPlan, pantryItems, userRecipes, userProfile,
-    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading, isOnline, isSubscribed,
+    allRecipesCache, shoppingList, isAppDataLoading, isOnline, isSubscribed,
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus, 
     clearMealPlanForDate, clearEntireMealPlan,
     toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
@@ -516,7 +516,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
   }), [
     mealPlan, pantryItems, userRecipes, userProfile,
-    allRecipesCache, shoppingList, isRecipeCacheLoading, isAppDataLoading, isOnline, isSubscribed,
+    allRecipesCache, shoppingList, isAppDataLoading, isOnline, isSubscribed,
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus,
     clearMealPlanForDate, clearEntireMealPlan, 
     toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
