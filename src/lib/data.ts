@@ -1,5 +1,5 @@
 
-import type { PlannedMeal, Macros, MealType, DailyWeightLog, Sex, RDA, Recipe, PantryItem } from '@/types';
+import type { PlannedMeal, Macros, MealType, DailyWeightLog, Sex, RDA, Recipe, PantryItem, UKSupermarketCategory } from '@/types';
 
 export const MEAL_TYPES: MealType[] = ["Breakfast", "Lunch", "Dinner", "Snack"];
 
@@ -11,7 +11,7 @@ export const calculateTotalMacros = (plannedMeals: PlannedMeal[], allRecipes: Re
     const recipe = plannedMeal.recipeDetails || allRecipes.find(r => r.id === plannedMeal.recipeId);
     if (recipe && recipe.macrosPerServing) {
       acc.calories += recipe.macrosPerServing.calories * plannedMeal.servings;
-      acc.protein += recipe.macrosPerServing.protein * plannedMeal.servings;
+      acc.protein += recipe.macrosPerserving.protein * plannedMeal.servings;
       acc.carbs += recipe.macrosPerServing.carbs * plannedMeal.servings;
       acc.fat += recipe.macrosPerServing.fat * plannedMeal.servings;
     }
@@ -25,14 +25,6 @@ export interface ParsedIngredient {
   unit: string | null;
   name: string;
 }
-
-export interface ShoppingListItem extends ParsedIngredient {
-  id: string;
-  category: string;
-  purchased: boolean;
-  recipes: { recipeId: number; recipeName: string }[];
-}
-// #endregion
 
 // =================================================================================
 // SECTION 1.1: INGREDIENT PARSING & STANDARDIZATION
@@ -161,13 +153,15 @@ export function parseIngredientString(ingredientString: string): ParsedIngredien
 
   name = workingString
     .replace(descriptorRegex, '')
-    .replace(/,/g, '')
+    .replace(/,/g, '') // Remove commas before standardizing
     .replace(/^of\s+/, '')
     .replace(/\s+/g, ' ')
     .trim();
 
   name = nameMap.get(name) || name;
   
+  // This is a simplified pluralization, but helps with common cases.
+  // It's applied after unit extraction to avoid turning "cups" into "cup" here.
   if (!unit && name.endsWith('s')) {
     name = name.slice(0, -1);
   }
@@ -214,14 +208,10 @@ function standardizeIngredient(ingredient: ParsedIngredient): ParsedIngredient {
 // =================================================================================
 // SECTION 1.3: SHOPPING LIST CATEGORY ASSIGNMENT
 // =================================================================================
-type UKSupermarketCategory =
-  | 'Fresh Fruit & Vegetables' | 'Meat & Poultry' | 'Fish & Seafood' | 'Dairy, Butter & Eggs'
-  | 'Bakery' | 'Food Cupboard' | 'Baking Goods' | 'Pasta, Rice & Grains' | 'Canned Goods'
-  | 'Condiments & Sauces' | 'Herbs & Spices' | 'Snacks & Confectionery' | 'Drinks' | 'Frozen' | 'Other Food Items';
 
 const categoryMap: Map<UKSupermarketCategory, string[]> = new Map([
-  ['Herbs & Spices', ['herb', 'spice', 'chili flake', 'cinnamon', 'cumin', 'paprika', 'turmeric', 'oregano', 'thyme', 'rosemary', 'basil', 'parsley', 'cilantro', 'dill', 'mint', 'bay leaf', 'salt', 'pepper']],
-  ['Condiments & Sauces', ['sauce', 'ketchup', 'mayonnaise', 'mustard', 'vinegar', 'pesto', 'relish', 'chutney', 'dressing', 'syrup', 'miso', 'tahini', 'hoisin', 'sriracha']],
+  ['Herbs & Spices', ['herb', 'spice', 'chili flake', 'cinnamon', 'cumin', 'paprika', 'turmeric', 'oregano', 'thyme', 'rosemary', 'basil', 'parsley', 'cilantro', 'dill', 'mint', 'bay leaf', 'salt', 'pepper', 'garlic powder', 'onion powder']],
+  ['Condiments & Sauces', ['sauce', 'ketchup', 'mayonnaise', 'mustard', 'vinegar', 'pesto', 'relish', 'chutney', 'dressing', 'syrup', 'miso', 'tahini', 'hoisin', 'sriracha', 'soy sauce']],
   ['Baking Goods', ['flour', 'sugar', 'baking powder', 'baking soda', 'yeast', 'cocoa powder', 'chocolate chip', 'vanilla extract', 'sprinkles']],
   ['Pasta, Rice & Grains', ['pasta', 'spaghetti', 'penne', 'rice', 'quinoa', 'couscous', 'oats', 'noodle', 'lasagna sheet', 'bulgur']],
   ['Canned Goods', ['canned', 'tinned', 'chickpea', 'kidney bean', 'black bean', 'lentil', 'coconut milk']],
@@ -231,7 +221,7 @@ const categoryMap: Map<UKSupermarketCategory, string[]> = new Map([
   ['Fresh Fruit & Vegetables', ['fruit', 'vegetable', 'apple', 'banana', 'berry', 'orange', 'lemon', 'lime', 'grape', 'avocado', 'tomato', 'onion', 'potato', 'carrot', 'lettuce', 'spinach', 'broccoli', 'cauliflower', 'bell pepper', 'garlic', 'zucchini', 'spring onion']],
   ['Bakery', ['bread', 'bagel', 'croissant', 'wrap', 'tortilla', 'pastry', 'cake']],
   ['Snacks & Confectionery', ['crisps', 'nuts', 'seeds', 'cracker', 'biscuit', 'chocolate', 'sweets']],
-  ['Frozen', ['frozen peas', 'frozen corn', 'ice cream']],
+  ['Frozen Foods', ['frozen peas', 'frozen corn', 'ice cream']],
   ['Drinks', ['water', 'juice', 'coffee', 'tea', 'wine']],
   ['Food Cupboard', ['oil', 'stock', 'broth', 'bouillon', 'honey', 'jam', 'peanut butter']],
 ]);
@@ -362,27 +352,4 @@ export const calculateTrendWeight = (dailyWeightLog: DailyWeightLog[]): DailyWei
   });
 
   return trend_weight_data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-};
-
-export const getRdaProfile = (sex: Sex | null | undefined, age: number | null | undefined): RDA | null => {
-    if (!sex || !age) {
-        return null;
-    }
-    if (age >= 19 && age <= 50) {
-        if (sex === 'male') {
-            return {
-                iron: 8, calcium: 1000, potassium: 3400,
-                vitaminA: 900, vitaminC: 90, vitaminD: 15
-            };
-        } else {
-            return {
-                iron: 18, calcium: 1000, potassium: 2600,
-                vitaminA: 700, vitaminC: 75, vitaminD: 15
-            };
-        }
-    }
-    return {
-        iron: 10, calcium: 1200, potassium: 3000,
-        vitaminA: 800, vitaminC: 80, vitaminD: 15
-    };
 };

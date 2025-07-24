@@ -9,18 +9,18 @@
     "cookTime": "15 mins",
     "chillTime": null,
     "ingredients": [
-      "200g chicken breast, sliced",
-      "1 red bell pepper, sliced",
+      "200g chicken breast",
+      "1 red bell pepper",
       "100g broccoli florets",
       "1 tbsp soy sauce",
       "1 tsp sesame oil",
-      "1 clove garlic, minced"
+      "1 clove garlic"
     ],
     "instructions": [
       "Heat sesame oil in a wok or large skillet over medium-high heat.",
-      "Add garlic and stir for 30 seconds until fragrant.",
-      "Add sliced chicken and cook until golden and cooked through.",
-      "Add broccoli and bell pepper, stirring frequently for 4-5 minutes until tender-crisp.",
+      "Mince the garlic and stir for 30 seconds until fragrant.",
+      "Slice the chicken breast and cook until golden and cooked through.",
+      "Slice the bell pepper. Add broccoli florets and bell pepper to the wok, stirring frequently for 4-5 minutes until tender-crisp.",
       "Stir in soy sauce and cook for another minute. Serve immediately."
     ],
     "macrosPerServing": {
@@ -42,21 +42,22 @@
     "chillTime": null,
     "ingredients": [
       "1 tbsp olive oil",
-      "1 large onion, chopped",
-      "2 carrots, diced",
-      "2 celery stalks, diced",
-      "2 cloves garlic, minced",
-      "1 cup brown or green lentils, rinsed",
+      "1 large onion",
+      "2 carrots",
+      "2 celery stalks",
+      "2 cloves garlic",
+      "1 cup brown lentils",
       "6 cups vegetable broth",
-      "1 (14.5 oz) can diced tomatoes, undrained",
+      "1 can diced tomatoes",
       "1 tsp dried thyme",
-      "Salt and pepper to taste"
+      "salt to taste",
+      "pepper to taste"
     ],
     "instructions": [
       "Heat olive oil in a large pot or Dutch oven over medium heat.",
-      "Add onion, carrots, and celery. Cook until softened, about 5-7 minutes.",
-      "Stir in garlic and thyme, and cook for another minute until fragrant.",
-      "Add the rinsed lentils, vegetable broth, and diced tomatoes.",
+      "Chop the onion, dice the carrots and celery. Add to the pot and cook until softened, about 5-7 minutes.",
+      "Mince the garlic, stir it in with the thyme, and cook for another minute until fragrant.",
+      "Rinse the lentils, then add them to the pot with the vegetable broth and diced tomatoes (undrained).",
       "Bring to a boil, then reduce heat and let simmer for 30-40 minutes, or until lentils are tender.",
       "Season with salt and pepper to taste before serving."
     ],
@@ -78,17 +79,18 @@
     "cookTime": "20 mins",
     "chillTime": null,
     "ingredients": [
-      "2 (6 oz) salmon fillets",
-      "1 bunch asparagus, trimmed",
+      "2 fillets salmon",
+      "1 bunch asparagus",
       "1 tbsp olive oil",
-      "1 lemon, halved",
-      "Salt and pepper to taste"
+      "1 lemon",
+      "salt to taste",
+      "pepper to taste"
     ],
     "instructions": [
       "Preheat oven to 400°F (200°C).",
-      "On a baking sheet, toss asparagus with olive oil, salt, and pepper.",
+      "Trim the asparagus. On a baking sheet, toss asparagus with olive oil, salt, and pepper.",
       "Place salmon fillets on the same baking sheet, skin-side down.",
-      "Squeeze the juice of half a lemon over the salmon and asparagus. Season the salmon with salt and pepper.",
+      "Cut the lemon in half. Squeeze the juice of half a lemon over the salmon and asparagus. Season the salmon with salt and pepper.",
       "Bake for 15-20 minutes, or until salmon is cooked through and flakes easily with a fork.",
       "Serve with the remaining lemon wedges."
     ],
@@ -110,11 +112,12 @@
     "cookTime": "5 mins",
     "chillTime": null,
     "ingredients": [
-      "1 slice of whole-wheat bread, toasted",
-      "1/2 ripe avocado",
+      "1 slice whole-wheat bread",
+      "0.5 ripe avocado",
       "1 large egg",
-      "1 pinch red pepper flakes (optional)",
-      "Salt and pepper to taste"
+      "1 pinch red pepper flakes",
+      "salt to taste",
+      "pepper to taste"
     ],
     "instructions": [
       "While the bread is toasting, cook the egg to your liking (fried, poached, or scrambled).",
@@ -141,10 +144,10 @@
     "cookTime": "0 mins",
     "chillTime": null,
     "ingredients": [
-      "1 cup Greek yogurt, plain",
-      "1/2 cup mixed berries (fresh or frozen)",
+      "1 cup plain greek yogurt",
+      "0.5 cup mixed berries",
       "2 tbsp granola",
-      "1 tsp honey or maple syrup (optional)"
+      "1 tsp honey"
     ],
     "instructions": [
       "In a glass or bowl, layer half of the Greek yogurt.",

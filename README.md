@@ -54,6 +54,27 @@ Fine-tune every aspect of your nutrition journey.
 
 ---
 
+## 💡 How to Add Recipes for Optimal Shopping List Generation
+
+For the automated shopping list to work correctly, it's crucial to format the ingredient strings in your recipes consistently. The parser is designed to handle a specific format.
+
+**The Golden Rule**: Use the format `"[quantity][unit] [ingredient name]"`.
+
+- **Good**: `"200g chicken breast"`, `"1 tbsp olive oil"`, `"0.5 cup flour"`
+- **Bad**: `"200g of sliced chicken breast"`, `"Olive oil, 1 tablespoon"`, `"a handful of nuts"`
+
+**Key Guidelines:**
+
+1.  **No Descriptors in the Name**: Keep preparation instructions (like "chopped", "diced", "frozen") in the `instructions` array, not the `ingredients` array.
+2.  **Quantity First**: Always start with the numerical quantity.
+3.  **Standard Units**: Use common abbreviations like `g`, `kg`, `ml`, `l`, `tbsp`, `tsp`, `cup`. The parser will standardize common variations (e.g., "tablespoon" becomes "tbsp").
+4.  **No "of"**: Avoid using "of" between the quantity/unit and the ingredient name.
+5.  **One Ingredient Per Line**: Each ingredient should be its own string in the `ingredients` array.
+
+By following these rules, you'll ensure the app can accurately parse, aggregate, and generate your shopping list.
+
+---
+
 ## 🗺️ The User Journey: How to Get Started
 
 1.  **Set Up Your Profile**: The more information you provide, the better the app works.
