@@ -139,7 +139,7 @@ export type MealSlotConfig = z.infer<typeof MealSlotConfigSchema>;
 
 
 export type Sex = 'male' | 'female' | 'notSpecified';
-export const SEX_OPTIONS: Sex[] = ['male', 'female', 'notSpecified'];
+export const SEX_OPTIONS: Sex[] = ['male', 'female'];
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'veryActive' | 'notSpecified';
 export const ACTIVITY_LEVEL_OPTIONS: { value: ActivityLevel; label: string; multiplier: number }[] = [
@@ -242,7 +242,7 @@ export const UserProfileSettingsSchema = z.object({
   heightCm: z.number().positive().nullable(),
   weightKg: z.number().positive().nullable(),
   age: z.number().positive().nullable(),
-  sex: z.enum(SEX_OPTIONS).nullable(),
+  sex: z.enum(['male', 'female', 'notSpecified']).nullable(),
   activityLevel: z.enum(ACTIVITY_LEVEL_OPTIONS.map(o => o.value) as [ActivityLevel, ...ActivityLevel[]]).nullable(),
   training_experience_level: z.enum(TRAINING_EXPERIENCE_OPTIONS.map(o => o.value) as [TrainingExperienceLevel, ...TrainingExperienceLevel[]]).nullable(),
   bodyFatPercentage: z.number().min(1).max(70).nullable(),
