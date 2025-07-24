@@ -3,55 +3,14 @@
 
 import { revalidatePath } from 'next/cache'
 import type { DailyVitalsLog, DailyManualMacrosLog, DailyWeightLog, PlannedMeal, PantryItem, RecipeFormData, UserProfileSettings } from '@/types';
-import { getAuth } from "firebase-admin/auth";
-import { app } from '@/lib/firebase-admin'; // Admin SDK
+import { getFirebaseAdmin } from '@/lib/firebase-admin'; 
 import { getFirestore, doc, updateDoc, collection, addDoc, getDoc, setDoc, deleteDoc, writeBatch, serverTimestamp } from "firebase-admin/firestore";
-
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-// In a server action, we cannot access client-side auth state directly.
-// We must get the user from the session cookie, which is not implemented yet.
-// For now, this function will throw an error if no user is found, which is a secure default.
-async function getUserId() {
-  // This part needs to be replaced with a proper session management library like next-auth or by handling cookies manually.
-  // For now, let's assume we can't proceed without a user and this will fail securely.
-  // In a real app this is where you'd verify the user's session token.
-  // const session = await getSession(); // Placeholder for getting session
-  // return session?.user?.uid;
-  // Let's hardcode a temporary user ID for the purpose of making the code compile during this migration phase.
-  // THIS MUST BE REPLACED WITH REAL AUTHENTICATION.
-  return "placeholder-user-id";
-}
-
-
-// --- User Profile Actions ---
-export async function updateUserProfile(updates: Partial<UserProfileSettings> & { id: string }) {
-  // const userId = await getUserId();
-  // For this server action, we will trust the ID passed from the client context,
-  // as the client context gets the ID securely from onAuthStateChanged.
-  const userId = updates.id;
-  if (!userId) return { error: 'Authentication required.' };
-
-  const { id, ...profileUpdates } = updates;
-  const profileRef = doc(db, "profiles", userId);
-
-  try {
-    await setDoc(profileRef, profileUpdates, { merge: true }); // Use set with merge instead of update for safety
-    revalidatePath('/profile', 'layout')
-    revalidatePath('/', 'layout') 
-    
-    const updatedDoc = await getDoc(profileRef);
-
-    return { success: true, data: updatedDoc.data() }
-  } catch (error: any) {
-    console.error('Error updating profile:', error);
-    return { error: `Could not update your profile. DB error: ${error.message}` };
-  }
-}
+import { processBugReport } from '@/ai/flows/report-bug-flow';
+import type { BugReportInput, BugReportOutput } from '@/ai/flows/schemas';
 
 // --- Recipe Actions ---
 export async function addRecipe(recipeData: RecipeFormData & { user_id: string }) {
+  const { db } = getFirebaseAdmin();
   const userId = recipeData.user_id; // Get user ID from the passed data
   if (!userId) {
     return { error: 'You must be logged in to add a recipe.' };
@@ -90,6 +49,7 @@ export async function addRecipe(recipeData: RecipeFormData & { user_id: string }
 
 // --- Meal Plan Actions ---
 export async function addOrUpdateMealPlan(mealData: Partial<Omit<PlannedMeal, 'recipeDetails'>> & { user_id: string }) {
+  const { db } = getFirebaseAdmin();
   const userId = mealData.user_id;
   if (!userId) return { error: 'Authentication required.' };
 
@@ -110,6 +70,7 @@ export async function addOrUpdateMealPlan(mealData: Partial<Omit<PlannedMeal, 'r
 }
 
 export async function deleteMealFromPlan(plannedMealId: string) {
+    const { db } = getFirebaseAdmin();
     const mealRef = doc(db, "planned_meals", plannedMealId);
     
     try {
@@ -125,6 +86,7 @@ export async function deleteMealFromPlan(plannedMealId: string) {
 
 // --- Pantry Actions ---
 export async function addOrUpdatePantryItem(itemData: Omit<PantryItem, 'user_id'> & { user_id: string }) {
+    const { db } = getFirebaseAdmin();
     const userId = itemData.user_id;
     if (!userId) return { error: 'Authentication required.' };
 
@@ -144,6 +106,7 @@ export async function addOrUpdatePantryItem(itemData: Omit<PantryItem, 'user_id'
 }
 
 export async function deletePantryItem(itemId: string) {
+    const { db } = getFirebaseAdmin();
     const itemRef = doc(db, "pantry_items", itemId);
     
     try {
@@ -159,6 +122,7 @@ export async function deletePantryItem(itemId: string) {
 
 // --- Daily Log Actions ---
 export async function addOrUpdateVitalsLog(vitalsData: Omit<DailyVitalsLog, 'user_id'> & { user_id: string }) {
+  const { db } = getFirebaseAdmin();
   const userId = vitalsData.user_id;
   if (!userId) return { error: 'Authentication required.' };
 
@@ -179,6 +143,7 @@ export async function addOrUpdateVitalsLog(vitalsData: Omit<DailyVitalsLog, 'use
 }
 
 export async function addOrUpdateWeightLog(userId: string, date: string, weightKg: number) {
+  const { db } = getFirebaseAdmin();
   if (!userId) return { error: 'Authentication required.' };
 
   const logData = { date, weightKg, user_id: userId };
@@ -188,7 +153,7 @@ export async function addOrUpdateWeightLog(userId: string, date: string, weightK
   const profileRef = doc(db, "profiles", userId);
 
   try {
-    const batch = writeBatch(db);
+    const batch = db.batch();
     batch.set(weightLogRef, logData, { merge: true });
     batch.update(profileRef, { weightKg }); // Also update the main profile weight
     await batch.commit();
@@ -205,6 +170,7 @@ export async function addOrUpdateWeightLog(userId: string, date: string, weightK
 }
 
 export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacrosLog, 'user_id'> & { user_id: string }) {
+    const { db } = getFirebaseAdmin();
     const userId = macroData.user_id;
     if (!userId) return { error: 'Authentication required.' };
 
@@ -231,6 +197,7 @@ export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacr
 
 // --- Bug Reporting Action ---
 export async function reportBug(description: string, userId: string): Promise<{ success: boolean, error?: string, data?: BugReportOutput }> {
+    const { db } = getFirebaseAdmin();
     if (!userId) return { error: 'Authentication required to report a bug.' };
 
     try {
@@ -260,4 +227,27 @@ export async function reportBug(description: string, userId: string): Promise<{ 
         console.error('Error reporting bug:', error);
         return { success: false, error: 'Failed to submit bug report. Please try again later.' };
     }
+}
+
+// --- User Profile Actions ---
+export async function updateUserProfile(updates: Partial<UserProfileSettings> & { id: string }) {
+  const { db } = getFirebaseAdmin();
+  const userId = updates.id;
+  if (!userId) return { error: 'Authentication required.' };
+
+  const { id, ...profileUpdates } = updates;
+  const profileRef = doc(db, "profiles", userId);
+
+  try {
+    await setDoc(profileRef, profileUpdates, { merge: true }); // Use set with merge instead of update for safety
+    revalidatePath('/profile', 'layout')
+    revalidatePath('/', 'layout') 
+    
+    const updatedDoc = await getDoc(profileRef);
+
+    return { success: true, data: updatedDoc.data() }
+  } catch (error: any) {
+    console.error('Error updating profile:', error);
+    return { error: `Could not update your profile. DB error: ${error.message}` };
+  }
 }
