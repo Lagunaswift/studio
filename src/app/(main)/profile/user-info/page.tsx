@@ -68,7 +68,7 @@ const userInfoSchema = z.object({
   heightCm: z.coerce.number().min(50, "Height must be at least 50cm").max(300, "Height must be at most 300cm").nullable().optional(),
   weightKg: z.coerce.number().min(20, "Weight must be at least 20kg").max(500, "Weight must be at most 500kg").nullable().optional(),
   age: z.coerce.number().min(1, "Age must be at least 1").max(120, "Age must be at most 120").nullable().optional(),
-  sex: z.enum(SEX_OPTIONS).nullable().optional(),
+  sex: z.enum(['male', 'female'], { errorMap: () => ({ message: 'Please select a sex.' }) }).nullable(),
   activityLevel: z.enum(ACTIVITY_LEVEL_OPTIONS.map(o => o.value) as [ActivityLevel, ...ActivityLevel[]]).nullable().optional(),
   training_experience_level: z.enum(TRAINING_EXPERIENCE_OPTIONS.map(o => o.value) as [TrainingExperienceLevel, ...TrainingExperienceLevel[]]).nullable().optional(),
   bodyFatPercentage: z.coerce.number().min(1, "Body fat % must be at least 1").max(70, "Body fat % must be at most 70").nullable().optional(),
@@ -114,7 +114,7 @@ export default function UserInfoPage() {
       heightCm: userProfile?.heightCm || null,
       weightKg: userProfile?.weightKg || null,
       age: userProfile?.age || null,
-      sex: userProfile?.sex || null,
+      sex: userProfile?.sex === 'notSpecified' ? null : userProfile?.sex,
       activityLevel: userProfile?.activityLevel || null,
       training_experience_level: userProfile?.training_experience_level || null,
       bodyFatPercentage: userProfile?.bodyFatPercentage || null,
@@ -137,7 +137,7 @@ export default function UserInfoPage() {
         heightCm: userProfile.heightCm || null,
         weightKg: userProfile.weightKg || null,
         age: userProfile.age || null,
-        sex: userProfile.sex || null,
+        sex: userProfile.sex === 'notSpecified' ? null : userProfile.sex,
         activityLevel: userProfile.activityLevel || null,
         training_experience_level: userProfile.training_experience_level || null,
         bodyFatPercentage: userProfile.bodyFatPercentage || null,
@@ -152,7 +152,7 @@ export default function UserInfoPage() {
   }, [userProfile, form]);
 
   const onSubmit: SubmitHandler<UserInfoFormValues> = (data) => {
-    setUserInformation(data); 
+    setUserInformation(data as Partial<UserProfileSettings>); 
     toast({
       title: "User Information Saved",
       description: "Your profile details have been updated.",
