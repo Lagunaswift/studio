@@ -28,6 +28,7 @@ if (!admin.apps.length) {
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       projectId: serviceAccount.project_id, // Explicitly set the projectId
+      databaseURL: `https://${serviceAccount.project_id}.firebaseio.com` // Explicitly set the databaseURL
     });
     console.log("Firebase Admin SDK initialized successfully for seeding.");
   } catch (error: any) {
