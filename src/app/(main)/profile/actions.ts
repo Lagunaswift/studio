@@ -5,7 +5,6 @@ import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers';
 import type { DailyVitalsLog, DailyManualMacrosLog, DailyWeightLog, PlannedMeal, PantryItem, RecipeFormData, UserProfileSettings } from '@/types';
 import { db, auth as adminAuth } from '@/lib/firebase-admin'; 
-import { doc, updateDoc, collection, addDoc, getDoc, setDoc, deleteDoc, writeBatch, serverTimestamp } from "firebase-admin/firestore";
 import { processBugReport } from '@/ai/flows/report-bug-flow';
 import type { BugReportInput, BugReportOutput } from '@/ai/flows/schemas';
 
