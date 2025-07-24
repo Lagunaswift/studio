@@ -34,7 +34,7 @@ import {
   type UKSupermarketCategory
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
-import { getAllRecipes as getAllRecipesFromDataFile, calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
+import { calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, parseIngredientString as parseIngredientStringUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
 import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { format, subDays, differenceInDays } from 'date-fns';
 import { addOrUpdateMealPlan, deleteMealFromPlan, addOrUpdatePantryItem, deletePantryItem, addRecipe as addRecipeAction, updateUserProfile, addOrUpdateVitalsLog, addOrUpdateWeightLog, addOrUpdateManualMacrosLog, reportBug } from '@/app/(main)/profile/actions';
@@ -152,9 +152,6 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 function useAppData(userId: string | undefined, isAuthLoading: boolean) {
-    const [staticRecipes, setStaticRecipes] = useState<Recipe[]>([]);
-    const [isStaticRecipeLoading, setIsStaticRecipeLoading] = useState(true);
-
     const [userProfileData, setUserProfileData] = useState<UserProfileSettings | null>(null);
     const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
     const [mealPlan, setMealPlan] = useState<PlannedMeal[]>([]);
@@ -162,6 +159,7 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     const [dailyWeightLog, setDailyWeightLog] = useState<DailyWeightLog[]>([]);
     const [dailyVitalsLog, setDailyVitalsLog] = useState<DailyVitalsLog[]>([]);
     const [dailyManualMacrosLog, setDailyManualMacrosLog] = useState<DailyManualMacrosLog[]>([]);
+    const [isDataLoading, setIsDataLoading] = useState(true);
 
     const idToUse = useMemo(() => userId, [userId]);
     
@@ -174,9 +172,11 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
         setDailyWeightLog([]);
         setDailyVitalsLog([]);
         setDailyManualMacrosLog([]);
+        setIsDataLoading(false);
         return;
       }
 
+      setIsDataLoading(true);
       const unsubscribes: (() => void)[] = [];
 
       unsubscribes.push(onSnapshot(doc(db, "profiles", idToUse), (doc) => {
@@ -201,6 +201,12 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
         }));
       });
 
+      // A simple way to know when initial data has been fetched.
+      // This could be more sophisticated by tracking loading state for each collection.
+      const initialLoadTimer = setTimeout(() => setIsDataLoading(false), 2000); // Assume loading is done after 2s
+      unsubscribes.push(() => clearTimeout(initialLoadTimer));
+
+
       return () => unsubscribes.forEach(unsub => unsub());
 
     }, [idToUse]);
@@ -220,37 +226,23 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
 
 
     const isSubscribed = useMemo(() => userProfile?.subscription_status === 'active', [userProfile?.subscription_status]);
-
-    useEffect(() => {
-        async function loadStaticRecipes() {
-            setIsStaticRecipeLoading(true);
-            try {
-                const recipes = await getAllRecipesFromDataFile();
-                setStaticRecipes(recipes);
-            } catch (error) {
-                console.error("Failed to load static recipes:", error);
-            } finally {
-                setIsStaticRecipeLoading(false);
-            }
-        }
-        loadStaticRecipes();
-    }, []);
     
-    const isAppDataLoading = isAuthLoading || isStaticRecipeLoading || userProfile === undefined;
+    const isAppDataLoading = isAuthLoading || isDataLoading;
 
     const allRecipesCache = useMemo(() => {
-        let recipes = [...staticRecipes, ...userRecipes];
+        let recipes = [...userRecipes];
         recipes = Array.from(new Map(recipes.map(recipe => [recipe.id, recipe])).values());
         
         if (isSubscribed) {
           return recipes;
         } else {
+          // If not subscribed, only show custom recipes plus a limited number of non-custom ones
           const freeRecipes = recipes.filter(r => !r.isCustom).slice(0, 15);
           const customRecipes = recipes.filter(r => r.isCustom);
           return [...freeRecipes, ...customRecipes];
         }
 
-    }, [staticRecipes, userRecipes, isSubscribed]);
+    }, [userRecipes, isSubscribed]);
 
     const favoriteRecipeIds = useMemo(() => userProfile?.favorite_recipe_ids || [], [userProfile]);
 
@@ -558,3 +550,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
