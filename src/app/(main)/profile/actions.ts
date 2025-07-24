@@ -2,33 +2,48 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { headers } from 'next/headers';
 import type { DailyVitalsLog, DailyManualMacrosLog, DailyWeightLog, PlannedMeal, PantryItem, RecipeFormData, UserProfileSettings } from '@/types';
-import { getFirebaseAdmin } from '@/lib/firebase-admin'; 
-import { getFirestore, doc, updateDoc, collection, addDoc, getDoc, setDoc, deleteDoc, writeBatch, serverTimestamp } from "firebase-admin/firestore";
+import { db, auth as adminAuth } from '@/lib/firebase-admin'; 
+import { doc, updateDoc, collection, addDoc, getDoc, setDoc, deleteDoc, writeBatch, serverTimestamp } from "firebase-admin/firestore";
 import { processBugReport } from '@/ai/flows/report-bug-flow';
 import type { BugReportInput, BugReportOutput } from '@/ai/flows/schemas';
 
+async function getUserId(): Promise<string | null> {
+  const authorization = headers().get('Authorization');
+  if (!authorization?.startsWith('Bearer ')) {
+    console.warn("getUserId: No valid Authorization header found.");
+    return null;
+  }
+  const idToken = authorization.split('Bearer ')[1];
+
+  try {
+    const decodedToken = await adminAuth.verifyIdToken(idToken);
+    return decodedToken.uid;
+  } catch (error) {
+    console.error("getUserId: Error verifying ID token:", error);
+    return null;
+  }
+}
+
 // --- Recipe Actions ---
-export async function addRecipe(recipeData: RecipeFormData & { user_id: string }) {
-  const { db } = getFirebaseAdmin();
-  const userId = recipeData.user_id; // Get user ID from the passed data
+export async function addRecipe(recipeData: Omit<RecipeFormData, 'user_id'>) {
+  const userId = await getUserId();
   if (!userId) {
     return { error: 'You must be logged in to add a recipe.' };
   }
 
-  const { user_id, ...restOfRecipeData } = recipeData;
-
   const dataToInsert = {
-    ...restOfRecipeData,
-    ingredients: restOfRecipeData.ingredients.map(ing => ing.value),
-    instructions: restOfRecipeData.instructions.map(inst => inst.value),
+    ...recipeData,
+    ingredients: recipeData.ingredients.map(ing => ing.value),
+    instructions: recipeData.instructions.map(inst => inst.value),
     macrosPerServing: { 
-        calories: restOfRecipeData.calories, 
-        protein: restOfRecipeData.protein, 
-        carbs: restOfRecipeData.carbs, 
-        fat: restOfRecipeData.fat 
+        calories: recipeData.calories, 
+        protein: recipeData.protein, 
+        carbs: recipeData.carbs, 
+        fat: recipeData.fat 
     },
-    image: restOfRecipeData.image || `https://placehold.co/600x400.png?text=${encodeURIComponent(restOfRecipeData.name)}`,
+    image: recipeData.image || `https://placehold.co/600x400.png?text=${encodeURIComponent(recipeData.name)}`,
     isCustom: true,
     user_id: userId,
   };
@@ -48,13 +63,12 @@ export async function addRecipe(recipeData: RecipeFormData & { user_id: string }
 
 
 // --- Meal Plan Actions ---
-export async function addOrUpdateMealPlan(mealData: Partial<Omit<PlannedMeal, 'recipeDetails'>> & { user_id: string }) {
-  const { db } = getFirebaseAdmin();
-  const userId = mealData.user_id;
+export async function addOrUpdateMealPlan(mealData: Partial<Omit<PlannedMeal, 'recipeDetails' | 'user_id'>>) {
+  const userId = await getUserId();
   if (!userId) return { error: 'Authentication required.' };
 
   const docId = mealData.id || `meal_${Date.now()}_${Math.random()}`;
-  const { syncStatus, ...dataToSet } = { ...mealData, id: docId };
+  const { syncStatus, ...dataToSet } = { ...mealData, id: docId, user_id: userId };
 
   const mealRef = doc(db, "planned_meals", docId);
 
@@ -70,7 +84,9 @@ export async function addOrUpdateMealPlan(mealData: Partial<Omit<PlannedMeal, 'r
 }
 
 export async function deleteMealFromPlan(plannedMealId: string) {
-    const { db } = getFirebaseAdmin();
+    const userId = await getUserId();
+    if (!userId) return { error: 'Authentication required.' };
+
     const mealRef = doc(db, "planned_meals", plannedMealId);
     
     try {
@@ -85,12 +101,11 @@ export async function deleteMealFromPlan(plannedMealId: string) {
 
 
 // --- Pantry Actions ---
-export async function addOrUpdatePantryItem(itemData: Omit<PantryItem, 'user_id'> & { user_id: string }) {
-    const { db } = getFirebaseAdmin();
-    const userId = itemData.user_id;
+export async function addOrUpdatePantryItem(itemData: Omit<PantryItem, 'user_id'>) {
+    const userId = await getUserId();
     if (!userId) return { error: 'Authentication required.' };
 
-    const { syncStatus, ...dataToSet } = itemData;
+    const { syncStatus, ...dataToSet } = { ...itemData, user_id: userId };
     
     const itemRef = doc(db, "pantry_items", itemData.id);
 
@@ -106,7 +121,8 @@ export async function addOrUpdatePantryItem(itemData: Omit<PantryItem, 'user_id'
 }
 
 export async function deletePantryItem(itemId: string) {
-    const { db } = getFirebaseAdmin();
+    const userId = await getUserId();
+    if (!userId) return { error: 'Authentication required.' };
     const itemRef = doc(db, "pantry_items", itemId);
     
     try {
@@ -121,18 +137,17 @@ export async function deletePantryItem(itemId: string) {
 
 
 // --- Daily Log Actions ---
-export async function addOrUpdateVitalsLog(vitalsData: Omit<DailyVitalsLog, 'user_id'> & { user_id: string }) {
-  const { db } = getFirebaseAdmin();
-  const userId = vitalsData.user_id;
+export async function addOrUpdateVitalsLog(vitalsData: Omit<DailyVitalsLog, 'user_id'>) {
+  const userId = await getUserId();
   if (!userId) return { error: 'Authentication required.' };
 
   const { syncStatus, ...restOfVitalsData } = vitalsData;
   
-  const docId = `${userId}_${vitalsData.date}`; // Create a predictable ID
+  const docId = `${userId}_${vitalsData.date}`; 
   const vitalsRef = doc(db, "daily_vitals_logs", docId);
 
   try {
-    await setDoc(vitalsRef, restOfVitalsData, { merge: true });
+    await setDoc(vitalsRef, { ...restOfVitalsData, user_id: userId }, { merge: true });
     const updatedDoc = await getDoc(vitalsRef);
     revalidatePath('/daily-log');
     return { success: true, data: updatedDoc.data() };
@@ -142,12 +157,12 @@ export async function addOrUpdateVitalsLog(vitalsData: Omit<DailyVitalsLog, 'use
   }
 }
 
-export async function addOrUpdateWeightLog(userId: string, date: string, weightKg: number) {
-  const { db } = getFirebaseAdmin();
+export async function addOrUpdateWeightLog(date: string, weightKg: number) {
+  const userId = await getUserId();
   if (!userId) return { error: 'Authentication required.' };
 
   const logData = { date, weightKg, user_id: userId };
-  const docId = `${userId}_${date}`; // Predictable ID
+  const docId = `${userId}_${date}`; 
   
   const weightLogRef = doc(db, "daily_weight_logs", docId);
   const profileRef = doc(db, "profiles", userId);
@@ -155,7 +170,7 @@ export async function addOrUpdateWeightLog(userId: string, date: string, weightK
   try {
     const batch = db.batch();
     batch.set(weightLogRef, logData, { merge: true });
-    batch.update(profileRef, { weightKg }); // Also update the main profile weight
+    batch.update(profileRef, { weightKg }); 
     await batch.commit();
     
     const updatedDoc = await getDoc(weightLogRef);
@@ -169,9 +184,8 @@ export async function addOrUpdateWeightLog(userId: string, date: string, weightK
   }
 }
 
-export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacrosLog, 'user_id'> & { user_id: string }) {
-    const { db } = getFirebaseAdmin();
-    const userId = macroData.user_id;
+export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacrosLog, 'user_id'>) {
+    const userId = await getUserId();
     if (!userId) return { error: 'Authentication required.' };
 
     const { syncStatus, ...restOfMacroData } = macroData;
@@ -180,6 +194,7 @@ export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacr
     const dataToSet = {
         ...restOfMacroData,
         id: docId,
+        user_id: userId,
     };
     
     const logRef = doc(db, "daily_manual_macros_logs", docId);
@@ -196,26 +211,24 @@ export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacr
 }
 
 // --- Bug Reporting Action ---
-export async function reportBug(description: string, userId: string): Promise<{ success: boolean, error?: string, data?: BugReportOutput }> {
-    const { db } = getFirebaseAdmin();
+export async function reportBug(description: string): Promise<{ success: boolean, error?: string, data?: BugReportOutput }> {
+    const userId = await getUserId();
     if (!userId) return { error: 'Authentication required to report a bug.' };
 
     try {
-        // 1. Process the bug report with AI
         const aiInput: BugReportInput = {
             description,
             userId,
-            appVersion: "1.0.0" // This could be dynamic in a real app
+            appVersion: "1.0.0" 
         };
         const processedReport = await processBugReport(aiInput);
 
-        // 2. Save the structured report to Firestore
         const bugReportData = {
             ...processedReport,
             originalDescription: description,
             userId: userId,
             createdAt: serverTimestamp(),
-            status: 'new' // 'new', 'in-progress', 'resolved'
+            status: 'new' 
         };
 
         await addDoc(collection(db, "bug_reports"), bugReportData);
@@ -230,16 +243,14 @@ export async function reportBug(description: string, userId: string): Promise<{ 
 }
 
 // --- User Profile Actions ---
-export async function updateUserProfile(updates: Partial<UserProfileSettings> & { id: string }) {
-  const { db } = getFirebaseAdmin();
-  const userId = updates.id;
+export async function updateUserProfile(updates: Partial<Omit<UserProfileSettings, 'id'>>) {
+  const userId = await getUserId();
   if (!userId) return { error: 'Authentication required.' };
 
-  const { id, ...profileUpdates } = updates;
   const profileRef = doc(db, "profiles", userId);
 
   try {
-    await setDoc(profileRef, profileUpdates, { merge: true }); // Use set with merge instead of update for safety
+    await setDoc(profileRef, { ...updates, id: userId }, { merge: true }); 
     revalidatePath('/profile', 'layout')
     revalidatePath('/', 'layout') 
     
