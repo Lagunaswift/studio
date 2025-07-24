@@ -1,0 +1,164 @@
+
+[
+  {
+    "id": 1,
+    "name": "Classic Chicken Stir-Fry",
+    "description": "A quick, healthy, and flavorful stir-fry packed with protein and fresh vegetables.",
+    "servings": 2,
+    "prepTime": "15 mins",
+    "cookTime": "15 mins",
+    "chillTime": null,
+    "ingredients": [
+      "200g chicken breast, sliced",
+      "1 red bell pepper, sliced",
+      "100g broccoli florets",
+      "1 tbsp soy sauce",
+      "1 tsp sesame oil",
+      "1 clove garlic, minced"
+    ],
+    "instructions": [
+      "Heat sesame oil in a wok or large skillet over medium-high heat.",
+      "Add garlic and stir for 30 seconds until fragrant.",
+      "Add sliced chicken and cook until golden and cooked through.",
+      "Add broccoli and bell pepper, stirring frequently for 4-5 minutes until tender-crisp.",
+      "Stir in soy sauce and cook for another minute. Serve immediately."
+    ],
+    "macrosPerServing": {
+      "calories": 450,
+      "protein": 40,
+      "carbs": 25,
+      "fat": 20
+    },
+    "micronutrientsPerServing": null,
+    "tags": ["High Protein", "Quick Meal", "Dinner", "Dairy-Free"]
+  },
+  {
+    "id": 2,
+    "name": "Hearty Lentil Soup",
+    "description": "A comforting and nutritious vegan soup that's perfect for a cold day.",
+    "servings": 4,
+    "prepTime": "10 mins",
+    "cookTime": "40 mins",
+    "chillTime": null,
+    "ingredients": [
+      "1 tbsp olive oil",
+      "1 large onion, chopped",
+      "2 carrots, diced",
+      "2 celery stalks, diced",
+      "2 cloves garlic, minced",
+      "1 cup brown or green lentils, rinsed",
+      "6 cups vegetable broth",
+      "1 (14.5 oz) can diced tomatoes, undrained",
+      "1 tsp dried thyme",
+      "Salt and pepper to taste"
+    ],
+    "instructions": [
+      "Heat olive oil in a large pot or Dutch oven over medium heat.",
+      "Add onion, carrots, and celery. Cook until softened, about 5-7 minutes.",
+      "Stir in garlic and thyme, and cook for another minute until fragrant.",
+      "Add the rinsed lentils, vegetable broth, and diced tomatoes.",
+      "Bring to a boil, then reduce heat and let simmer for 30-40 minutes, or until lentils are tender.",
+      "Season with salt and pepper to taste before serving."
+    ],
+    "macrosPerServing": {
+      "calories": 320,
+      "protein": 18,
+      "carbs": 55,
+      "fat": 4
+    },
+    "micronutrientsPerServing": null,
+    "tags": ["Vegan", "Vegetarian", "High Protein", "Meal Prep", "Gluten-Free"]
+  },
+  {
+    "id": 3,
+    "name": "Simple Salmon & Asparagus",
+    "description": "An elegant and easy one-pan meal, perfect for a quick weeknight dinner.",
+    "servings": 2,
+    "prepTime": "5 mins",
+    "cookTime": "20 mins",
+    "chillTime": null,
+    "ingredients": [
+      "2 (6 oz) salmon fillets",
+      "1 bunch asparagus, trimmed",
+      "1 tbsp olive oil",
+      "1 lemon, halved",
+      "Salt and pepper to taste"
+    ],
+    "instructions": [
+      "Preheat oven to 400°F (200°C).",
+      "On a baking sheet, toss asparagus with olive oil, salt, and pepper.",
+      "Place salmon fillets on the same baking sheet, skin-side down.",
+      "Squeeze the juice of half a lemon over the salmon and asparagus. Season the salmon with salt and pepper.",
+      "Bake for 15-20 minutes, or until salmon is cooked through and flakes easily with a fork.",
+      "Serve with the remaining lemon wedges."
+    ],
+    "macrosPerServing": {
+      "calories": 480,
+      "protein": 45,
+      "carbs": 8,
+      "fat": 30
+    },
+    "micronutrientsPerServing": null,
+    "tags": ["Low Carb", "High Protein", "Quick Meal", "Dinner", "Gluten-Free", "Dairy-Free"]
+  },
+  {
+    "id": 4,
+    "name": "Quick Avocado Toast with Egg",
+    "description": "A classic, balanced breakfast or snack that's ready in minutes.",
+    "servings": 1,
+    "prepTime": "5 mins",
+    "cookTime": "5 mins",
+    "chillTime": null,
+    "ingredients": [
+      "1 slice of whole-wheat bread, toasted",
+      "1/2 ripe avocado",
+      "1 large egg",
+      "1 pinch red pepper flakes (optional)",
+      "Salt and pepper to taste"
+    ],
+    "instructions": [
+      "While the bread is toasting, cook the egg to your liking (fried, poached, or scrambled).",
+      "In a small bowl, mash the avocado with a fork. Season with salt and pepper.",
+      "Spread the mashed avocado evenly on the toasted bread.",
+      "Top with the cooked egg.",
+      "Sprinkle with red pepper flakes, if using."
+    ],
+    "macrosPerServing": {
+      "calories": 350,
+      "protein": 15,
+      "carbs": 30,
+      "fat": 20
+    },
+    "micronutrientsPerServing": null,
+    "tags": ["Breakfast", "Snack", "Quick Meal", "Vegetarian"]
+  },
+  {
+    "id": 5,
+    "name": "Greek Yogurt Parfait",
+    "description": "A simple, protein-packed breakfast or dessert that requires no cooking.",
+    "servings": 1,
+    "prepTime": "5 mins",
+    "cookTime": "0 mins",
+    "chillTime": null,
+    "ingredients": [
+      "1 cup Greek yogurt, plain",
+      "1/2 cup mixed berries (fresh or frozen)",
+      "2 tbsp granola",
+      "1 tsp honey or maple syrup (optional)"
+    ],
+    "instructions": [
+      "In a glass or bowl, layer half of the Greek yogurt.",
+      "Top with half of the mixed berries and half of the granola.",
+      "Repeat the layers: remaining yogurt, remaining berries, and remaining granola.",
+      "Drizzle with honey or maple syrup, if desired."
+    ],
+    "macrosPerServing": {
+      "calories": 300,
+      "protein": 25,
+      "carbs": 35,
+      "fat": 6
+    },
+    "micronutrientsPerServing": null,
+    "tags": ["Breakfast", "Snack", "High Protein", "Vegetarian", "Quick Meal"]
+  }
+]
