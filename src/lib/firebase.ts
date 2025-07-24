@@ -1,4 +1,3 @@
-
 // src/lib/firebase.ts
 import { initializeApp, getApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
@@ -13,15 +12,25 @@ const firebaseConfig = {
   messagingSenderId: "724190135561"
 };
 
-// Singleton pattern to ensure Firebase is initialized only once
-let app: FirebaseApp;
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
+// More robust singleton pattern
+const getFirebaseApp = (): FirebaseApp => {
+  if (!getApps().length) {
+    return initializeApp(firebaseConfig);
+  }
+  return getApp();
+};
+
+export const getFirebaseAuth = (): Auth => {
+  const app = getFirebaseApp();
+  return getAuth(app);
 }
 
-const auth: Auth = getAuth(app);
-const db: Firestore = getFirestore(app);
+export const getFirebaseDb = (): Firestore => {
+  const app = getFirebaseApp();
+  return getFirestore(app);
+}
 
-export { app, auth, db };
+// For parts of the app that might just need the app instance
+export const app = getFirebaseApp();
+export const auth = getFirebaseAuth();
+export const db = getFirebaseDb();
