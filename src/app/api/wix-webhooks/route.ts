@@ -1,38 +1,27 @@
-
 // studio-supabasetofirebase/src/app/api/wix-webhooks/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import * as admin from 'firebase-admin';
 import { z } from 'zod';
 
 // --- Initialize Firebase Admin SDK ---
-// Ensure this runs only once and handles build-time environment correctly.
+// This ensures the SDK is initialized only once per function instance.
 if (!admin.apps.length) {
   try {
-    const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-    if (serviceAccountKey) {
-      // If the service account key is explicitly provided (e.g., in development or specific prod setups)
-      // Only attempt JSON.parse if the variable is actually present.
-      const serviceAccount = JSON.parse(serviceAccountKey);
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-      });
-    } else {
-      // This path is crucial for deployments to Firebase App Hosting / Cloud Run
-      // where GOOGLE_APPLICATION_CREDENTIALS is implicitly handled by GCP.
-      // It will also be used during local builds if FIREBASE_SERVICE_ACCOUNT_KEY is not set.
-      console.log("Initializing Firebase Admin with default credentials (for GCP environment or local dev)...");
-      admin.initializeApp();
-    }
+    // For Firebase App Hosting (Cloud Run), the Admin SDK automatically
+    // initializes using the default service account credentials provided by GCP.
+    // We no longer need to parse FIREBASE_SERVICE_ACCOUNT_KEY here for deployment.
+    admin.initializeApp();
+    console.log("Firebase Admin SDK initialized with default credentials.");
   } catch (error) {
-    // This catches JSON parsing errors if FIREBASE_SERVICE_ACCOUNT_KEY is present but malformed JSON.
-    // It's a critical error that should stop the application or build.
-    console.error("CRITICAL ERROR: Failed to initialize Firebase Admin SDK. Check FIREBASE_SERVICE_ACCOUNT_KEY format or its presence.", error);
-    // Re-throw to ensure the build fails if this essential setup step cannot complete.
-    throw new Error("Firebase Admin SDK initialization failed due to configuration error.");
+    // This catch block will trigger if there's a fundamental issue preventing
+    // default initialization (e.g., severe permission problems in the environment).
+    console.error("CRITICAL ERROR: Failed to initialize Firebase Admin SDK.", error);
+    // Re-throw to indicate a fatal issue that prevents the app/API route from working.
+    throw new Error("Firebase Admin SDK initialization failed due to environment configuration.");
   }
 }
 
-const db = admin.firestore();
+const db = admin.firestore(); // Firestore instance
 
 // --- Zod Schema for Payload Validation ---
 const WixWebhookPayloadSchema = z.object({
@@ -46,13 +35,13 @@ const WixWebhookPayloadSchema = z.object({
 export async function POST(req: NextRequest) {
   let rawBody: string;
   try {
-    // Read the raw request body as text first. This is more robust.
+    // Read the raw request body as text first. This is more resilient to unexpected body formats.
     rawBody = await req.text();
     
-    // If the body is empty, it's very likely a Next.js build probe.
-    // Return a success status to allow the build to proceed.
+    // If the body is empty, it's highly likely a Next.js build-time probe.
+    // Return a successful response to allow the build to proceed.
     if (!rawBody) {
-      console.warn("Wix webhook handler received empty request body. (Likely a Next.js build probe).");
+      console.warn("Wix webhook handler received an empty request body. (Likely a Next.js build probe).");
       return NextResponse.json({ success: true, message: 'Empty body received.' }, { status: 200 });
     }
   } catch (e) {
@@ -62,8 +51,8 @@ export async function POST(req: NextRequest) {
 
   let payload: any;
   try {
-    // Manually parse the raw text body as JSON.
-    // This will throw a SyntaxError if rawBody is not valid JSON.
+    // Attempt to parse the raw text body as JSON.
+    // This will throw a SyntaxError if 'rawBody' is not valid JSON.
     payload = JSON.parse(rawBody);
   } catch (e: any) {
     console.error("Failed to parse request body as JSON:", e);
@@ -75,7 +64,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // 1. Verify the Secret Key
-    // Ensure WIX_WEBHOOK_SECRET is set as an environment variable in Firebase Hosting settings for this app.
+    // Ensure WIX_WEBHOOK_SECRET is set as an environment variable in your Firebase Hosting settings.
     const expectedSecret = process.env.WIX_WEBHOOK_SECRET;
     if (!expectedSecret) {
       console.error("[CRITICAL] WIX_WEBHOOK_SECRET is not configured in environment variables.");

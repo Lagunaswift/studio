@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -8,17 +9,27 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { reportBug } from '@/app/(main)/profile/actions';
+import { useAppContext } from '@/context/AppContext';
 import { Megaphone, Bug, CheckCircle, Lightbulb, Loader2, Send } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
 export default function UpdatesAndFeedbackPage() {
+  const { userProfile } = useAppContext();
   const [bugDescription, setBugDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionResult, setSubmissionResult] = useState<{ success: boolean; message: string } | null>(null);
   const { toast } = useToast();
 
   const handleBugSubmit = async () => {
+    if (!userProfile?.id) {
+       toast({
+        title: "Authentication Error",
+        description: "You must be logged in to report a bug.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!bugDescription.trim()) {
       toast({
         title: "Description Required",
@@ -32,7 +43,7 @@ export default function UpdatesAndFeedbackPage() {
     setSubmissionResult(null);
 
     try {
-      const result = await reportBug(bugDescription);
+      const result = await reportBug(bugDescription, userProfile.id);
       if (result.error) {
         throw new Error(result.error);
       }

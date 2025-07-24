@@ -182,7 +182,6 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
       // User Profile - Only depend on idToUse for the profile
       unsubscribes.push(onSnapshot(doc(db, "profiles", idToUse), (doc) => {
         const data = doc.data() as UserProfileSettings | undefined;
-        // Do NOT combine log states here. Process only the profile document's direct data.
         const processed = processProfile(data as UserProfileSettings); 
         setUserProfile(processed);
       }));
@@ -207,7 +206,7 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
 
       return () => unsubscribes.forEach(unsub => unsub());
 
-    }, [idToUse]); // Removed dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog from dependencies here.
+    }, [idToUse]);
 
     const isSubscribed = useMemo(() => userProfile?.subscription_status === 'active', [userProfile?.subscription_status]);
 
@@ -385,13 +384,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   } = useAppData(user?.uid, isAuthLoading);
 
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
+    if (!user) {
+        console.error("No user logged in, cannot update profile.");
+        throw new Error("You must be logged in to update your profile.");
+    }
     try {
-        await updateUserProfile(updates);
+        await updateUserProfile({ ...updates, id: user.uid });
     } catch (e: any) {
         console.error("Failed to update user profile:", e);
         throw e;
     }
-  }, []);
+  }, [user]);
 
   const acceptTerms = useCallback(async () => {
     await setUserInformation({ has_accepted_terms: true });
@@ -411,7 +414,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [userProfile?.dashboardSettings, setUserInformation]);
 
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
-    const newPlannedMeal: Omit<PlannedMeal, 'id' | 'user_id' | 'recipeDetails'> = { 
+    if (!user) throw new Error("Authentication required.");
+    const newPlannedMeal: Omit<PlannedMeal, 'id' | 'recipeDetails' | 'user_id'> = { 
       recipeId: recipe.id, 
       date, 
       mealType, 
@@ -419,7 +423,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'planned',
     };
     await addOrUpdateMealPlan(newPlannedMeal);
-  }, []);
+  }, [user]);
 
   const removeMealFromPlan = useCallback(async (plannedMealId: string) => {
     await deleteMealFromPlan(plannedMealId);
@@ -428,12 +432,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateMealServingsOrStatus = useCallback(async (plannedMealId: string, updates: Partial<Pick<PlannedMeal, 'servings' | 'status'>>) => {
       const meal = mealPlan.find(m => m.id === plannedMealId);
       if (!meal) throw new Error("Meal not found locally.");
+      if (!user) throw new Error("Authentication required.");
       
       const { recipeDetails, ...restOfMeal } = meal;
-      const updatedMealData = { ...restOfMeal, ...updates };
+      const updatedMealData = { ...restOfMeal, ...updates, user_id: user.uid };
 
       await addOrUpdateMealPlan(updatedMealData);
-  }, [mealPlan]);
+  }, [mealPlan, user]);
 
   const updatePlannedMealServings = (plannedMealId: string, newServings: number) => updateMealServingsOrStatus(plannedMealId, { servings: newServings });
   const updateMealStatus = (plannedMealId: string, status: 'planned' | 'eaten') => updateMealServingsOrStatus(plannedMealId, { status });
@@ -465,6 +470,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const addPantryItem = useCallback(async (name: string, quantity: number, unit: string, category: string, expiryDate?: string) => {
+    if (!user) throw new Error("Authentication required.");
     const existingItem = pantryItems.find(item => 
         item.name.toLowerCase() === name.toLowerCase() && item.unit === unit
     );
@@ -484,8 +490,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             expiryDate
         };
     }
-    await addOrUpdatePantryItem(itemToSave);
-  }, [pantryItems]);
+    await addOrUpdatePantryItem({ ...itemToSave, user_id: user.uid });
+  }, [pantryItems, user]);
 
   const removePantryItem = useCallback(async (itemId: string) => {
     await deletePantryItem(itemId);
@@ -497,14 +503,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     const item = pantryItems.find(p => p.id === itemId);
     if (!item) throw new Error("Pantry item not found locally.");
+    if (!user) throw new Error("Authentication required.");
     
-    const updatedItem = { ...item, quantity: newQuantity };
+    const updatedItem = { ...item, quantity: newQuantity, user_id: user.uid };
     await addOrUpdatePantryItem(updatedItem);
-  }, [pantryItems, removePantryItem]);
+  }, [pantryItems, removePantryItem, user]);
 
   const addCustomRecipe = useCallback(async (recipeData: RecipeFormData) => {
-    return await addRecipeAction(recipeData);
-  }, []);
+    if (!user) throw new Error("Authentication required.");
+    return await addRecipeAction({ ...recipeData, user_id: user.uid });
+  }, [user]);
 
   const contextValue = useMemo(() => ({
     mealPlan, pantryItems, userRecipes, userProfile,
@@ -537,5 +545,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-
-    

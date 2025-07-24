@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Scale, Save, Loader2, BrainCircuit, CheckCircle2, TrendingUp, Edit, CalculatorIcon, Lock } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import { format, parseISO } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -34,7 +35,6 @@ import {
 } from "@/components/ui/chart";
 
 import { addOrUpdateWeightLog, addOrUpdateVitalsLog, addOrUpdateManualMacrosLog } from '../profile/actions';
-import { db } from '@/lib/db';
 
 
 const weightLogSchema = z.object({
@@ -62,6 +62,7 @@ type VitalsFormValues = z.infer<typeof vitalsSchema>;
 
 function DailyVitalsCheckin() {
   const { userProfile } = useAppContext();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -91,7 +92,11 @@ function DailyVitalsCheckin() {
   }, [todayLog, form]);
 
   const onSubmit: SubmitHandler<VitalsFormValues> = async (data) => {
-    const vitalsData = { date: clientTodayDate, ...data };
+    if (!user) {
+        toast({ title: "Authentication Error", description: "You must be logged in to log vitals.", variant: "destructive"});
+        return;
+    }
+    const vitalsData = { date: clientTodayDate, user_id: user.uid, ...data };
     
     startTransition(async () => {
         const result = await addOrUpdateVitalsLog(vitalsData);
@@ -99,19 +104,11 @@ function DailyVitalsCheckin() {
         if (result.error) {
             toast({ title: "Error Saving Vitals", description: result.error, variant: "destructive" });
         } else {
-            console.log('✅ Vitals saved to Supabase!');
-            try {
-                await db.dailyVitalsLog.put(result.data);
-                console.log('✅ Vitals synced to local cache!');
-                toast({
-                  title: "Vitals Logged",
-                  description: "Your daily vitals have been saved.",
-                });
-                setIsOpen(false);
-            } catch (dexieError) {
-                console.error('🔥 Failed to sync vitals to Dexie:', dexieError);
-                toast({ title: "Local Sync Error", description: "Could not save vitals to local cache.", variant: "destructive" });
-            }
+            toast({
+              title: "Vitals Logged",
+              description: "Your daily vitals have been saved.",
+            });
+            setIsOpen(false);
         }
     });
   };
@@ -347,6 +344,7 @@ function DailyVitalsCheckin() {
 
 function DailyWeightLog() {
     const { userProfile } = useAppContext();
+    const { user } = useAuth();
     const { toast } = useToast();
     const [clientTodayDate, setClientTodayDate] = useState<string>('');
     const [isPending, startTransition] = useTransition();
@@ -370,26 +368,21 @@ function DailyWeightLog() {
 
     const handleLogWeight: SubmitHandler<WeightLogFormValues> = async (data) => {
         if (!clientTodayDate) return;
+        if (!user) {
+            toast({ title: "Authentication Error", description: "You must be logged in to log your weight.", variant: "destructive"});
+            return;
+        }
 
         startTransition(async () => {
-            const result = await addOrUpdateWeightLog(clientTodayDate, data.weightKg);
+            const result = await addOrUpdateWeightLog(user.uid, clientTodayDate, data.weightKg);
 
             if (result.error) {
                 toast({ title: "Error Saving Weight", description: result.error, variant: "destructive" });
             } else {
-                console.log('✅ Weight saved to Supabase!');
-                try {
-                    await db.dailyWeightLog.put(result.data);
-                    await db.userProfile.update(userProfile!.id, { weightKg: data.weightKg });
-                    console.log('✅ Weight synced to local cache!');
-                    toast({
-                        title: "Weight Logged",
-                        description: `Weight of ${data.weightKg}kg logged for today.`,
-                    });
-                } catch (dexieError) {
-                    console.error('🔥 Failed to sync weight to Dexie:', dexieError);
-                    toast({ title: "Local Sync Error", description: "Could not save weight to local cache.", variant: "destructive" });
-                }
+                toast({
+                    title: "Weight Logged",
+                    description: `Weight of ${data.weightKg}kg logged for today.`,
+                });
             }
         });
     };
@@ -450,6 +443,7 @@ function DailyWeightLog() {
 
 function ManualMacroLog() {
     const { userProfile } = useAppContext();
+    const { user } = useAuth();
     const { toast } = useToast();
     const [isPending, startTransition] = useTransition();
     const clientTodayDate = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
@@ -485,25 +479,21 @@ function ManualMacroLog() {
     }, [todayLog, form]);
 
     const onSubmit: SubmitHandler<ManualMacroLogFormValues> = async (data) => {
-        const macroData = { date: clientTodayDate, macros: data };
+        if (!user) {
+            toast({ title: "Authentication Error", description: "You must be logged in to log macros.", variant: "destructive"});
+            return;
+        }
+        const macroData = { date: clientTodayDate, macros: data, user_id: user.uid };
 
         startTransition(async () => {
             const result = await addOrUpdateManualMacrosLog(macroData);
             if (result.error) {
                 toast({ title: "Error Saving Macros", description: result.error, variant: "destructive" });
             } else {
-                console.log('✅ Manual macros saved to Supabase!');
-                try {
-                    await db.dailyManualMacrosLog.put(result.data);
-                    console.log('✅ Manual macros synced to local cache!');
-                    toast({
-                        title: "Macros Logged",
-                        description: "Your manually entered macros have been saved for today.",
-                    });
-                } catch (dexieError) {
-                    console.error('🔥 Failed to sync manual macros to Dexie:', dexieError);
-                    toast({ title: "Local Sync Error", description: "Could not save manual macros to local cache.", variant: "destructive" });
-                }
+                toast({
+                    title: "Macros Logged",
+                    description: "Your manually entered macros have been saved for today.",
+                });
             }
         });
     };
