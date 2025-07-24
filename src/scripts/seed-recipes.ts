@@ -28,7 +28,7 @@ if (!admin.apps.length) {
   try {
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
-      projectId: serviceAccount.project_id, // Explicitly provide projectId
+      projectId: serviceAccount.project_id,
     });
     console.log("Firebase Admin SDK initialized successfully for seeding.");
   } catch (error: any) {
@@ -45,6 +45,16 @@ async function seedDatabase() {
     console.log("No recipes found in converted_recipes_for_seeding.json. Exiting.");
     return;
   }
+  
+  try {
+    console.log('Attempting a minimal test write to Firestore...');
+    await db.collection('debug_test').doc('test').set({ hello: 'world' });
+    console.log("✅ Minimal test write succeeded!");
+  } catch(error) {
+    console.error('❌ Minimal test write FAILED. This indicates a core connection or permission issue.', error);
+    process.exit(1);
+  }
+
 
   console.log(`Starting to seed ${(recipes as any[]).length} recipes...`);
 

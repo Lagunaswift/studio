@@ -1,4 +1,3 @@
-
 import * as admin from 'firebase-admin';
 import type { Auth } from 'firebase-admin/auth';
 import type { Firestore } from 'firebase-admin/firestore';
@@ -30,19 +29,5 @@ if (!admin.apps.length) {
 }
 
 // Lazy-load and export the services. This ensures they are accessed only after initialization.
-const getAuth = (): Auth => {
-  if (!admin.apps.length) {
-    throw new Error("Firebase Admin SDK has not been initialized.");
-  }
-  return admin.auth();
-};
-
-const getDb = (): Firestore => {
-  if (!admin.apps.length) {
-    throw new Error("Firebase Admin SDK has not been initialized.");
-  }
-  return admin.firestore();
-};
-
-export const auth: Auth = getAuth();
-export const db: Firestore = getDb();
+export const auth: Auth = admin.auth();
+export const db: Firestore = admin.firestore();
