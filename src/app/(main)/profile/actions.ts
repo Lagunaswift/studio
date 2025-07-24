@@ -7,6 +7,8 @@ import type { DailyVitalsLog, DailyManualMacrosLog, DailyWeightLog, PlannedMeal,
 import { db, auth as adminAuth } from '@/lib/firebase-admin'; 
 import { processBugReport } from '@/ai/flows/report-bug-flow';
 import type { BugReportInput, BugReportOutput } from '@/ai/flows/schemas';
+import { collection, addDoc, getDoc, setDoc, deleteDoc, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
+
 
 async function getUserId(): Promise<string | null> {
   const authorization = headers().get('Authorization');
@@ -26,7 +28,7 @@ async function getUserId(): Promise<string | null> {
 }
 
 // --- Recipe Actions ---
-export async function addRecipe(recipeData: Omit<RecipeFormData, 'user_id'>) {
+export async function addRecipe(recipeData: Omit<RecipeFormData, 'user_id' | 'id'>) {
   const userId = await getUserId();
   if (!userId) {
     return { error: 'You must be logged in to add a recipe.' };
@@ -52,7 +54,7 @@ export async function addRecipe(recipeData: Omit<RecipeFormData, 'user_id'>) {
     const newDocSnapshot = await getDoc(docRef);
     const finalData = { ...newDocSnapshot.data(), id: newDocSnapshot.id };
 
-    revalidatePath('/recipes');
+    revalidatePath('/recipes', 'layout');
     return { success: true, data: finalData };
   } catch (error: any) {
     console.error('Error adding recipe:', error);
@@ -136,17 +138,17 @@ export async function deletePantryItem(itemId: string) {
 
 
 // --- Daily Log Actions ---
-export async function addOrUpdateVitalsLog(vitalsData: Omit<DailyVitalsLog, 'user_id'>) {
+export async function addOrUpdateVitalsLog(vitalsData: Omit<DailyVitalsLog, 'user_id' | 'id'> & { date: string }) {
   const userId = await getUserId();
   if (!userId) return { error: 'Authentication required.' };
 
-  const { syncStatus, ...restOfVitalsData } = vitalsData;
+  const { syncStatus, ...restOfVitalsData } = vitalsData as any;
   
   const docId = `${userId}_${vitalsData.date}`; 
   const vitalsRef = doc(db, "daily_vitals_logs", docId);
 
   try {
-    await setDoc(vitalsRef, { ...restOfVitalsData, user_id: userId }, { merge: true });
+    await setDoc(vitalsRef, { ...restOfVitalsData, user_id: userId, id: docId, date: vitalsData.date }, { merge: true });
     const updatedDoc = await getDoc(vitalsRef);
     revalidatePath('/daily-log');
     return { success: true, data: updatedDoc.data() };
@@ -156,31 +158,30 @@ export async function addOrUpdateVitalsLog(vitalsData: Omit<DailyVitalsLog, 'use
   }
 }
 
-export async function addOrUpdateWeightLog(date: string, weightKg: number) {
-  const userId = await getUserId();
-  if (!userId) return { error: 'Authentication required.' };
+export async function addOrUpdateWeightLog(userId: string, date: string, weightKg: number) {
+    if (!userId) return { error: 'Authentication required.' };
 
-  const logData = { date, weightKg, user_id: userId };
-  const docId = `${userId}_${date}`; 
-  
-  const weightLogRef = doc(db, "daily_weight_logs", docId);
-  const profileRef = doc(db, "profiles", userId);
-
-  try {
-    const batch = db.batch();
-    batch.set(weightLogRef, logData, { merge: true });
-    batch.update(profileRef, { weightKg }); 
-    await batch.commit();
+    const logData = { date, weightKg, user_id: userId };
+    const docId = `${userId}_${date}`; 
     
-    const updatedDoc = await getDoc(weightLogRef);
+    const weightLogRef = doc(db, "daily_weight_logs", docId);
+    const profileRef = doc(db, "profiles", userId);
 
-    revalidatePath('/daily-log');
-    revalidatePath('/profile/user-info');
-    return { success: true, data: updatedDoc.data() };
-  } catch (error: any) {
-    console.error('Error saving weight log:', error);
-    return { error: 'Could not save your weight.' };
-  }
+    try {
+        const batch = db.batch();
+        batch.set(weightLogRef, logData, { merge: true });
+        batch.update(profileRef, { weightKg }); 
+        await batch.commit();
+        
+        const updatedDoc = await getDoc(weightLogRef);
+
+        revalidatePath('/daily-log');
+        revalidatePath('/profile/user-info');
+        return { success: true, data: updatedDoc.data() };
+    } catch (error: any) {
+        console.error('Error saving weight log:', error);
+        return { error: 'Could not save your weight.' };
+    }
 }
 
 export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacrosLog, 'user_id'>) {
@@ -210,8 +211,7 @@ export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacr
 }
 
 // --- Bug Reporting Action ---
-export async function reportBug(description: string): Promise<{ success: boolean, error?: string, data?: BugReportOutput }> {
-    const userId = await getUserId();
+export async function reportBug(description: string, userId: string): Promise<{ success: boolean, error?: string, data?: BugReportOutput }> {
     if (!userId) return { error: 'Authentication required to report a bug.' };
 
     try {

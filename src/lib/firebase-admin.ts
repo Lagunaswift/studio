@@ -1,22 +1,62 @@
 
 import * as admin from 'firebase-admin';
+import type { Auth } from 'firebase-admin/auth';
+import type { Firestore } from 'firebase-admin/firestore';
 
-// This pattern ensures the Admin SDK is initialized only once.
-if (!admin.apps.length) {
-  try {
-    // In a deployed Firebase/Google Cloud environment, the SDK is automatically
-    // initialized with default credentials.
-    console.log('Initializing Firebase Admin SDK with default credentials...');
-    admin.initializeApp();
-    console.log('Firebase Admin SDK initialized successfully.');
-  } catch (error) {
-    console.error('Firebase Admin SDK initialization error:', error);
-    // For local development, you would typically use a service account key:
-    // const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-    // admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-    // Since we are in a managed environment, we rely on default credentials.
-  }
+interface FirebaseAdminServices {
+  auth: Auth;
+  db: Firestore;
 }
 
-export const auth = admin.auth();
-export const db = admin.firestore();
+let services: FirebaseAdminServices | null = null;
+
+function initializeFirebaseAdmin(): FirebaseAdminServices {
+  // Check if the app is already initialized
+  if (admin.apps.length > 0 && services) {
+    return services;
+  }
+
+  try {
+    const serviceAccountKeyBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64;
+
+    if (serviceAccountKeyBase64) {
+      // Decode the service account key from Base64
+      const serviceAccountJson = Buffer.from(serviceAccountKeyBase64, 'base64').toString('utf-8');
+      const serviceAccount = JSON.parse(serviceAccountJson);
+      
+      console.log("Initializing Firebase Admin SDK with Service Account Key...");
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
+      });
+    } else {
+      // Rely on default credentials in a deployed environment
+      console.log("Initializing Firebase Admin SDK with default credentials...");
+      admin.initializeApp();
+    }
+    
+    console.log("Firebase Admin SDK initialized successfully.");
+  } catch (error: any) {
+    console.error("CRITICAL: Firebase Admin SDK initialization failed.", error);
+    // Throw a more descriptive error to help with debugging.
+    throw new Error(`Firebase Admin SDK could not be initialized. Error: ${error.message}`);
+  }
+
+  // Assign services after successful initialization
+  services = {
+    auth: admin.auth(),
+    db: admin.firestore(),
+  };
+
+  return services;
+}
+
+function getFirebaseAdmin(): FirebaseAdminServices {
+  if (!services) {
+    return initializeFirebaseAdmin();
+  }
+  return services;
+}
+
+// Export a getter for the services
+export const { auth, db } = getFirebaseAdmin();
