@@ -552,16 +552,16 @@ export default function UserInfoPage() {
             <div>
               <h3 className="text-sm font-medium text-muted-foreground">Estimated TDEE (Total Daily Energy Expenditure)</h3>
               <p className="text-2xl font-bold text-primary">
-                {tdee ? `${tdee.toLocaleString()} kcal/day` : 'N/A'}
+                {userProfile?.tdee ? `${userProfile.tdee.toLocaleString()} kcal/day` : 'N/A'}
               </p>
-              {!tdee && <p className="text-xs text-muted-foreground mt-1">Requires height, weight, age, sex, and activity level.</p>}
+              {!userProfile?.tdee && <p className="text-xs text-muted-foreground mt-1">Requires height, weight, age, sex, and activity level.</p>}
             </div>
             <div>
               <h3 className="text-sm font-medium text-muted-foreground">Estimated Lean Body Mass (LBM)</h3>
               <p className="text-2xl font-bold text-primary">
-                {leanBodyMassKg ? `${leanBodyMassKg.toFixed(1)} kg` : 'N/A'}
+                {userProfile?.leanBodyMassKg ? `${userProfile.leanBodyMassKg.toFixed(1)} kg` : 'N/A'}
               </p>
-              {!leanBodyMassKg && <p className="text-xs text-muted-foreground mt-1">Requires weight and body fat %.</p>}
+              {!userProfile?.leanBodyMassKg && <p className="text-xs text-muted-foreground mt-1">Requires weight and body fat %.</p>}
             </div>
           </CardContent>
         </Card>

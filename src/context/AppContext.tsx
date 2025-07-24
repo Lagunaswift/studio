@@ -155,7 +155,7 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     const [staticRecipes, setStaticRecipes] = useState<Recipe[]>([]);
     const [isStaticRecipeLoading, setIsStaticRecipeLoading] = useState(true);
 
-    const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
+    const [userProfileData, setUserProfileData] = useState<UserProfileSettings | null>(null);
     const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
     const [mealPlan, setMealPlan] = useState<PlannedMeal[]>([]);
     const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
@@ -167,7 +167,7 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     
     useEffect(() => {
       if (!idToUse) {
-        setUserProfile(null);
+        setUserProfileData(null);
         setUserRecipes([]);
         setMealPlan([]);
         setPantryItems([]);
@@ -179,14 +179,11 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
 
       const unsubscribes: (() => void)[] = [];
 
-      // User Profile - Only depend on idToUse for the profile
       unsubscribes.push(onSnapshot(doc(db, "profiles", idToUse), (doc) => {
         const data = doc.data() as UserProfileSettings | undefined;
-        const processed = processProfile(data as UserProfileSettings); 
-        setUserProfile(processed);
+        setUserProfileData(data || null);
       }));
 
-      // User-specific collections - These subscriptions are independent
       const collections: {name: string, setter: React.Dispatch<any>}[] = [
         { name: "recipes", setter: setUserRecipes },
         { name: "planned_meals", setter: setMealPlan },
@@ -207,6 +204,20 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
       return () => unsubscribes.forEach(unsub => unsub());
 
     }, [idToUse]);
+
+    const userProfile = useMemo(() => {
+        if (!userProfileData) return null;
+        const processed = processProfile(userProfileData);
+        if (!processed) return userProfileData;
+
+        return {
+            ...processed,
+            dailyWeightLog,
+            dailyVitalsLog,
+            dailyManualMacrosLog,
+        };
+    }, [userProfileData, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog]);
+
 
     const isSubscribed = useMemo(() => userProfile?.subscription_status === 'active', [userProfile?.subscription_status]);
 
@@ -267,11 +278,11 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     const isRecipeFavorite = useCallback((recipeId: number): boolean => (favoriteRecipeIds || []).includes(recipeId), [favoriteRecipeIds]);
 
     const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: PreppyOutput | null }> => {
-        if (!userProfile || !dailyWeightLog || dailyWeightLog.length < 14) {
+        if (!userProfile || !userProfile.dailyWeightLog || userProfile.dailyWeightLog.length < 14) {
           return { success: false, message: "At least 14 days of weight and calorie data are needed for an accurate calculation." };
         }
         
-        const logsWithTrend = calculateTrendWeight(dailyWeightLog);
+        const logsWithTrend = calculateTrendWeight(userProfile.dailyWeightLog);
         const validTrendLogs = logsWithTrend.filter(log => log.trendWeightKg !== undefined);
     
         if (validTrendLogs.length < 7) {
@@ -330,23 +341,14 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     
         const recommendation = await runPreppy(preppyInput);
         
-        await updateUserProfile({ tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
+        await updateUserProfile({ id: idToUse!, tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
 
         return { success: true, message: "Check-in complete!", recommendation };
-    }, [userProfile, dailyWeightLog, getConsumedMacrosForDate]);
+    }, [userProfile, getConsumedMacrosForDate, idToUse]);
 
-    const fullUserProfile = useMemo(() => {
-        if (!userProfile) return null;
-        return {
-            ...userProfile,
-            dailyWeightLog,
-            dailyVitalsLog,
-            dailyManualMacrosLog
-        }
-    }, [userProfile, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog]);
 
     return {
-        mealPlan, pantryItems, userRecipes, userProfile: fullUserProfile,
+        mealPlan, pantryItems, userRecipes, userProfile,
         isAppDataLoading, isSubscribed, allRecipesCache,
         shoppingList, getConsumedMacrosForDate, getPlannedMacrosForDate,
         getMealsForDate, isRecipeFavorite, runWeeklyCheckin
@@ -415,12 +417,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
     if (!user) throw new Error("Authentication required.");
-    const newPlannedMeal: Omit<PlannedMeal, 'id' | 'recipeDetails' | 'user_id'> = { 
+    const newPlannedMeal: Partial<Omit<PlannedMeal, 'recipeDetails'>> & { user_id: string } = { 
       recipeId: recipe.id, 
       date, 
       mealType, 
       servings,
       status: 'planned',
+      user_id: user.uid,
     };
     await addOrUpdateMealPlan(newPlannedMeal);
   }, [user]);
@@ -457,13 +460,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [mealPlan]);
 
   const toggleFavoriteRecipe = useCallback(async (recipeId: number) => {
-    const currentFavorites = userProfile?.favorite_recipe_ids || [];
+    if (!userProfile) return;
+    const currentFavorites = userProfile.favorite_recipe_ids || [];
     const isCurrentlyFavorite = currentFavorites.includes(recipeId);
     const newFavorites = isCurrentlyFavorite
       ? currentFavorites.filter(id => id !== recipeId)
       : [...currentFavorites, recipeId];
     await setUserInformation({ favorite_recipe_ids: newFavorites });
-  }, [userProfile?.favorite_recipe_ids, setUserInformation]);
+  }, [userProfile, setUserInformation]);
   
   const assignIngredientCategory = useCallback((ingredientName: string): UKSupermarketCategory => {
     return assignCategoryUtil(ingredientName);
