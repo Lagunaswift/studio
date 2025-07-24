@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { getFirebaseAuth } from '@/lib/firebase';
 
 const signUpSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -32,6 +32,7 @@ export default function SignUpPage() {
   const [isClient, setIsClient] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const auth = getFirebaseAuth();
 
   useEffect(() => {
     setIsClient(true);

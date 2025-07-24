@@ -13,7 +13,7 @@ import { Lock, KeyRound, AlertTriangle, ArrowLeft, Eye, EyeOff } from 'lucide-re
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { getFirebaseAuth } from '@/lib/firebase';
 
 const updatePasswordSchema = z.object({
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),
@@ -35,6 +35,7 @@ function UpdatePasswordFormComponent() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [actionCode, setActionCode] = useState<string | null>(null);
+  const auth = getFirebaseAuth();
 
   useEffect(() => {
     const oobCode = searchParams.get('oobCode');
@@ -56,7 +57,7 @@ function UpdatePasswordFormComponent() {
       .finally(() => {
         setIsCheckingToken(false);
       });
-  }, [searchParams]);
+  }, [searchParams, auth]);
 
   const form = useForm<UpdatePasswordFormValues>({
     resolver: zodResolver(updatePasswordSchema),

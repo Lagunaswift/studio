@@ -1,4 +1,3 @@
-
 // src/lib/firebase.js
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
@@ -13,14 +12,23 @@ const firebaseConfig = {
     messagingSenderId: "724190135561"
 };
 
-// Singleton pattern to ensure Firebase is initialized only once
-let app;
-if (!getApps().length) {
-    app = initializeApp(firebaseConfig);
+const getFirebaseApp = () => {
+  if (!getApps().length) {
+    return initializeApp(firebaseConfig);
+  }
+  return getApp();
+};
+
+export const getFirebaseAuth = () => {
+  const app = getFirebaseApp();
+  return getAuth(app);
 }
-else {
-    app = getApp();
+
+export const getFirebaseDb = () => {
+  const app = getFirebaseApp();
+  return getFirestore(app);
 }
-const auth = getAuth(app);
-const db = getFirestore(app);
-export { app, auth, db };
+
+export const app = getFirebaseApp();
+export const auth = getFirebaseAuth();
+export const db = getFirebaseDb();
