@@ -152,7 +152,42 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-function useAppData(userId: string | undefined, isAuthLoading: boolean) {
+function getDefaultUserProfile(userId: string, userEmail: string | null): UserProfileSettings {
+  return {
+    id: userId,
+    email: userEmail,
+    name: null,
+    macroTargets: null,
+    dietaryPreferences: [],
+    allergens: [],
+    mealStructure: [
+      { id: '1', name: 'Breakfast', type: 'Breakfast' },
+      { id: '2', name: 'Lunch', type: 'Lunch' },
+      { id: '3', name: 'Dinner', type: 'Dinner' },
+      { id: '4', name: 'Snack', type: 'Snack' },
+    ],
+    heightCm: null,
+    weightKg: null,
+    age: null,
+    sex: 'notSpecified',
+    activityLevel: 'notSpecified',
+    training_experience_level: 'notSpecified',
+    bodyFatPercentage: null,
+    athleteType: 'notSpecified',
+    primaryGoal: 'notSpecified',
+    tdee: null,
+    leanBodyMassKg: null,
+    rda: null,
+    subscription_status: 'none',
+    has_accepted_terms: false,
+    last_check_in_date: null,
+    target_weight_change_rate_kg: null,
+    dashboardSettings: { showMacros: true, showMenu: true, showFeaturedRecipe: true, showQuickRecipes: true },
+    favorite_recipe_ids: [],
+  };
+}
+
+function useAppData(userId: string | undefined, userEmail: string | null | undefined, isAuthLoading: boolean) {
     const [userProfileData, setUserProfileData] = useState<UserProfileSettings | null>(null);
     const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
     const [builtInRecipes, setBuiltInRecipes] = useState<Recipe[]>([]);
@@ -170,7 +205,6 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
       const unsubscribes: (() => void)[] = [];
 
       setIsRecipeCacheLoading(true);
-      // Listener for built-in recipes (where user_id is null)
       const builtInQuery = query(collection(db, "recipes"), where("user_id", "==", null));
       unsubscribes.push(onSnapshot(builtInQuery, (snapshot) => {
         const recipes = snapshot.docs.map(doc => ({ id: parseInt(doc.id, 10), ...doc.data() } as Recipe));
@@ -182,7 +216,6 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
       }));
 
       if (!idToUse) {
-        // If no user, only load built-in recipes and clear user data
         setUserProfileData(null);
         setUserRecipes([]);
         setMealPlan([]);
@@ -192,12 +225,15 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
         setDailyManualMacrosLog([]);
         setIsDataLoading(false);
       } else {
-        // If there is a user, load their specific data
         setIsDataLoading(true);
 
         unsubscribes.push(onSnapshot(doc(db, "profiles", idToUse), (doc) => {
-            const data = doc.data() as UserProfileSettings | undefined;
-            setUserProfileData(data || null);
+            if (doc.exists()) {
+              setUserProfileData(doc.data() as UserProfileSettings);
+            } else {
+              // New user, profile doesn't exist yet. Create a default one client-side.
+              setUserProfileData(getDefaultUserProfile(idToUse, userEmail || null));
+            }
         }));
 
         const collections: {name: string, setter: React.Dispatch<any>}[] = [
@@ -217,14 +253,13 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
             }));
         });
         
-        // A simple way to know when initial data has been fetched.
         const initialLoadTimer = setTimeout(() => setIsDataLoading(false), 2000); 
         unsubscribes.push(() => clearTimeout(initialLoadTimer));
       }
 
       return () => unsubscribes.forEach(unsub => unsub());
 
-    }, [idToUse]);
+    }, [idToUse, userEmail]);
 
     const userProfile = useMemo(() => {
         if (!userProfileData) return null;
@@ -387,7 +422,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isAppDataLoading, isRecipeCacheLoading, isSubscribed, allRecipesCache,
       shoppingList, getConsumedMacrosForDate, getPlannedMacrosForDate,
       getMealsForDate, isRecipeFavorite, runWeeklyCheckin
-  } = useAppData(user?.uid, isAuthLoading);
+  } = useAppData(user?.uid, user?.email, isAuthLoading);
 
   const callServerActionWithAuth = useCallback(async (action: (...args: any[]) => Promise<any>, ...args: any[]) => {
     if (!user) {
@@ -396,10 +431,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     const idToken = await user.getIdToken();
     
-    // The `headers()` in the server action will automatically pick up this header
-    // when using Next.js's built-in fetch patching for server actions.
-    // However, to be explicit, this is where you'd construct headers if needed.
-    // The current setup relies on the automatic forwarding.
     return action(...args);
 
   }, [user]);
@@ -485,8 +516,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const toggleShoppingListItem = useCallback(async (itemId: string) => {
       const item = shoppingList.find(i => i.id === itemId);
       if(item) {
-        // This is a local-only operation for now as 'purchased' state isn't in Firestore.
-        // In a real app, this would be synced with a database.
         console.log("Toggling purchased status for item (local state):", item.name);
       }
   }, [shoppingList]);

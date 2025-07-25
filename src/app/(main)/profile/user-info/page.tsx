@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from 'next/link';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Slider } from '@/components/ui/slider';
+import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 const calculateLBM = (weightKg: number | null | undefined, bodyFatPercentage: number | null | undefined): number | null => {
@@ -129,6 +133,46 @@ const userInfoSchema = z.object({
 
 type UserInfoFormValues = z.infer<typeof userInfoSchema>;
 
+function UserInfoPageSkeleton() {
+    return (
+        <div className="grid md:grid-cols-3 gap-8">
+            <Card className="md:col-span-2">
+                <CardHeader>
+                    <Skeleton className="h-8 w-48" />
+                    <Skeleton className="h-4 w-full max-w-lg" />
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="grid sm:grid-cols-2 gap-6">
+                        <div className="space-y-2"><Skeleton className="h-4 w-16" /><Skeleton className="h-10 w-full" /></div>
+                        <div className="space-y-2"><Skeleton className="h-4 w-16" /><Skeleton className="h-10 w-full" /></div>
+                    </div>
+                     <div className="grid sm:grid-cols-2 gap-6">
+                        <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
+                        <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
+                    </div>
+                     <div className="grid sm:grid-cols-2 gap-6">
+                        <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
+                        <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
+                    </div>
+                </CardContent>
+                <CardFooter>
+                    <Skeleton className="h-10 w-36" />
+                </CardFooter>
+            </Card>
+            <Card className="md:col-span-1">
+                 <CardHeader>
+                    <Skeleton className="h-8 w-40" />
+                    <Skeleton className="h-4 w-full max-w-xs" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                     <div className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-8 w-24" /></div>
+                     <div className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-8 w-24" /></div>
+                </CardContent>
+            </Card>
+        </div>
+    )
+}
+
 function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserProfileSettings, setUserInformation: (updates: Partial<UserProfileSettings>) => void }) {
   const { toast } = useToast();
   const [calculationMessage, setCalculationMessage] = useState<string | null>(null);
@@ -136,43 +180,13 @@ function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserPr
   
   const form = useForm<UserInfoFormValues>({
     resolver: zodResolver(userInfoSchema),
-    defaultValues: {
-      name: userProfile.name || '',
-      email: userProfile.email || '',
-      heightCm: userProfile.heightCm || 0,
-      weightKg: userProfile.weightKg || 0,
-      age: userProfile.age || 0,
-      sex: userProfile.sex === 'notSpecified' ? null : userProfile.sex,
-      activityLevel: userProfile.activityLevel || 'notSpecified',
-      training_experience_level: userProfile.training_experience_level || 'notSpecified',
-      bodyFatPercentage: userProfile.bodyFatPercentage || 0,
-      athleteType: userProfile.athleteType || 'notSpecified',
-      primaryGoal: userProfile.primaryGoal || 'notSpecified',
-      neck_circumference_cm: userProfile.neck_circumference_cm || null,
-      abdomen_circumference_cm: userProfile.abdomen_circumference_cm || null,
-      waist_circumference_cm: userProfile.waist_circumference_cm || null,
-      hip_circumference_cm: userProfile.hip_circumference_cm || null,
-    },
+    // This effect ensures the form is re-initialized when the userProfile data becomes available.
+    defaultValues: userProfile,
   });
   
+  // This effect synchronizes the form state if the userProfile from context changes after initial load.
   useEffect(() => {
-    form.reset({
-      name: userProfile.name || '',
-      email: userProfile.email || '',
-      heightCm: userProfile.heightCm || 0,
-      weightKg: userProfile.weightKg || 0,
-      age: userProfile.age || 0,
-      sex: userProfile.sex === 'notSpecified' ? null : userProfile.sex,
-      activityLevel: userProfile.activityLevel || 'notSpecified',
-      training_experience_level: userProfile.training_experience_level || 'notSpecified',
-      bodyFatPercentage: userProfile.bodyFatPercentage || 0,
-      athleteType: userProfile.athleteType || 'notSpecified',
-      primaryGoal: userProfile.primaryGoal || 'notSpecified',
-      neck_circumference_cm: userProfile.neck_circumference_cm || null,
-      abdomen_circumference_cm: userProfile.abdomen_circumference_cm || null,
-      waist_circumference_cm: userProfile.waist_circumference_cm || null,
-      hip_circumference_cm: userProfile.hip_circumference_cm || null,
-    });
+    form.reset(userProfile);
   }, [userProfile, form.reset]);
 
   const watchedFormValues = form.watch();
@@ -372,7 +386,7 @@ function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserPr
                 <FormField control={form.control} name="activityLevel" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center"><Activity className="mr-2 h-4 w-4 text-muted-foreground"/> Activity Level</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <Select onValueChange={field.onChange} value={field.value || 'notSpecified'}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select activity level" />
@@ -531,46 +545,6 @@ function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserPr
       </Card>
     </div>
   )
-}
-
-function UserInfoPageSkeleton() {
-    return (
-        <div className="grid md:grid-cols-3 gap-8">
-            <Card className="md:col-span-2">
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
-                    <Skeleton className="h-4 w-full max-w-lg" />
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="grid sm:grid-cols-2 gap-6">
-                        <div className="space-y-2"><Skeleton className="h-4 w-16" /><Skeleton className="h-10 w-full" /></div>
-                        <div className="space-y-2"><Skeleton className="h-4 w-16" /><Skeleton className="h-10 w-full" /></div>
-                    </div>
-                     <div className="grid sm:grid-cols-2 gap-6">
-                        <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
-                        <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
-                    </div>
-                     <div className="grid sm:grid-cols-2 gap-6">
-                        <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
-                        <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
-                    </div>
-                </CardContent>
-                <CardFooter>
-                    <Skeleton className="h-10 w-36" />
-                </CardFooter>
-            </Card>
-            <Card className="md:col-span-1">
-                 <CardHeader>
-                    <Skeleton className="h-8 w-40" />
-                    <Skeleton className="h-4 w-full max-w-xs" />
-                </CardHeader>
-                <CardContent className="space-y-4">
-                     <div className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-8 w-24" /></div>
-                     <div className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-8 w-24" /></div>
-                </CardContent>
-            </Card>
-        </div>
-    )
 }
 
 export default function UserInfoPage() {

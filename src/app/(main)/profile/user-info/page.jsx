@@ -1,6 +1,7 @@
 
+
 "use client";
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from 'next/link';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
-
+import { Slider } from '@/components/ui/slider';
+import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const calculateLBM = (weightKg, bodyFatPercentage) => {
     if (weightKg && weightKg > 0 && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
@@ -156,43 +159,13 @@ function UserInfoForm({ userProfile, setUserInformation }) {
   
   const form = useForm({
     resolver: zodResolver(userInfoSchema),
-    defaultValues: {
-      name: userProfile.name || '',
-      email: userProfile.email || '',
-      heightCm: userProfile.heightCm || 0,
-      weightKg: userProfile.weightKg || 0,
-      age: userProfile.age || 0,
-      sex: userProfile.sex === 'notSpecified' ? null : userProfile.sex,
-      activityLevel: userProfile.activityLevel || 'notSpecified',
-      training_experience_level: userProfile.training_experience_level || 'notSpecified',
-      bodyFatPercentage: userProfile.bodyFatPercentage || 0,
-      athleteType: userProfile.athleteType || 'notSpecified',
-      primaryGoal: userProfile.primaryGoal || 'notSpecified',
-      neck_circumference_cm: userProfile.neck_circumference_cm || null,
-      abdomen_circumference_cm: userProfile.abdomen_circumference_cm || null,
-      waist_circumference_cm: userProfile.waist_circumference_cm || null,
-      hip_circumference_cm: userProfile.hip_circumference_cm || null,
-    },
+    // This effect ensures the form is re-initialized when the userProfile data becomes available.
+    defaultValues: userProfile,
   });
   
+  // This effect synchronizes the form state if the userProfile from context changes after initial load.
   useEffect(() => {
-    form.reset({
-      name: userProfile.name || '',
-      email: userProfile.email || '',
-      heightCm: userProfile.heightCm || 0,
-      weightKg: userProfile.weightKg || 0,
-      age: userProfile.age || 0,
-      sex: userProfile.sex === 'notSpecified' ? null : userProfile.sex,
-      activityLevel: userProfile.activityLevel || 'notSpecified',
-      training_experience_level: userProfile.training_experience_level || 'notSpecified',
-      bodyFatPercentage: userProfile.bodyFatPercentage || 0,
-      athleteType: userProfile.athleteType || 'notSpecified',
-      primaryGoal: userProfile.primaryGoal || 'notSpecified',
-      neck_circumference_cm: userProfile.neck_circumference_cm || null,
-      abdomen_circumference_cm: userProfile.abdomen_circumference_cm || null,
-      waist_circumference_cm: userProfile.waist_circumference_cm || null,
-      hip_circumference_cm: userProfile.hip_circumference_cm || null,
-    });
+    form.reset(userProfile);
   }, [userProfile, form.reset]);
 
   const watchedFormValues = form.watch();
@@ -392,7 +365,7 @@ function UserInfoForm({ userProfile, setUserInformation }) {
                 <FormField control={form.control} name="activityLevel" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center"><Activity className="mr-2 h-4 w-4 text-muted-foreground"/> Activity Level</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <Select onValueChange={field.onChange} value={field.value || 'notSpecified'}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select activity level" />

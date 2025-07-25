@@ -69,8 +69,44 @@ const getRdaProfile = (sex, age) => {
     // Default for other age groups for now
     return { iron: 10, calcium: 1200, potassium: 3000, vitaminA: 800, vitaminC: 80, vitaminD: 15 };
 };
+
+const getDefaultUserProfile = (userId, userEmail) => {
+  return {
+    id: userId,
+    email: userEmail,
+    name: null,
+    macroTargets: null,
+    dietaryPreferences: [],
+    allergens: [],
+    mealStructure: [
+      { id: '1', name: 'Breakfast', type: 'Breakfast' },
+      { id: '2', name: 'Lunch', type: 'Lunch' },
+      { id: '3', name: 'Dinner', type: 'Dinner' },
+      { id: '4', name: 'Snack', type: 'Snack' },
+    ],
+    heightCm: null,
+    weightKg: null,
+    age: null,
+    sex: 'notSpecified',
+    activityLevel: 'notSpecified',
+    training_experience_level: 'notSpecified',
+    bodyFatPercentage: null,
+    athleteType: 'notSpecified',
+    primaryGoal: 'notSpecified',
+    tdee: null,
+    leanBodyMassKg: null,
+    rda: null,
+    subscription_status: 'none',
+    has_accepted_terms: false,
+    last_check_in_date: null,
+    target_weight_change_rate_kg: null,
+    dashboardSettings: { showMacros: true, showMenu: true, showFeaturedRecipe: true, showQuickRecipes: true },
+    favorite_recipe_ids: [],
+  };
+}
+
 const AppContext = createContext(undefined);
-function useAppData(userId, isAuthLoading) {
+function useAppData(userId, userEmail, isAuthLoading) {
     const [userProfileData, setUserProfileData] = useState(null);
     const [userRecipes, setUserRecipes] = useState([]);
     const [builtInRecipes, setBuiltInRecipes] = useState([]);
@@ -110,8 +146,11 @@ function useAppData(userId, isAuthLoading) {
             // If there is a user, load their specific data
             setIsDataLoading(true);
             unsubscribes.push(onSnapshot(doc(db, "profiles", idToUse), (doc) => {
-                const data = doc.data();
-                setUserProfileData(data || null);
+                if (doc.exists()) {
+                    setUserProfileData(doc.data());
+                } else {
+                    setUserProfileData(getDefaultUserProfile(idToUse, userEmail || null));
+                }
             }));
             const collections = [
                 { name: "recipes", setter: setUserRecipes },
@@ -133,7 +172,7 @@ function useAppData(userId, isAuthLoading) {
             unsubscribes.push(() => clearTimeout(initialLoadTimer));
         }
         return () => unsubscribes.forEach(unsub => unsub());
-    }, [idToUse]);
+    }, [idToUse, userEmail]);
     const userProfile = useMemo(() => {
         if (!userProfileData)
             return null;
@@ -255,7 +294,7 @@ export const AppProvider = ({ children }) => {
             window.removeEventListener('offline', handleOffline);
         };
     }, []);
-    const { mealPlan, pantryItems, userRecipes, userProfile, isAppDataLoading, isRecipeCacheLoading, isSubscribed, allRecipesCache, shoppingList, getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite, runWeeklyCheckin } = useAppData(user?.uid, isAuthLoading);
+    const { mealPlan, pantryItems, userRecipes, userProfile, isAppDataLoading, isRecipeCacheLoading, isSubscribed, allRecipesCache, shoppingList, getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite, runWeeklyCheckin } = useAppData(user?.uid, user?.email, isAuthLoading);
     const callServerActionWithAuth = useCallback(async (action, ...args) => {
         if (!user) {
             console.error("Attempted to call server action without authenticated user.");
