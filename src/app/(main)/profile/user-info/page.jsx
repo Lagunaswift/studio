@@ -134,6 +134,30 @@ function UserInfoForm({ userProfile, setUserInformation }) {
       hip_circumference_cm: userProfile.hip_circumference_cm || null,
     },
   });
+  
+  // Set form values once userProfile is available
+  useEffect(() => {
+    if(userProfile) {
+        form.reset({
+            name: userProfile.name || '',
+            email: userProfile.email || '',
+            heightCm: userProfile.heightCm || 0,
+            weightKg: userProfile.weightKg || 0,
+            age: userProfile.age || 0,
+            sex: userProfile.sex === 'notSpecified' ? null : userProfile.sex,
+            activityLevel: userProfile.activityLevel || 'notSpecified',
+            training_experience_level: userProfile.training_experience_level || 'notSpecified',
+            bodyFatPercentage: userProfile.bodyFatPercentage || 0,
+            athleteType: userProfile.athleteType || 'notSpecified',
+            primaryGoal: userProfile.primaryGoal || 'notSpecified',
+            neck_circumference_cm: userProfile.neck_circumference_cm || null,
+            abdomen_circumference_cm: userProfile.abdomen_circumference_cm || null,
+            waist_circumference_cm: userProfile.waist_circumference_cm || null,
+            hip_circumference_cm: userProfile.hip_circumference_cm || null,
+        });
+    }
+  }, [userProfile, form.reset]);
+
 
   const watchedFormValues = form.watch();
 
@@ -540,3 +564,4 @@ export default function UserInfoPage() {
     </PageWrapper>
   );
 }
+
