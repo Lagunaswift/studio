@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -77,11 +78,12 @@ export default function ShoppingListPage() {
       if (recipeDetails) {
         recipeDetails.ingredients.forEach((ingStr, index) => {
           const parsedOriginal = parseIngredientString(ingStr);
-          const quantityForThisMeal = parsedOriginal.quantity * pm.servings;
+          if (!parsedOriginal || parsedOriginal.name === 'non-item') return;
+          const quantityForThisMeal = (parsedOriginal.quantity / recipeDetails.servings) * pm.servings;
           
           let correspondingShoppingListItem = shoppingList.find(sli => 
             sli.name.toLowerCase().trim() === parsedOriginal.name.toLowerCase().trim() &&
-            (sli.unit.toLowerCase() === parsedOriginal.unit.toLowerCase() || sli.recipes.some(r => r.recipeId === pm.recipeId))
+            (sli.unit.toLowerCase() === (parsedOriginal.unit || '').toLowerCase() || sli.recipes.some(r => r.recipeId === pm.recipeId))
           );
           
           if(!correspondingShoppingListItem){
@@ -98,7 +100,7 @@ export default function ShoppingListPage() {
             originalIngredientString: ingStr,
             parsedName: parsedOriginal.name,
             parsedQuantity: parseFloat(quantityForThisMeal.toFixed(2)),
-            parsedUnit: parsedOriginal.unit,
+            parsedUnit: parsedOriginal.unit || 'items',
             shoppingListItemId: correspondingShoppingListItem?.id,
             purchased: correspondingShoppingListItem?.purchased || false,
           });
@@ -228,7 +230,7 @@ export default function ShoppingListPage() {
                           <div key={ing.id} className="flex items-center space-x-3 py-1">
                             <Checkbox
                               id={ing.id}
-                              checked={ing.purchased}
+                              checked={!!ing.purchased}
                               onCheckedChange={() => {
                                 if (ing.shoppingListItemId) {
                                   toggleShoppingListItem(ing.shoppingListItemId);

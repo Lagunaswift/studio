@@ -37,6 +37,8 @@ const recipeFormSchema = z.object({
   tags: z.array(z.string()).optional().default([]),
 });
 
+type RecipeFormValues = z.infer<typeof recipeFormSchema>;
+
 interface RecipeFormProps {
   onSubmit: (data: RecipeFormData) => Promise<void>;
   initialData?: Partial<RecipeFormData>; // For future edit functionality
@@ -45,7 +47,7 @@ interface RecipeFormProps {
 export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
   const [isPending, startTransition] = useTransition();
 
-  const form = useForm<RecipeFormData>({
+  const form = useForm<RecipeFormValues>({
     resolver: zodResolver(recipeFormSchema),
     defaultValues: initialData ? {
       ...initialData,
@@ -78,7 +80,7 @@ export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
     name: "instructions",
   });
 
-  const handleFormSubmit: SubmitHandler<RecipeFormData> = (data) => {
+  const handleFormSubmit: SubmitHandler<RecipeFormValues> = (data) => {
     startTransition(() => {
         onSubmit(data);
     });

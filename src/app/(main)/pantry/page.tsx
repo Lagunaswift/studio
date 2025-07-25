@@ -22,11 +22,7 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { format, addDays, isBefore, isSameDay, parseISO, isValid, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
-
-const UK_SUPERMARKET_CATEGORIES: UKSupermarketCategory[] = [
-  "Fresh Fruit & Vegetables", "Bakery", "Meat & Poultry", "Fish & Seafood", 
-  "Dairy, Butter & Eggs", "Chilled Foods", "Frozen Foods", "Food Cupboard", "Drinks", "Other Food Items"
-];
+import { UK_SUPERMARKET_CATEGORIES } from '@/types';
 
 const COMMON_UNITS: string[] = [
   "item(s)", "g", "kg", "ml", "L", "tsp", "tbsp", "cup", "oz", "lb", "slice(s)", "can(s)", "egg"
@@ -203,7 +199,7 @@ export default function PantryPage() {
                 The following items are expiring within the next 7 days or are expired today:
                 <ul className="list-disc pl-5 mt-2">
                   {expiringSoonItems.map(item => (
-                    <li key={`expiring-${item.id}`} className={item.expiryDate && isBefore(parseISO(item.expiryDate), new Date()) && !isSameDay(parseISO(item.expiryDate), new Date()) ? "text-red-600 dark:text-red-400 font-semibold" : ""}>
+                    <li key={`expiring-${item.id}`} className={cn(item.expiryDate && isBefore(parseISO(item.expiryDate), new Date()) && !isSameDay(parseISO(item.expiryDate), new Date()) ? "text-red-600 dark:text-red-400 font-semibold" : "")}>
                       {item.name} (Expires on: {item.expiryDate ? format(parseISO(item.expiryDate), 'dd MMMM yyyy') : 'N/A'})
                        {item.expiryDate && isBefore(parseISO(item.expiryDate), new Date()) && !isSameDay(parseISO(item.expiryDate), new Date()) && " - Already Expired!"}
                     </li>

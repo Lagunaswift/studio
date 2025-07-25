@@ -125,7 +125,7 @@ export default function RecipeDetailPage() {
 
 
   const handleImageError = () => {
-    if (!imageError) {
+    if (!imageLoadError) {
       setImageLoadError(true);
     }
   };
@@ -312,7 +312,7 @@ export default function RecipeDetailPage() {
   const aiHint = recipe && recipe.tags && recipe.tags.length > 0 ? recipe.tags.slice(0, 2).join(' ') : "food meal";
   const dynamicImageSrc = `/images/${recipe.id}.jpg`;
   const defaultPlaceholder = `https://placehold.co/600x400.png`;
-  const imageSrc = imageError ? defaultPlaceholder : dynamicImageSrc;
+  const imageSrc = imageLoadError ? defaultPlaceholder : dynamicImageSrc;
 
   const renderRecipeTweaker = () => {
     if (!isSubscribed) {
@@ -357,7 +357,7 @@ export default function RecipeDetailPage() {
             sizes="(max-width: 768px) 100vw, 100vw"
             className="object-cover"
             priority
-            data-ai-hint={imageError ? aiHint : undefined}
+            data-ai-hint={imageLoadError ? aiHint : undefined}
             onError={handleImageError} 
           />
            <Button 

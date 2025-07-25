@@ -77,24 +77,12 @@ export interface PlannedMeal {
   user_id?: string;
 }
 
-export type UKSupermarketCategory =
-  | 'Fresh Fruit & Vegetables'
-  | 'Bakery'
-  | 'Meat & Poultry'
-  | 'Fish & Seafood'
-  | 'Dairy, Butter & Eggs'
-  | 'Chilled Foods'
-  | 'Frozen Foods'
-  | 'Food Cupboard'
-  | 'Drinks'
-  | 'Other Food Items'
-  | 'Herbs & Spices'
-  | 'Condiments & Sauces'
-  | 'Baking Goods'
-  | 'Pasta, Rice & Grains'
-  | 'Canned Goods'
-  | 'Snacks & Confectionery'
-  | 'Frozen';
+export const UK_SUPERMARKET_CATEGORIES = [
+  "Fresh Fruit & Vegetables", "Bakery", "Meat & Poultry", "Fish & Seafood", 
+  "Dairy, Butter & Eggs", "Chilled Foods", "Frozen Foods", "Food Cupboard", "Drinks", "Other Food Items",
+  "Herbs & Spices", "Condiments & Sauces", "Baking Goods", "Pasta, Rice & Grains", "Canned Goods", "Snacks & Confectionery", "Frozen"
+] as const;
+export type UKSupermarketCategory = typeof UK_SUPERMARKET_CATEGORIES[number];
 
 
 export interface ShoppingListItem {
@@ -139,7 +127,7 @@ export type MealSlotConfig = z.infer<typeof MealSlotConfigSchema>;
 
 
 export type Sex = 'male' | 'female' | 'notSpecified';
-export const SEX_OPTIONS: Sex[] = ['male', 'female'];
+export const SEX_OPTIONS: Array<Exclude<Sex, 'notSpecified'>> = ['male', 'female'];
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'veryActive' | 'notSpecified';
 export const ACTIVITY_LEVEL_OPTIONS: { value: ActivityLevel; label: string; multiplier: number }[] = [
@@ -288,3 +276,4 @@ export interface RecipeFormData {
   fat: number;
   tags?: string[];
 }
+

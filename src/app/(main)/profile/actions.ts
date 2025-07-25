@@ -4,7 +4,7 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers';
 import type { DailyVitalsLog, DailyManualMacrosLog, RecipeFormData, UserProfileSettings } from '@/types';
-import { db, auth as adminAuth } from '@/lib/firebase-admin'; 
+import { getAuth, getDb } from '@/lib/firebase-admin'; 
 import { processBugReport } from '@/ai/flows/report-bug-flow';
 import type { BugReportInput, BugReportOutput } from '@/ai/flows/schemas';
 import { collection, addDoc, getDoc, setDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
@@ -19,7 +19,7 @@ async function getUserId(): Promise<string | null> {
   const idToken = authorization.split('Bearer ')[1];
 
   try {
-    const decodedToken = await adminAuth.verifyIdToken(idToken);
+    const decodedToken = await getAuth().verifyIdToken(idToken);
     return decodedToken.uid;
   } catch (error) {
     console.error("getUserId: Error verifying ID token:", error);
@@ -50,6 +50,7 @@ export async function addRecipe(recipeData: Omit<RecipeFormData, 'user_id' | 'id
   };
 
   try {
+    const db = getDb();
     const docRef = await addDoc(collection(db, "recipes"), dataToInsert);
     const newDocSnapshot = await getDoc(docRef);
     const finalData = { ...newDocSnapshot.data(), id: newDocSnapshot.id };
@@ -71,6 +72,7 @@ export async function addOrUpdateMealPlan(mealData: any) {
   const docId = mealData.id || `meal_${Date.now()}_${Math.random()}`;
   const { syncStatus, recipeDetails, ...dataToSet } = { ...mealData, id: docId, user_id: userId };
 
+  const db = getDb();
   const mealRef = doc(db, "planned_meals", docId);
 
   try {
@@ -86,8 +88,9 @@ export async function addOrUpdateMealPlan(mealData: any) {
 
 export async function deleteMealFromPlan(plannedMealId: string) {
     const userId = await getUserId();
-    if (!userId) return { error: 'Authentication required.' };
+    if (!userId) return { success: false, error: 'Authentication required.' };
 
+    const db = getDb();
     const mealRef = doc(db, "planned_meals", plannedMealId);
     
     try {
@@ -96,7 +99,7 @@ export async function deleteMealFromPlan(plannedMealId: string) {
         return { success: true };
     } catch (error: any) {
         console.error('Error deleting meal plan item:', error);
-        return { error: 'Could not remove meal from plan.' };
+        return { success: false, error: 'Could not remove meal from plan.' };
     }
 }
 
@@ -104,10 +107,11 @@ export async function deleteMealFromPlan(plannedMealId: string) {
 // --- Pantry Actions ---
 export async function addOrUpdatePantryItem(itemData: any) {
     const userId = await getUserId();
-    if (!userId) return { error: 'Authentication required.' };
+    if (!userId) return { success: false, error: 'Authentication required.' };
 
     const { syncStatus, ...dataToSet } = { ...itemData, user_id: userId };
     
+    const db = getDb();
     const itemRef = doc(db, "pantry_items", itemData.id);
 
     try {
@@ -117,13 +121,14 @@ export async function addOrUpdatePantryItem(itemData: any) {
         return { success: true, data: updatedDoc.data() };
     } catch (error: any) {
         console.error('Error saving pantry item:', error);
-        return { error: 'Could not save item to pantry.' };
+        return { success: false, error: 'Could not save item to pantry.' };
     }
 }
 
 export async function deletePantryItem(itemId: string) {
     const userId = await getUserId();
-    if (!userId) return { error: 'Authentication required.' };
+    if (!userId) return { success: false, error: 'Authentication required.' };
+    const db = getDb();
     const itemRef = doc(db, "pantry_items", itemId);
     
     try {
@@ -132,7 +137,7 @@ export async function deletePantryItem(itemId: string) {
         return { success: true };
     } catch (error: any) {
         console.error('Error deleting pantry item:', error);
-        return { error: 'Could not remove item from pantry.' };
+        return { success: false, error: 'Could not remove item from pantry.' };
     }
 }
 
@@ -145,6 +150,7 @@ export async function addOrUpdateVitalsLog(vitalsData: any) {
   const { syncStatus, ...restOfVitalsData } = vitalsData as any;
   
   const docId = `${userId}_${vitalsData.date}`; 
+  const db = getDb();
   const vitalsRef = doc(db, "daily_vitals_logs", docId);
 
   try {
@@ -164,6 +170,7 @@ export async function addOrUpdateWeightLog(userId: string, date: string, weightK
     const logData = { date, weightKg, user_id: userId };
     const docId = `${userId}_${date}`; 
     
+    const db = getDb();
     const weightLogRef = doc(db, "daily_weight_logs", docId);
     const profileRef = doc(db, "profiles", userId);
 
@@ -197,6 +204,7 @@ export async function addOrUpdateManualMacrosLog(macroData: any) {
         user_id: userId,
     };
     
+    const db = getDb();
     const logRef = doc(db, "daily_manual_macros_logs", docId);
 
     try {
@@ -229,7 +237,8 @@ export async function reportBug(description: string, userId: string): Promise<{ 
             createdAt: serverTimestamp(),
             status: 'new' 
         };
-
+        
+        const db = getDb();
         await addDoc(collection(db, "bug_reports"), bugReportData);
 
         revalidatePath('/updates');
@@ -245,7 +254,8 @@ export async function reportBug(description: string, userId: string): Promise<{ 
 export async function updateUserProfile(updates: Partial<Omit<UserProfileSettings, 'id'>>) {
   const userId = await getUserId();
   if (!userId) return { error: 'Authentication required.' };
-
+  
+  const db = getDb();
   const profileRef = doc(db, "profiles", userId);
 
   try {

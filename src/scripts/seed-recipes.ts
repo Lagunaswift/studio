@@ -1,46 +1,12 @@
 
 // scripts/seed-recipes.ts
-import * as admin from 'firebase-admin';
-import { config } from 'dotenv';
-import path from 'path';
+import { getDb } from '@/lib/firebase-admin';
 import recipes from './converted_recipes_for_seeding.json';
 
-// Load environment variables from .env file
-config({ path: path.resolve(process.cwd(), '.env') });
-
-// --- Initialize Firebase Admin SDK ---
-const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64;
-
-if (!serviceAccountBase64) {
-  throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY_BASE64 environment variable is not set. The application cannot initialize the admin SDK.');
-}
-
-let serviceAccount;
-try {
-  // Decode the Base64 string back to JSON string, then parse it
-  const serviceAccountString = Buffer.from(serviceAccountBase64, 'base64').toString('utf8');
-  serviceAccount = JSON.parse(serviceAccountString);
-} catch (error: any) {
-  throw new Error('Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY_BASE64. Make sure it is a valid Base64 encoded JSON string. Error: ' + error.message);
-}
-
-if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      projectId: serviceAccount.project_id,
-    });
-    console.log("Firebase Admin SDK initialized successfully for seeding.");
-  } catch (error: any) {
-    console.error("Firebase Admin SDK initialization error:", error);
-    process.exit(1);
-  }
-}
-
-const db = admin.firestore();
-const recipesCollection = db.collection('recipes');
-
 async function seedDatabase() {
+  const db = getDb(); // Safely get the initialized DB instance
+  const recipesCollection = db.collection('recipes');
+
   if (!recipes || (recipes as any[]).length === 0) {
     console.log("No recipes found in converted_recipes_for_seeding.json. Exiting.");
     return;
@@ -48,13 +14,14 @@ async function seedDatabase() {
   
   try {
     console.log('Attempting a minimal test write to Firestore...');
-    await db.collection('debug_test').doc('test').set({ hello: 'world' });
-    console.log("✅ Minimal test write succeeded!");
+    const testDocRef = db.collection('debug_test').doc('test-write');
+    await testDocRef.set({ hello: 'world', timestamp: new Date() });
+    await testDocRef.delete();
+    console.log("✅ Minimal test write/delete succeeded!");
   } catch(error) {
     console.error('❌ Minimal test write FAILED. This indicates a core connection or permission issue.', error);
     process.exit(1);
   }
-
 
   console.log(`Starting to seed ${(recipes as any[]).length} recipes...`);
 
