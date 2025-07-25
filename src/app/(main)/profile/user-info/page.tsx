@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,36 @@ import type { UserProfileSettings, Sex, ActivityLevel, AthleteType, PrimaryGoal,
 import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS, TRAINING_EXPERIENCE_OPTIONS } from '@/types';
 import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale, Award } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+
+const calculateLBM = (weightKg: number | null | undefined, bodyFatPercentage: number | null | undefined): number | null => {
+    if (weightKg && weightKg > 0 && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
+        const lbm = weightKg * (1 - bodyFatPercentage / 100);
+        if (isNaN(lbm) || !isFinite(lbm) || lbm <= 0) return null;
+        return parseFloat(lbm.toFixed(1));
+    }
+    return null;
+};
+
+const calculateTDEE = (
+  weightKg: number | null | undefined,
+  heightCm: number | null | undefined,
+  age: number | null | undefined,
+  sex: Sex | null | undefined,
+  activityLevel: ActivityLevel | null | undefined
+): number | null => {
+  if (!weightKg || !heightCm || !age || !sex || !activityLevel || activityLevel === 'notSpecified') return null;
+  let bmr: number;
+  if (sex === 'male') bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
+  else bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
+  const activity = ACTIVITY_LEVEL_OPTIONS.find(opt => opt.value === activityLevel);
+  if (activity) {
+    const tdee = bmr * activity.multiplier;
+    if (isNaN(tdee) || !isFinite(tdee) || tdee <= 0) return null;
+    return Math.round(tdee);
+  }
+  return null;
+};
 
 
 // Helper function (can be moved to utils if used elsewhere)
@@ -127,7 +157,15 @@ export default function UserInfoPage() {
     },
   });
 
-  const watchedSex = form.watch("sex");
+  const watchedFormValues = form.watch();
+
+  const liveTdee = useMemo(() => {
+    return calculateTDEE(watchedFormValues.weightKg, watchedFormValues.heightCm, watchedFormValues.age, watchedFormValues.sex, watchedFormValues.activityLevel);
+  }, [watchedFormValues.weightKg, watchedFormValues.heightCm, watchedFormValues.age, watchedFormValues.sex, watchedFormValues.activityLevel]);
+
+  const liveLbm = useMemo(() => {
+    return calculateLBM(watchedFormValues.weightKg, watchedFormValues.bodyFatPercentage);
+  }, [watchedFormValues.weightKg, watchedFormValues.bodyFatPercentage]);
 
   useEffect(() => {
     if (userProfile) {
@@ -222,9 +260,6 @@ export default function UserInfoPage() {
       toast({ title: "Calculation Error", description: "Please check measurements. Abdomen > Neck (M), Waist + Hip > Neck (F).", variant: "destructive"});
     }
   };
-
-
-  const { tdee, leanBodyMassKg } = userProfile || {};
 
   return (
     <PageWrapper title="User Information">
@@ -414,7 +449,7 @@ export default function UserInfoPage() {
                         </FormItem>
                         )}
                     />
-                    {watchedSex === 'male' && (
+                    {watchedFormValues.sex === 'male' && (
                         <FormField
                             control={form.control}
                             name="abdomen_circumference_cm"
@@ -429,7 +464,7 @@ export default function UserInfoPage() {
                             )}
                         />
                     )}
-                    {watchedSex === 'female' && (
+                    {watchedFormValues.sex === 'female' && (
                         <>
                         <FormField
                             control={form.control}
@@ -552,16 +587,16 @@ export default function UserInfoPage() {
             <div>
               <h3 className="text-sm font-medium text-muted-foreground">Estimated TDEE (Total Daily Energy Expenditure)</h3>
               <p className="text-2xl font-bold text-primary">
-                {userProfile?.tdee ? `${userProfile.tdee.toLocaleString()} kcal/day` : 'N/A'}
+                {liveTdee ? `${liveTdee.toLocaleString()} kcal/day` : 'N/A'}
               </p>
-              {!userProfile?.tdee && <p className="text-xs text-muted-foreground mt-1">Requires height, weight, age, sex, and activity level.</p>}
+              {!liveTdee && <p className="text-xs text-muted-foreground mt-1">Requires height, weight, age, sex, and activity level.</p>}
             </div>
             <div>
               <h3 className="text-sm font-medium text-muted-foreground">Estimated Lean Body Mass (LBM)</h3>
               <p className="text-2xl font-bold text-primary">
-                {userProfile?.leanBodyMassKg ? `${userProfile.leanBodyMassKg.toFixed(1)} kg` : 'N/A'}
+                {liveLbm ? `${liveLbm.toFixed(1)} kg` : 'N/A'}
               </p>
-              {!userProfile?.leanBodyMassKg && <p className="text-xs text-muted-foreground mt-1">Requires weight and body fat %.</p>}
+              {!liveLbm && <p className="text-xs text-muted-foreground mt-1">Requires weight and body fat %.</p>}
             </div>
           </CardContent>
         </Card>
