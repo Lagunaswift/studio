@@ -9,9 +9,9 @@ import type { BugReportInput, BugReportOutput } from '@/ai/flows/report-bug-flow
 import { FieldValue } from 'firebase-admin/firestore';
 
 
-async function getUserId(idToken: string): Promise<string | null> {
+async function getUserIdFromToken(idToken: string): Promise<string | null> {
   if (!idToken) {
-    console.warn("getUserId: No ID token provided.");
+    console.warn("getUserIdFromToken: No ID token provided.");
     return null;
   }
   try {
@@ -19,14 +19,14 @@ async function getUserId(idToken: string): Promise<string | null> {
     const decodedToken = await adminAuth.verifyIdToken(idToken);
     return decodedToken.uid;
   } catch (error) {
-    console.error("getUserId: Error verifying ID token:", error);
+    console.error("getUserIdFromToken: Error verifying ID token:", error);
     return null;
   }
 }
 
 // --- Recipe Actions ---
 export async function addRecipe(idToken: string, recipeData: Omit<RecipeFormData, 'user_id' | 'id'>) {
-  const userId = await getUserId(idToken);
+  const userId = await getUserIdFromToken(idToken);
   if (!userId) {
     return { error: 'You must be logged in to add a recipe.' };
   }
@@ -63,7 +63,7 @@ export async function addRecipe(idToken: string, recipeData: Omit<RecipeFormData
 
 // --- Meal Plan Actions ---
 export async function addOrUpdateMealPlan(idToken: string, mealData: any) {
-  const userId = await getUserId(idToken);
+  const userId = await getUserIdFromToken(idToken);
   if (!userId) return { error: 'Authentication required.' };
 
   const docId = mealData.id || `meal_${Date.now()}_${Math.random()}`;
@@ -84,7 +84,7 @@ export async function addOrUpdateMealPlan(idToken: string, mealData: any) {
 }
 
 export async function deleteMealFromPlan(idToken: string, plannedMealId: string) {
-    const userId = await getUserId(idToken);
+    const userId = await getUserIdFromToken(idToken);
     if (!userId) return { success: false, error: 'Authentication required.' };
 
     const db = getDb();
@@ -103,7 +103,7 @@ export async function deleteMealFromPlan(idToken: string, plannedMealId: string)
 
 // --- Pantry Actions ---
 export async function addOrUpdatePantryItem(idToken: string, itemData: any) {
-    const userId = await getUserId(idToken);
+    const userId = await getUserIdFromToken(idToken);
     if (!userId) return { success: false, error: 'Authentication required.' };
 
     const { syncStatus, ...dataToSet } = { ...itemData, user_id: userId };
@@ -123,7 +123,7 @@ export async function addOrUpdatePantryItem(idToken: string, itemData: any) {
 }
 
 export async function deletePantryItem(idToken: string, itemId: string) {
-    const userId = await getUserId(idToken);
+    const userId = await getUserIdFromToken(idToken);
     if (!userId) return { success: false, error: 'Authentication required.' };
     const db = getDb();
     const itemRef = db.collection("pantry_items").doc(itemId);
@@ -141,7 +141,7 @@ export async function deletePantryItem(idToken: string, itemId: string) {
 
 // --- Daily Log Actions ---
 export async function addOrUpdateVitalsLog(idToken: string, vitalsData: any) {
-  const userId = await getUserId(idToken);
+  const userId = await getUserIdFromToken(idToken);
   if (!userId) return { error: 'Authentication required.' };
 
   const { syncStatus, ...restOfVitalsData } = vitalsData as any;
@@ -162,7 +162,7 @@ export async function addOrUpdateVitalsLog(idToken: string, vitalsData: any) {
 }
 
 export async function addOrUpdateWeightLog(idToken: string, date: string, weightKg: number) {
-    const userId = await getUserId(idToken);
+    const userId = await getUserIdFromToken(idToken);
     if (!userId) return { error: 'Authentication required.' };
 
     const logData = { date, weightKg, user_id: userId };
@@ -190,7 +190,7 @@ export async function addOrUpdateWeightLog(idToken: string, date: string, weight
 }
 
 export async function addOrUpdateManualMacrosLog(idToken: string, macroData: any) {
-    const userId = await getUserId(idToken);
+    const userId = await getUserIdFromToken(idToken);
     if (!userId) return { error: 'Authentication required.' };
 
     const { syncStatus, ...restOfMacroData } = macroData;
@@ -218,7 +218,7 @@ export async function addOrUpdateManualMacrosLog(idToken: string, macroData: any
 
 // --- Bug Reporting Action ---
 export async function reportBug(idToken: string, description: string): Promise<{ success: boolean, error?: string, data?: BugReportOutput }> {
-    const userId = await getUserId(idToken);
+    const userId = await getUserIdFromToken(idToken);
     if (!userId) return { success: false, error: 'Authentication required to report a bug.' };
 
     try {
@@ -251,7 +251,7 @@ export async function reportBug(idToken: string, description: string): Promise<{
 
 // --- User Profile Actions ---
 export async function updateUserProfile(idToken: string, updates: Partial<Omit<UserProfileSettings, 'id'>>) {
-  const userId = await getUserId(idToken);
+  const userId = await getUserIdFromToken(idToken);
   if (!userId) return { error: 'Authentication required.' };
   
   const db = getDb();
