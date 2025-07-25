@@ -21,6 +21,8 @@ import Link from 'next/link';
 import { Slider } from '@/components/ui/slider';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Label } from '@/components/ui/label';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+
 
 const calculateLBM = (weightKg: number | null | undefined, bodyFatPercentage: number | null | undefined): number | null => {
     if (weightKg && weightKg > 0 && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
@@ -139,21 +141,21 @@ function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserPr
   const form = useForm<UserInfoFormValues>({
     resolver: zodResolver(userInfoSchema),
     defaultValues: {
-      name: userProfile.name || '',
-      email: userProfile.email || '',
-      heightCm: userProfile.heightCm || 0,
-      weightKg: userProfile.weightKg || 0,
-      age: userProfile.age || 0,
-      sex: userProfile.sex === 'notSpecified' ? null : userProfile.sex,
-      activityLevel: userProfile.activityLevel || 'notSpecified',
-      training_experience_level: userProfile.training_experience_level || 'notSpecified',
-      bodyFatPercentage: userProfile.bodyFatPercentage || 0,
-      athleteType: userProfile.athleteType || 'notSpecified',
-      primaryGoal: userProfile.primaryGoal || 'notSpecified',
-      neck_circumference_cm: userProfile.neck_circumference_cm || null,
-      abdomen_circumference_cm: userProfile.abdomen_circumference_cm || null,
-      waist_circumference_cm: userProfile.waist_circumference_cm || null,
-      hip_circumference_cm: userProfile.hip_circumference_cm || null,
+      name: '',
+      email: '',
+      heightCm: 0,
+      weightKg: 0,
+      age: 0,
+      sex: null,
+      activityLevel: 'notSpecified',
+      training_experience_level: 'notSpecified',
+      bodyFatPercentage: 0,
+      athleteType: 'notSpecified',
+      primaryGoal: 'notSpecified',
+      neck_circumference_cm: null,
+      abdomen_circumference_cm: null,
+      waist_circumference_cm: null,
+      hip_circumference_cm: null,
     },
   });
   
@@ -581,17 +583,13 @@ function UserInfoPageSkeleton() {
 export default function UserInfoPage() {
   const { userProfile, setUserInformation, isAppDataLoading } = useAppContext();
   
-  if (isAppDataLoading || !userProfile) {
-    return (
-      <PageWrapper title="User Information">
-        <UserInfoPageSkeleton />
-      </PageWrapper>
-    )
-  }
-
   return (
     <PageWrapper title="User Information">
-      <UserInfoForm userProfile={userProfile} setUserInformation={setUserInformation} />
+      {isAppDataLoading || !userProfile ? (
+        <UserInfoPageSkeleton />
+      ) : (
+        <UserInfoForm userProfile={userProfile} setUserInformation={setUserInformation} />
+      )}
     </PageWrapper>
   );
 }
