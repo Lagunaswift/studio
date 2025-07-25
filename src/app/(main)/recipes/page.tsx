@@ -185,7 +185,9 @@ function RecipesPageComponent() {
 
   const getIconForAllergen = (allergen: string) => {
      switch (allergen.toLowerCase()) {
-      case 'nuts': case 'peanuts': return <TreeDeciduous className="h-4 w-4 mr-1 text-orange-600" />;
+      case 'nuts':
+      case 'peanuts':
+         return <TreeDeciduous className="h-4 w-4 mr-1 text-orange-600"/>;
       case 'dairy': return <Milk className="h-4 w-4 mr-1 text-blue-400" />;
       case 'eggs': return <Egg className="h-4 w-4 mr-1 text-yellow-500" />;
       case 'fish': return <Fish className="h-4 w-4 mr-1 text-sky-500" />;
