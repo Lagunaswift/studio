@@ -53,7 +53,7 @@ export const RecipeSchema = z.object({
   chillTime: z.string().optional(),
   ingredients: z.array(z.string()),
   macrosPerServing: MacrosSchema,
-  micronutrientsPerServing: MicronutrientsSchema.nullable(),
+  micronutrientsPerServing: MicronutrientsSchema.nullable().optional(),
   instructions: z.array(z.string()),
   tags: z.array(z.string()).optional(),
   isCustom: z.boolean().optional(),
@@ -104,6 +104,7 @@ export interface PantryItem {
   expiryDate?: string; 
   syncStatus?: 'synced' | 'pending' | 'deleted';
   user_id?: string;
+  purchased?: boolean;
 }
 
 
@@ -276,4 +277,3 @@ export interface RecipeFormData {
   fat: number;
   tags?: string[];
 }
-

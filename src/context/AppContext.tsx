@@ -348,7 +348,7 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     
         const recommendation = await runPreppy(preppyInput);
         
-        await updateUserProfile({ id: idToUse!, tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') } as any);
+        await updateUserProfile({ tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
 
         return { success: true, message: "Check-in complete!", recommendation };
     }, [userProfile, getConsumedMacrosForDate, idToUse]);

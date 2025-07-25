@@ -2,50 +2,32 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Helper function to check ownership
-    function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
+
+    // Helper function to check ownership against the user's auth UID
+    function isOwner() {
+      return request.auth != null;
     }
 
-    // Profiles can only be read and updated by the owner.
-    match /profiles/{userId} {
-      allow read, update: if isOwner(userId);
-    }
-    
-    // Recipes can be read by anyone if they are public (user_id is null).
-    // Users can read their own recipes.
+    // Recipes can be read by anyone if public, or by the owner if private.
     // Users can only create/update/delete their own recipes.
     match /recipes/{recipeId} {
-      allow read: if resource.data.user_id == null || (request.auth != null && resource.data.user_id == request.auth.uid);
-      allow create: if isOwner(request.resource.data.user_id);
-      allow update, delete: if isOwner(resource.data.user_id);
-    }
-    
-    // Users can only manage their own data in these collections.
-    match /planned_meals/{mealId} {
-      allow read, create, update, delete: if isOwner(request.resource.data.user_id);
-    }
-    
-    match /pantry_items/{itemId} {
-       allow read, create, update, delete: if isOwner(request.resource.data.user_id);
-    }
-    
-    match /daily_weight_logs/{logId} {
-      allow read, create, update, delete: if isOwner(request.resource.data.user_id);
-    }
-    
-    match /daily_vitals_logs/{logId} {
-       allow read, create, update, delete: if isOwner(request.resource.data.user_id);
+      allow read: if resource.data.user_id == null || request.auth.uid == resource.data.user_id;
+      allow create: if request.auth.uid == request.resource.data.user_id;
+      allow update, delete: if request.auth.uid == resource.data.user_id;
     }
 
-    match /daily_manual_macros_logs/{logId} {
-       allow read, create, update, delete: if isOwner(request.resource.data.user_id);
+    // Profiles can be read and updated by their owner.
+    match /profiles/{userId} {
+      allow read, update: if request.auth.uid == userId;
+      // Anyone can create their own profile document.
+      allow create: if request.auth.uid == userId;
     }
-    
-    // Default deny all other access
-    match /{document=**} {
-      allow read, write: if false;
+
+    // For all other user-specific collections, grant access if the
+    // document's user_id matches the requestor's UID.
+    match /{collection}/{docId} {
+      // This rule applies to: planned_meals, pantry_items, daily_weight_logs, etc.
+      allow read, write: if request.auth.uid == resource.data.user_id;
     }
   }
 }

@@ -111,24 +111,26 @@ export function RecipeCard({
             <Clock className="w-3 h-3 md:w-4 md:h-4 mr-1.5 text-accent" />
             <span>Prep: {recipe.prepTime}, Cook: {recipe.cookTime}</span>
         </div>
-        <div className="flex flex-wrap justify-start items-center gap-x-3 gap-y-1 text-xs md:text-sm text-muted-foreground mb-2">
-          <div className="flex items-center">
-            <Flame className="w-3 h-3 md:w-4 md:h-4 mr-1 text-red-500" />
-            <span>{recipe.macrosPerServing.calories.toFixed(0)}kcal</span>
+        {recipe.macrosPerServing && (
+          <div className="flex flex-wrap justify-start items-center gap-x-3 gap-y-1 text-xs md:text-sm text-muted-foreground mb-2">
+            <div className="flex items-center">
+              <Flame className="w-3 h-3 md:w-4 md:h-4 mr-1 text-red-500" />
+              <span>{recipe.macrosPerServing.calories.toFixed(0)}kcal</span>
+            </div>
+            <div className="flex items-center">
+              <Beef className="w-3 h-3 md:w-4 md:h-4 mr-1 text-blue-500" />
+              <span>{recipe.macrosPerServing.protein.toFixed(0)}g P</span>
+            </div>
+            <div className="flex items-center">
+              <Wheat className="w-3 h-3 md:w-4 md:h-4 mr-1 text-green-500" />
+              <span>{recipe.macrosPerServing.carbs.toFixed(0)}g C</span>
+            </div>
+            <div className="flex items-center">
+              <Droplets className="w-3 h-3 md:w-4 md:h-4 mr-1 text-yellow-500" />
+              <span>{recipe.macrosPerServing.fat.toFixed(0)}g F</span>
+            </div>
           </div>
-          <div className="flex items-center">
-            <Beef className="w-3 h-3 md:w-4 md:h-4 mr-1 text-blue-500" />
-            <span>{recipe.macrosPerServing.protein.toFixed(0)}g P</span>
-          </div>
-          <div className="flex items-center">
-            <Wheat className="w-3 h-3 md:w-4 md:h-4 mr-1 text-green-500" />
-            <span>{recipe.macrosPerServing.carbs.toFixed(0)}g C</span>
-          </div>
-          <div className="flex items-center">
-            <Droplets className="w-3 h-3 md:w-4 md:h-4 mr-1 text-yellow-500" />
-            <span>{recipe.macrosPerServing.fat.toFixed(0)}g F</span>
-          </div>
-        </div>
+        )}
         {recipe.tags && recipe.tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {recipe.tags.slice(0, 3).map(tag => (
