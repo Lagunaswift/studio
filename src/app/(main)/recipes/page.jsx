@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2, Info, Wheat, Milk, Shell, Fish, Egg, TreeDeciduous, Drumstick, Heart, Plus } from 'lucide-react'; // Added Plus
+import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2, Info, Wheat, Milk, Shell, Fish, Egg, TreeDeciduous, Drumstick, Heart, Plus, Bean as Peanut } from 'lucide-react'; // Added Plus
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -19,10 +19,12 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from "@/components/ui/switch";
+
 const DIETARY_PREFERENCE_TO_TAG_MAP = {
     "Vegetarian": "V", "Vegan": "VG", "Pescatarian": "P", "Gluten-Free": "GF",
     "Dairy-Free": "DF", "Low Carb": "LC", "Keto": "KETO",
 };
+
 const ALLERGEN_KEYWORD_MAP = {
     nuts: ['nut', 'almond', 'walnut', 'pecan', 'cashew', 'pistachio', 'hazelnut', 'macadamia'],
     peanuts: ['peanut'],
@@ -35,12 +37,14 @@ const ALLERGEN_KEYWORD_MAP = {
     sesame: ['sesame', 'tahini'],
     mustard: ['mustard'],
 };
+
 const containsAllergenKeyword = (text, keywords) => {
     if (!text || typeof text !== 'string')
         return false;
     const lowerText = text.toLowerCase();
     return keywords.some(keyword => lowerText.includes(keyword));
 };
+
 function RecipesPageComponent() {
     const { userProfile, addMealToPlan, allRecipesCache, isRecipeCacheLoading, isRecipeFavorite, pantryItems } = useAppContext();
     const { toast } = useToast();
@@ -48,6 +52,7 @@ function RecipesPageComponent() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const searchTermFromUrl = searchParams.get('q') || '';
+
     const [searchTerm, setSearchTerm] = useState(searchTermFromUrl);
     const [selectedRecipe, setSelectedRecipe] = useState(null);
     const [showAddToPlanDialog, setShowAddToPlanDialog] = useState(false);
@@ -55,11 +60,14 @@ function RecipesPageComponent() {
     const [planMealType, setPlanMealType] = useState(MEAL_TYPES[0]);
     const [planServings, setPlanServings] = useState(1);
     const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+
     useEffect(() => {
         setSearchTerm(searchTermFromUrl);
     }, [searchTermFromUrl]);
+
     const activeDietaryFilters = useMemo(() => userProfile?.dietaryPreferences || [], [userProfile]);
     const activeAllergenFilters = useMemo(() => userProfile?.allergens || [], [userProfile]);
+
     const handleSearchChange = (newSearchTerm) => {
         setSearchTerm(newSearchTerm);
         const params = new URLSearchParams(searchParams.toString());
@@ -71,50 +79,55 @@ function RecipesPageComponent() {
         }
         router.replace(`${pathname}?${params.toString()}`);
     };
-    const filteredRecipes = useMemo(() => {
-        if (isRecipeCacheLoading)
-            return [];
+
+    const finalRecipesForDisplay = useMemo(() => {
+        if (isRecipeCacheLoading) return [];
+        
         let recipes = allRecipesCache;
+
         if (searchTerm.trim()) {
             const lowerSearchTerm = searchTerm.toLowerCase();
-            recipes = recipes.filter(recipe => recipe.name.toLowerCase().includes(lowerSearchTerm) ||
+            recipes = recipes.filter(recipe =>
+                recipe.name.toLowerCase().includes(lowerSearchTerm) ||
                 (recipe.description && recipe.description.toLowerCase().includes(lowerSearchTerm)) ||
-                (recipe.tags && recipe.tags.some(tag => tag.toLowerCase().includes(lowerSearchTerm))));
+                (recipe.tags && recipe.tags.some(tag => tag.toLowerCase().includes(lowerSearchTerm)))
+            );
         }
+
         if (activeDietaryFilters.length > 0) {
-            recipes = recipes.filter(recipe => activeDietaryFilters.every(preference => {
-                const targetTag = DIETARY_PREFERENCE_TO_TAG_MAP[preference];
-                return targetTag ? recipe.tags && recipe.tags.includes(targetTag) : true;
-            }));
+            recipes = recipes.filter(recipe =>
+                activeDietaryFilters.every(preference => {
+                    const targetTag = DIETARY_PREFERENCE_TO_TAG_MAP[preference];
+                    return targetTag ? recipe.tags && recipe.tags.includes(targetTag) : true;
+                })
+            );
         }
+
         if (activeAllergenFilters.length > 0) {
-            recipes = recipes.filter(recipe => !activeAllergenFilters.some(allergen => {
-                const keywords = ALLERGEN_KEYWORD_MAP[allergen.toLowerCase()];
-                if (!keywords)
+            recipes = recipes.filter(recipe =>
+                !activeAllergenFilters.some(allergen => {
+                    const keywords = ALLERGEN_KEYWORD_MAP[allergen.toLowerCase()];
+                    if (!keywords) return false;
+                    if (containsAllergenKeyword(recipe.name, keywords)) return true;
+                    if (recipe.ingredients.some(ing => containsAllergenKeyword(ing, keywords))) return true;
+                    if (allergen.toLowerCase() === 'nuts' && recipe.tags?.includes('N')) return true;
+                    const isGlutenAllergen = allergen.toLowerCase() === 'gluten';
+                    const isDietaryGlutenFree = activeDietaryFilters.includes("Gluten-Free");
+                    if (isGlutenAllergen && !isDietaryGlutenFree && !recipe.tags?.includes('GF')) {
+                        if (containsAllergenKeyword(recipe.name, ALLERGEN_KEYWORD_MAP.gluten)) return true;
+                        if (recipe.ingredients.some(ing => containsAllergenKeyword(ing, ALLERGEN_KEYWORD_MAP.gluten))) return true;
+                    }
                     return false;
-                if (containsAllergenKeyword(recipe.name, keywords))
-                    return true;
-                if (recipe.ingredients.some(ing => containsAllergenKeyword(ing, keywords)))
-                    return true;
-                if (allergen.toLowerCase() === 'nuts' && recipe.tags?.includes('N'))
-                    return true;
-                const isGlutenAllergen = allergen.toLowerCase() === 'gluten';
-                const isDietaryGlutenFree = activeDietaryFilters.includes("Gluten-Free");
-                if (isGlutenAllergen && !isDietaryGlutenFree && !recipe.tags?.includes('GF')) {
-                    if (containsAllergenKeyword(recipe.name, ALLERGEN_KEYWORD_MAP.gluten))
-                        return true;
-                    if (recipe.ingredients.some(ing => containsAllergenKeyword(ing, ALLERGEN_KEYWORD_MAP.gluten)))
-                        return true;
-                }
-                return false;
-            }));
+                })
+            );
         }
+
         if (showFavoritesOnly) {
             recipes = recipes.filter(recipe => isRecipeFavorite(recipe.id));
         }
         return recipes;
     }, [allRecipesCache, searchTerm, activeDietaryFilters, activeAllergenFilters, showFavoritesOnly, isRecipeFavorite, isRecipeCacheLoading]);
-    const finalRecipesForDisplay = filteredRecipes;
+    
     const calculatePantryMatch = useCallback((recipe, pantryItems) => {
         if (!pantryItems || pantryItems.length === 0 || !recipe.ingredients) {
             return { matched: 0, total: recipe.ingredients?.length || 0 };
@@ -132,12 +145,14 @@ function RecipesPageComponent() {
         });
         return { matched: matchedCount, total: recipe.ingredients.length };
     }, []);
+
     const handleOpenAddToPlanDialog = (recipe) => {
         setSelectedRecipe(recipe);
         setPlanServings(recipe.servings);
         setPlanDate(new Date());
         setShowAddToPlanDialog(true);
     };
+
     const handleAddToMealPlan = () => {
         if (selectedRecipe && planDate && planMealType && planServings > 0) {
             addMealToPlan(selectedRecipe, format(planDate, 'yyyy-MM-dd'), planMealType, planServings);
@@ -152,6 +167,7 @@ function RecipesPageComponent() {
             toast({ title: "Error", description: "Please fill all fields.", variant: 'destructive' });
         }
     };
+    
     const getIconForPreference = (preference) => {
         switch (preference.toLowerCase()) {
             case 'vegetarian':
@@ -160,10 +176,11 @@ function RecipesPageComponent() {
             default: return <Filter className="h-4 w-4 mr-1 text-blue-600"/>;
         }
     };
+
     const getIconForAllergen = (allergen) => {
         switch (allergen.toLowerCase()) {
-            case 'nuts':
-            case 'peanuts': return <TreeDeciduous className="h-4 w-4 mr-1 text-orange-600"/>;
+            case 'nuts': return <TreeDeciduous className="h-4 w-4 mr-1 text-orange-600"/>;
+            case 'peanuts': return <Peanut className="h-4 w-4 mr-1 text-orange-600"/>;
             case 'dairy': return <Milk className="h-4 w-4 mr-1 text-blue-400"/>;
             case 'eggs': return <Egg className="h-4 w-4 mr-1 text-yellow-500"/>;
             case 'fish': return <Fish className="h-4 w-4 mr-1 text-sky-500"/>;
@@ -171,7 +188,9 @@ function RecipesPageComponent() {
             default: return <Info className="h-4 w-4 mr-1 text-red-600"/>;
         }
     };
-    return (<PageWrapper>
+
+    return (
+    <PageWrapper>
       <div className="mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative flex-grow w-full md:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground"/>
@@ -297,6 +316,7 @@ function RecipesPageComponent() {
         </Dialog>)}
     </PageWrapper>);
 }
+
 export default function RecipesPage() {
     return (<Suspense fallback={<div>Loading...</div>}>
             <RecipesPageComponent />

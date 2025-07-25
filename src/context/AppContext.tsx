@@ -1,4 +1,3 @@
-
 //src/context/AppContext.tsx
 "use client";
 
@@ -348,10 +347,10 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     
         const recommendation = await runPreppy(preppyInput);
         
-        await updateUserProfile({ tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
+        await updateUserProfile({ tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') } as any);
 
         return { success: true, message: "Check-in complete!", recommendation };
-    }, [userProfile, getConsumedMacrosForDate, idToUse]);
+    }, [userProfile, getConsumedMacrosForDate]);
 
 
     return {
@@ -429,7 +428,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         showQuickRecipes: true,
     };
     const newSettings = { ...(userProfile?.dashboardSettings || defaultSettings), ...settings };
-    await setUserInformation({ dashboardSettings: newSettings });
+    await setUserInformation({ dashboardSettings: newSettings as DashboardSettings });
   }, [userProfile?.dashboardSettings, setUserInformation]);
 
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
@@ -487,8 +486,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const item = shoppingList.find(i => i.id === itemId);
       if(item) {
         // This is a local-only operation for now as 'purchased' state isn't in Firestore.
-        // It will be re-evaluated on next list generation.
-        // In a real app, you might store purchased status in a separate table.
+        // In a real app, this would be synced with a database.
         console.log("Toggling purchased status for item (local state):", item.name);
       }
   }, [shoppingList]);

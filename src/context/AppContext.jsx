@@ -10,6 +10,7 @@ import { calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList 
 import { runPreppy } from '@/ai/flows/pro-coach-flow';
 import { format, subDays, differenceInDays } from 'date-fns';
 import { addOrUpdateMealPlan, deleteMealFromPlan, addOrUpdatePantryItem, deletePantryItem, addRecipe as addRecipeAction, updateUserProfile } from '@/app/(main)/profile/actions';
+
 // --- Calculation Helpers ---
 const processProfile = (profileData) => {
     if (!profileData)
@@ -79,14 +80,20 @@ function useAppData(userId, isAuthLoading) {
     const [dailyVitalsLog, setDailyVitalsLog] = useState([]);
     const [dailyManualMacrosLog, setDailyManualMacrosLog] = useState([]);
     const [isDataLoading, setIsDataLoading] = useState(true);
+    const [isRecipeCacheLoading, setIsRecipeCacheLoading] = useState(true);
     const idToUse = useMemo(() => userId, [userId]);
     useEffect(() => {
         const unsubscribes = [];
+        setIsRecipeCacheLoading(true);
         // Listener for built-in recipes (where user_id is null)
         const builtInQuery = query(collection(db, "recipes"), where("user_id", "==", null));
         unsubscribes.push(onSnapshot(builtInQuery, (snapshot) => {
             const recipes = snapshot.docs.map(doc => ({ id: parseInt(doc.id, 10), ...doc.data() }));
             setBuiltInRecipes(recipes);
+            setIsRecipeCacheLoading(false);
+        }, (error) => {
+            console.error("Error fetching built-in recipes:", error);
+            setIsRecipeCacheLoading(false);
         }));
         if (!idToUse) {
             // If no user, only load built-in recipes and clear user data
@@ -224,12 +231,12 @@ function useAppData(userId, isAuthLoading) {
             currentFatTarget: userProfile.macroTargets?.fat || 0,
         };
         const recommendation = await runPreppy(preppyInput);
-        await updateUserProfile({ id: idToUse, tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
+        await updateUserProfile({ tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
         return { success: true, message: "Check-in complete!", recommendation };
-    }, [userProfile, getConsumedMacrosForDate, idToUse]);
+    }, [userProfile, getConsumedMacrosForDate, idToUse, updateUserProfile]);
     return {
         mealPlan, pantryItems, userRecipes, userProfile,
-        isAppDataLoading, isSubscribed, allRecipesCache,
+        isAppDataLoading, isRecipeCacheLoading, isSubscribed, allRecipesCache,
         shoppingList, getConsumedMacrosForDate, getPlannedMacrosForDate,
         getMealsForDate, isRecipeFavorite, runWeeklyCheckin
     };
@@ -248,7 +255,7 @@ export const AppProvider = ({ children }) => {
             window.removeEventListener('offline', handleOffline);
         };
     }, []);
-    const { mealPlan, pantryItems, userRecipes, userProfile, isAppDataLoading, isSubscribed, allRecipesCache, shoppingList, getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite, runWeeklyCheckin } = useAppData(user?.uid, isAuthLoading);
+    const { mealPlan, pantryItems, userRecipes, userProfile, isAppDataLoading, isRecipeCacheLoading, isSubscribed, allRecipesCache, shoppingList, getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite, runWeeklyCheckin } = useAppData(user?.uid, isAuthLoading);
     const callServerActionWithAuth = useCallback(async (action, ...args) => {
         if (!user) {
             console.error("Attempted to call server action without authenticated user.");
@@ -274,7 +281,13 @@ export const AppProvider = ({ children }) => {
         await setUserInformation({ mealStructure: structure });
     }, [setUserInformation]);
     const setDashboardSettings = useCallback(async (settings) => {
-        const newSettings = { ...(userProfile?.dashboardSettings || {}), ...settings };
+        const defaultSettings = {
+            showMacros: true,
+            showMenu: true,
+            showFeaturedRecipe: true,
+            showQuickRecipes: true,
+        };
+        const newSettings = { ...(userProfile?.dashboardSettings || defaultSettings), ...settings };
         await setUserInformation({ dashboardSettings: newSettings });
     }, [userProfile?.dashboardSettings, setUserInformation]);
     const addMealToPlan = useCallback(async (recipe, date, mealType, servings) => {
@@ -321,6 +334,14 @@ export const AppProvider = ({ children }) => {
             : [...currentFavorites, recipeId];
         await setUserInformation({ favorite_recipe_ids: newFavorites });
     }, [userProfile, setUserInformation]);
+    const toggleShoppingListItem = useCallback(async (itemId) => {
+        const item = shoppingList.find(i => i.id === itemId);
+        if (item) {
+            // This is a local-only operation for now as 'purchased' state isn't in Firestore.
+            // In a real app, this would be synced with a database.
+            console.log("Toggling purchased status for item (local state):", item.name);
+        }
+    }, [shoppingList]);
     const assignIngredientCategory = useCallback((ingredientName) => {
         return assignCategoryUtil(ingredientName);
     }, []);
@@ -363,20 +384,20 @@ export const AppProvider = ({ children }) => {
     }, [callServerActionWithAuth]);
     const contextValue = useMemo(() => ({
         mealPlan, pantryItems, userRecipes, userProfile,
-        allRecipesCache, shoppingList, isAppDataLoading, isOnline, isSubscribed,
+        allRecipesCache, shoppingList, isAppDataLoading, isRecipeCacheLoading, isOnline, isSubscribed,
         addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus,
         clearMealPlanForDate, clearEntireMealPlan,
-        toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
+        toggleFavoriteRecipe, toggleShoppingListItem, addPantryItem, removePantryItem, updatePantryItemQuantity,
         addCustomRecipe, runWeeklyCheckin,
         setUserInformation, setMacroTargets, setMealStructure, setDashboardSettings, acceptTerms,
         assignIngredientCategory,
         getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
     }), [
         mealPlan, pantryItems, userRecipes, userProfile,
-        allRecipesCache, shoppingList, isAppDataLoading, isOnline, isSubscribed,
+        allRecipesCache, shoppingList, isAppDataLoading, isRecipeCacheLoading, isOnline, isSubscribed,
         addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus,
         clearMealPlanForDate, clearEntireMealPlan,
-        toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
+        toggleFavoriteRecipe, toggleShoppingListItem, addPantryItem, removePantryItem, updatePantryItemQuantity,
         addCustomRecipe, runWeeklyCheckin, setUserInformation, setMacroTargets, setMealStructure,
         setDashboardSettings, acceptTerms, assignIngredientCategory, getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
     ]);
