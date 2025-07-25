@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { getFirebaseAuth } from '@/lib/firebase';
 const loginSchema = z.object({
     email: z.string().email({ message: "Invalid email address." }),
     password: z.string().min(1, { message: "Password is required." }),
@@ -24,6 +24,7 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [isClient, setIsClient] = useState(false);
     const { user } = useAuth();
+    const auth = getFirebaseAuth();
     useEffect(() => {
         setIsClient(true);
         if (user) {
