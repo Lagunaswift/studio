@@ -5,8 +5,8 @@ import { config } from 'dotenv';
 import path from 'path';
 import recipes from './converted_recipes_for_seeding.json';
 
-// Load environment variables from .env file
-config({ path: path.resolve(process.cwd(), '.env') });
+// Load environment variables from .env.local
+config({ path: '.env.local' });
 
 // --- Initialize Firebase Admin SDK ---
 const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64;
