@@ -6,7 +6,8 @@ import { headers } from 'next/headers';
 import type { DailyVitalsLog, DailyManualMacrosLog, RecipeFormData, UserProfileSettings } from '@/types';
 import { getAuth, getDb } from '@/lib/firebase-admin'; 
 import { processBugReport } from '@/ai/flows/report-bug-flow';
-import type { BugReportInput, BugReportOutput } from '@/ai/flows/schemas';
+import type { BugReportInput, BugReportOutput } from '@/ai/flows/report-bug-flow';
+import * as admin from 'firebase-admin';
 
 async function getUserId(): Promise<string | null> {
   const authorization = headers().get('Authorization');
@@ -17,7 +18,8 @@ async function getUserId(): Promise<string | null> {
   const idToken = authorization.split('Bearer ')[1];
 
   try {
-    const decodedToken = await getAuth().verifyIdToken(idToken);
+    const adminAuth = getAuth();
+    const decodedToken = await adminAuth.verifyIdToken(idToken);
     return decodedToken.uid;
   } catch (error) {
     console.error("getUserId: Error verifying ID token:", error);

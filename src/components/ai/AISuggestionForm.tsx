@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, Loader2 } from 'lucide-react';
-import type { SuggestMealPlanInput, SuggestMealPlanOutput } from '@/ai/flows/suggest-meal-plan';
+
 
 const formSchema = z.object({
   dietaryGoals: z.string().min(10, { message: "Please describe your dietary goals in at least 10 characters." }),
@@ -20,7 +20,7 @@ const formSchema = z.object({
 type AISuggestionFormValues = z.infer<typeof formSchema>;
 
 interface AISuggestionFormProps {
-  onSubmit: (data: SuggestMealPlanInput) => Promise<SuggestMealPlanOutput | null>;
+  onSubmit: (data: any) => Promise<any | null>;
   isLoading: boolean;
 }
 

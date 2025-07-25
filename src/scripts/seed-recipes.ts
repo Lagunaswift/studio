@@ -1,12 +1,19 @@
 
 // scripts/seed-recipes.ts
-import { getDb } from '@/lib/firebase-admin';
+import * as admin from 'firebase-admin';
+import { getDb } from '@/lib/firebase-admin'; // Use the robust getter
+import { config } from 'dotenv';
+import path from 'path';
 import recipes from './converted_recipes_for_seeding.json';
 
-async function seedDatabase() {
-  const db = getDb(); // Safely get the initialized DB instance
-  const recipesCollection = db.collection('recipes');
+// Load environment variables from .env file
+config({ path: path.resolve(process.cwd(), '.env') });
 
+
+const db = getDb();
+const recipesCollection = db.collection('recipes');
+
+async function seedDatabase() {
   if (!recipes || (recipes as any[]).length === 0) {
     console.log("No recipes found in converted_recipes_for_seeding.json. Exiting.");
     return;
