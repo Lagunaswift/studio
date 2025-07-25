@@ -17,7 +17,10 @@ import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL
 import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale, Award, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from '@/components/ui/skeleton';
-
+import Link from 'next/link';
+import { Slider } from '@/components/ui/slider';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Label } from '@/components/ui/label';
 
 const calculateLBM = (weightKg: number | null | undefined, bodyFatPercentage: number | null | undefined): number | null => {
     if (weightKg && weightKg > 0 && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
@@ -153,7 +156,7 @@ function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserPr
       hip_circumference_cm: userProfile.hip_circumference_cm || null,
     },
   });
-
+  
   // Set form values once userProfile is available
   useEffect(() => {
     if(userProfile) {
