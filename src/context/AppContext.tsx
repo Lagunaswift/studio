@@ -187,148 +187,18 @@ function getDefaultUserProfile(userId: string, userEmail: string | null): UserPr
   };
 }
 
-function useAppData(userId: string | undefined, userEmail: string | null | undefined, isAuthLoading: boolean) {
-    const [userProfileData, setUserProfileData] = useState<UserProfileSettings | null>(null);
-    const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
-    const [builtInRecipes, setBuiltInRecipes] = useState<Recipe[]>([]);
-    const [mealPlan, setMealPlan] = useState<PlannedMeal[]>([]);
-    const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
-    const [dailyWeightLog, setDailyWeightLog] = useState<DailyWeightLog[]>([]);
-    const [dailyVitalsLog, setDailyVitalsLog] = useState<DailyVitalsLog[]>([]);
-    const [dailyManualMacrosLog, setDailyManualMacrosLog] = useState<DailyManualMacrosLog[]>([]);
-    const [isDataLoading, setIsDataLoading] = useState(true);
-    const [isRecipeCacheLoading, setIsRecipeCacheLoading] = useState(true);
-
-    const idToUse = useMemo(() => userId, [userId]);
-    
-    useEffect(() => {
-      const unsubscribes: (() => void)[] = [];
-
-      setIsRecipeCacheLoading(true);
-      const builtInQuery = query(collection(db, "recipes"), where("user_id", "==", null));
-      unsubscribes.push(onSnapshot(builtInQuery, (snapshot) => {
-        const recipes = snapshot.docs.map(doc => ({ id: parseInt(doc.id, 10), ...doc.data() } as Recipe));
-        setBuiltInRecipes(recipes);
-        setIsRecipeCacheLoading(false);
-      }, (error) => {
-        console.error("Error fetching built-in recipes:", error);
-        setIsRecipeCacheLoading(false);
-      }));
-
-      if (!idToUse) {
-        setUserProfileData(null);
-        setUserRecipes([]);
-        setMealPlan([]);
-        setPantryItems([]);
-        setDailyWeightLog([]);
-        setDailyVitalsLog([]);
-        setDailyManualMacrosLog([]);
-        setIsDataLoading(false);
-      } else {
-        setIsDataLoading(true);
-
-        unsubscribes.push(onSnapshot(doc(db, "profiles", idToUse), (doc) => {
-            if (doc.exists()) {
-              setUserProfileData(doc.data() as UserProfileSettings);
-            } else {
-              setUserProfileData(getDefaultUserProfile(idToUse, userEmail || null));
-            }
-        }));
-
-        const collections: {name: string, setter: React.Dispatch<any>}[] = [
-            { name: "recipes", setter: setUserRecipes },
-            { name: "planned_meals", setter: setMealPlan },
-            { name: "pantry_items", setter: setPantryItems },
-            { name: "daily_weight_logs", setter: setDailyWeightLog },
-            { name: "daily_vitals_logs", setter: setDailyVitalsLog },
-            { name: "daily_manual_macros_logs", setter: setDailyManualMacrosLog },
-        ];
-
-        collections.forEach(c => {
-            const q = query(collection(db, c.name), where("user_id", "==", idToUse));
-            unsubscribes.push(onSnapshot(q, (querySnapshot) => {
-                const items = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                c.setter(items);
-            }));
-        });
-        
-        const initialLoadTimer = setTimeout(() => setIsDataLoading(false), 2000); 
-        unsubscribes.push(() => clearTimeout(initialLoadTimer));
-      }
-
-      return () => unsubscribes.forEach(unsub => unsub());
-
-    }, [idToUse, userEmail]);
-
-    const userProfile = useMemo(() => {
-        if (!userProfileData) return null;
-        const processed = processProfile(userProfileData);
-        if (!processed) return userProfileData;
-
-        return {
-            ...processed,
-            dailyWeightLog,
-            dailyVitalsLog,
-            dailyManualMacrosLog,
-        };
-    }, [userProfileData, dailyWeightLog, dailyVitalsLog, dailyManualMacrosLog]);
-
-
-    const isSubscribed = useMemo(() => userProfile?.subscription_status === 'active', [userProfile?.subscription_status]);
-    
-    const isAppDataLoading = isAuthLoading || isDataLoading;
-
-    const allRecipesCache = useMemo(() => {
-        let recipes = [...userRecipes, ...builtInRecipes];
-        recipes = Array.from(new Map(recipes.map(recipe => [recipe.id, recipe])).values());
-        
-        if (isSubscribed) {
-          return recipes;
-        } else {
-          const freeRecipes = recipes.filter(r => !r.isCustom).slice(0, 15);
-          const customRecipes = recipes.filter(r => r.isCustom);
-          return [...freeRecipes, ...customRecipes];
-        }
-
-    }, [userRecipes, builtInRecipes, isSubscribed]);
-
-    const favoriteRecipeIds = useMemo(() => userProfile?.favorite_recipe_ids || [], [userProfile]);
-
-    const shoppingList = useMemo(() => {
-        if (isAppDataLoading || !mealPlan || !allRecipesCache || !pantryItems) return [];
-        return generateShoppingListUtil(mealPlan, allRecipesCache, pantryItems);
-    }, [mealPlan, pantryItems, allRecipesCache, isAppDataLoading]);
-
-    const getConsumedMacrosForDate = useCallback((date: string): Macros => {
-        const manualLog = dailyManualMacrosLog?.find(log => log.date === date);
-        if (manualLog) {
-          return manualLog.macros;
-        }
-        return calculateTotalMacrosUtil(mealPlan?.filter(pm => pm.date === date && pm.status === 'eaten') || [], allRecipesCache);
-    }, [mealPlan, allRecipesCache, dailyManualMacrosLog]);
-    
-    const getPlannedMacrosForDate = useCallback((date: string): Macros => calculateTotalMacrosUtil(mealPlan?.filter(pm => pm.date === date) || [], allRecipesCache), [mealPlan, allRecipesCache]);
-    
-    const getMealsForDate = useCallback((date: string): PlannedMeal[] => {
-        return (mealPlan || [])
-          .filter(pm => pm.date === date)
-          .map(pm => ({ ...pm, recipeDetails: allRecipesCache.find(r => r.id === pm.recipeId) }));
-    }, [mealPlan, allRecipesCache]);
-
-    const isRecipeFavorite = useCallback((recipeId: number): boolean => (favoriteRecipeIds || []).includes(recipeId), [favoriteRecipeIds]);
-
-    return {
-        mealPlan, pantryItems, userRecipes, userProfile,
-        isAppDataLoading, isRecipeCacheLoading, isSubscribed, allRecipesCache,
-        shoppingList, getConsumedMacrosForDate, getPlannedMacrosForDate,
-        getMealsForDate, isRecipeFavorite
-    };
-}
-
-
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoading: isAuthLoading } = useAuth();
-  
+  const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
+  const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
+  const [builtInRecipes, setBuiltInRecipes] = useState<Recipe[]>([]);
+  const [mealPlan, setMealPlan] = useState<PlannedMeal[]>([]);
+  const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
+  const [dailyWeightLog, setDailyWeightLog] = useState<DailyWeightLog[]>([]);
+  const [dailyVitalsLog, setDailyVitalsLog] = useState<DailyVitalsLog[]>([]);
+  const [dailyManualMacrosLog, setDailyManualMacrosLog] = useState<DailyManualMacrosLog[]>([]);
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  const [isRecipeCacheLoading, setIsRecipeCacheLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true); 
 
   useEffect(() => {
@@ -345,13 +215,72 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-  
-  const appData = useAppData(user?.uid, user?.email, isAuthLoading);
 
-  const callServerActionWithAuth = useCallback(async (action: (...args: any[]) => Promise<any>, ...args: any[]) => {
+  useEffect(() => {
+    const unsubscribes: (() => void)[] = [];
+
+    setIsRecipeCacheLoading(true);
+    const builtInQuery = query(collection(db, "recipes"), where("user_id", "==", null));
+    unsubscribes.push(onSnapshot(builtInQuery, (snapshot) => {
+      const recipes = snapshot.docs.map(doc => ({ id: parseInt(doc.id, 10), ...doc.data() } as Recipe));
+      setBuiltInRecipes(recipes);
+      setIsRecipeCacheLoading(false);
+    }, (error) => {
+      console.error("Error fetching built-in recipes:", error);
+      setIsRecipeCacheLoading(false);
+    }));
+    
+    if (user?.uid) {
+        setIsDataLoading(true);
+
+        const profileUnsub = onSnapshot(doc(db, "profiles", user.uid), (doc) => {
+            if (doc.exists()) {
+                const data = doc.data() as UserProfileSettings;
+                setUserProfile(processProfile(data));
+            } else {
+                 const defaultProfile = getDefaultUserProfile(user.uid, user.email);
+                 setUserProfile(processProfile(defaultProfile));
+            }
+        });
+        unsubscribes.push(profileUnsub);
+
+        const collections: {name: string, setter: React.Dispatch<any>}[] = [
+            { name: "recipes", setter: setUserRecipes },
+            { name: "planned_meals", setter: setMealPlan },
+            { name: "pantry_items", setter: setPantryItems },
+            { name: "daily_weight_logs", setter: setDailyWeightLog },
+            { name: "daily_vitals_logs", setter: setDailyVitalsLog },
+            { name: "daily_manual_macros_logs", setter: setDailyManualMacrosLog },
+        ];
+        
+        collections.forEach(c => {
+            const q = query(collection(db, c.name), where("user_id", "==", user.uid));
+            unsubscribes.push(onSnapshot(q, (querySnapshot) => {
+                const items = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                c.setter(items);
+            }));
+        });
+        
+        const initialLoadTimer = setTimeout(() => setIsDataLoading(false), 2000); 
+        unsubscribes.push(() => clearTimeout(initialLoadTimer));
+    } else if (!isAuthLoading) {
+        // No user and auth is not loading anymore
+        setIsDataLoading(false);
+        setUserProfile(null);
+        setUserRecipes([]);
+        setMealPlan([]);
+        setPantryItems([]);
+        setDailyWeightLog([]);
+        setDailyVitalsLog([]);
+        setDailyManualMacrosLog([]);
+    }
+
+    return () => unsubscribes.forEach(unsub => unsub());
+  }, [user?.uid, user?.email, isAuthLoading]);
+  
+  const callServerActionWithAuth = useCallback(async (action: (idToken: string, ...args: any[]) => Promise<any>, ...args: any[]) => {
     if (!user) {
-        console.error("Attempted to call server action without authenticated user.");
-        throw new Error("Authentication required.");
+        throw new Error("You must be logged in to perform this action.");
     }
     const idToken = await user.getIdToken(true);
     return action(idToken, ...args);
@@ -360,29 +289,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
     await callServerActionWithAuth(updateUserProfile, updates);
   }, [callServerActionWithAuth]);
-
-  const acceptTerms = useCallback(async () => {
-    await setUserInformation({ has_accepted_terms: true });
-  }, [setUserInformation]);
-
-  const setMacroTargets = useCallback(async (targets: Macros) => {
-    await setUserInformation({ macroTargets: targets });
-  }, [setUserInformation]);
-  
-  const setMealStructure = useCallback(async (structure: MealSlotConfig[]) => {
-    await setUserInformation({ mealStructure: structure });
-  }, [setUserInformation]);
-
-  const setDashboardSettings = useCallback(async (settings: Partial<DashboardSettings>) => {
-    const defaultSettings: DashboardSettings = {
-        showMacros: true,
-        showMenu: true,
-        showFeaturedRecipe: true,
-        showQuickRecipes: true,
-    };
-    const newSettings = { ...(appData.userProfile?.dashboardSettings || defaultSettings), ...settings };
-    await setUserInformation({ dashboardSettings: newSettings as DashboardSettings });
-  }, [appData.userProfile?.dashboardSettings, setUserInformation]);
 
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
     const newPlannedMeal: Partial<Omit<PlannedMeal, 'id' | 'user_id' | 'recipeDetails'>> = { 
@@ -394,61 +300,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     await callServerActionWithAuth(addOrUpdateMealPlan, newPlannedMeal);
   }, [callServerActionWithAuth]);
-
+  
   const removeMealFromPlan = useCallback(async (plannedMealId: string) => {
     await callServerActionWithAuth(deleteMealFromPlan, plannedMealId);
   }, [callServerActionWithAuth]);
 
   const updateMealServingsOrStatus = useCallback(async (plannedMealId: string, updates: Partial<Pick<PlannedMeal, 'servings' | 'status'>>) => {
-      const meal = appData.mealPlan.find(m => m.id === plannedMealId);
+      const meal = mealPlan.find(m => m.id === plannedMealId);
       if (!meal) throw new Error("Meal not found locally.");
       
       const { recipeDetails, ...restOfMeal } = meal;
       const updatedMealData = { ...restOfMeal, ...updates };
 
       await callServerActionWithAuth(addOrUpdateMealPlan, updatedMealData);
-  }, [appData.mealPlan, callServerActionWithAuth]);
-
-  const updatePlannedMealServings = (plannedMealId: string, newServings: number) => updateMealServingsOrStatus(plannedMealId, { servings: newServings });
-  const updateMealStatus = (plannedMealId: string, status: 'planned' | 'eaten') => updateMealServingsOrStatus(plannedMealId, { status });
-
-  const clearMealPlanForDate = useCallback(async (date: string) => {
-    const mealsToDelete = appData.mealPlan.filter(pm => pm.date === date);
-    for (const meal of mealsToDelete) {
-        await callServerActionWithAuth(deleteMealFromPlan, meal.id);
-    }
-  }, [appData.mealPlan, callServerActionWithAuth]);
-
-  const clearEntireMealPlan = useCallback(async () => {
-    for (const meal of appData.mealPlan) {
-        await callServerActionWithAuth(deleteMealFromPlan, meal.id);
-    }
-  }, [appData.mealPlan, callServerActionWithAuth]);
-
-  const toggleFavoriteRecipe = useCallback(async (recipeId: number) => {
-    if (!appData.userProfile) return;
-    const currentFavorites = appData.userProfile.favorite_recipe_ids || [];
-    const isCurrentlyFavorite = currentFavorites.includes(recipeId);
-    const newFavorites = isCurrentlyFavorite
-      ? currentFavorites.filter(id => id !== recipeId)
-      : [...currentFavorites, recipeId];
-    await setUserInformation({ favorite_recipe_ids: newFavorites });
-  }, [appData.userProfile, setUserInformation]);
+  }, [mealPlan, callServerActionWithAuth]);
   
-  const toggleShoppingListItem = useCallback(async (itemId: string) => {
-      const item = appData.shoppingList.find(i => i.id === itemId);
-      if(item) {
-        console.log("Toggling purchased status for item (local state):", item.name);
-      }
-  }, [appData.shoppingList]);
-
-
-  const assignIngredientCategory = useCallback((ingredientName: string): UKSupermarketCategory => {
-    return assignCategoryUtil(ingredientName);
-  }, []);
-
   const addPantryItem = useCallback(async (name: string, quantity: number, unit: string, category: string, expiryDate?: string) => {
-    const existingItem = appData.pantryItems.find(item => 
+    const existingItem = pantryItems.find(item => 
         item.name.toLowerCase() === name.toLowerCase() && item.unit === unit
     );
 
@@ -468,7 +336,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
     }
     await callServerActionWithAuth(addOrUpdatePantryItem, itemToSave);
-  }, [appData.pantryItems, callServerActionWithAuth]);
+  }, [pantryItems, callServerActionWithAuth]);
 
   const removePantryItem = useCallback(async (itemId: string) => {
     await callServerActionWithAuth(deletePantryItem, itemId);
@@ -478,25 +346,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (newQuantity <= 0) {
       return removePantryItem(itemId);
     }
-    const item = appData.pantryItems.find(p => p.id === itemId);
+    const item = pantryItems.find(p => p.id === itemId);
     if (!item) throw new Error("Pantry item not found locally.");
     
     const { user_id, ...restOfItem } = item;
     const updatedItem = { ...restOfItem, quantity: newQuantity };
     await callServerActionWithAuth(addOrUpdatePantryItem, updatedItem);
-  }, [appData.pantryItems, removePantryItem, callServerActionWithAuth]);
-
-  const addCustomRecipe = useCallback(async (recipeData: RecipeFormData) => {
-    return await callServerActionWithAuth(addRecipeAction, recipeData);
-  }, [callServerActionWithAuth]);
+  }, [pantryItems, removePantryItem, callServerActionWithAuth]);
+  
+  const getConsumedMacrosForDate = useCallback((date: string): Macros => {
+    const manualLog = dailyManualMacrosLog?.find(log => log.date === date);
+    if (manualLog) {
+      return manualLog.macros;
+    }
+    return calculateTotalMacrosUtil(mealPlan?.filter(pm => pm.date === date && pm.status === 'eaten') || [], builtInRecipes.concat(userRecipes));
+  }, [mealPlan, builtInRecipes, userRecipes, dailyManualMacrosLog]);
 
   const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: PreppyOutput | null }> => {
-    const userProfile = appData.userProfile;
-    if (!userProfile || !userProfile.dailyWeightLog || userProfile.dailyWeightLog.length < 14) {
+    if (!userProfile || !dailyWeightLog || dailyWeightLog.length < 14) {
       return { success: false, message: "At least 14 days of weight and calorie data are needed for an accurate calculation." };
     }
     
-    const logsWithTrend = calculateTrendWeight(userProfile.dailyWeightLog);
+    const logsWithTrend = calculateTrendWeight(dailyWeightLog);
     const validTrendLogs = logsWithTrend.filter(log => log.trendWeightKg !== undefined);
 
     if (validTrendLogs.length < 7) {
@@ -517,7 +388,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let daysWithCalorieData = 0;
     
     for (const date of datesInPeriod) {
-        const consumed = appData.getConsumedMacrosForDate(date);
+        const consumed = getConsumedMacrosForDate(date);
         if (consumed && consumed.calories > 0) {
             totalCalories += consumed.calories;
             daysWithCalorieData++;
@@ -558,26 +429,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await callServerActionWithAuth(updateUserProfile, { tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
 
     return { success: true, message: "Check-in complete!", recommendation };
-  }, [appData.userProfile, appData.getConsumedMacrosForDate, callServerActionWithAuth]);
-
-
+  }, [userProfile, dailyWeightLog, getConsumedMacrosForDate, callServerActionWithAuth]);
+  
   const contextValue: AppContextType = useMemo(() => ({
-    ...appData,
-    addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus, 
-    clearMealPlanForDate, clearEntireMealPlan,
-    toggleFavoriteRecipe, toggleShoppingListItem, addPantryItem, removePantryItem, updatePantryItemQuantity,
-    addCustomRecipe, runWeeklyCheckin,
-    setUserInformation, setMacroTargets, setMealStructure, setDashboardSettings, acceptTerms,
-    assignIngredientCategory,
+    userProfile,
+    userRecipes,
+    mealPlan,
+    pantryItems,
+    isAppDataLoading: isDataLoading,
+    isRecipeCacheLoading,
+    isSubscribed: userProfile?.subscription_status === 'active',
     isOnline,
+    allRecipesCache: Array.from(new Map([...builtInRecipes, ...userRecipes].map(recipe => [recipe.id, recipe])).values()),
+    shoppingList: generateShoppingListUtil(mealPlan, [...builtInRecipes, ...userRecipes], pantryItems),
+    
+    getConsumedMacrosForDate,
+    getPlannedMacrosForDate: (date: string) => calculateTotalMacrosUtil(mealPlan.filter(pm => pm.date === date), [...builtInRecipes, ...userRecipes]),
+    getMealsForDate: (date: string) => mealPlan.filter(pm => pm.date === date).map(pm => ({ ...pm, recipeDetails: [...builtInRecipes, ...userRecipes].find(r => r.id === pm.recipeId) })),
+    isRecipeFavorite: (recipeId: number) => userProfile?.favorite_recipe_ids?.includes(recipeId) || false,
+    
+    addMealToPlan,
+    removeMealFromPlan,
+    updatePlannedMealServings: (plannedMealId: string, newServings: number) => updateMealServingsOrStatus(plannedMealId, { servings: newServings }),
+    updateMealStatus: (plannedMealId: string, status: 'planned' | 'eaten') => updateMealServingsOrStatus(plannedMealId, { status }),
+    clearMealPlanForDate: (date: string) => {
+        const mealsToDelete = mealPlan.filter(pm => pm.date === date);
+        mealsToDelete.forEach(meal => callServerActionWithAuth(deleteMealFromPlan, meal.id));
+    },
+    clearEntireMealPlan: () => {
+        mealPlan.forEach(meal => callServerActionWithAuth(deleteMealFromPlan, meal.id));
+    },
+    toggleFavoriteRecipe: async (recipeId: number) => {
+        if (!userProfile) return;
+        const currentFavorites = userProfile.favorite_recipe_ids || [];
+        const newFavorites = currentFavorites.includes(recipeId)
+          ? currentFavorites.filter(id => id !== recipeId)
+          : [...currentFavorites, recipeId];
+        await setUserInformation({ favorite_recipe_ids: newFavorites });
+    },
+    toggleShoppingListItem: async (itemId: string) => {
+        console.warn("Toggling shopping list item is not implemented with Firestore yet.");
+    },
+    addPantryItem,
+    removePantryItem,
+    updatePantryItemQuantity,
+    addCustomRecipe: (recipeData: RecipeFormData) => callServerActionWithAuth(addRecipeAction, recipeData),
+    runWeeklyCheckin,
+    setUserInformation,
+    setMacroTargets: (targets: Macros) => setUserInformation({ macroTargets: targets }),
+    setMealStructure: (structure: MealSlotConfig[]) => setUserInformation({ mealStructure: structure }),
+    setDashboardSettings: (settings: Partial<DashboardSettings>) => {
+      const defaultSettings: DashboardSettings = { showMacros: true, showMenu: true, showFeaturedRecipe: true, showQuickRecipes: true };
+      const newSettings = { ...(userProfile?.dashboardSettings || defaultSettings), ...settings };
+      setUserInformation({ dashboardSettings: newSettings });
+    },
+    acceptTerms: () => setUserInformation({ has_accepted_terms: true }),
+    assignIngredientCategory: assignCategoryUtil,
   }), [
-    appData,
-    isOnline,
-    addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus,
-    clearMealPlanForDate, clearEntireMealPlan, 
-    toggleFavoriteRecipe, toggleShoppingListItem, addPantryItem, removePantryItem, updatePantryItemQuantity,
-    addCustomRecipe, runWeeklyCheckin, setUserInformation, setMacroTargets, setMealStructure,
-    setDashboardSettings, acceptTerms, assignIngredientCategory,
+    userProfile, userRecipes, builtInRecipes, mealPlan, pantryItems, isDataLoading, isRecipeCacheLoading, isOnline,
+    addMealToPlan, removeMealFromPlan, updateMealServingsOrStatus, callServerActionWithAuth, getConsumedMacrosForDate,
+    setUserInformation, addPantryItem, removePantryItem, updatePantryItemQuantity, runWeeklyCheckin
   ]);
   
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
