@@ -99,7 +99,7 @@ function DailyVitalsCheckin() {
     const vitalsData = { date: clientTodayDate, user_id: user.uid, ...data };
     
     startTransition(async () => {
-        const result = await addOrUpdateVitalsLog(vitalsData);
+        const result = await addOrUpdateVitalsLog(vitalsData as any);
 
         if (result.error) {
             toast({ title: "Error Saving Vitals", description: result.error, variant: "destructive" });
@@ -486,7 +486,7 @@ function ManualMacroLog() {
         const macroData = { date: clientTodayDate, macros: data, user_id: user.uid };
 
         startTransition(async () => {
-            const result = await addOrUpdateManualMacrosLog(macroData);
+            const result = await addOrUpdateManualMacrosLog(macroData as any);
             if (result.error) {
                 toast({ title: "Error Saving Macros", description: result.error, variant: "destructive" });
             } else {
@@ -570,13 +570,14 @@ function VitalsHistoryCharts() {
     const sorenessMap: Record<SorenessLevel, number> = { none: 1, mild: 2, moderate: 3, severe: 4 };
     const activityMap: Record<ActivityYesterdayLevel, number> = { rest: 1, light: 2, moderate: 3, strenuous: 4 };
 
-    return last14Days.map(log => ({
-      date: format(parseISO(log.date), 'dd/MM'),
+    const formattedData = last14Days.map(log => ({
       ...log,
+      date: format(parseISO(log.date), 'dd/MM'),
       energyValue: energyMap[log.energyLevel] || 0,
       sorenessValue: sorenessMap[log.muscleSoreness] || 0,
       activityValue: activityMap[log.activityYesterday] || 0,
     }));
+    return formattedData;
   }, [userProfile?.dailyVitalsLog]);
   
   if (!isSubscribed) {
