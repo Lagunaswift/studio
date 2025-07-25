@@ -1,9 +1,70 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // By default, deny all client-side reads and writes.
-    // Server-side admin SDK access is not affected by these rules.
+
+    // Helper function to check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if the user is the owner of a document
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Profiles: Users can read their own profile and create it. They can only update their own.
+    match /profiles/{userId} {
+      allow read, update: if isAuthenticated() && isOwner(userId);
+      allow create: if isAuthenticated();
+    }
+
+    // Recipes: 
+    // - Allow any authenticated user to read all recipes (both built-in and custom).
+    // - Allow users to create new custom recipes.
+    // - Allow users to update or delete ONLY their own custom recipes.
+    match /recipes/{recipeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && isOwner(resource.data.user_id);
+    }
+    
+    // Planned Meals: Users can only manage their own meal plan entries.
+    match /planned_meals/{mealId} {
+        allow read, write: if isAuthenticated() && isOwner(resource.data.user_id);
+        allow create: if isAuthenticated();
+    }
+
+    // Pantry Items: Users can only manage their own pantry items.
+    match /pantry_items/{itemId} {
+        allow read, write: if isAuthenticated() && isOwner(resource.data.user_id);
+        allow create: if isAuthenticated();
+    }
+    
+    // Daily Logs (Weight, Vitals, Manual Macros): Users can only manage their own logs.
+    match /daily_weight_logs/{logId} {
+        allow read, write: if isAuthenticated() && isOwner(resource.data.user_id);
+        allow create: if isAuthenticated();
+    }
+
+    match /daily_vitals_logs/{logId} {
+        allow read, write: if isAuthenticated() && isOwner(resource.data.user_id);
+        allow create: if isAuthenticated();
+    }
+
+    match /daily_manual_macros_logs/{logId} {
+        allow read, write: if isAuthenticated() && isOwner(resource.data.user_id);
+        allow create: if isAuthenticated();
+    }
+    
+    // Bug Reports: Any authenticated user can create a report. No one can read/update/delete.
+    match /bug_reports/{reportId} {
+        allow create: if isAuthenticated();
+        allow read, write, delete: if false;
+    }
+
+    // Default deny all other access
     match /{document=**} {
       allow read, write: if false;
     }
