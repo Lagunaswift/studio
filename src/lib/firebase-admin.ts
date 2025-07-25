@@ -12,7 +12,6 @@ function initializeFirebaseAdmin() {
     
   if (!serviceAccountKeyBase64) {
     console.log("Attempting to initialize Firebase Admin SDK with default credentials...");
-    // This will work in managed environments like Cloud Run (App Hosting)
     admin.initializeApp();
     console.log("Firebase Admin SDK initialized with default credentials.");
   } else {
@@ -28,6 +27,7 @@ function initializeFirebaseAdmin() {
   return admin.app();
 }
 
+
 export function getDb(): Firestore {
   const app = initializeFirebaseAdmin();
   return admin.firestore(app);
@@ -37,7 +37,3 @@ export function getAuth(): Auth {
   const app = initializeFirebaseAdmin();
   return admin.auth(app);
 }
-
-// For direct usage if needed, though getters are safer.
-export const db: Firestore = getDb();
-export const auth: Auth = getAuth();

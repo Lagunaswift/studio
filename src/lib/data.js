@@ -1,3 +1,4 @@
+
 export const MEAL_TYPES = ["Breakfast", "Lunch", "Dinner", "Snack"];
 export const calculateTotalMacros = (plannedMeals, allRecipes) => {
     if (!allRecipes || allRecipes.length === 0) {
@@ -7,7 +8,7 @@ export const calculateTotalMacros = (plannedMeals, allRecipes) => {
         const recipe = plannedMeal.recipeDetails || allRecipes.find(r => r.id === plannedMeal.recipeId);
         if (recipe && recipe.macrosPerServing) {
             acc.calories += recipe.macrosPerServing.calories * plannedMeal.servings;
-            acc.protein += recipe.macrosPerserving.protein * plannedMeal.servings;
+            acc.protein += recipe.macrosPerServing.protein * plannedMeal.servings;
             acc.carbs += recipe.macrosPerServing.carbs * plannedMeal.servings;
             acc.fat += recipe.macrosPerServing.fat * plannedMeal.servings;
         }

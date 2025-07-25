@@ -7,8 +7,6 @@ import type { DailyVitalsLog, DailyManualMacrosLog, RecipeFormData, UserProfileS
 import { getAuth, getDb } from '@/lib/firebase-admin'; 
 import { processBugReport } from '@/ai/flows/report-bug-flow';
 import type { BugReportInput, BugReportOutput } from '@/ai/flows/schemas';
-import { collection, addDoc, getDoc, setDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
-
 
 async function getUserId(): Promise<string | null> {
   const authorization = headers().get('Authorization');
@@ -51,8 +49,8 @@ export async function addRecipe(recipeData: Omit<RecipeFormData, 'user_id' | 'id
 
   try {
     const db = getDb();
-    const docRef = await addDoc(collection(db, "recipes"), dataToInsert);
-    const newDocSnapshot = await getDoc(docRef);
+    const docRef = await db.collection("recipes").add(dataToInsert);
+    const newDocSnapshot = await docRef.get();
     const finalData = { ...newDocSnapshot.data(), id: newDocSnapshot.id };
 
     revalidatePath('/recipes', 'layout');
@@ -73,11 +71,11 @@ export async function addOrUpdateMealPlan(mealData: any) {
   const { syncStatus, recipeDetails, ...dataToSet } = { ...mealData, id: docId, user_id: userId };
 
   const db = getDb();
-  const mealRef = doc(db, "planned_meals", docId);
+  const mealRef = db.collection("planned_meals").doc(docId);
 
   try {
-    await setDoc(mealRef, dataToSet, { merge: true });
-    const updatedDoc = await getDoc(mealRef);
+    await mealRef.set(dataToSet, { merge: true });
+    const updatedDoc = await mealRef.get();
     revalidatePath('/meal-plan', 'layout');
     return { success: true, data: updatedDoc.data() };
   } catch (error: any) {
@@ -91,10 +89,10 @@ export async function deleteMealFromPlan(plannedMealId: string) {
     if (!userId) return { success: false, error: 'Authentication required.' };
 
     const db = getDb();
-    const mealRef = doc(db, "planned_meals", plannedMealId);
+    const mealRef = db.collection("planned_meals").doc(plannedMealId);
     
     try {
-        await deleteDoc(mealRef);
+        await mealRef.delete();
         revalidatePath('/meal-plan', 'layout');
         return { success: true };
     } catch (error: any) {
@@ -112,11 +110,11 @@ export async function addOrUpdatePantryItem(itemData: any) {
     const { syncStatus, ...dataToSet } = { ...itemData, user_id: userId };
     
     const db = getDb();
-    const itemRef = doc(db, "pantry_items", itemData.id);
+    const itemRef = db.collection("pantry_items").doc(itemData.id);
 
     try {
-        await setDoc(itemRef, dataToSet, { merge: true });
-        const updatedDoc = await getDoc(itemRef);
+        await itemRef.set(dataToSet, { merge: true });
+        const updatedDoc = await itemRef.get();
         revalidatePath('/pantry');
         return { success: true, data: updatedDoc.data() };
     } catch (error: any) {
@@ -129,10 +127,10 @@ export async function deletePantryItem(itemId: string) {
     const userId = await getUserId();
     if (!userId) return { success: false, error: 'Authentication required.' };
     const db = getDb();
-    const itemRef = doc(db, "pantry_items", itemId);
+    const itemRef = db.collection("pantry_items").doc(itemId);
     
     try {
-        await deleteDoc(itemRef);
+        await itemRef.delete();
         revalidatePath('/pantry');
         return { success: true };
     } catch (error: any) {
@@ -151,11 +149,11 @@ export async function addOrUpdateVitalsLog(vitalsData: any) {
   
   const docId = `${userId}_${vitalsData.date}`; 
   const db = getDb();
-  const vitalsRef = doc(db, "daily_vitals_logs", docId);
+  const vitalsRef = db.collection("daily_vitals_logs").doc(docId);
 
   try {
-    await setDoc(vitalsRef, { ...restOfVitalsData, user_id: userId, id: docId, date: vitalsData.date }, { merge: true });
-    const updatedDoc = await getDoc(vitalsRef);
+    await vitalsRef.set({ ...restOfVitalsData, user_id: userId, id: docId, date: vitalsData.date }, { merge: true });
+    const updatedDoc = await vitalsRef.get();
     revalidatePath('/daily-log');
     return { success: true, data: updatedDoc.data() };
   } catch (error: any) {
@@ -171,8 +169,8 @@ export async function addOrUpdateWeightLog(userId: string, date: string, weightK
     const docId = `${userId}_${date}`; 
     
     const db = getDb();
-    const weightLogRef = doc(db, "daily_weight_logs", docId);
-    const profileRef = doc(db, "profiles", userId);
+    const weightLogRef = db.collection("daily_weight_logs").doc(docId);
+    const profileRef = db.collection("profiles").doc(userId);
 
     try {
         const batch = db.batch();
@@ -180,7 +178,7 @@ export async function addOrUpdateWeightLog(userId: string, date: string, weightK
         batch.update(profileRef, { weightKg }); 
         await batch.commit();
         
-        const updatedDoc = await getDoc(weightLogRef);
+        const updatedDoc = await weightLogRef.get();
 
         revalidatePath('/daily-log');
         revalidatePath('/profile/user-info');
@@ -205,11 +203,11 @@ export async function addOrUpdateManualMacrosLog(macroData: any) {
     };
     
     const db = getDb();
-    const logRef = doc(db, "daily_manual_macros_logs", docId);
+    const logRef = db.collection("daily_manual_macros_logs").doc(docId);
 
     try {
-        await setDoc(logRef, dataToSet, { merge: true });
-        const updatedDoc = await getDoc(logRef);
+        await logRef.set(dataToSet, { merge: true });
+        const updatedDoc = await logRef.get();
         revalidatePath('/daily-log');
         return { success: true, data: updatedDoc.data() };
     } catch (error: any) {
@@ -229,17 +227,17 @@ export async function reportBug(description: string, userId: string): Promise<{ 
             appVersion: "1.0.0" 
         };
         const processedReport = await processBugReport(aiInput);
-
+        
+        const db = getDb();
         const bugReportData = {
             ...processedReport,
             originalDescription: description,
             userId: userId,
-            createdAt: serverTimestamp(),
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
             status: 'new' 
         };
         
-        const db = getDb();
-        await addDoc(collection(db, "bug_reports"), bugReportData);
+        await db.collection("bug_reports").add(bugReportData);
 
         revalidatePath('/updates');
         return { success: true, data: processedReport };
@@ -256,14 +254,14 @@ export async function updateUserProfile(updates: Partial<Omit<UserProfileSetting
   if (!userId) return { error: 'Authentication required.' };
   
   const db = getDb();
-  const profileRef = doc(db, "profiles", userId);
+  const profileRef = db.collection("profiles").doc(userId);
 
   try {
-    await setDoc(profileRef, { ...updates, id: userId }, { merge: true }); 
+    await profileRef.set({ ...updates, id: userId }, { merge: true }); 
     revalidatePath('/profile', 'layout')
     revalidatePath('/', 'layout') 
     
-    const updatedDoc = await getDoc(profileRef);
+    const updatedDoc = await profileRef.get();
 
     return { success: true, data: updatedDoc.data() }
   } catch (error: any) {
