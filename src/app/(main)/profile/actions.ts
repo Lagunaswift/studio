@@ -3,11 +3,11 @@
 
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers';
-import type { DailyVitalsLog, DailyManualMacrosLog, DailyWeightLog, PlannedMeal, PantryItem, RecipeFormData, UserProfileSettings } from '@/types';
+import type { DailyVitalsLog, DailyManualMacrosLog, RecipeFormData, UserProfileSettings } from '@/types';
 import { db, auth as adminAuth } from '@/lib/firebase-admin'; 
 import { processBugReport } from '@/ai/flows/report-bug-flow';
 import type { BugReportInput, BugReportOutput } from '@/ai/flows/schemas';
-import { collection, addDoc, getDoc, setDoc, deleteDoc, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, getDoc, setDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 
 
 async function getUserId(): Promise<string | null> {
@@ -64,12 +64,12 @@ export async function addRecipe(recipeData: Omit<RecipeFormData, 'user_id' | 'id
 
 
 // --- Meal Plan Actions ---
-export async function addOrUpdateMealPlan(mealData: Partial<Omit<PlannedMeal, 'recipeDetails' | 'user_id'>>) {
+export async function addOrUpdateMealPlan(mealData: any) {
   const userId = await getUserId();
   if (!userId) return { error: 'Authentication required.' };
 
   const docId = mealData.id || `meal_${Date.now()}_${Math.random()}`;
-  const { syncStatus, ...dataToSet } = { ...mealData, id: docId, user_id: userId };
+  const { syncStatus, recipeDetails, ...dataToSet } = { ...mealData, id: docId, user_id: userId };
 
   const mealRef = doc(db, "planned_meals", docId);
 
@@ -102,7 +102,7 @@ export async function deleteMealFromPlan(plannedMealId: string) {
 
 
 // --- Pantry Actions ---
-export async function addOrUpdatePantryItem(itemData: Omit<PantryItem, 'user_id'>) {
+export async function addOrUpdatePantryItem(itemData: any) {
     const userId = await getUserId();
     if (!userId) return { error: 'Authentication required.' };
 
@@ -138,7 +138,7 @@ export async function deletePantryItem(itemId: string) {
 
 
 // --- Daily Log Actions ---
-export async function addOrUpdateVitalsLog(vitalsData: Omit<DailyVitalsLog, 'user_id' | 'id'> & { date: string }) {
+export async function addOrUpdateVitalsLog(vitalsData: any) {
   const userId = await getUserId();
   if (!userId) return { error: 'Authentication required.' };
 
@@ -184,7 +184,7 @@ export async function addOrUpdateWeightLog(userId: string, date: string, weightK
     }
 }
 
-export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacrosLog, 'user_id'>) {
+export async function addOrUpdateManualMacrosLog(macroData: any) {
     const userId = await getUserId();
     if (!userId) return { error: 'Authentication required.' };
 
@@ -212,7 +212,7 @@ export async function addOrUpdateManualMacrosLog(macroData: Omit<DailyManualMacr
 
 // --- Bug Reporting Action ---
 export async function reportBug(description: string, userId: string): Promise<{ success: boolean, error?: string, data?: BugReportOutput }> {
-    if (!userId) return { error: 'Authentication required to report a bug.' };
+    if (!userId) return { success: false, error: 'Authentication required to report a bug.' };
 
     try {
         const aiInput: BugReportInput = {

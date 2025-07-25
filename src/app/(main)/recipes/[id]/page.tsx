@@ -4,7 +4,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { getRecipeById, MEAL_TYPES, parseIngredientString } from '@/lib/data';
+import { MEAL_TYPES, parseIngredientString } from '@/lib/data';
 import type { Recipe as RecipeType, MealType, Macros, RecipeFormData } from '@/types';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Badge } from '@/components/ui/badge';
@@ -125,7 +125,7 @@ export default function RecipeDetailPage() {
 
 
   const handleImageError = () => {
-    if (!imageLoadError) {
+    if (!imageError) {
       setImageLoadError(true);
     }
   };
@@ -164,7 +164,8 @@ export default function RecipeDetailPage() {
   };
   
   const handleFavoriteToggle = async (e: React.MouseEvent) => {
-    e.preventDefault();
+    e.preventDefault(); 
+    e.stopPropagation();
     if (recipe) {
       try {
         await toggleFavoriteRecipe(recipe.id);
@@ -207,10 +208,10 @@ export default function RecipeDetailPage() {
       const input: SuggestRecipeModificationInput = {
         recipeToModify: {
           name: recipe.name,
-          description: recipe.description,
+          description: recipe.description || '',
           ingredients: recipe.ingredients,
           instructions: recipe.instructions,
-          tags: recipe.tags,
+          tags: recipe.tags || [],
         },
         userRequest: tweakRequest,
       };
@@ -238,8 +239,8 @@ export default function RecipeDetailPage() {
         name: tweakSuggestion.newName,
         description: tweakSuggestion.newDescription,
         servings: recipe.servings,
-        prepTime: recipe.prepTime,
-        cookTime: recipe.cookTime,
+        prepTime: recipe.prepTime || 'N/A',
+        cookTime: recipe.cookTime || 'N/A',
         chillTime: recipe.chillTime,
         ingredients: tweakSuggestion.newIngredients.map(value => ({ value })),
         instructions: tweakSuggestion.newInstructions.map(value => ({ value })),
@@ -311,7 +312,7 @@ export default function RecipeDetailPage() {
   const aiHint = recipe && recipe.tags && recipe.tags.length > 0 ? recipe.tags.slice(0, 2).join(' ') : "food meal";
   const dynamicImageSrc = `/images/${recipe.id}.jpg`;
   const defaultPlaceholder = `https://placehold.co/600x400.png`;
-  const imageSrc = imageLoadError ? defaultPlaceholder : dynamicImageSrc;
+  const imageSrc = imageError ? defaultPlaceholder : dynamicImageSrc;
 
   const renderRecipeTweaker = () => {
     if (!isSubscribed) {
@@ -356,7 +357,7 @@ export default function RecipeDetailPage() {
             sizes="(max-width: 768px) 100vw, 100vw"
             className="object-cover"
             priority
-            data-ai-hint={imageLoadError ? aiHint : undefined}
+            data-ai-hint={imageError ? aiHint : undefined}
             onError={handleImageError} 
           />
            <Button 
@@ -571,11 +572,8 @@ export default function RecipeDetailPage() {
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
                   <Calendar
-                    mode="single"
-                    selected={planDate}
-                    onSelect={setPlanDate}
-                    disabled={undefined}
-                    initialFocus
+                    mode="single" selected={planDate} onSelect={setPlanDate}
+                    disabled={undefined} initialFocus
                   />
                 </PopoverContent>
               </Popover>
@@ -587,9 +585,7 @@ export default function RecipeDetailPage() {
                   <SelectValue placeholder="Select meal type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {MEAL_TYPES.map(type => (
-                    <SelectItem key={type} value={type}>{type}</SelectItem>
-                  ))}
+                  {MEAL_TYPES.map(type => (<SelectItem key={type} value={type}>{type}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
