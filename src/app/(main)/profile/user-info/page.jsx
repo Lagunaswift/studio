@@ -1,3 +1,4 @@
+
 "use client";
 import { useEffect, useState, useMemo } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
@@ -288,7 +289,7 @@ export default function UserInfoPage() {
                     else if (value === 'female') {
                         form.setValue('abdomen_circumference_cm', null, { shouldValidate: true });
                     }
-                }} value={controllerField.value ?? undefined}>
+                }} value={controllerField.value ?? ""}>
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select sex"/>
@@ -318,7 +319,7 @@ export default function UserInfoPage() {
                       </FormItem>)}/>
                   <FormField control={form.control} name="activityLevel" render={({ field }) => (<FormItem>
                         <FormLabel className="flex items-center"><Activity className="mr-2 h-4 w-4 text-muted-foreground"/> Activity Level</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                        <Select onValueChange={field.onChange} value={field.value ?? ""}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select activity level"/>
@@ -451,3 +452,4 @@ export default function UserInfoPage() {
       </div>
     </PageWrapper>);
 }
+

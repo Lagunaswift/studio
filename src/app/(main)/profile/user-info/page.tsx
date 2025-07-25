@@ -13,7 +13,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import type { UserProfileSettings, Sex, ActivityLevel, AthleteType, PrimaryGoal, TrainingExperienceLevel } from '@/types';
 import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS, TRAINING_EXPERIENCE_OPTIONS } from '@/types';
 import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale, Award } from 'lucide-react';
@@ -365,7 +364,7 @@ export default function UserInfoPage() {
                                   form.setValue('abdomen_circumference_cm', null, {shouldValidate: true});
                                 }
                               }}
-                              value={controllerField.value ?? undefined}
+                              value={controllerField.value ?? ""}
                             >
                               <FormControl>
                                 <SelectTrigger>
@@ -414,7 +413,7 @@ export default function UserInfoPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="flex items-center"><Activity className="mr-2 h-4 w-4 text-muted-foreground"/> Activity Level</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                        <Select onValueChange={field.onChange} value={field.value ?? ""}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select activity level" />
@@ -604,3 +603,4 @@ export default function UserInfoPage() {
     </PageWrapper>
   );
 }
+
