@@ -1,5 +1,4 @@
 
-//src/context/AppContext.tsx
 "use client";
 
 import React, { createContext, useContext, useMemo, useCallback, useState, useEffect } from 'react';
@@ -318,81 +317,11 @@ function useAppData(userId: string | undefined, userEmail: string | null | undef
 
     const isRecipeFavorite = useCallback((recipeId: number): boolean => (favoriteRecipeIds || []).includes(recipeId), [favoriteRecipeIds]);
 
-    const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: PreppyOutput | null }> => {
-        if (!userProfile || !userProfile.dailyWeightLog || userProfile.dailyWeightLog.length < 14) {
-          return { success: false, message: "At least 14 days of weight and calorie data are needed for an accurate calculation." };
-        }
-        
-        const logsWithTrend = calculateTrendWeight(userProfile.dailyWeightLog);
-        const validTrendLogs = logsWithTrend.filter(log => log.trendWeightKg !== undefined);
-    
-        if (validTrendLogs.length < 7) {
-          return { success: false, message: "Not enough consistent data to establish a weight trend. Keep logging daily!" };
-        }
-    
-        const endDate = new Date(validTrendLogs[0].date);
-        const startDate = subDays(endDate, 21);
-        
-        const recentWeightLogs = validTrendLogs.filter(log => new Date(log.date) >= startDate);
-        
-        if (recentWeightLogs.length < 14) {
-          return { success: false, message: `Need at least 14 days of weight data in the last 3 weeks. You have ${recentWeightLogs.length}.` };
-        }
-    
-        const datesInPeriod = recentWeightLogs.map(l => l.date);
-        let totalCalories = 0;
-        let daysWithCalorieData = 0;
-        
-        for (const date of datesInPeriod) {
-            const consumed = getConsumedMacrosForDate(date);
-            if (consumed && consumed.calories > 0) {
-                totalCalories += consumed.calories;
-                daysWithCalorieData++;
-            }
-        }
-    
-        if (daysWithCalorieData < 7) {
-          return { success: false, message: `Need at least 7 days of calorie logs in the analysis period. You have ${daysWithCalorieData}.` };
-        }
-        const averageDailyCalories = totalCalories / daysWithCalorieData;
-    
-        const latestTrendWeight = recentWeightLogs[0].trendWeightKg!;
-        const oldestTrendWeight = recentWeightLogs[recentWeightLogs.length - 1].trendWeightKg!;
-        const weightChangeKg = latestTrendWeight - oldestTrendWeight;
-        const durationDays = differenceInDays(new Date(recentWeightLogs[0].date), new Date(recentWeightLogs[recentWeightLogs.length - 1].date)) || 1;
-        const actualWeeklyWeightChangeKg = (weightChangeKg / durationDays) * 7;
-    
-        const caloriesFromWeightChange = weightChangeKg * 7700;
-        const averageDailyDeficitOrSurplus = caloriesFromWeightChange / durationDays;
-        const newDynamicTDEE = Math.round(averageDailyCalories - averageDailyDeficitOrSurplus);
-    
-        if (isNaN(newDynamicTDEE) || newDynamicTDEE <= 0) {
-          return { success: false, message: "Calculation resulted in an invalid TDEE. Check your logged data for consistency." };
-        }
-        
-        const preppyInput: PreppyInput = {
-          primaryGoal: userProfile.primaryGoal || 'maintenance',
-          targetWeightChangeRateKg: userProfile.target_weight_change_rate_kg || 0,
-          dynamicTdee: newDynamicTDEE,
-          actualAvgCalories: averageDailyCalories,
-          actualWeeklyWeightChangeKg: actualWeeklyWeightChangeKg,
-          currentProteinTarget: userProfile.macroTargets?.protein || 0,
-          currentFatTarget: userProfile.macroTargets?.fat || 0,
-        };
-    
-        const recommendation = await runPreppy(preppyInput);
-        
-        await updateUserProfile(idToUse!, { tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
-
-        return { success: true, message: "Check-in complete!", recommendation };
-    }, [userProfile, getConsumedMacrosForDate, idToUse]);
-
-
     return {
         mealPlan, pantryItems, userRecipes, userProfile,
         isAppDataLoading, isRecipeCacheLoading, isSubscribed, allRecipesCache,
         shoppingList, getConsumedMacrosForDate, getPlannedMacrosForDate,
-        getMealsForDate, isRecipeFavorite, runWeeklyCheckin
+        getMealsForDate, isRecipeFavorite
     };
 }
 
@@ -561,12 +490,83 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return await callServerActionWithAuth(addRecipeAction, recipeData);
   }, [callServerActionWithAuth]);
 
+  const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: PreppyOutput | null }> => {
+    const userProfile = appData.userProfile;
+    if (!userProfile || !userProfile.dailyWeightLog || userProfile.dailyWeightLog.length < 14) {
+      return { success: false, message: "At least 14 days of weight and calorie data are needed for an accurate calculation." };
+    }
+    
+    const logsWithTrend = calculateTrendWeight(userProfile.dailyWeightLog);
+    const validTrendLogs = logsWithTrend.filter(log => log.trendWeightKg !== undefined);
+
+    if (validTrendLogs.length < 7) {
+      return { success: false, message: "Not enough consistent data to establish a weight trend. Keep logging daily!" };
+    }
+
+    const endDate = new Date(validTrendLogs[0].date);
+    const startDate = subDays(endDate, 21);
+    
+    const recentWeightLogs = validTrendLogs.filter(log => new Date(log.date) >= startDate);
+    
+    if (recentWeightLogs.length < 14) {
+      return { success: false, message: `Need at least 14 days of weight data in the last 3 weeks. You have ${recentWeightLogs.length}.` };
+    }
+
+    const datesInPeriod = recentWeightLogs.map(l => l.date);
+    let totalCalories = 0;
+    let daysWithCalorieData = 0;
+    
+    for (const date of datesInPeriod) {
+        const consumed = appData.getConsumedMacrosForDate(date);
+        if (consumed && consumed.calories > 0) {
+            totalCalories += consumed.calories;
+            daysWithCalorieData++;
+        }
+    }
+
+    if (daysWithCalorieData < 7) {
+      return { success: false, message: `Need at least 7 days of calorie logs in the analysis period. You have ${daysWithCalorieData}.` };
+    }
+    const averageDailyCalories = totalCalories / daysWithCalorieData;
+
+    const latestTrendWeight = recentWeightLogs[0].trendWeightKg!;
+    const oldestTrendWeight = recentWeightLogs[recentWeightLogs.length - 1].trendWeightKg!;
+    const weightChangeKg = latestTrendWeight - oldestTrendWeight;
+    const durationDays = differenceInDays(new Date(recentWeightLogs[0].date), new Date(recentWeightLogs[recentWeightLogs.length - 1].date)) || 1;
+    const actualWeeklyWeightChangeKg = (weightChangeKg / durationDays) * 7;
+
+    const caloriesFromWeightChange = weightChangeKg * 7700;
+    const averageDailyDeficitOrSurplus = caloriesFromWeightChange / durationDays;
+    const newDynamicTDEE = Math.round(averageDailyCalories - averageDailyDeficitOrSurplus);
+
+    if (isNaN(newDynamicTDEE) || newDynamicTDEE <= 0) {
+      return { success: false, message: "Calculation resulted in an invalid TDEE. Check your logged data for consistency." };
+    }
+    
+    const preppyInput: PreppyInput = {
+      primaryGoal: userProfile.primaryGoal || 'maintenance',
+      targetWeightChangeRateKg: userProfile.target_weight_change_rate_kg || 0,
+      dynamicTdee: newDynamicTDEE,
+      actualAvgCalories: averageDailyCalories,
+      actualWeeklyWeightChangeKg: actualWeeklyWeightChangeKg,
+      currentProteinTarget: userProfile.macroTargets?.protein || 0,
+      currentFatTarget: userProfile.macroTargets?.fat || 0,
+    };
+
+    const recommendation = await runPreppy(preppyInput);
+    
+    await callServerActionWithAuth(updateUserProfile, { tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
+
+    return { success: true, message: "Check-in complete!", recommendation };
+  }, [appData.userProfile, appData.getConsumedMacrosForDate, callServerActionWithAuth]);
+
+
   const contextValue: AppContextType = useMemo(() => ({
     ...appData,
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus, 
     clearMealPlanForDate, clearEntireMealPlan,
     toggleFavoriteRecipe, toggleShoppingListItem, addPantryItem, removePantryItem, updatePantryItemQuantity,
-    addCustomRecipe,
+    addCustomRecipe, runWeeklyCheckin,
     setUserInformation, setMacroTargets, setMealStructure, setDashboardSettings, acceptTerms,
     assignIngredientCategory,
     isOnline,
@@ -576,7 +576,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus,
     clearMealPlanForDate, clearEntireMealPlan, 
     toggleFavoriteRecipe, toggleShoppingListItem, addPantryItem, removePantryItem, updatePantryItemQuantity,
-    addCustomRecipe, setUserInformation, setMacroTargets, setMealStructure,
+    addCustomRecipe, runWeeklyCheckin, setUserInformation, setMacroTargets, setMealStructure,
     setDashboardSettings, acceptTerms, assignIngredientCategory,
   ]);
   

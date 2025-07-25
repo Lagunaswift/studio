@@ -1,4 +1,5 @@
 
+
 //src/context/AppContext.tsx
 "use client";
 import React, { createContext, useContext, useMemo, useCallback, useState, useEffect } from 'react';
@@ -221,7 +222,40 @@ function useAppData(userId, userEmail, isAuthLoading) {
             .map(pm => ({ ...pm, recipeDetails: allRecipesCache.find(r => r.id === pm.recipeId) }));
     }, [mealPlan, allRecipesCache]);
     const isRecipeFavorite = useCallback((recipeId) => (favoriteRecipeIds || []).includes(recipeId), [favoriteRecipeIds]);
+    
+    return {
+        mealPlan, pantryItems, userRecipes, userProfile,
+        isAppDataLoading, isRecipeCacheLoading, isSubscribed, allRecipesCache,
+        shoppingList, getConsumedMacrosForDate, getPlannedMacrosForDate,
+        getMealsForDate, isRecipeFavorite
+    };
+}
+export const AppProvider = ({ children }) => {
+    const { user, isLoading: isAuthLoading } = useAuth();
+    const [isOnline, setIsOnline] = useState(true);
+    useEffect(() => {
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        setIsOnline(navigator.onLine);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
+    const appData = useAppData(user?.uid, user?.email, isAuthLoading);
+    const callServerActionWithAuth = useCallback(async (action, ...args) => {
+        if (!user) {
+            console.error("Attempted to call server action without authenticated user.");
+            throw new Error("Authentication required.");
+        }
+        const idToken = await user.getIdToken(true);
+        return action(idToken, ...args);
+    }, [user]);
+
     const runWeeklyCheckin = useCallback(async () => {
+        const userProfile = appData.userProfile;
         if (!userProfile || !userProfile.dailyWeightLog || userProfile.dailyWeightLog.length < 14) {
             return { success: false, message: "At least 14 days of weight and calorie data are needed for an accurate calculation." };
         }
@@ -240,7 +274,7 @@ function useAppData(userId, userEmail, isAuthLoading) {
         let totalCalories = 0;
         let daysWithCalorieData = 0;
         for (const date of datesInPeriod) {
-            const consumed = getConsumedMacrosForDate(date);
+            const consumed = appData.getConsumedMacrosForDate(date);
             if (consumed && consumed.calories > 0) {
                 totalCalories += consumed.calories;
                 daysWithCalorieData++;
@@ -271,39 +305,10 @@ function useAppData(userId, userEmail, isAuthLoading) {
             currentFatTarget: userProfile.macroTargets?.fat || 0,
         };
         const recommendation = await runPreppy(preppyInput);
-        await updateUserProfile({ tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
+        await callServerActionWithAuth(updateUserProfile, { tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
         return { success: true, message: "Check-in complete!", recommendation };
-    }, [userProfile, getConsumedMacrosForDate, idToUse, updateUserProfile]);
-    return {
-        mealPlan, pantryItems, userRecipes, userProfile,
-        isAppDataLoading, isRecipeCacheLoading, isSubscribed, allRecipesCache,
-        shoppingList, getConsumedMacrosForDate, getPlannedMacrosForDate,
-        getMealsForDate, isRecipeFavorite, runWeeklyCheckin
-    };
-}
-export const AppProvider = ({ children }) => {
-    const { user, isLoading: isAuthLoading } = useAuth();
-    const [isOnline, setIsOnline] = useState(true);
-    useEffect(() => {
-        const handleOnline = () => setIsOnline(true);
-        const handleOffline = () => setIsOnline(false);
-        window.addEventListener('online', handleOnline);
-        window.addEventListener('offline', handleOffline);
-        setIsOnline(navigator.onLine);
-        return () => {
-            window.removeEventListener('online', handleOnline);
-            window.removeEventListener('offline', handleOffline);
-        };
-    }, []);
-    const appData = useAppData(user?.uid, user?.email, isAuthLoading);
-    const callServerActionWithAuth = useCallback(async (action, ...args) => {
-        if (!user) {
-            console.error("Attempted to call server action without authenticated user.");
-            throw new Error("Authentication required.");
-        }
-        const idToken = await user.getIdToken(true);
-        return action(idToken, ...args);
-    }, [user]);
+    }, [appData.userProfile, appData.getConsumedMacrosForDate, callServerActionWithAuth]);
+    
     const setUserInformation = useCallback(async (updates) => {
         await callServerActionWithAuth(updateUserProfile, updates);
     }, [callServerActionWithAuth]);
@@ -424,7 +429,6 @@ export const AppProvider = ({ children }) => {
         addCustomRecipe, runWeeklyCheckin,
         setUserInformation, setMacroTargets, setMealStructure, setDashboardSettings, acceptTerms,
         assignIngredientCategory,
-        getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
         isOnline
     }), [
         appData,
@@ -433,7 +437,7 @@ export const AppProvider = ({ children }) => {
         clearMealPlanForDate, clearEntireMealPlan, 
         toggleFavoriteRecipe, toggleShoppingListItem, addPantryItem, removePantryItem, updatePantryItemQuantity,
         addCustomRecipe, runWeeklyCheckin, setUserInformation, setMacroTargets, setMealStructure,
-        setDashboardSettings, acceptTerms, assignIngredientCategory, getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
+        setDashboardSettings, acceptTerms, assignIngredientCategory,
     ]);
     return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 };
