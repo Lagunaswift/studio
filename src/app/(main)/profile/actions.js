@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { db, auth as adminAuth } from '@/lib/firebase-admin';
 import { processBugReport } from '@/ai/flows/report-bug-flow';
+import { collection, addDoc, getDoc, setDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 async function getUserId() {
     const authorization = headers().get('Authorization');
     if (!authorization?.startsWith('Bearer ')) {
@@ -43,7 +44,7 @@ export async function addRecipe(recipeData) {
         const docRef = await addDoc(collection(db, "recipes"), dataToInsert);
         const newDocSnapshot = await getDoc(docRef);
         const finalData = { ...newDocSnapshot.data(), id: newDocSnapshot.id };
-        revalidatePath('/recipes');
+        revalidatePath('/recipes', 'layout');
         return { success: true, data: finalData };
     }
     catch (error) {
@@ -127,7 +128,7 @@ export async function addOrUpdateVitalsLog(vitalsData) {
     const docId = `${userId}_${vitalsData.date}`;
     const vitalsRef = doc(db, "daily_vitals_logs", docId);
     try {
-        await setDoc(vitalsRef, { ...restOfVitalsData, user_id: userId }, { merge: true });
+        await setDoc(vitalsRef, { ...restOfVitalsData, user_id: userId, id: docId, date: vitalsData.date }, { merge: true });
         const updatedDoc = await getDoc(vitalsRef);
         revalidatePath('/daily-log');
         return { success: true, data: updatedDoc.data() };
@@ -137,8 +138,7 @@ export async function addOrUpdateVitalsLog(vitalsData) {
         return { error: 'Could not save your daily vitals.' };
     }
 }
-export async function addOrUpdateWeightLog(date, weightKg) {
-    const userId = await getUserId();
+export async function addOrUpdateWeightLog(userId, date, weightKg) {
     if (!userId)
         return { error: 'Authentication required.' };
     const logData = { date, weightKg, user_id: userId };
@@ -184,8 +184,7 @@ export async function addOrUpdateManualMacrosLog(macroData) {
     }
 }
 // --- Bug Reporting Action ---
-export async function reportBug(description) {
-    const userId = await getUserId();
+export async function reportBug(description, userId) {
     if (!userId)
         return { error: 'Authentication required to report a bug.' };
     try {

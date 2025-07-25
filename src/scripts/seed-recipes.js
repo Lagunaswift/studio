@@ -23,7 +23,7 @@ if (!admin.apps.length) {
     try {
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
-            databaseURL: `https://${serviceAccount.project_id}.firebaseio.com` // Explicitly set the databaseURL
+            projectId: serviceAccount.project_id,
         });
         console.log("Firebase Admin SDK initialized successfully for seeding.");
     }
@@ -39,13 +39,24 @@ async function seedDatabase() {
         console.log("No recipes found in converted_recipes_for_seeding.json. Exiting.");
         return;
     }
+    try {
+        console.log('Attempting a minimal test write to Firestore...');
+        await db.collection('debug_test').doc('test').set({ hello: 'world' });
+        console.log("✅ Minimal test write succeeded!");
+    }
+    catch (error) {
+        console.error('❌ Minimal test write FAILED. This indicates a core connection or permission issue.', error);
+        process.exit(1);
+    }
     console.log(`Starting to seed ${recipes.length} recipes...`);
     // Firestore allows a maximum of 500 operations in a single batch.
-    const batchSize = 499;
+    const batchSize = 100; // Using a smaller batch size for safety
+    const totalBatches = Math.ceil(recipes.length / batchSize);
     for (let i = 0; i < recipes.length; i += batchSize) {
         const batch = db.batch();
         const chunk = recipes.slice(i, i + batchSize);
-        console.log(`Processing batch ${Math.floor(i / batchSize) + 1}...`);
+        const batchNumber = Math.floor(i / batchSize) + 1;
+        console.log(`Processing batch ${batchNumber}/${totalBatches}...`);
         chunk.forEach((recipe) => {
             // The recipe ID from the JSON file will be used as the document ID in Firestore.
             const docRef = recipesCollection.doc(String(recipe.id));
@@ -57,17 +68,21 @@ async function seedDatabase() {
         });
         try {
             await batch.commit();
-            console.log(`Batch ${Math.floor(i / batchSize) + 1} committed successfully.`);
+            console.log(`✅ Batch ${batchNumber} committed successfully.`);
+            // Add a small delay between batches to avoid hitting rate limits
+            if (batchNumber < totalBatches) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
         }
         catch (error) {
-            console.error(`Error committing batch ${Math.floor(i / batchSize) + 1}:`, error);
+            console.error(`❌ Error committing batch ${batchNumber}:`, error);
             // Exit on error to prevent partial writes
             process.exit(1);
         }
     }
-    console.log("Database seeding completed successfully!");
+    console.log("🎉 Database seeding completed successfully!");
 }
 seedDatabase().catch((error) => {
-    console.error("An error occurred during database seeding:", error);
+    console.error("💥 An error occurred during database seeding:", error);
     process.exit(1);
 });

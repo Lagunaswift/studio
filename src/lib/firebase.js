@@ -1,8 +1,7 @@
-// src/lib/firebase.js
+// src/lib/firebase.ts
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-
 const firebaseConfig = {
     projectId: "macro-teal-meal-planner",
     appId: "1:724190135561:web:941f2a7f3c7be2563e3fd8",
@@ -11,24 +10,22 @@ const firebaseConfig = {
     authDomain: "macro-teal-meal-planner.firebaseapp.com",
     messagingSenderId: "724190135561"
 };
-
+// More robust singleton pattern
 const getFirebaseApp = () => {
-  if (!getApps().length) {
-    return initializeApp(firebaseConfig);
-  }
-  return getApp();
+    if (!getApps().length) {
+        return initializeApp(firebaseConfig);
+    }
+    return getApp();
 };
-
 export const getFirebaseAuth = () => {
-  const app = getFirebaseApp();
-  return getAuth(app);
-}
-
+    const app = getFirebaseApp();
+    return getAuth(app);
+};
 export const getFirebaseDb = () => {
-  const app = getFirebaseApp();
-  return getFirestore(app);
-}
-
+    const app = getFirebaseApp();
+    return getFirestore(app);
+};
+// For parts of the app that might just need the app instance
 export const app = getFirebaseApp();
 export const auth = getFirebaseAuth();
 export const db = getFirebaseDb();
