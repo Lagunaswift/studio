@@ -1,26 +1,23 @@
 
 "use client";
+import { useEffect } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
-import { useEffect, useState, useMemo } from 'react';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS, TRAINING_EXPERIENCE_OPTIONS } from '@/types';
-import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale, Award, Loader2 } from 'lucide-react';
+import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale, Award } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-import { Slider } from '@/components/ui/slider';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Skeleton } from '@/components/ui/skeleton';
+
 
 const calculateLBM = (weightKg, bodyFatPercentage) => {
     if (weightKg && weightKg > 0 && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
@@ -32,21 +29,19 @@ const calculateLBM = (weightKg, bodyFatPercentage) => {
 };
 
 const calculateTDEE = (weightKg, heightCm, age, sex, activityLevel) => {
-    if (!weightKg || !heightCm || !age || !sex || !activityLevel || activityLevel === 'notSpecified') return null;
-    let bmr;
-    if (sex === 'male') bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
-    else bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
-    const activity = ACTIVITY_LEVEL_OPTIONS.find(opt => opt.value === activityLevel);
-    if (activity) {
-        const tdee = bmr * activity.multiplier;
-        if (isNaN(tdee) || !isFinite(tdee) || tdee <= 0) return null;
-        return Math.round(tdee);
-    }
-    return null;
+  if (!weightKg || !heightCm || !age || !sex || !activityLevel || activityLevel === 'notSpecified') return null;
+  let bmr;
+  if (sex === 'male') bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
+  else bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
+  const activity = ACTIVITY_LEVEL_OPTIONS.find(opt => opt.value === activityLevel);
+  if (activity) {
+    const tdee = bmr * activity.multiplier;
+    if (isNaN(tdee) || !isFinite(tdee) || tdee <= 0) return null;
+    return Math.round(tdee);
+  }
+  return null;
 };
 
-
-// Helper function (can be moved to utils if used elsewhere)
 const calculateNavyBodyFatPercentage = (sex, heightCm, neckCm, abdomenCm, waistCm, hipCm) => {
     if (!sex || !heightCm || heightCm <= 0 || !neckCm || neckCm <= 0) {
         return null;
@@ -59,8 +54,7 @@ const calculateNavyBodyFatPercentage = (sex, heightCm, neckCm, abdomenCm, waistC
             }
             const bf = 86.010 * Math.log10(abdomenCm - neckCm) - 70.041 * Math.log10(heightCm) + 36.76;
             return Math.max(1, Math.min(100, parseFloat(bf.toFixed(1))));
-        }
-        else if (sex === 'female') {
+        } else if (sex === 'female') {
             if (!waistCm || waistCm <= 0 || !hipCm || hipCm <= 0) {
                 console.warn("Female BFP calc: Waist and Hip must be > 0.");
                 return null;
@@ -73,37 +67,38 @@ const calculateNavyBodyFatPercentage = (sex, heightCm, neckCm, abdomenCm, waistC
             const bf = 163.205 * Math.log10(waistPlusHipMinusNeck) - 97.684 * Math.log10(heightCm) - 78.387;
             return Math.max(1, Math.min(100, parseFloat(bf.toFixed(1))));
         }
-    }
-    catch (error) {
+    } catch (error) {
         console.error("Error in Navy BFP calculation:", error);
         return null;
     }
     return null;
 };
+
+
 const userInfoSchema = z.object({
-    name: z.string().min(1, "Name is required.").max(100, "Name is too long.").nullable().optional(),
-    email: z.string().email("Invalid email address.").nullable().optional(),
-    heightCm: z.coerce.number().min(50, "Height must be at least 50cm").max(300, "Height must be at most 300cm").nullable().optional(),
-    weightKg: z.coerce.number().min(20, "Weight must be at least 20kg").max(500, "Weight must be at most 500kg").nullable().optional(),
-    age: z.coerce.number().min(1, "Age must be at least 1").max(120, "Age must be at most 120").nullable().optional(),
-    sex: z.enum(['male', 'female'], { errorMap: () => ({ message: 'Please select a sex.' }) }).nullable(),
-    activityLevel: z.enum(ACTIVITY_LEVEL_OPTIONS.map(o => o.value)).nullable().optional(),
-    training_experience_level: z.enum(TRAINING_EXPERIENCE_OPTIONS.map(o => o.value)).nullable().optional(),
-    bodyFatPercentage: z.coerce.number().min(1, "Body fat % must be at least 1").max(70, "Body fat % must be at most 70").nullable().optional(),
-    athleteType: z.enum(ATHLETE_TYPE_OPTIONS.map(o => o.value)).nullable().optional(),
-    primaryGoal: z.enum(PRIMARY_GOAL_OPTIONS.map(o => o.value)).nullable().optional(),
-    neck_circumference_cm: z.coerce.number().min(1, "Neck circumference must be positive").nullable().optional(),
-    abdomen_circumference_cm: z.coerce.number().min(1, "Abdomen circumference must be positive").nullable().optional(), // Male
-    waist_circumference_cm: z.coerce.number().min(1, "Waist circumference must be positive").nullable().optional(), // Female
-    hip_circumference_cm: z.coerce.number().min(1, "Hip circumference must be positive").nullable().optional(), // Female
+  name: z.string().min(1, "Name is required.").max(100, "Name is too long.").nullable().optional(),
+  email: z.string().email("Invalid email address.").nullable().optional(),
+  heightCm: z.coerce.number().min(50, "Height must be at least 50cm").max(300, "Height must be at most 300cm").nullable().optional(),
+  weightKg: z.coerce.number().min(20, "Weight must be at least 20kg").max(500, "Weight must be at most 500kg").nullable().optional(),
+  age: z.coerce.number().min(1, "Age must be at least 1").max(120, "Age must be at most 120").nullable().optional(),
+  sex: z.enum(['male', 'female'], { errorMap: () => ({ message: 'Please select a sex.' }) }).nullable(),
+  activityLevel: z.enum(ACTIVITY_LEVEL_OPTIONS.map(o => o.value)).nullable().optional(),
+  training_experience_level: z.enum(TRAINING_EXPERIENCE_OPTIONS.map(o => o.value)).nullable().optional(),
+  bodyFatPercentage: z.coerce.number().min(1, "Body fat % must be at least 1").max(70, "Body fat % must be at most 70").nullable().optional(),
+  athleteType: z.enum(ATHLETE_TYPE_OPTIONS.map(o => o.value)).nullable().optional(),
+  primaryGoal: z.enum(PRIMARY_GOAL_OPTIONS.map(o => o.value)).nullable().optional(),
+  neck_circumference_cm: z.coerce.number().min(1, "Neck circumference must be positive").nullable().optional(),
+  abdomen_circumference_cm: z.coerce.number().min(1, "Abdomen circumference must be positive").nullable().optional(),
+  waist_circumference_cm: z.coerce.number().min(1, "Waist circumference must be positive").nullable().optional(),
+  hip_circumference_cm: z.coerce.number().min(1, "Hip circumference must be positive").nullable().optional(),
 }).refine(data => {
-    if (data.sex === 'male' && data.abdomen_circumference_cm && data.neck_circumference_cm) {
-        return data.abdomen_circumference_cm > data.neck_circumference_cm;
-    }
-    return true;
+  if (data.sex === 'male' && data.abdomen_circumference_cm && data.neck_circumference_cm) {
+    return data.abdomen_circumference_cm > data.neck_circumference_cm;
+  }
+  return true;
 }, {
-    message: "Abdomen circumference must be greater than neck circumference for males.",
-    path: ["abdomen_circumference_cm"],
+  message: "Abdomen circumference must be greater than neck circumference for males.",
+  path: ["abdomen_circumference_cm"],
 }).refine(data => {
     if (data.sex === 'female' && data.waist_circumference_cm && data.hip_circumference_cm && data.neck_circumference_cm) {
         return (data.waist_circumference_cm + data.hip_circumference_cm) > data.neck_circumference_cm;
@@ -111,8 +106,48 @@ const userInfoSchema = z.object({
     return true;
 }, {
     message: "For females, the sum of waist and hip circumferences must be greater than neck circumference.",
-    path: ["hip_circumference_cm"], // Or waist_circumference_cm
+    path: ["hip_circumference_cm"],
 });
+
+function UserInfoPageSkeleton() {
+    return (
+        <div className="grid md:grid-cols-3 gap-8">
+            <Card className="md:col-span-2">
+                <CardHeader>
+                    <Skeleton className="h-8 w-48" />
+                    <Skeleton className="h-4 w-full max-w-lg" />
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="grid sm:grid-cols-2 gap-6">
+                        <div className="space-y-2"><Skeleton className="h-4 w-16" /><Skeleton className="h-10 w-full" /></div>
+                        <div className="space-y-2"><Skeleton className="h-4 w-16" /><Skeleton className="h-10 w-full" /></div>
+                    </div>
+                     <div className="grid sm:grid-cols-2 gap-6">
+                        <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
+                        <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
+                    </div>
+                     <div className="grid sm:grid-cols-2 gap-6">
+                        <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
+                        <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
+                    </div>
+                </CardContent>
+                <CardFooter>
+                    <Skeleton className="h-10 w-36" />
+                </CardFooter>
+            </Card>
+            <Card className="md:col-span-1">
+                 <CardHeader>
+                    <Skeleton className="h-8 w-40" />
+                    <Skeleton className="h-4 w-full max-w-xs" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                     <div className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-8 w-24" /></div>
+                     <div className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-8 w-24" /></div>
+                </CardContent>
+            </Card>
+        </div>
+    )
+}
 
 function UserInfoForm({ userProfile, setUserInformation }) {
   const { toast } = useToast();
@@ -122,47 +157,43 @@ function UserInfoForm({ userProfile, setUserInformation }) {
   const form = useForm({
     resolver: zodResolver(userInfoSchema),
     defaultValues: {
-      name: '',
-      email: '',
-      heightCm: 0,
-      weightKg: 0,
-      age: 0,
-      sex: null,
-      activityLevel: 'notSpecified',
-      training_experience_level: 'notSpecified',
-      bodyFatPercentage: 0,
-      athleteType: 'notSpecified',
-      primaryGoal: 'notSpecified',
-      neck_circumference_cm: null,
-      abdomen_circumference_cm: null,
-      waist_circumference_cm: null,
-      hip_circumference_cm: null,
+      name: userProfile.name || '',
+      email: userProfile.email || '',
+      heightCm: userProfile.heightCm || 0,
+      weightKg: userProfile.weightKg || 0,
+      age: userProfile.age || 0,
+      sex: userProfile.sex === 'notSpecified' ? null : userProfile.sex,
+      activityLevel: userProfile.activityLevel || 'notSpecified',
+      training_experience_level: userProfile.training_experience_level || 'notSpecified',
+      bodyFatPercentage: userProfile.bodyFatPercentage || 0,
+      athleteType: userProfile.athleteType || 'notSpecified',
+      primaryGoal: userProfile.primaryGoal || 'notSpecified',
+      neck_circumference_cm: userProfile.neck_circumference_cm || null,
+      abdomen_circumference_cm: userProfile.abdomen_circumference_cm || null,
+      waist_circumference_cm: userProfile.waist_circumference_cm || null,
+      hip_circumference_cm: userProfile.hip_circumference_cm || null,
     },
   });
   
-  // Set form values once userProfile is available
   useEffect(() => {
-    if(userProfile) {
-        form.reset({
-            name: userProfile.name || '',
-            email: userProfile.email || '',
-            heightCm: userProfile.heightCm || 0,
-            weightKg: userProfile.weightKg || 0,
-            age: userProfile.age || 0,
-            sex: userProfile.sex === 'notSpecified' ? null : userProfile.sex,
-            activityLevel: userProfile.activityLevel || 'notSpecified',
-            training_experience_level: userProfile.training_experience_level || 'notSpecified',
-            bodyFatPercentage: userProfile.bodyFatPercentage || 0,
-            athleteType: userProfile.athleteType || 'notSpecified',
-            primaryGoal: userProfile.primaryGoal || 'notSpecified',
-            neck_circumference_cm: userProfile.neck_circumference_cm || null,
-            abdomen_circumference_cm: userProfile.abdomen_circumference_cm || null,
-            waist_circumference_cm: userProfile.waist_circumference_cm || null,
-            hip_circumference_cm: userProfile.hip_circumference_cm || null,
-        });
-    }
+    form.reset({
+      name: userProfile.name || '',
+      email: userProfile.email || '',
+      heightCm: userProfile.heightCm || 0,
+      weightKg: userProfile.weightKg || 0,
+      age: userProfile.age || 0,
+      sex: userProfile.sex === 'notSpecified' ? null : userProfile.sex,
+      activityLevel: userProfile.activityLevel || 'notSpecified',
+      training_experience_level: userProfile.training_experience_level || 'notSpecified',
+      bodyFatPercentage: userProfile.bodyFatPercentage || 0,
+      athleteType: userProfile.athleteType || 'notSpecified',
+      primaryGoal: userProfile.primaryGoal || 'notSpecified',
+      neck_circumference_cm: userProfile.neck_circumference_cm || null,
+      abdomen_circumference_cm: userProfile.abdomen_circumference_cm || null,
+      waist_circumference_cm: userProfile.waist_circumference_cm || null,
+      hip_circumference_cm: userProfile.hip_circumference_cm || null,
+    });
   }, [userProfile, form.reset]);
-
 
   const watchedFormValues = form.watch();
 
@@ -175,10 +206,10 @@ function UserInfoForm({ userProfile, setUserInformation }) {
   }, [watchedFormValues.weightKg, watchedFormValues.bodyFatPercentage]);
   
   const onSubmit = (data) => {
-    setUserInformation(data);
+    setUserInformation(data); 
     toast({
-        title: "User Information Saved",
-        description: "Your profile details have been updated.",
+      title: "User Information Saved",
+      description: "Your profile details have been updated.",
     });
     form.reset(data, { keepDirty: false, keepValues: true });
   };
@@ -187,52 +218,62 @@ function UserInfoForm({ userProfile, setUserInformation }) {
     setCalculationMessage(null);
     setCalculationError(false);
     const { heightCm, sex, neck_circumference_cm, abdomen_circumference_cm, waist_circumference_cm, hip_circumference_cm } = form.getValues();
+
     if (!sex || !heightCm || !neck_circumference_cm) {
-        setCalculationMessage("Sex, Height, and Neck circumference are required for body fat calculation.");
-        setCalculationError(true);
-        toast({ title: "Missing Information", description: "Sex, Height, and Neck circumference are required.", variant: "destructive" });
-        return;
+      setCalculationMessage("Sex, Height, and Neck circumference are required for body fat calculation.");
+      setCalculationError(true);
+      toast({ title: "Missing Information", description: "Sex, Height, and Neck circumference are required.", variant: "destructive"});
+      return;
     }
+
     let calculatedBFP = null;
     if (sex === 'male') {
         if (!abdomen_circumference_cm) {
             setCalculationMessage("Abdomen circumference is required for male body fat calculation.");
             setCalculationError(true);
-            toast({ title: "Missing Information", description: "Abdomen circumference is required for males.", variant: "destructive" });
+            toast({ title: "Missing Information", description: "Abdomen circumference is required for males.", variant: "destructive"});
             return;
         }
-        if (abdomen_circumference_cm <= neck_circumference_cm) {
+         if (abdomen_circumference_cm <= neck_circumference_cm) {
             setCalculationMessage("For males, abdomen circumference must be greater than neck circumference.");
             setCalculationError(true);
-            toast({ title: "Invalid Measurements", description: "Abdomen must be greater than neck for males.", variant: "destructive" });
+            toast({ title: "Invalid Measurements", description: "Abdomen must be greater than neck for males.", variant: "destructive"});
             return;
         }
-    }
-    else if (sex === 'female') {
+    } else if (sex === 'female') {
         if (!waist_circumference_cm || !hip_circumference_cm) {
             setCalculationMessage("Waist and Hip circumferences are required for female body fat calculation.");
             setCalculationError(true);
-            toast({ title: "Missing Information", description: "Waist and Hip circumferences are required for females.", variant: "destructive" });
+            toast({ title: "Missing Information", description: "Waist and Hip circumferences are required for females.", variant: "destructive"});
             return;
         }
         if ((waist_circumference_cm + hip_circumference_cm) <= neck_circumference_cm) {
             setCalculationMessage("For females, (Waist + Hip) must be greater than Neck circumference.");
             setCalculationError(true);
-            toast({ title: "Invalid Measurements", description: "For females, (Waist + Hip) must be > Neck.", variant: "destructive" });
+            toast({ title: "Invalid Measurements", description: "For females, (Waist + Hip) must be > Neck.", variant: "destructive"});
             return;
         }
     }
-    calculatedBFP = calculateNavyBodyFatPercentage(sex, heightCm, neck_circumference_cm, abdomen_circumference_cm, waist_circumference_cm, hip_circumference_cm);
+
+
+    calculatedBFP = calculateNavyBodyFatPercentage(
+      sex,
+      heightCm,
+      neck_circumference_cm,
+      abdomen_circumference_cm,
+      waist_circumference_cm,
+      hip_circumference_cm
+    );
+
     if (calculatedBFP !== null && !isNaN(calculatedBFP)) {
-        form.setValue("bodyFatPercentage", parseFloat(calculatedBFP.toFixed(1)), { shouldValidate: true, shouldDirty: true });
-        setCalculationMessage(`Estimated Body Fat: ${calculatedBFP.toFixed(1)}%. This value has been updated in the form.`);
-        setCalculationError(false);
-        toast({ title: "Body Fat Calculated", description: `Estimated at ${calculatedBFP.toFixed(1)}%. You can now save your profile.` });
-    }
-    else {
-        setCalculationMessage("Could not calculate body fat percentage. Please check your measurements. Ensure abdomen > neck (males) or waist + hip > neck (females).");
-        setCalculationError(true);
-        toast({ title: "Calculation Error", description: "Please check measurements. Abdomen > Neck (M), Waist + Hip > Neck (F).", variant: "destructive" });
+      form.setValue("bodyFatPercentage", parseFloat(calculatedBFP.toFixed(1)), { shouldValidate: true, shouldDirty: true });
+      setCalculationMessage(`Estimated Body Fat: ${calculatedBFP.toFixed(1)}%. This value has been updated in the form.`);
+      setCalculationError(false);
+      toast({ title: "Body Fat Calculated", description: `Estimated at ${calculatedBFP.toFixed(1)}%. You can now save your profile.`});
+    } else {
+      setCalculationMessage("Could not calculate body fat percentage. Please check your measurements. Ensure abdomen > neck (males) or waist + hip > neck (females).");
+      setCalculationError(true);
+      toast({ title: "Calculation Error", description: "Please check measurements. Abdomen > Neck (M), Waist + Hip > Neck (F).", variant: "destructive"});
     }
   };
 
@@ -302,29 +343,29 @@ function UserInfoForm({ userProfile, setUserInformation }) {
                  <FormField control={form.control} name="sex" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Sex</FormLabel>
-                    <Select 
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        if (value === 'male') {
-                            form.setValue('waist_circumference_cm', null, { shouldValidate: true });
-                            form.setValue('hip_circumference_cm', null, { shouldValidate: true });
-                        } else if (value === 'female') {
-                            form.setValue('abdomen_circumference_cm', null, { shouldValidate: true });
-                        }
-                      }}
-                      value={field.value || ''}
-                     >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select sex" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {SEX_OPTIONS.map(option => (
-                          <SelectItem key={option} value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <Select 
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          if (value === 'male') {
+                              form.setValue('waist_circumference_cm', null, { shouldValidate: true });
+                              form.setValue('hip_circumference_cm', null, { shouldValidate: true });
+                          } else if (value === 'female') {
+                              form.setValue('abdomen_circumference_cm', null, { shouldValidate: true });
+                          }
+                        }}
+                        value={field.value || ''}
+                       >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select sex" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {SEX_OPTIONS.map(option => (
+                            <SelectItem key={option} value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -510,46 +551,6 @@ function UserInfoForm({ userProfile, setUserInformation }) {
       </Card>
     </div>
   )
-}
-
-function UserInfoPageSkeleton() {
-    return (
-        <div className="grid md:grid-cols-3 gap-8">
-            <Card className="md:col-span-2">
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
-                    <Skeleton className="h-4 w-full max-w-lg" />
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="grid sm:grid-cols-2 gap-6">
-                        <div className="space-y-2"><Skeleton className="h-4 w-16" /><Skeleton className="h-10 w-full" /></div>
-                        <div className="space-y-2"><Skeleton className="h-4 w-16" /><Skeleton className="h-10 w-full" /></div>
-                    </div>
-                     <div className="grid sm:grid-cols-2 gap-6">
-                        <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
-                        <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
-                    </div>
-                     <div className="grid sm:grid-cols-2 gap-6">
-                        <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
-                        <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
-                    </div>
-                </CardContent>
-                <CardFooter>
-                    <Skeleton className="h-10 w-36" />
-                </CardFooter>
-            </Card>
-            <Card className="md:col-span-1">
-                 <CardHeader>
-                    <Skeleton className="h-8 w-40" />
-                    <Skeleton className="h-4 w-full max-w-xs" />
-                </CardHeader>
-                <CardContent className="space-y-4">
-                     <div className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-8 w-24" /></div>
-                     <div className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-8 w-24" /></div>
-                </CardContent>
-            </Card>
-        </div>
-    )
 }
 
 export default function UserInfoPage() {

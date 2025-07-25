@@ -1,27 +1,24 @@
 
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useForm, SubmitHandler, Controller } from 'react-hook-form';
+import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import type { UserProfileSettings, Sex, ActivityLevel, AthleteType, PrimaryGoal, TrainingExperienceLevel } from '@/types';
 import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS, TRAINING_EXPERIENCE_OPTIONS } from '@/types';
-import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale, Award, Loader2 } from 'lucide-react';
+import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale, Award } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-import { Slider } from '@/components/ui/slider';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 const calculateLBM = (weightKg: number | null | undefined, bodyFatPercentage: number | null | undefined): number | null => {
@@ -54,7 +51,6 @@ const calculateTDEE = (
 };
 
 
-// Helper function (can be moved to utils if used elsewhere)
 const calculateNavyBodyFatPercentage = (
   sex: Sex | null | undefined,
   heightCm: number | null | undefined,
@@ -109,10 +105,10 @@ const userInfoSchema = z.object({
   athleteType: z.enum(ATHLETE_TYPE_OPTIONS.map(o => o.value) as [AthleteType, ...AthleteType[]]).nullable().optional(),
   primaryGoal: z.enum(PRIMARY_GOAL_OPTIONS.map(o => o.value) as [PrimaryGoal, ...PrimaryGoal[]]).nullable().optional(),
   neck_circumference_cm: z.coerce.number().min(1, "Neck circumference must be positive").nullable().optional(),
-  abdomen_circumference_cm: z.coerce.number().min(1, "Abdomen circumference must be positive").nullable().optional(), // Male
-  waist_circumference_cm: z.coerce.number().min(1, "Waist circumference must be positive").nullable().optional(),   // Female
-  hip_circumference_cm: z.coerce.number().min(1, "Hip circumference must be positive").nullable().optional(),     // Female
-}).refine(data => { // Ensure abdomen > neck for males if both are provided
+  abdomen_circumference_cm: z.coerce.number().min(1, "Abdomen circumference must be positive").nullable().optional(),
+  waist_circumference_cm: z.coerce.number().min(1, "Waist circumference must be positive").nullable().optional(),
+  hip_circumference_cm: z.coerce.number().min(1, "Hip circumference must be positive").nullable().optional(),
+}).refine(data => {
   if (data.sex === 'male' && data.abdomen_circumference_cm && data.neck_circumference_cm) {
     return data.abdomen_circumference_cm > data.neck_circumference_cm;
   }
@@ -120,14 +116,14 @@ const userInfoSchema = z.object({
 }, {
   message: "Abdomen circumference must be greater than neck circumference for males.",
   path: ["abdomen_circumference_cm"],
-}).refine(data => { // Ensure waist + hip > neck for females if all are provided
+}).refine(data => {
     if (data.sex === 'female' && data.waist_circumference_cm && data.hip_circumference_cm && data.neck_circumference_cm) {
         return (data.waist_circumference_cm + data.hip_circumference_cm) > data.neck_circumference_cm;
     }
     return true;
 }, {
     message: "For females, the sum of waist and hip circumferences must be greater than neck circumference.",
-    path: ["hip_circumference_cm"], // Or waist_circumference_cm
+    path: ["hip_circumference_cm"],
 });
 
 
@@ -141,45 +137,42 @@ function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserPr
   const form = useForm<UserInfoFormValues>({
     resolver: zodResolver(userInfoSchema),
     defaultValues: {
-      name: '',
-      email: '',
-      heightCm: 0,
-      weightKg: 0,
-      age: 0,
-      sex: null,
-      activityLevel: 'notSpecified',
-      training_experience_level: 'notSpecified',
-      bodyFatPercentage: 0,
-      athleteType: 'notSpecified',
-      primaryGoal: 'notSpecified',
-      neck_circumference_cm: null,
-      abdomen_circumference_cm: null,
-      waist_circumference_cm: null,
-      hip_circumference_cm: null,
+      name: userProfile.name || '',
+      email: userProfile.email || '',
+      heightCm: userProfile.heightCm || 0,
+      weightKg: userProfile.weightKg || 0,
+      age: userProfile.age || 0,
+      sex: userProfile.sex === 'notSpecified' ? null : userProfile.sex,
+      activityLevel: userProfile.activityLevel || 'notSpecified',
+      training_experience_level: userProfile.training_experience_level || 'notSpecified',
+      bodyFatPercentage: userProfile.bodyFatPercentage || 0,
+      athleteType: userProfile.athleteType || 'notSpecified',
+      primaryGoal: userProfile.primaryGoal || 'notSpecified',
+      neck_circumference_cm: userProfile.neck_circumference_cm || null,
+      abdomen_circumference_cm: userProfile.abdomen_circumference_cm || null,
+      waist_circumference_cm: userProfile.waist_circumference_cm || null,
+      hip_circumference_cm: userProfile.hip_circumference_cm || null,
     },
   });
   
-  // Set form values once userProfile is available
   useEffect(() => {
-    if(userProfile) {
-        form.reset({
-            name: userProfile.name || '',
-            email: userProfile.email || '',
-            heightCm: userProfile.heightCm || 0,
-            weightKg: userProfile.weightKg || 0,
-            age: userProfile.age || 0,
-            sex: userProfile.sex === 'notSpecified' ? null : userProfile.sex,
-            activityLevel: userProfile.activityLevel || 'notSpecified',
-            training_experience_level: userProfile.training_experience_level || 'notSpecified',
-            bodyFatPercentage: userProfile.bodyFatPercentage || 0,
-            athleteType: userProfile.athleteType || 'notSpecified',
-            primaryGoal: userProfile.primaryGoal || 'notSpecified',
-            neck_circumference_cm: userProfile.neck_circumference_cm || null,
-            abdomen_circumference_cm: userProfile.abdomen_circumference_cm || null,
-            waist_circumference_cm: userProfile.waist_circumference_cm || null,
-            hip_circumference_cm: userProfile.hip_circumference_cm || null,
-        });
-    }
+    form.reset({
+      name: userProfile.name || '',
+      email: userProfile.email || '',
+      heightCm: userProfile.heightCm || 0,
+      weightKg: userProfile.weightKg || 0,
+      age: userProfile.age || 0,
+      sex: userProfile.sex === 'notSpecified' ? null : userProfile.sex,
+      activityLevel: userProfile.activityLevel || 'notSpecified',
+      training_experience_level: userProfile.training_experience_level || 'notSpecified',
+      bodyFatPercentage: userProfile.bodyFatPercentage || 0,
+      athleteType: userProfile.athleteType || 'notSpecified',
+      primaryGoal: userProfile.primaryGoal || 'notSpecified',
+      neck_circumference_cm: userProfile.neck_circumference_cm || null,
+      abdomen_circumference_cm: userProfile.abdomen_circumference_cm || null,
+      waist_circumference_cm: userProfile.waist_circumference_cm || null,
+      hip_circumference_cm: userProfile.hip_circumference_cm || null,
+    });
   }, [userProfile, form.reset]);
 
   const watchedFormValues = form.watch();
