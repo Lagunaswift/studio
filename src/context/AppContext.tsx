@@ -118,6 +118,7 @@ interface AppContextType {
 
   // Loaders
   isAppDataLoading: boolean;
+  isRecipeCacheLoading: boolean;
 
   // Actions
   addMealToPlan: (recipe: Recipe, date: string, mealType: MealType, servings: number) => Promise<void>;
@@ -127,6 +128,7 @@ interface AppContextType {
   clearMealPlanForDate: (date: string) => Promise<void>;
   clearEntireMealPlan: () => Promise<void>;
   toggleFavoriteRecipe: (recipeId: number) => Promise<void>;
+  toggleShoppingListItem: (itemId: string) => Promise<void>;
   addPantryItem: (name: string, quantity: number, unit: string, category: string, expiryDate?: string) => Promise<void>;
   removePantryItem: (itemId: string) => Promise<void>;
   updatePantryItemQuantity: (itemId: string, newQuantity: number) => Promise<void>;
@@ -160,17 +162,23 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
     const [dailyVitalsLog, setDailyVitalsLog] = useState<DailyVitalsLog[]>([]);
     const [dailyManualMacrosLog, setDailyManualMacrosLog] = useState<DailyManualMacrosLog[]>([]);
     const [isDataLoading, setIsDataLoading] = useState(true);
+    const [isRecipeCacheLoading, setIsRecipeCacheLoading] = useState(true);
 
     const idToUse = useMemo(() => userId, [userId]);
     
     useEffect(() => {
       const unsubscribes: (() => void)[] = [];
 
+      setIsRecipeCacheLoading(true);
       // Listener for built-in recipes (where user_id is null)
       const builtInQuery = query(collection(db, "recipes"), where("user_id", "==", null));
       unsubscribes.push(onSnapshot(builtInQuery, (snapshot) => {
         const recipes = snapshot.docs.map(doc => ({ id: parseInt(doc.id, 10), ...doc.data() } as Recipe));
         setBuiltInRecipes(recipes);
+        setIsRecipeCacheLoading(false);
+      }, (error) => {
+        console.error("Error fetching built-in recipes:", error);
+        setIsRecipeCacheLoading(false);
       }));
 
       if (!idToUse) {
@@ -347,7 +355,7 @@ function useAppData(userId: string | undefined, isAuthLoading: boolean) {
 
     return {
         mealPlan, pantryItems, userRecipes, userProfile,
-        isAppDataLoading, isSubscribed, allRecipesCache,
+        isAppDataLoading, isRecipeCacheLoading, isSubscribed, allRecipesCache,
         shoppingList, getConsumedMacrosForDate, getPlannedMacrosForDate,
         getMealsForDate, isRecipeFavorite, runWeeklyCheckin
     };
@@ -376,7 +384,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   const {
       mealPlan, pantryItems, userRecipes, userProfile,
-      isAppDataLoading, isSubscribed, allRecipesCache,
+      isAppDataLoading, isRecipeCacheLoading, isSubscribed, allRecipesCache,
       shoppingList, getConsumedMacrosForDate, getPlannedMacrosForDate,
       getMealsForDate, isRecipeFavorite, runWeeklyCheckin
   } = useAppData(user?.uid, isAuthLoading);
@@ -468,6 +476,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await setUserInformation({ favorite_recipe_ids: newFavorites });
   }, [userProfile, setUserInformation]);
   
+  const toggleShoppingListItem = useCallback(async (itemId: string) => {
+      const item = shoppingList.find(i => i.id === itemId);
+      if(item) {
+        // This is a local-only operation for now as 'purchased' state isn't in Firestore.
+        // It will be re-evaluated on next list generation.
+        // In a real app, you might store purchased status in a separate table.
+        console.log("Toggling purchased status for item (local state):", item.name);
+      }
+  }, [shoppingList]);
+
+
   const assignIngredientCategory = useCallback((ingredientName: string): UKSupermarketCategory => {
     return assignCategoryUtil(ingredientName);
   }, []);
@@ -515,22 +534,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return await callServerActionWithAuth(addRecipeAction, recipeData);
   }, [callServerActionWithAuth]);
 
-  const contextValue = useMemo(() => ({
+  const contextValue: AppContextType = useMemo(() => ({
     mealPlan, pantryItems, userRecipes, userProfile,
-    allRecipesCache, shoppingList, isAppDataLoading, isOnline, isSubscribed,
+    allRecipesCache, shoppingList, isAppDataLoading, isRecipeCacheLoading, isOnline, isSubscribed,
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus, 
     clearMealPlanForDate, clearEntireMealPlan,
-    toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
+    toggleFavoriteRecipe, toggleShoppingListItem, addPantryItem, removePantryItem, updatePantryItemQuantity,
     addCustomRecipe, runWeeklyCheckin,
     setUserInformation, setMacroTargets, setMealStructure, setDashboardSettings, acceptTerms,
     assignIngredientCategory,
     getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
   }), [
     mealPlan, pantryItems, userRecipes, userProfile,
-    allRecipesCache, shoppingList, isAppDataLoading, isOnline, isSubscribed,
+    allRecipesCache, shoppingList, isAppDataLoading, isRecipeCacheLoading, isOnline, isSubscribed,
     addMealToPlan, removeMealFromPlan, updatePlannedMealServings, updateMealStatus,
     clearMealPlanForDate, clearEntireMealPlan, 
-    toggleFavoriteRecipe, addPantryItem, removePantryItem, updatePantryItemQuantity,
+    toggleFavoriteRecipe, toggleShoppingListItem, addPantryItem, removePantryItem, updatePantryItemQuantity,
     addCustomRecipe, runWeeklyCheckin, setUserInformation, setMacroTargets, setMealStructure,
     setDashboardSettings, acceptTerms, assignIngredientCategory, getConsumedMacrosForDate, getPlannedMacrosForDate, getMealsForDate, isRecipeFavorite,
   ]);

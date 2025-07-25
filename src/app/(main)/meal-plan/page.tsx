@@ -440,7 +440,7 @@ export default function MealPlanPage() {
 
       {editingMeal && (
         <Dialog open={!!editingMeal} onOpenChange={() => setEditingMeal(null)}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle className="font-headline text-primary">Edit Servings for {editingMeal.recipeDetails?.name}</DialogTitle>
               <DialogDescription>Update the number of servings for this meal.</DialogDescription>
