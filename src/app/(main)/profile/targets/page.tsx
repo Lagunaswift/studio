@@ -38,8 +38,8 @@ interface FatSuggestion {
   justification: string;
 }
 
-const getMonthlyGainKg = (sex: 'male' | 'female' | null, level: TrainingExperienceLevel | null): number => {
-    if (!sex || !level || level === 'notSpecified') return 0;
+const getMonthlyGainKg = (sex: 'male' | 'female' | null | 'notSpecified', level: TrainingExperienceLevel | null): number => {
+    if (!sex || sex === 'notSpecified' || !level || level === 'notSpecified') return 0;
     
     if (sex === 'female') {
         switch(level) {

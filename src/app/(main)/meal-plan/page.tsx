@@ -68,13 +68,14 @@ export default function MealPlanPage() {
 
   const [recipePickerIndices, setRecipePickerIndices] = useState<{[key: string]: number}>(
     (userProfile?.mealStructure || MEAL_SLOT_CONFIG).reduce((acc, slot, index) => {
-      acc[`${slot.type}-${index}`] = 0;
+      const key = 'name' in slot ? `${slot.type}-${slot.id}` : `${slot.type}-${index}`;
+      acc[key] = 0;
       return acc;
     }, {} as {[key: string]: number})
   );
   
   const availableRecipesForPicker = allRecipesCache;
-  const mealStructureToUse = userProfile?.mealStructure || MEAL_SLOT_CONFIG.map(s => ({...s, id: s.displayName.replace(' ','-')}));
+  const mealStructureToUse = userProfile?.mealStructure || MEAL_SLOT_CONFIG.map((s, i) => ({...s, id: `default-${i}`}));
 
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
   const dailyMacros = getPlannedMacrosForDate(formattedDate);
@@ -276,7 +277,7 @@ export default function MealPlanPage() {
 
 
         {!isAppRecipeCacheLoading && availableRecipesForPicker.length > 0 && mealStructureToUse.map((slotConfig, index) => {
-          const slotKey = `${slotConfig.type}-${index}`;
+          const slotKey = `${slotConfig.type}-${'id' in slotConfig ? slotConfig.id : index}`;
           let NthInstanceOfType = 0;
           for(let i=0; i < index; i++){
             if(mealStructureToUse[i].type === slotConfig.type) {
@@ -284,10 +285,11 @@ export default function MealPlanPage() {
             }
           }
           const mealToDisplay = getPlannedMealForSlot(slotConfig.type, NthInstanceOfType);
+          const slotName = 'name' in slotConfig ? slotConfig.name : ('displayName' in slotConfig ? slotConfig.displayName : slotConfig.type);
 
           return (
             <div key={slotKey} className="p-4 border rounded-lg shadow-md bg-card">
-              <h3 className="text-xl font-semibold font-headline text-primary/90 mb-4">{slotConfig.name || slotConfig.displayName}</h3>
+              <h3 className="text-xl font-semibold font-headline text-primary/90 mb-4">{slotName}</h3>
               {mealToDisplay ? (
                 <div className="w-full max-w-lg mx-auto">
                    <Card className={cn(
@@ -383,7 +385,7 @@ export default function MealPlanPage() {
                       disabled={!availableRecipesForPicker[recipePickerIndices[slotKey] || 0]}
                     >
                       <PlusCircle className="mr-2 h-5 w-5 shrink-0" />
-                      <span className="text-left">Add "{availableRecipesForPicker[recipePickerIndices[slotKey] || 0]?.name}" as {slotConfig.name}</span>
+                      <span className="text-left">Add "{availableRecipesForPicker[recipePickerIndices[slotKey] || 0]?.name}" as {slotName}</span>
                     </Button>
                   )}
                 </div>

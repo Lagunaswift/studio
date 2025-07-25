@@ -1,3 +1,4 @@
+
 //src/context/AppContext.tsx
 "use client";
 
@@ -421,7 +422,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [setUserInformation]);
 
   const setDashboardSettings = useCallback(async (settings: Partial<DashboardSettings>) => {
-    const newSettings = { ...(userProfile?.dashboardSettings || {}), ...settings };
+    const defaultSettings: DashboardSettings = {
+        showMacros: true,
+        showMenu: true,
+        showFeaturedRecipe: true,
+        showQuickRecipes: true,
+    };
+    const newSettings = { ...(userProfile?.dashboardSettings || defaultSettings), ...settings };
     await setUserInformation({ dashboardSettings: newSettings });
   }, [userProfile?.dashboardSettings, setUserInformation]);
 
