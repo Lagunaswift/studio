@@ -1,72 +1,55 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if the user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    // Helper function to check if the user is the owner of a document
+    
+    // Helper function to check if the requesting user is the owner of the document.
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return request.auth != null && request.auth.uid == userId;
     }
 
-    // Profiles: Users can read their own profile and create it. They can only update their own.
+    // --- User Profile ---
+    // Users can only read and write to their own profile document.
     match /profiles/{userId} {
-      allow read, update: if isAuthenticated() && isOwner(userId);
-      allow create: if isAuthenticated();
+      allow read, write: if isOwner(userId);
     }
 
-    // Recipes: 
-    // - Allow any authenticated user to read all recipes (both built-in and custom).
-    // - Allow users to create new custom recipes.
-    // - Allow users to update or delete ONLY their own custom recipes.
+    // --- Recipes ---
+    // Recipes have special rules:
+    // - ANY authenticated user can READ any recipe (both built-in and custom ones from other users).
+    // - Users can only CREATE recipes for themselves.
+    // - Users can only UPDATE or DELETE recipes they own.
     match /recipes/{recipeId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && isOwner(resource.data.user_id);
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && isOwner(request.resource.data.user_id);
+      allow update, delete: if isOwner(resource.data.user_id);
     }
-    
-    // Planned Meals: Users can only manage their own meal plan entries.
+
+    // --- User-Specific Collections (Meals, Pantry, Logs) ---
+    // For these collections, users can only read or write documents they own.
     match /planned_meals/{mealId} {
-        allow read, write: if isAuthenticated() && isOwner(resource.data.user_id);
-        allow create: if isAuthenticated();
+      allow read, write: if isOwner(resource.data.user_id);
     }
 
-    // Pantry Items: Users can only manage their own pantry items.
     match /pantry_items/{itemId} {
-        allow read, write: if isAuthenticated() && isOwner(resource.data.user_id);
-        allow create: if isAuthenticated();
+      allow read, write: if isOwner(resource.data.user_id);
+    }
+
+    match /daily_weight_logs/{logId} {
+      allow read, write: if isOwner(resource.data.user_id);
     }
     
-    // Daily Logs (Weight, Vitals, Manual Macros): Users can only manage their own logs.
-    match /daily_weight_logs/{logId} {
-        allow read, write: if isAuthenticated() && isOwner(resource.data.user_id);
-        allow create: if isAuthenticated();
-    }
-
     match /daily_vitals_logs/{logId} {
-        allow read, write: if isAuthenticated() && isOwner(resource.data.user_id);
-        allow create: if isAuthenticated();
+        allow read, write: if isOwner(resource.data.user_id);
     }
 
     match /daily_manual_macros_logs/{logId} {
-        allow read, write: if isAuthenticated() && isOwner(resource.data.user_id);
-        allow create: if isAuthenticated();
+        allow read, write: if isOwner(resource.data.user_id);
     }
     
-    // Bug Reports: Any authenticated user can create a report. No one can read/update/delete.
     match /bug_reports/{reportId} {
-        allow create: if isAuthenticated();
-        allow read, write, delete: if false;
-    }
-
-    // Default deny all other access
-    match /{document=**} {
-      allow read, write: if false;
+      allow create: if request.auth != null; // Allow any authenticated user to create a bug report.
+      allow read, write, delete: if false; // Disallow any client-side reading/updating/deleting of reports.
     }
   }
 }
