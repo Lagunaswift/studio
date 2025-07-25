@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useEffect, useState, useMemo } from 'react';
@@ -15,8 +14,9 @@ import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import type { UserProfileSettings, Sex, ActivityLevel, AthleteType, PrimaryGoal, TrainingExperienceLevel } from '@/types';
 import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS, TRAINING_EXPERIENCE_OPTIONS } from '@/types';
-import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale, Award } from 'lucide-react';
+import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale, Award, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 const calculateLBM = (weightKg: number | null | undefined, bodyFatPercentage: number | null | undefined): number | null => {
@@ -128,31 +128,29 @@ const userInfoSchema = z.object({
 
 type UserInfoFormValues = z.infer<typeof userInfoSchema>;
 
-export default function UserInfoPage() {
-  const { userProfile, setUserInformation } = useAppContext();
+function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserProfileSettings, setUserInformation: (updates: Partial<UserProfileSettings>) => void }) {
   const { toast } = useToast();
   const [calculationMessage, setCalculationMessage] = useState<string | null>(null);
   const [calculationError, setCalculationError] = useState<boolean>(false);
-
-
+  
   const form = useForm<UserInfoFormValues>({
     resolver: zodResolver(userInfoSchema),
     defaultValues: {
-      name: userProfile?.name || null,
-      email: userProfile?.email || null,
-      heightCm: userProfile?.heightCm || null,
-      weightKg: userProfile?.weightKg || null,
-      age: userProfile?.age || null,
-      sex: userProfile?.sex === 'notSpecified' ? null : userProfile?.sex,
-      activityLevel: userProfile?.activityLevel || null,
-      training_experience_level: userProfile?.training_experience_level || null,
-      bodyFatPercentage: userProfile?.bodyFatPercentage || null,
-      athleteType: userProfile?.athleteType || 'notSpecified',
-      primaryGoal: userProfile?.primaryGoal || 'notSpecified',
-      neck_circumference_cm: userProfile?.neck_circumference_cm || null,
-      abdomen_circumference_cm: userProfile?.abdomen_circumference_cm || null,
-      waist_circumference_cm: userProfile?.waist_circumference_cm || null,
-      hip_circumference_cm: userProfile?.hip_circumference_cm || null,
+      name: userProfile.name || '',
+      email: userProfile.email || '',
+      heightCm: userProfile.heightCm || 0,
+      weightKg: userProfile.weightKg || 0,
+      age: userProfile.age || 0,
+      sex: userProfile.sex === 'notSpecified' ? null : userProfile.sex,
+      activityLevel: userProfile.activityLevel || 'notSpecified',
+      training_experience_level: userProfile.training_experience_level || 'notSpecified',
+      bodyFatPercentage: userProfile.bodyFatPercentage || 0,
+      athleteType: userProfile.athleteType || 'notSpecified',
+      primaryGoal: userProfile.primaryGoal || 'notSpecified',
+      neck_circumference_cm: userProfile.neck_circumference_cm || null,
+      abdomen_circumference_cm: userProfile.abdomen_circumference_cm || null,
+      waist_circumference_cm: userProfile.waist_circumference_cm || null,
+      hip_circumference_cm: userProfile.hip_circumference_cm || null,
     },
   });
 
@@ -165,29 +163,7 @@ export default function UserInfoPage() {
   const liveLbm = useMemo(() => {
     return calculateLBM(watchedFormValues.weightKg, watchedFormValues.bodyFatPercentage);
   }, [watchedFormValues.weightKg, watchedFormValues.bodyFatPercentage]);
-
-  useEffect(() => {
-    if (userProfile) {
-      form.reset({
-        name: userProfile.name || null,
-        email: userProfile.email || null,
-        heightCm: userProfile.heightCm || null,
-        weightKg: userProfile.weightKg || null,
-        age: userProfile.age || null,
-        sex: userProfile.sex === 'notSpecified' ? null : userProfile.sex,
-        activityLevel: userProfile.activityLevel || null,
-        training_experience_level: userProfile.training_experience_level || null,
-        bodyFatPercentage: userProfile.bodyFatPercentage || null,
-        athleteType: userProfile.athleteType || 'notSpecified',
-        primaryGoal: userProfile.primaryGoal || 'notSpecified',
-        neck_circumference_cm: userProfile.neck_circumference_cm || null,
-        abdomen_circumference_cm: userProfile.abdomen_circumference_cm || null,
-        waist_circumference_cm: userProfile.waist_circumference_cm || null,
-        hip_circumference_cm: userProfile.hip_circumference_cm || null,
-      });
-    }
-  }, [userProfile, form]);
-
+  
   const onSubmit: SubmitHandler<UserInfoFormValues> = (data) => {
     setUserInformation(data as Partial<UserProfileSettings>); 
     toast({
@@ -196,7 +172,7 @@ export default function UserInfoPage() {
     });
     form.reset(data, { keepDirty: false, keepValues: true });
   };
-
+  
   const handleCalculateBodyFat = () => {
     setCalculationMessage(null);
     setCalculationError(false);
@@ -260,347 +236,336 @@ export default function UserInfoPage() {
     }
   };
 
+
+  return (
+    <div className="grid md:grid-cols-3 gap-8">
+      <Card className="md:col-span-2">
+        <CardHeader>
+          <CardTitle className="flex items-center"><UserCircle className="mr-2 h-5 w-5 text-accent"/> Your Details</CardTitle>
+          <CardDescription>
+            Provide your name, email, physical attributes, activity level, and goals to help personalize your experience.
+          </CardDescription>
+        </CardHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <CardContent className="space-y-6">
+              <div className="grid sm:grid-cols-2 gap-6">
+                <FormField control={form.control} name="name" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center"><UserIcon className="mr-2 h-4 w-4 text-muted-foreground"/>Name</FormLabel>
+                    <FormControl>
+                      <Input type="text" placeholder="Your Name" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="email" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center"><Mail className="mr-2 h-4 w-4 text-muted-foreground"/>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="you@example.com" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+              <div className="grid sm:grid-cols-2 gap-6">
+                <FormField control={form.control} name="heightCm" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center"><Ruler className="mr-2 h-4 w-4 text-muted-foreground"/>Height (cm)</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="e.g., 175" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="weightKg" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Weight (kg)</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="e.g., 70" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+              <div className="grid sm:grid-cols-2 gap-6">
+                <FormField control={form.control} name="age" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Age (years)</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="e.g., 30" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                 <FormField control={form.control} name="sex" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sex</FormLabel>
+                      <Select 
+                        onValueChange={(value) => {
+                          field.onChange(value as Sex);
+                          if (value === 'male') {
+                              form.setValue('waist_circumference_cm', null, { shouldValidate: true });
+                              form.setValue('hip_circumference_cm', null, { shouldValidate: true });
+                          } else if (value === 'female') {
+                              form.setValue('abdomen_circumference_cm', null, { shouldValidate: true });
+                          }
+                        }}
+                        value={field.value || ''}
+                       >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select sex" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {SEX_OPTIONS.map(option => (
+                            <SelectItem key={option} value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+               <div className="grid sm:grid-cols-2 gap-6">
+                 <FormField control={form.control} name="training_experience_level" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center"><Award className="mr-2 h-4 w-4 text-muted-foreground"/>Training Experience</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || 'notSpecified'}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your training level" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {TRAINING_EXPERIENCE_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="activityLevel" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center"><Activity className="mr-2 h-4 w-4 text-muted-foreground"/> Activity Level</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select activity level" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {ACTIVITY_LEVEL_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+               </div>
+
+              <div className="space-y-2 p-4 border rounded-md bg-muted/20">
+                  <h4 className="text-md font-semibold text-primary flex items-center mb-3">
+                      <Scale className="mr-2 h-5 w-5 text-accent"/> Body Measurements (for optional Body Fat % calc)
+                  </h4>
+                  <FormField control={form.control} name="neck_circumference_cm" render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Neck Circumference (cm)</FormLabel>
+                          <FormControl>
+                          <Input type="number" step="0.1" placeholder="e.g., 38.5" {...field} value={field.value ?? ""} />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )} />
+                  {watchedFormValues.sex === 'male' && (
+                      <FormField control={form.control} name="abdomen_circumference_cm" render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>Abdomen Circumference (cm)</FormLabel>
+                              <FormControl>
+                              <Input type="number" step="0.1" placeholder="e.g., 90.0 (at navel level)" {...field} value={field.value ?? ""} />
+                              </FormControl>
+                              <FormMessage />
+                          </FormItem>
+                      )} />
+                  )}
+                  {watchedFormValues.sex === 'female' && (
+                      <>
+                      <FormField control={form.control} name="waist_circumference_cm" render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>Waist Circumference (cm)</FormLabel>
+                              <FormControl>
+                              <Input type="number" step="0.1" placeholder="e.g., 70.0 (narrowest point)" {...field} value={field.value ?? ""} />
+                              </FormControl>
+                              <FormMessage />
+                          </FormItem>
+                      )} />
+                      <FormField control={form.control} name="hip_circumference_cm" render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>Hip Circumference (cm)</FormLabel>
+                              <FormControl>
+                              <Input type="number" step="0.1" placeholder="e.g., 95.0 (widest point)" {...field} value={field.value ?? ""} />
+                              </FormControl>
+                              <FormMessage />
+                          </FormItem>
+                      )} />
+                      </>
+                  )}
+                  <Button type="button" variant="outline" onClick={handleCalculateBodyFat} className="mt-2 w-full sm:w-auto">
+                      <Calculator className="mr-2 h-4 w-4 text-accent"/> Calculate Body Fat % (Navy Method)
+                  </Button>
+                  {calculationMessage && (
+                       <Alert variant={calculationError ? "destructive" : "default"} className="mt-2">
+                          <AlertTitle>{calculationError ? "Error" : "Info"}</AlertTitle>
+                          <AlertDescription>{calculationMessage}</AlertDescription>
+                      </Alert>
+                  )}
+              </div>
+
+
+              <FormField control={form.control} name="bodyFatPercentage" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Body Fat % (Direct Entry or Calculated)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.1" placeholder="e.g., 15.5" {...field} value={field.value ?? ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+               
+              <div className="grid sm:grid-cols-2 gap-6">
+                <FormField control={form.control} name="athleteType" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center"><Dumbbell className="mr-2 h-4 w-4 text-muted-foreground"/> Athlete Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || 'notSpecified'}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select athlete type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {ATHLETE_TYPE_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="primaryGoal" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center"><TargetIcon className="mr-2 h-4 w-4 text-muted-foreground"/> Primary Goal</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || 'notSpecified'}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select primary goal" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {PRIMARY_GOAL_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button type="submit" disabled={form.formState.isSubmitting || !form.formState.isDirty} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                <Save className="mr-2 h-4 w-4" /> {form.formState.isSubmitting ? "Saving..." : "Save Information"}
+              </Button>
+            </CardFooter>
+          </form>
+        </Form>
+      </Card>
+
+      <Card className="md:col-span-1">
+        <CardHeader>
+          <CardTitle className="flex items-center"><Calculator className="mr-2 h-5 w-5 text-accent"/> Calculated Estimates</CardTitle>
+          <CardDescription>
+            Based on your inputs. These help in setting macro targets. LBM requires Body Fat %.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <h3 className="text-sm font-medium text-muted-foreground">Estimated TDEE (Total Daily Energy Expenditure)</h3>
+            <p className="text-2xl font-bold text-primary">
+              {liveTdee ? `${liveTdee.toLocaleString()} kcal/day` : 'N/A'}
+            </p>
+            {!liveTdee && <p className="text-xs text-muted-foreground mt-1">Requires height, weight, age, sex, and activity level.</p>}
+          </div>
+          <div>
+            <h3 className="text-sm font-medium text-muted-foreground">Estimated Lean Body Mass (LBM)</h3>
+            <p className="text-2xl font-bold text-primary">
+              {liveLbm ? `${liveLbm.toFixed(1)} kg` : 'N/A'}
+            </p>
+            {!liveLbm && <p className="text-xs text-muted-foreground mt-1">Requires weight and body fat %.</p>}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function UserInfoPageSkeleton() {
+    return (
+        <div className="grid md:grid-cols-3 gap-8">
+            <Card className="md:col-span-2">
+                <CardHeader>
+                    <Skeleton className="h-8 w-48" />
+                    <Skeleton className="h-4 w-full max-w-lg" />
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="grid sm:grid-cols-2 gap-6">
+                        <div className="space-y-2"><Skeleton className="h-4 w-16" /><Skeleton className="h-10 w-full" /></div>
+                        <div className="space-y-2"><Skeleton className="h-4 w-16" /><Skeleton className="h-10 w-full" /></div>
+                    </div>
+                     <div className="grid sm:grid-cols-2 gap-6">
+                        <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
+                        <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
+                    </div>
+                     <div className="grid sm:grid-cols-2 gap-6">
+                        <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
+                        <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
+                    </div>
+                </CardContent>
+                <CardFooter>
+                    <Skeleton className="h-10 w-36" />
+                </CardFooter>
+            </Card>
+            <Card className="md:col-span-1">
+                 <CardHeader>
+                    <Skeleton className="h-8 w-40" />
+                    <Skeleton className="h-4 w-full max-w-xs" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                     <div className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-8 w-24" /></div>
+                     <div className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-8 w-24" /></div>
+                </CardContent>
+            </Card>
+        </div>
+    )
+}
+
+export default function UserInfoPage() {
+  const { userProfile, setUserInformation, isAppDataLoading } = useAppContext();
+  
+  if (isAppDataLoading || !userProfile) {
+    return (
+      <PageWrapper title="User Information">
+        <UserInfoPageSkeleton />
+      </PageWrapper>
+    )
+  }
+
   return (
     <PageWrapper title="User Information">
-      <div className="grid md:grid-cols-3 gap-8">
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center"><UserCircle className="mr-2 h-5 w-5 text-accent"/> Your Details</CardTitle>
-            <CardDescription>
-              Provide your name, email, physical attributes, activity level, and goals to help personalize your experience.
-            </CardDescription>
-          </CardHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)}>
-              <CardContent className="space-y-6">
-                <div className="grid sm:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center"><UserIcon className="mr-2 h-4 w-4 text-muted-foreground"/>Name</FormLabel>
-                        <FormControl>
-                          <Input type="text" placeholder="Your Name" {...field} value={field.value ?? ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center"><Mail className="mr-2 h-4 w-4 text-muted-foreground"/>Email</FormLabel>
-                        <FormControl>
-                          <Input type="email" placeholder="you@example.com" {...field} value={field.value ?? ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="grid sm:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="heightCm"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center"><Ruler className="mr-2 h-4 w-4 text-muted-foreground"/>Height (cm)</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="e.g., 175" {...field} value={field.value ?? ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="weightKg"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Weight (kg)</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="e.g., 70" {...field} value={field.value ?? ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="grid sm:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="age"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Age (years)</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="e.g., 30" {...field} value={field.value ?? ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                   <FormField
-                    control={form.control}
-                    name="sex"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sex</FormLabel>
-                        <Controller
-                          name="sex"
-                          control={form.control}
-                          render={({ field: controllerField }) => (
-                            <Select
-                              onValueChange={(value) => {
-                                controllerField.onChange(value as Sex);
-                                // Reset gender-specific fields when sex changes
-                                if (value === 'male') {
-                                  form.setValue('waist_circumference_cm', null, {shouldValidate: true});
-                                  form.setValue('hip_circumference_cm', null, {shouldValidate: true});
-                                } else if (value === 'female') {
-                                  form.setValue('abdomen_circumference_cm', null, {shouldValidate: true});
-                                }
-                              }}
-                              value={controllerField.value ?? ""}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select sex" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {SEX_OPTIONS.map(option => (
-                                  <SelectItem key={option} value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                        />
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                 <div className="grid sm:grid-cols-2 gap-6">
-                   <FormField
-                    control={form.control}
-                    name="training_experience_level"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center"><Award className="mr-2 h-4 w-4 text-muted-foreground"/>Training Experience</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value ?? 'notSpecified'}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select your training level" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {TRAINING_EXPERIENCE_OPTIONS.map(option => (
-                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="activityLevel"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center"><Activity className="mr-2 h-4 w-4 text-muted-foreground"/> Activity Level</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select activity level" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {ACTIVITY_LEVEL_OPTIONS.map(option => (
-                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                 </div>
-
-                <div className="space-y-2 p-4 border rounded-md bg-muted/20">
-                    <h4 className="text-md font-semibold text-primary flex items-center mb-3">
-                        <Scale className="mr-2 h-5 w-5 text-accent"/> Body Measurements (for optional Body Fat % calc)
-                    </h4>
-                    <FormField
-                        control={form.control}
-                        name="neck_circumference_cm"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Neck Circumference (cm)</FormLabel>
-                            <FormControl>
-                            <Input type="number" step="0.1" placeholder="e.g., 38.5" {...field} value={field.value ?? ""} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                    {watchedFormValues.sex === 'male' && (
-                        <FormField
-                            control={form.control}
-                            name="abdomen_circumference_cm"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Abdomen Circumference (cm)</FormLabel>
-                                <FormControl>
-                                <Input type="number" step="0.1" placeholder="e.g., 90.0 (at navel level)" {...field} value={field.value ?? ""} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                    )}
-                    {watchedFormValues.sex === 'female' && (
-                        <>
-                        <FormField
-                            control={form.control}
-                            name="waist_circumference_cm"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Waist Circumference (cm)</FormLabel>
-                                <FormControl>
-                                <Input type="number" step="0.1" placeholder="e.g., 70.0 (narrowest point)" {...field} value={field.value ?? ""} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="hip_circumference_cm"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Hip Circumference (cm)</FormLabel>
-                                <FormControl>
-                                <Input type="number" step="0.1" placeholder="e.g., 95.0 (widest point)" {...field} value={field.value ?? ""} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                        </>
-                    )}
-                    <Button type="button" variant="outline" onClick={handleCalculateBodyFat} className="mt-2 w-full sm:w-auto">
-                        <Calculator className="mr-2 h-4 w-4 text-accent"/> Calculate Body Fat % (Navy Method)
-                    </Button>
-                    {calculationMessage && (
-                         <Alert variant={calculationError ? "destructive" : "default"} className="mt-2">
-                            <AlertTitle>{calculationError ? "Error" : "Info"}</AlertTitle>
-                            <AlertDescription>{calculationMessage}</AlertDescription>
-                        </Alert>
-                    )}
-                </div>
-
-
-                <FormField
-                  control={form.control}
-                  name="bodyFatPercentage"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Body Fat % (Direct Entry or Calculated)</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.1" placeholder="e.g., 15.5" {...field} value={field.value ?? ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 
-                <div className="grid sm:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="athleteType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center"><Dumbbell className="mr-2 h-4 w-4 text-muted-foreground"/> Athlete Type</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value ?? 'notSpecified'}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select athlete type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {ATHLETE_TYPE_OPTIONS.map(option => (
-                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="primaryGoal"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center"><TargetIcon className="mr-2 h-4 w-4 text-muted-foreground"/> Primary Goal</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value ?? 'notSpecified'}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select primary goal" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {PRIMARY_GOAL_OPTIONS.map(option => (
-                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button type="submit" disabled={form.formState.isSubmitting || !form.formState.isDirty} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                  <Save className="mr-2 h-4 w-4" /> {form.formState.isSubmitting ? "Saving..." : "Save Information"}
-                </Button>
-              </CardFooter>
-            </form>
-          </Form>
-        </Card>
-
-        <Card className="md:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center"><Calculator className="mr-2 h-5 w-5 text-accent"/> Calculated Estimates</CardTitle>
-            <CardDescription>
-              Based on your inputs. These help in setting macro targets. LBM requires Body Fat %.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground">Estimated TDEE (Total Daily Energy Expenditure)</h3>
-              <p className="text-2xl font-bold text-primary">
-                {liveTdee ? `${liveTdee.toLocaleString()} kcal/day` : 'N/A'}
-              </p>
-              {!liveTdee && <p className="text-xs text-muted-foreground mt-1">Requires height, weight, age, sex, and activity level.</p>}
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground">Estimated Lean Body Mass (LBM)</h3>
-              <p className="text-2xl font-bold text-primary">
-                {liveLbm ? `${liveLbm.toFixed(1)} kg` : 'N/A'}
-              </p>
-              {!liveLbm && <p className="text-xs text-muted-foreground mt-1">Requires weight and body fat %.</p>}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <UserInfoForm userProfile={userProfile} setUserInformation={setUserInformation} />
     </PageWrapper>
   );
 }
-
