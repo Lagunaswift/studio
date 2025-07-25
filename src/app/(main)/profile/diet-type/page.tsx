@@ -56,9 +56,10 @@ export default function DietAndAllergensPage() {
     }
   }, [userProfile, form]);
 
-  const handleConfirmSubmit = () => {
+  const handleConfirmSubmit = async () => {
     if (formData) {
-        setUserInformation({ 
+      try {
+        await setUserInformation({ 
             dietaryPreferences: formData.dietaryPreferences, 
             allergens: formData.allergens 
         });
@@ -67,12 +68,22 @@ export default function DietAndAllergensPage() {
             description: "Your diet and allergen preferences have been saved.",
         });
         form.reset(formData);
+      } catch (error: any) {
+        toast({
+          title: "Error Updating Settings",
+          description: error.message || "Could not save your preferences.",
+          variant: "destructive",
+        });
+      } finally {
         setFormData(null);
+        setIsAlertOpen(false);
+      }
+    } else {
+        setIsAlertOpen(false);
     }
-    setIsAlertOpen(false);
   };
   
-  const onFormSubmit: SubmitHandler<DietAndAllergensFormValues> = (data) => {
+  const onFormSubmit: SubmitHandler<DietAndAllergensFormValues> = async (data) => {
     // Show warning only if a new allergen is being selected
     const initialAllergens = new Set(userProfile?.allergens || []);
     const addedAllergens = data.allergens.filter(a => !initialAllergens.has(a));
@@ -82,15 +93,23 @@ export default function DietAndAllergensPage() {
         setIsAlertOpen(true);
     } else {
         // If no new allergens are added, or if allergens are only removed, save directly.
-        setUserInformation({ 
-            dietaryPreferences: data.dietaryPreferences, 
-            allergens: data.allergens 
-        });
-        toast({
-            title: "Settings Updated",
-            description: "Your diet and allergen preferences have been saved.",
-        });
-        form.reset(data);
+        try {
+            await setUserInformation({ 
+                dietaryPreferences: data.dietaryPreferences, 
+                allergens: data.allergens 
+            });
+            toast({
+                title: "Settings Updated",
+                description: "Your diet and allergen preferences have been saved.",
+            });
+            form.reset(data);
+        } catch (error: any) {
+             toast({
+              title: "Error Updating Settings",
+              description: error.message || "Could not save your preferences.",
+              variant: "destructive",
+            });
+        }
     }
   };
 

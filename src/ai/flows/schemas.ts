@@ -24,3 +24,18 @@ export const MicronutrientsSchema = z.object({
   vitaminC: z.number().nullable().describe('Estimated Vitamin C in milligrams (mg).'),
   vitaminD: z.number().nullable().describe('Estimated Vitamin D in micrograms (mcg).'),
 });
+
+// Schema for Bug Reporting Flow
+export const BugReportInputSchema = z.object({
+  description: z.string().min(20, "Please provide a detailed description of the bug.").describe("The user's detailed description of the issue they encountered."),
+  appVersion: z.string().optional().describe("The version of the app the user is on."),
+  userId: z.string().optional().describe("The user's ID for tracking purposes."),
+});
+
+export const BugReportOutputSchema = z.object({
+  title: z.string().describe("A short, descriptive title for the bug report (e.g., 'Recipe fails to save', 'Macro chart not updating')."),
+  summary: z.string().describe("A concise one-paragraph summary of the user's issue."),
+  category: z.enum(['UI/UX', 'Performance', 'Data', 'Authentication', 'AI/Preppy', 'Other']).describe("The best-fitting category for the reported bug."),
+  priority: z.enum(['Low', 'Medium', 'High', 'Critical']).describe("The estimated priority based on the bug's impact (e.g., 'Critical' for crashes, 'Low' for typos)."),
+  stepsToReproduce: z.array(z.string()).optional().describe("A list of steps to reproduce the bug, if discernible from the user's description."),
+});

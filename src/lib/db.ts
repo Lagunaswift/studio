@@ -1,4 +1,5 @@
 
+
 import Dexie, { type Table } from 'dexie';
 import type { Recipe, PlannedMeal, PantryItem, DailyWeightLog, UserProfileSettings, DailyVitalsLog, DailyManualMacrosLog } from '@/types';
 
@@ -13,15 +14,15 @@ export class AppDatabase extends Dexie {
   dailyManualMacrosLog!: Table<DailyManualMacrosLog>;
 
   constructor() {
-    super('MealPlannerProDB_v2'); // Renamed database to force a reset
-    this.version(1).stores({ // Reset to version 1 for the new database
-      recipes: '++id, name, *tags, isCustom', 
-      plannedMeals: 'id, date, mealType, recipeId',
-      pantryItems: 'id, name, category',
-      dailyWeightLog: 'date',
-      userProfile: 'id', 
-      dailyVitalsLog: 'date',
-      dailyManualMacrosLog: 'date'
+    super('MealPlannerProDB_v3_Firebase'); // New DB name for clean migration
+    this.version(1).stores({ 
+        recipes: '++id, name, *tags, isCustom', 
+        plannedMeals: 'id, date, mealType, recipeId',
+        pantryItems: 'id, name, category',
+        dailyWeightLog: 'date',
+        userProfile: 'id', 
+        dailyVitalsLog: 'date',
+        dailyManualMacrosLog: 'id' // Using id which is now predictable
     });
   }
 }
@@ -55,18 +56,18 @@ export async function getOrCreateUserProfile(userId: string): Promise<UserProfil
       weightKg: null,
       age: null,
       sex: null,
-      activityLevel: null,
-      trainingExperienceLevel: null,
+      activityLevel: 'notSpecified',
+      training_experience_level: 'notSpecified',
       bodyFatPercentage: null,
-      athleteType: null,
-      primaryGoal: null,
+      athleteType: 'notSpecified',
+      primaryGoal: 'notSpecified',
       tdee: null,
       leanBodyMassKg: null,
       rda: null,
       subscription_status: 'none',
-      hasAcceptedTerms: false,
-      lastCheckInDate: null,
-      targetWeightChangeRateKg: null,
+      has_accepted_terms: false,
+      last_check_in_date: null,
+      target_weight_change_rate_kg: null,
       dashboardSettings: { showMacros: true, showMenu: true, showFeaturedRecipe: true, showQuickRecipes: true },
       // Initialize log arrays as empty
       dailyWeightLog: [],
@@ -82,10 +83,4 @@ export async function getOrCreateUserProfile(userId: string): Promise<UserProfil
     console.error("Failed to create user profile:", error);
     throw error;
   }
-}
-
-// Function to update user profile
-export async function updateUserProfile(userId: string, updates: Partial<UserProfileSettings>): Promise<UserProfileSettings> {
-  await db.userProfile.update(userId, updates);
-  return (await db.userProfile.get(userId))!;
 }
