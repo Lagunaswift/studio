@@ -1,5 +1,6 @@
 
-import type { PlannedMeal, Macros, MealType, DailyWeightLog, Sex, RDA, Recipe, PantryItem, UKSupermarketCategory } from '@/types';
+
+import type { PlannedMeal, Macros, MealType, DailyWeightLog, Sex, RDA, Recipe, PantryItem, UKSupermarketCategory, ShoppingListItem } from '@/types';
 
 export const MEAL_TYPES: MealType[] = ["Breakfast", "Lunch", "Dinner", "Snack"];
 
@@ -11,7 +12,7 @@ export const calculateTotalMacros = (plannedMeals: PlannedMeal[], allRecipes: Re
     const recipe = plannedMeal.recipeDetails || allRecipes.find(r => r.id === plannedMeal.recipeId);
     if (recipe && recipe.macrosPerServing) {
       acc.calories += recipe.macrosPerServing.calories * plannedMeal.servings;
-      acc.protein += recipe.macrosPerserving.protein * plannedMeal.servings;
+      acc.protein += recipe.macrosPerServing.protein * plannedMeal.servings;
       acc.carbs += recipe.macrosPerServing.carbs * plannedMeal.servings;
       acc.fat += recipe.macrosPerServing.fat * plannedMeal.servings;
     }
