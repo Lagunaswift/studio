@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { useAppContext } from '@/context/AppContext';
-import type { PlannedMeal, MealType, Recipe, Macros } from '@/types';
+import type { PlannedMeal, MealType, Recipe, Macros, MealSlotConfig } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
@@ -74,7 +74,7 @@ export default function MealPlanPage() {
   );
   
   const availableRecipesForPicker = allRecipesCache;
-  const mealStructureToUse = userProfile?.mealStructure || MEAL_SLOT_CONFIG;
+  const mealStructureToUse = userProfile?.mealStructure || MEAL_SLOT_CONFIG.map(s => ({...s, id: s.displayName.replace(' ','-')}));
 
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
   const dailyMacros = getPlannedMacrosForDate(formattedDate);
@@ -287,7 +287,7 @@ export default function MealPlanPage() {
 
           return (
             <div key={slotKey} className="p-4 border rounded-lg shadow-md bg-card">
-              <h3 className="text-xl font-semibold font-headline text-primary/90 mb-4">{slotConfig.name}</h3>
+              <h3 className="text-xl font-semibold font-headline text-primary/90 mb-4">{slotConfig.name || slotConfig.displayName}</h3>
               {mealToDisplay ? (
                 <div className="w-full max-w-lg mx-auto">
                    <Card className={cn(
