@@ -1,9 +1,13 @@
+
 'use server';
+
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
-import { db, auth as adminAuth } from '@/lib/firebase-admin';
+import { getDb, getAuth } from '@/lib/firebase-admin';
 import { processBugReport } from '@/ai/flows/report-bug-flow';
-import { collection, addDoc, getDoc, setDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { serverTimestamp } from 'firebase-admin/firestore';
+
+
 async function getUserId() {
     const authorization = headers().get('Authorization');
     if (!authorization?.startsWith('Bearer ')) {
@@ -11,7 +15,9 @@ async function getUserId() {
         return null;
     }
     const idToken = authorization.split('Bearer ')[1];
+
     try {
+        const adminAuth = getAuth();
         const decodedToken = await adminAuth.verifyIdToken(idToken);
         return decodedToken.uid;
     }
@@ -20,12 +26,14 @@ async function getUserId() {
         return null;
     }
 }
+
 // --- Recipe Actions ---
 export async function addRecipe(recipeData) {
     const userId = await getUserId();
     if (!userId) {
         return { error: 'You must be logged in to add a recipe.' };
     }
+
     const dataToInsert = {
         ...recipeData,
         ingredients: recipeData.ingredients.map(ing => ing.value),
@@ -40,10 +48,13 @@ export async function addRecipe(recipeData) {
         isCustom: true,
         user_id: userId,
     };
+
     try {
-        const docRef = await addDoc(collection(db, "recipes"), dataToInsert);
-        const newDocSnapshot = await getDoc(docRef);
+        const db = getDb();
+        const docRef = await db.collection("recipes").add(dataToInsert);
+        const newDocSnapshot = await docRef.get();
         const finalData = { ...newDocSnapshot.data(), id: newDocSnapshot.id };
+
         revalidatePath('/recipes', 'layout');
         return { success: true, data: finalData };
     }
@@ -52,17 +63,22 @@ export async function addRecipe(recipeData) {
         return { error: 'Failed to save the recipe.' };
     }
 }
+
 // --- Meal Plan Actions ---
 export async function addOrUpdateMealPlan(mealData) {
     const userId = await getUserId();
     if (!userId)
         return { error: 'Authentication required.' };
+
     const docId = mealData.id || `meal_${Date.now()}_${Math.random()}`;
     const { syncStatus, ...dataToSet } = { ...mealData, id: docId, user_id: userId };
-    const mealRef = doc(db, "planned_meals", docId);
+
+    const db = getDb();
+    const mealRef = db.collection("planned_meals").doc(docId);
+
     try {
-        await setDoc(mealRef, dataToSet, { merge: true });
-        const updatedDoc = await getDoc(mealRef);
+        await mealRef.set(dataToSet, { merge: true });
+        const updatedDoc = await mealRef.get();
         revalidatePath('/meal-plan', 'layout');
         return { success: true, data: updatedDoc.data() };
     }
@@ -71,13 +87,17 @@ export async function addOrUpdateMealPlan(mealData) {
         return { error: 'Could not save your meal plan item.' };
     }
 }
+
 export async function deleteMealFromPlan(plannedMealId) {
     const userId = await getUserId();
     if (!userId)
         return { error: 'Authentication required.' };
-    const mealRef = doc(db, "planned_meals", plannedMealId);
+    
+    const db = getDb();
+    const mealRef = db.collection("planned_meals").doc(plannedMealId);
+
     try {
-        await deleteDoc(mealRef);
+        await mealRef.delete();
         revalidatePath('/meal-plan', 'layout');
         return { success: true };
     }
@@ -86,16 +106,22 @@ export async function deleteMealFromPlan(plannedMealId) {
         return { error: 'Could not remove meal from plan.' };
     }
 }
+
+
 // --- Pantry Actions ---
 export async function addOrUpdatePantryItem(itemData) {
     const userId = await getUserId();
     if (!userId)
         return { error: 'Authentication required.' };
+
     const { syncStatus, ...dataToSet } = { ...itemData, user_id: userId };
-    const itemRef = doc(db, "pantry_items", itemData.id);
+
+    const db = getDb();
+    const itemRef = db.collection("pantry_items").doc(itemData.id);
+
     try {
-        await setDoc(itemRef, dataToSet, { merge: true });
-        const updatedDoc = await getDoc(itemRef);
+        await itemRef.set(dataToSet, { merge: true });
+        const updatedDoc = await itemRef.get();
         revalidatePath('/pantry');
         return { success: true, data: updatedDoc.data() };
     }
@@ -104,13 +130,18 @@ export async function addOrUpdatePantryItem(itemData) {
         return { error: 'Could not save item to pantry.' };
     }
 }
+
+
 export async function deletePantryItem(itemId) {
     const userId = await getUserId();
     if (!userId)
         return { error: 'Authentication required.' };
-    const itemRef = doc(db, "pantry_items", itemId);
+    
+    const db = getDb();
+    const itemRef = db.collection("pantry_items").doc(itemId);
+
     try {
-        await deleteDoc(itemRef);
+        await itemRef.delete();
         revalidatePath('/pantry');
         return { success: true };
     }
@@ -119,38 +150,50 @@ export async function deletePantryItem(itemId) {
         return { error: 'Could not remove item from pantry.' };
     }
 }
+
+
 // --- Daily Log Actions ---
 export async function addOrUpdateVitalsLog(vitalsData) {
-    const userId = await getUserId();
-    if (!userId)
-        return { error: 'Authentication required.' };
-    const { syncStatus, ...restOfVitalsData } = vitalsData;
-    const docId = `${userId}_${vitalsData.date}`;
-    const vitalsRef = doc(db, "daily_vitals_logs", docId);
-    try {
-        await setDoc(vitalsRef, { ...restOfVitalsData, user_id: userId, id: docId, date: vitalsData.date }, { merge: true });
-        const updatedDoc = await getDoc(vitalsRef);
-        revalidatePath('/daily-log');
-        return { success: true, data: updatedDoc.data() };
-    }
-    catch (error) {
-        console.error('Error saving vitals log:', error);
-        return { error: 'Could not save your daily vitals.' };
-    }
+  const userId = await getUserId();
+  if (!userId)
+      return { error: 'Authentication required.' };
+
+  const { syncStatus, ...restOfVitalsData } = vitalsData;
+  const docId = `${userId}_${vitalsData.date}`;
+
+  const db = getDb();
+  const vitalsRef = db.collection("daily_vitals_logs").doc(docId);
+
+  try {
+      await vitalsRef.set({ ...restOfVitalsData, user_id: userId, id: docId, date: vitalsData.date }, { merge: true });
+      const updatedDoc = await vitalsRef.get();
+      revalidatePath('/daily-log');
+      return { success: true, data: updatedDoc.data() };
+  }
+  catch (error) {
+      console.error('Error saving vitals log:', error);
+      return { error: 'Could not save your daily vitals.' };
+  }
 }
+
 export async function addOrUpdateWeightLog(userId, date, weightKg) {
     if (!userId)
         return { error: 'Authentication required.' };
+
     const logData = { date, weightKg, user_id: userId };
     const docId = `${userId}_${date}`;
-    const weightLogRef = doc(db, "daily_weight_logs", docId);
-    const profileRef = doc(db, "profiles", userId);
+
+    const db = getDb();
+    const weightLogRef = db.collection("daily_weight_logs").doc(docId);
+    const profileRef = db.collection("profiles").doc(userId);
+
     try {
         const batch = db.batch();
         batch.set(weightLogRef, logData, { merge: true });
         batch.update(profileRef, { weightKg });
         await batch.commit();
-        const updatedDoc = await getDoc(weightLogRef);
+
+        const updatedDoc = await weightLogRef.get();
         revalidatePath('/daily-log');
         revalidatePath('/profile/user-info');
         return { success: true, data: updatedDoc.data() };
@@ -160,10 +203,12 @@ export async function addOrUpdateWeightLog(userId, date, weightKg) {
         return { error: 'Could not save your weight.' };
     }
 }
+
 export async function addOrUpdateManualMacrosLog(macroData) {
     const userId = await getUserId();
     if (!userId)
         return { error: 'Authentication required.' };
+
     const { syncStatus, ...restOfMacroData } = macroData;
     const docId = restOfMacroData.id || `${userId}_${macroData.date}_macros`;
     const dataToSet = {
@@ -171,10 +216,12 @@ export async function addOrUpdateManualMacrosLog(macroData) {
         id: docId,
         user_id: userId,
     };
-    const logRef = doc(db, "daily_manual_macros_logs", docId);
+    
+    const db = getDb();
+    const logRef = db.collection("daily_manual_macros_logs").doc(docId);
     try {
-        await setDoc(logRef, dataToSet, { merge: true });
-        const updatedDoc = await getDoc(logRef);
+        await logRef.set(dataToSet, { merge: true });
+        const updatedDoc = await logRef.get();
         revalidatePath('/daily-log');
         return { success: true, data: updatedDoc.data() };
     }
@@ -183,10 +230,13 @@ export async function addOrUpdateManualMacrosLog(macroData) {
         return { error: 'Could not save your manual macros.' };
     }
 }
+
+
 // --- Bug Reporting Action ---
 export async function reportBug(description, userId) {
     if (!userId)
         return { error: 'Authentication required to report a bug.' };
+    
     try {
         const aiInput = {
             description,
@@ -194,6 +244,8 @@ export async function reportBug(description, userId) {
             appVersion: "1.0.0"
         };
         const processedReport = await processBugReport(aiInput);
+        
+        const db = getDb();
         const bugReportData = {
             ...processedReport,
             originalDescription: description,
@@ -201,26 +253,35 @@ export async function reportBug(description, userId) {
             createdAt: serverTimestamp(),
             status: 'new'
         };
-        await addDoc(collection(db, "bug_reports"), bugReportData);
+        
+        await db.collection("bug_reports").add(bugReportData);
+
         revalidatePath('/updates');
         return { success: true, data: processedReport };
-    }
-    catch (error) {
+
+    } catch (error) {
         console.error('Error reporting bug:', error);
         return { success: false, error: 'Failed to submit bug report. Please try again later.' };
     }
 }
+
+
 // --- User Profile Actions ---
 export async function updateUserProfile(updates) {
     const userId = await getUserId();
     if (!userId)
         return { error: 'Authentication required.' };
-    const profileRef = doc(db, "profiles", userId);
+    
+    const db = getDb();
+    const profileRef = db.collection("profiles").doc(userId);
+
     try {
-        await setDoc(profileRef, { ...updates, id: userId }, { merge: true });
+        await profileRef.set({ ...updates, id: userId }, { merge: true });
         revalidatePath('/profile', 'layout');
         revalidatePath('/', 'layout');
-        const updatedDoc = await getDoc(profileRef);
+
+        const updatedDoc = await profileRef.get();
+
         return { success: true, data: updatedDoc.data() };
     }
     catch (error) {

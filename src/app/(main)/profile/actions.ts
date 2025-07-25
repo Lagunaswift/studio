@@ -7,7 +7,8 @@ import type { DailyVitalsLog, DailyManualMacrosLog, RecipeFormData, UserProfileS
 import { getAuth, getDb } from '@/lib/firebase-admin'; 
 import { processBugReport } from '@/ai/flows/report-bug-flow';
 import type { BugReportInput, BugReportOutput } from '@/ai/flows/report-bug-flow';
-import * as admin from 'firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
+
 
 async function getUserId(): Promise<string | null> {
   const authorization = headers().get('Authorization');
@@ -235,7 +236,7 @@ export async function reportBug(description: string, userId: string): Promise<{ 
             ...processedReport,
             originalDescription: description,
             userId: userId,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: FieldValue.serverTimestamp(),
             status: 'new' 
         };
         

@@ -1,3 +1,4 @@
+
 import * as admin from 'firebase-admin';
 import type { Auth } from 'firebase-admin/auth';
 import type { Firestore } from 'firebase-admin/firestore';
@@ -36,12 +37,19 @@ function initializeFirebaseAdmin() {
   return admin.app();
 }
 
+let db: Firestore;
+let auth: Auth;
+
 export function getDb(): Firestore {
-  const app = initializeFirebaseAdmin();
-  return admin.firestore(app);
+  if (!db) {
+    db = admin.firestore(initializeFirebaseAdmin());
+  }
+  return db;
 }
 
 export function getAuth(): Auth {
-  const app = initializeFirebaseAdmin();
-  return admin.auth(app);
+  if (!auth) {
+    auth = admin.auth(initializeFirebaseAdmin());
+  }
+  return auth;
 }
