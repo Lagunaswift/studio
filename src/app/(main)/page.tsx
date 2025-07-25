@@ -159,7 +159,7 @@ export default function HomePage() {
     setMacroTargets(data);
     toast({
       title: "Targets Updated",
-      description: "Your macro targets have been saved.",
+      description: "Your daily caloric and macro targets have been saved.",
     });
     setShowSetTargetsDialog(false);
     macroTargetForm.reset(data);
@@ -317,7 +317,7 @@ export default function HomePage() {
                     ) : quickRecipe ? (
                         <RecipeCard
                             recipe={quickRecipe}
-                            showViewDetails={true}
+                            showViewDetailsButton={true}
                             showAddToMealPlanButton={false}
                             className="shadow-lg"
                         />
@@ -408,5 +408,3 @@ export default function HomePage() {
     </PageWrapper>
   );
 }
-
-    
