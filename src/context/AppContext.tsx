@@ -231,7 +231,6 @@ function useAppData(userId: string | undefined, userEmail: string | null | undef
             if (doc.exists()) {
               setUserProfileData(doc.data() as UserProfileSettings);
             } else {
-              // New user, profile doesn't exist yet. Create a default one client-side.
               setUserProfileData(getDefaultUserProfile(idToUse, userEmail || null));
             }
         }));
@@ -424,15 +423,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       getMealsForDate, isRecipeFavorite, runWeeklyCheckin
   } = useAppData(user?.uid, user?.email, isAuthLoading);
 
-  const callServerActionWithAuth = useCallback(async (action: (...args: any[]) => Promise<any>, ...args: any[]) => {
+  const callServerActionWithAuth = useCallback(async (action: (token: string, ...args: any[]) => Promise<any>, ...args: any[]) => {
     if (!user) {
         console.error("Attempted to call server action without authenticated user.");
         throw new Error("Authentication required.");
     }
     const idToken = await user.getIdToken();
-    
-    return action(...args);
-
+    return action(idToken, ...args);
   }, [user]);
 
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {

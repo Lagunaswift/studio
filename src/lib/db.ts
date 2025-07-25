@@ -32,7 +32,7 @@ export const db = new AppDatabase();
 // --- Database Interaction Functions ---
 
 // Function to get or create a user profile
-export async function getOrCreateUserProfile(userId: string): Promise<UserProfileSettings> {
+export async function getOrCreateUserProfile(userId: string, userEmail: string | null): Promise<UserProfileSettings> {
   let profile = await db.userProfile.get(userId);
   if (profile) {
     return profile;
@@ -41,7 +41,7 @@ export async function getOrCreateUserProfile(userId: string): Promise<UserProfil
   // If no profile exists, create a new one.
   const newProfile: UserProfileSettings = {
       id: userId,
-      email: null,
+      email: userEmail,
       name: null,
       macroTargets: null,
       dietaryPreferences: [],
