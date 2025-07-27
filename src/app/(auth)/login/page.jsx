@@ -8,16 +8,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Mail, Lock, LogIn, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, LogIn, Eye, EyeOff, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { getFirebaseAuth } from '@/lib/firebase';
+
 const loginSchema = z.object({
     email: z.string().email({ message: "Invalid email address." }),
     password: z.string().min(1, { message: "Password is required." }),
 });
+
 export default function LoginPage() {
     const { toast } = useToast();
     const router = useRouter();
@@ -25,12 +27,14 @@ export default function LoginPage() {
     const [isClient, setIsClient] = useState(false);
     const { user } = useAuth();
     const auth = getFirebaseAuth();
+
     useEffect(() => {
         setIsClient(true);
         if (user) {
             router.push('/');
         }
     }, [user, router]);
+
     const form = useForm({
         resolver: zodResolver(loginSchema),
         defaultValues: {
@@ -38,10 +42,41 @@ export default function LoginPage() {
             password: '',
         },
     });
+
+    const handleResendVerification = async () => {
+        if (auth.currentUser) {
+            try {
+                await sendEmailVerification(auth.currentUser);
+                toast({
+                    title: "Verification Email Sent",
+                    description: "A new verification link has been sent to your email address.",
+                });
+            } catch (error) {
+                toast({
+                    title: "Error Sending Verification",
+                    description: "Could not send a new verification email. Please try again later.",
+                    variant: "destructive",
+                });
+            }
+        }
+    };
+
     const onSubmit = async (data) => {
         form.clearErrors();
         try {
-            await signInWithEmailAndPassword(auth, data.email, data.password);
+            const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+            
+            if (!userCredential.user.emailVerified) {
+                 toast({
+                    title: "Email Not Verified",
+                    description: "Please check your inbox and verify your email address to log in.",
+                    variant: "destructive",
+                    action: <Button variant="outline" size="sm" onClick={handleResendVerification}><Send className="mr-2 h-4 w-4" />Resend Link</Button>,
+                    duration: 10000,
+                });
+                return;
+            }
+
             toast({
                 title: "Login Successful!",
                 description: "Welcome back!",
@@ -51,9 +86,13 @@ export default function LoginPage() {
         catch (error) {
             const errorCode = error.code;
             let description = "An unexpected error occurred.";
+            
             if (errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password' || errorCode === 'auth/invalid-credential') {
                 description = "Invalid email or password. Please try again.";
+            } else if (errorCode === 'auth/unverified-email'){
+                 description = "Your email address is not verified. Please check your inbox for the verification link.";
             }
+
             toast({
                 title: "Login Failed",
                 description,
@@ -61,7 +100,9 @@ export default function LoginPage() {
             });
         }
     };
+
     const isFormDisabled = form.formState.isSubmitting || !isClient;
+
     return (<Card className="shadow-2xl">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-headline text-primary flex items-center justify-center">
@@ -72,14 +113,17 @@ export default function LoginPage() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardContent className="space-y-6">
-            <FormField control={form.control} name="email" render={({ field }) => (<FormItem>
+            <FormField control={form.control} name="email" render={({ field }) => (
+                <FormItem>
                   <FormLabel className="flex items-center"><Mail className="mr-2 h-4 w-4 text-muted-foreground"/>Email</FormLabel>
                   <FormControl>
                     <Input type="email" placeholder="you@example.com" {...field} disabled={isFormDisabled}/>
                   </FormControl>
                   <FormMessage />
-                </FormItem>)}/>
-            <FormField control={form.control} name="password" render={({ field }) => (<FormItem>
+                </FormItem>
+            )}/>
+            <FormField control={form.control} name="password" render={({ field }) => (
+                <FormItem>
                   <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-muted-foreground"/>Password</FormLabel>
                   <FormControl>
                     <div className="relative">
@@ -90,7 +134,8 @@ export default function LoginPage() {
                     </div>
                   </FormControl>
                   <FormMessage />
-                </FormItem>)}/>
+                </FormItem>
+            )}/>
           </CardContent>
           <CardFooter className="flex flex-col items-center space-y-4">
             <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isFormDisabled}>
