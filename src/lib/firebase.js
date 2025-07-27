@@ -1,15 +1,18 @@
-// src/lib/firebase.ts
+
+// src/lib/firebase.js
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+
 const firebaseConfig = {
-    projectId: "macro-teal-meal-planner",
-    appId: "1:724190135561:web:941f2a7f3c7be2563e3fd8",
-    storageBucket: "macro-teal-meal-planner.appspot.com",
-    apiKey: "REDACTED",
-    authDomain: "macro-teal-meal-planner.firebaseapp.com",
-    messagingSenderId: "724190135561"
+    "apiKey": "REDACTED",
+    "authDomain": "macro-teal-meal-planner.firebaseapp.com",
+    "projectId": "macro-teal-meal-planner",
+    "storageBucket": "macro-teal-meal-planner.appspot.com",
+    "messagingSenderId": "724190135561",
+    "appId": "1:724190135561:web:941f2a7f3c7be2563e3fd8"
 };
+
 // More robust singleton pattern
 const getFirebaseApp = () => {
     if (!getApps().length) {
