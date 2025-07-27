@@ -2,6 +2,8 @@
 import * as admin from 'firebase-admin';
 import type { Auth } from 'firebase-admin/auth';
 import type { Firestore } from 'firebase-admin/firestore';
+// The path must be relative from this file to the project root.
+import serviceAccount from '../../serviceAccount.json';
 
 // This function ensures the Firebase Admin SDK is initialized only once.
 function initializeFirebaseAdmin() {
@@ -10,35 +12,27 @@ function initializeFirebaseAdmin() {
         return admin.app();
     }
 
-    const serviceAccountKeyBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64;
-
-    if (!serviceAccountKeyBase64) {
-        // In a deployed environment (like Firebase App Hosting), rely on default credentials
-        // if the service account key is not explicitly provided.
-        console.log("Service Account Key not found. Attempting to initialize with default credentials...");
-        try {
-            return admin.initializeApp();
-        } catch (error: any) {
-            console.error("CRITICAL ERROR: Default Firebase Admin SDK initialization failed.", error);
-            // This is a fatal error for the server, so we re-throw.
-            throw new Error("Could not initialize Firebase Admin SDK. Default credentials failed.");
-        }
-    }
+    // The service account key is imported as a JSON module.
+    // We must cast the imported JSON to the ServiceAccount type expected by the SDK.
+    const serviceAccountInfo = serviceAccount as admin.ServiceAccount;
 
     try {
-        // Decode the Base64 string to a standard JSON string, then parse it.
-        const serviceAccountJson = Buffer.from(serviceAccountKeyBase64, 'base64').toString('utf-8');
-        const serviceAccount = JSON.parse(serviceAccountJson);
+        console.log(`Initializing Firebase Admin SDK with explicit Project ID: ${serviceAccountInfo.project_id}`);
 
-        console.log(`Initializing Firebase Admin SDK with explicit Project ID: ${serviceAccount.project_id}`);
-        
         return admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-            databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
+            credential: admin.credential.cert({
+                // Spread the existing service account info
+                ...serviceAccountInfo,
+                // And override the private key with the correctly formatted version
+                private_key: serviceAccountInfo.private_key.replace(/
+/g, '
+'),
+            }),
+            databaseURL: `https://${serviceAccountInfo.project_id}.firebaseio.com`
         });
     } catch (error: any) {
         console.error("CRITICAL ERROR: Failed to parse or initialize with Service Account Key.", error);
-        throw new Error("Could not initialize Firebase Admin SDK. Check the format of your service account key in your .env file.");
+        throw new Error("Could not initialize Firebase Admin SDK. Please check the contents of your serviceAccount.json file and the import path in firebase-admin.ts.");
     }
 }
 
