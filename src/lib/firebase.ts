@@ -5,7 +5,7 @@ import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-    "apiKey": "REDACTED",
+    "apiKey": "SECRET_API_KEY",
     "authDomain": "macro-teal-meal-planner.firebaseapp.com",
     "projectId": "macro-teal-meal-planner",
     "storageBucket": "macro-teal-meal-planner.appspot.com",
