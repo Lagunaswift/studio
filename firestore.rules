@@ -3,31 +3,27 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check ownership against the user's auth UID
-    function isOwner() {
+    function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Recipes can be read by anyone if public, or by the owner if private.
-    // Users can only create/update/delete their own recipes.
+    // Recipes: readable if public or by owner. Writable only by owner.
     match /recipes/{recipeId} {
       allow read: if resource.data.user_id == null || request.auth.uid == resource.data.user_id;
-      allow create: if request.auth.uid == request.resource.data.user_id;
-      allow update, delete: if request.auth.uid == resource.data.user_id;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
+      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
     }
 
-    // Profiles can be read and updated by their owner.
+    // Profiles: Writable only by the owner.
     match /profiles/{userId} {
-      allow read, update: if request.auth.uid == userId;
-      // Anyone can create their own profile document.
-      allow create: if request.auth.uid == userId;
+      allow read, create, update: if isAuthenticated() && request.auth.uid == userId;
     }
 
-    // For all other user-specific collections, grant access if the
-    // document's user_id matches the requestor's UID.
+    // Generic rule for all other user-specific collections.
     match /{collection}/{docId} {
-      // This rule applies to: planned_meals, pantry_items, daily_weight_logs, etc.
-      allow read, write: if request.auth.uid == resource.data.user_id;
+      allow read, delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
+      allow update: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
     }
   }
 }

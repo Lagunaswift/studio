@@ -38,6 +38,17 @@ import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-c
 import { format, subDays, differenceInDays } from 'date-fns';
 import { addOrUpdateMealPlan, deleteMealFromPlan, addOrUpdatePantryItem, deletePantryItem, addRecipe as addRecipeAction, updateUserProfile, addOrUpdateVitalsLog, addOrUpdateWeightLog, addOrUpdateManualMacrosLog, reportBug } from '@/app/(main)/profile/actions';
 
+// --- Client-side helper for Server Actions ---
+// This function lives on the client and is only called when an action is performed.
+const callServerActionWithAuth = async (user: any, action: (idToken: string, ...args: any[]) => Promise<any>, ...args: any[]) => {
+  if (!user) {
+    throw new Error("You must be logged in to perform this action.");
+  }
+  // This is now safe because it's only called from client-side event handlers.
+  const idToken = await user.getIdToken(true);
+  return action(idToken, ...args);
+};
+
 
 // --- Calculation Helpers ---
 const processProfile = (profileData: UserProfileSettings | undefined | null): UserProfileSettings | null => {
@@ -278,17 +289,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => unsubscribes.forEach(unsub => unsub());
   }, [user?.uid, user?.email, isAuthLoading]);
   
-  const callServerActionWithAuth = useCallback(async (action: (idToken: string, ...args: any[]) => Promise<any>, ...args: any[]) => {
-    if (!user) {
-        throw new Error("You must be logged in to perform this action.");
-    }
-    const idToken = await user.getIdToken(true);
-    return action(idToken, ...args);
-  }, [user]);
-
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
-    await callServerActionWithAuth(updateUserProfile, updates);
-  }, [callServerActionWithAuth]);
+    await callServerActionWithAuth(user, updateUserProfile, updates);
+  }, [user]);
 
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
     const newPlannedMeal: Partial<Omit<PlannedMeal, 'id' | 'user_id' | 'recipeDetails'>> = { 
@@ -298,12 +301,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       servings,
       status: 'planned',
     };
-    await callServerActionWithAuth(addOrUpdateMealPlan, newPlannedMeal);
-  }, [callServerActionWithAuth]);
+    await callServerActionWithAuth(user, addOrUpdateMealPlan, newPlannedMeal);
+  }, [user]);
   
   const removeMealFromPlan = useCallback(async (plannedMealId: string) => {
-    await callServerActionWithAuth(deleteMealFromPlan, plannedMealId);
-  }, [callServerActionWithAuth]);
+    await callServerActionWithAuth(user, deleteMealFromPlan, plannedMealId);
+  }, [user]);
 
   const updateMealServingsOrStatus = useCallback(async (plannedMealId: string, updates: Partial<Pick<PlannedMeal, 'servings' | 'status'>>) => {
       const meal = mealPlan.find(m => m.id === plannedMealId);
@@ -312,8 +315,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { recipeDetails, ...restOfMeal } = meal;
       const updatedMealData = { ...restOfMeal, ...updates };
 
-      await callServerActionWithAuth(addOrUpdateMealPlan, updatedMealData);
-  }, [mealPlan, callServerActionWithAuth]);
+      await callServerActionWithAuth(user, addOrUpdateMealPlan, updatedMealData);
+  }, [mealPlan, user]);
   
   const addPantryItem = useCallback(async (name: string, quantity: number, unit: string, category: string, expiryDate?: string) => {
     const existingItem = pantryItems.find(item => 
@@ -335,12 +338,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             expiryDate
         };
     }
-    await callServerActionWithAuth(addOrUpdatePantryItem, itemToSave);
-  }, [pantryItems, callServerActionWithAuth]);
+    await callServerActionWithAuth(user, addOrUpdatePantryItem, itemToSave);
+  }, [pantryItems, user]);
 
   const removePantryItem = useCallback(async (itemId: string) => {
-    await callServerActionWithAuth(deletePantryItem, itemId);
-  }, [callServerActionWithAuth]);
+    await callServerActionWithAuth(user, deletePantryItem, itemId);
+  }, [user]);
 
   const updatePantryItemQuantity = useCallback(async (itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -351,8 +354,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     const { user_id, ...restOfItem } = item;
     const updatedItem = { ...restOfItem, quantity: newQuantity };
-    await callServerActionWithAuth(addOrUpdatePantryItem, updatedItem);
-  }, [pantryItems, removePantryItem, callServerActionWithAuth]);
+    await callServerActionWithAuth(user, addOrUpdatePantryItem, updatedItem);
+  }, [pantryItems, removePantryItem, user]);
   
   const getConsumedMacrosForDate = useCallback((date: string): Macros => {
     const manualLog = dailyManualMacrosLog?.find(log => log.date === date);
@@ -426,10 +429,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const recommendation = await runPreppy(preppyInput);
     
-    await callServerActionWithAuth(updateUserProfile, { tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
+    await callServerActionWithAuth(user, updateUserProfile, { tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
 
     return { success: true, message: "Check-in complete!", recommendation };
-  }, [userProfile, dailyWeightLog, getConsumedMacrosForDate, callServerActionWithAuth]);
+  }, [userProfile, dailyWeightLog, getConsumedMacrosForDate, user]);
   
   const contextValue: AppContextType = useMemo(() => ({
     userProfile,
@@ -454,10 +457,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateMealStatus: (plannedMealId: string, status: 'planned' | 'eaten') => updateMealServingsOrStatus(plannedMealId, { status }),
     clearMealPlanForDate: (date: string) => {
         const mealsToDelete = mealPlan.filter(pm => pm.date === date);
-        mealsToDelete.forEach(meal => callServerActionWithAuth(deleteMealFromPlan, meal.id));
+        mealsToDelete.forEach(meal => callServerActionWithAuth(user, deleteMealFromPlan, meal.id));
     },
     clearEntireMealPlan: () => {
-        mealPlan.forEach(meal => callServerActionWithAuth(deleteMealFromPlan, meal.id));
+        mealPlan.forEach(meal => callServerActionWithAuth(user, deleteMealFromPlan, meal.id));
     },
     toggleFavoriteRecipe: async (recipeId: number) => {
         if (!userProfile) return;
@@ -473,7 +476,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addPantryItem,
     removePantryItem,
     updatePantryItemQuantity,
-    addCustomRecipe: (recipeData: RecipeFormData) => callServerActionWithAuth(addRecipeAction, recipeData),
+    addCustomRecipe: (recipeData: RecipeFormData) => callServerActionWithAuth(user, addRecipeAction, recipeData),
     runWeeklyCheckin,
     setUserInformation,
     setMacroTargets: (targets: Macros) => setUserInformation({ macroTargets: targets }),
@@ -487,7 +490,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     assignIngredientCategory: assignCategoryUtil,
   }), [
     userProfile, userRecipes, builtInRecipes, mealPlan, pantryItems, isDataLoading, isRecipeCacheLoading, isOnline,
-    addMealToPlan, removeMealFromPlan, updateMealServingsOrStatus, callServerActionWithAuth, getConsumedMacrosForDate,
+    addMealToPlan, removeMealFromPlan, updateMealServingsOrStatus, user, getConsumedMacrosForDate,
     setUserInformation, addPantryItem, removePantryItem, updatePantryItemQuantity, runWeeklyCheckin
   ]);
   
