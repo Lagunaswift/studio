@@ -1,96 +1,88 @@
-// src/lib/firebase-admin.ts - Fixed version
+// src/lib/firebase-admin.ts
 import * as admin from 'firebase-admin';
+import type { App } from 'firebase-admin/app';
 import type { Auth } from 'firebase-admin/auth';
 import type { Firestore } from 'firebase-admin/firestore';
 
-// Initialize Firebase Admin SDK
-function initializeFirebaseAdmin() {
-  // Check if the app is already initialized
-  if (admin.apps.length > 0) {
-    return admin.app();
+let adminAppInstance: App | null = null;
+
+/**
+ * Initializes the Firebase Admin SDK if it hasn't been already.
+ * This function is designed to be safely called multiple times.
+ * @returns The initialized Firebase Admin App instance.
+ */
+function initializeFirebaseAdmin(): App {
+  // Return the existing instance if it's already been initialized.
+  if (adminAppInstance) {
+    return adminAppInstance;
   }
 
+  // Check if any app has already been initialized by another process
+  if (admin.apps.length > 0 && admin.apps[0]) {
+    adminAppInstance = admin.apps[0];
+    return adminAppInstance;
+  }
+
+  console.log('Attempting to initialize Firebase Admin SDK...');
   try {
-    console.log('Initializing Firebase Admin SDK...');
+    const isDevelopment = process.env.NODE_ENV === 'development';
 
-    // For development with emulators
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Development mode: Using emulator settings');
-      
-      // Set emulator environment variables
-      process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8080';
-      process.env.FIREBASE_AUTH_EMULATOR_HOST = 'localhost:9099';
-      
-      // Initialize with minimal config for emulator
-      return admin.initializeApp({
-        projectId: 'macro-teal-meal-planner',
-      });
-    }
+    if (isDevelopment) {
+      console.log('Development environment: Configuring emulators and using local service account.');
 
-    // For production, use service account
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64) {
-      // Decode base64 service account key
-      const serviceAccountJson = Buffer.from(
-        process.env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64,
-        'base64'
-      ).toString('utf8');
-      
-      const serviceAccount = JSON.parse(serviceAccountJson);
-      
-      console.log(`Initializing Firebase Admin SDK with Project ID: ${serviceAccount.project_id}`);
+      // Set emulator hosts BEFORE initializing the app. This is crucial.
+      // Using port 8081 for Firestore as indicated in the firebase-debug.log.
+      process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8081';
+      process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
 
-      return admin.initializeApp({
-        credential: admin.credential.cert({
-          ...serviceAccount,
-          // Fix private key line breaks - use proper regex syntax
-          private_key: serviceAccount.private_key.replace(/\\n/g, '\n'),
-        }),
-        projectId: serviceAccount.project_id,
-      });
-    }
-
-    // Fallback: try to load from local serviceAccount.json
-    try {
       const serviceAccount = require('../../serviceAccount.json');
-      console.log(`Fallback: Loading service account from local file for project: ${serviceAccount.project_id}`);
-      
-      return admin.initializeApp({
-        credential: admin.credential.cert({
-          ...serviceAccount,
-          // Fix private key line breaks - use proper regex syntax
-          private_key: serviceAccount.private_key.replace(/\\n/g, '\n'),
-        }),
+      adminAppInstance = admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
         projectId: serviceAccount.project_id,
       });
-    } catch (fileError) {
-      console.error('Could not load local serviceAccount.json:', fileError);
-      throw new Error('No valid Firebase Admin credentials found');
+      console.log('Firebase Admin SDK initialized for development.');
+    } else {
+      console.log('Production environment: Using credentials from environment variables.');
+      if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64) {
+        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY_BASE64 environment variable not set for production.');
+      }
+      const serviceAccountJson = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64, 'base64').toString('utf8');
+      const serviceAccount = JSON.parse(serviceAccountJson);
+      adminAppInstance = admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        projectId: serviceAccount.project_id,
+      });
+      console.log('Firebase Admin SDK initialized for production.');
     }
-
+    return adminAppInstance;
   } catch (error: any) {
-    console.error("CRITICAL ERROR: Failed to initialize Firebase Admin SDK.", error);
+    console.error("CRITICAL: Firebase Admin SDK Initialization failed.", error);
     throw new Error(`Could not initialize Firebase Admin SDK: ${error.message}`);
   }
 }
 
-// Initialize the app when this module is first loaded
-let app: admin.app.App;
-
-try {
-  app = initializeFirebaseAdmin();
-} catch (error) {
-  console.error('Failed to initialize Firebase Admin app:', error);
-  throw error;
-}
-
-// Export getter functions that return the initialized services
+/**
+ * Gets the initialized Firestore instance.
+ * @returns {Firestore} The Firestore service instance.
+ */
 export function getDb(): Firestore {
+  const app = initializeFirebaseAdmin();
   return admin.firestore(app);
 }
 
+/**
+ * Gets the initialized Auth instance.
+ * @returns {Auth} The Auth service instance.
+ */
 export function getAuth(): Auth {
+  const app = initializeFirebaseAdmin();
   return admin.auth(app);
 }
 
-// Export app instance
-export { app as adminApp };
+/**
+ * Gets the initialized Firebase Admin App instance.
+ * @returns {App} The Firebase Admin App instance.
+ */
+export function getAdminApp(): App {
+    return initializeFirebaseAdmin();
+}
