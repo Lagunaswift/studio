@@ -9,11 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Mail, Lock, LogIn, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, LogIn, Eye, EyeOff, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { getFirebaseAuth } from '@/lib/firebase';
 
 const loginSchema = z.object({
@@ -46,10 +46,40 @@ export default function LoginPage() {
     },
   });
 
+   const handleResendVerification = async () => {
+    if (auth.currentUser) {
+      try {
+        await sendEmailVerification(auth.currentUser);
+        toast({
+          title: "Verification Email Sent",
+          description: "A new verification link has been sent to your email address.",
+        });
+      } catch (error) {
+        toast({
+          title: "Error Sending Verification",
+          description: "Could not send a new verification email. Please try again later.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   const onSubmit: SubmitHandler<LoginFormValues> = async (data) => {
     form.clearErrors(); 
     try {
-      await signInWithEmailAndPassword(auth, data.email, data.password);
+      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+      
+      if (!userCredential.user.emailVerified) {
+        toast({
+          title: "Email Not Verified",
+          description: "Please check your inbox and verify your email address to log in.",
+          variant: "destructive",
+          action: <Button variant="outline" size="sm" onClick={handleResendVerification}><Send className="mr-2 h-4 w-4" />Resend Link</Button>,
+          duration: 10000,
+        });
+        return; 
+      }
+
       toast({
         title: "Login Successful!",
         description: "Welcome back!",
@@ -58,9 +88,13 @@ export default function LoginPage() {
     } catch (error: any) {
       const errorCode = error.code;
       let description = "An unexpected error occurred.";
+      
       if (errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password' || errorCode === 'auth/invalid-credential') {
         description = "Invalid email or password. Please try again.";
+      } else if (errorCode === 'auth/unverified-email') {
+        description = "Your email address is not verified. Please check your inbox for the verification link.";
       }
+
       toast({
         title: "Login Failed",
         description,
