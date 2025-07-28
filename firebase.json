@@ -3,6 +3,25 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "hosting": {
+    "source": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "frameworksBackend": {
+      "region": "us-central1"
+    },
+    "rewrites": [
+      {
+        "source": "/dataconnect",
+        "dataconnect": {
+          "serviceId": "dataconnect"
+        }
+      }
+    ]
+  },
   "emulators": {
     "auth": {
       "host": "0.0.0.0",

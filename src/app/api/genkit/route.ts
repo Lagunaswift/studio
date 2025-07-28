@@ -1,6 +1,10 @@
 
 // src/app/api/genkit/route.ts
 import { genkit } from '@/ai/genkit';
-import { run } from '@genkit-ai/next';
+import { createNextApiHandler } from '@genkit-ai/next';
 
-export const POST = run(genkit);
+export const POST = createNextApiHandler({
+  flows: [
+    // Add your Genkit flows here
+  ]
+});

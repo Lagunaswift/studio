@@ -13,7 +13,7 @@ import { Lock, KeyRound, AlertTriangle, ArrowLeft, Eye, EyeOff } from 'lucide-re
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
-import { getFirebaseAuth } from '@/lib/firebase';
+import { auth } from '@/lib/firebase'; // Corrected import
 
 const updatePasswordSchema = z.object({
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),
@@ -35,7 +35,6 @@ function UpdatePasswordFormComponent() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [actionCode, setActionCode] = useState<string | null>(null);
-  const auth = getFirebaseAuth();
 
   useEffect(() => {
     const oobCode = searchParams.get('oobCode');
@@ -57,7 +56,7 @@ function UpdatePasswordFormComponent() {
       .finally(() => {
         setIsCheckingToken(false);
       });
-  }, [searchParams, auth]);
+  }, [searchParams]);
 
   const form = useForm<UpdatePasswordFormValues>({
     resolver: zodResolver(updatePasswordSchema),
@@ -111,89 +110,91 @@ function UpdatePasswordFormComponent() {
   }
   
   return (
-    <Card className="shadow-2xl">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl font-headline text-primary flex items-center justify-center">
-          <KeyRound className="mr-2 h-6 w-6" /> Update Your Password
-        </CardTitle>
-        {!isTokenValid && (
-          <CardDescription className="text-destructive">
-            Your password reset link appears to be invalid or expired.
-          </CardDescription>
-        )}
-      </CardHeader>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <CardContent className="space-y-6">
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-muted-foreground" />New Password</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input type={showPassword ? 'text' : 'password'} placeholder="Minimum 8 characters" {...field} disabled={!isTokenValid} />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-primary"
-                        aria-label={showPassword ? "Hide password" : "Show password"}
-                      >
-                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </button>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+    <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
+      <Card className="w-full max-w-md shadow-2xl">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-headline text-primary flex items-center justify-center">
+            <KeyRound className="mr-2 h-6 w-6" /> Update Your Password
+          </CardTitle>
+          {!isTokenValid && (
+            <CardDescription className="text-destructive">
+              Your password reset link appears to be invalid or expired.
+            </CardDescription>
+          )}
+        </CardHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <CardContent className="space-y-6">
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-muted-foreground" />New Password</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input type={showPassword ? 'text' : 'password'} placeholder="Minimum 8 characters" {...field} disabled={!isTokenValid} />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-primary"
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-muted-foreground" />Confirm New Password</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="Re-type your new password" {...field} disabled={!isTokenValid} />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-primary"
+                          aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {error && (
+                <p className="text-sm text-destructive text-center p-2 bg-destructive/10 rounded-md">{error}</p>
               )}
-            />
-            <FormField
-              control={form.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-muted-foreground" />Confirm New Password</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="Re-type your new password" {...field} disabled={!isTokenValid} />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-primary"
-                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                      >
-                        {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </button>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+              {!isTokenValid && (
+                <div className="text-sm text-muted-foreground text-center p-3 bg-muted rounded-md border border-dashed">
+                  <AlertTriangle className="inline h-5 w-5 mr-2 text-destructive"/>
+                  Please request a new password reset link.
+              </div>
               )}
-            />
-             {error && (
-              <p className="text-sm text-destructive text-center p-2 bg-destructive/10 rounded-md">{error}</p>
-            )}
-            {!isTokenValid && (
-              <div className="text-sm text-muted-foreground text-center p-3 bg-muted rounded-md border border-dashed">
-                <AlertTriangle className="inline h-5 w-5 mr-2 text-destructive"/>
-                Please request a new password reset link.
-            </div>
-            )}
-          </CardContent>
-          <CardFooter className="flex flex-col items-center space-y-4">
-            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={!isTokenValid || form.formState.isSubmitting}>
-              Update Password
-            </Button>
-            <div className="text-sm text-center w-full">
-                <Link href="/login" className="font-medium text-primary hover:underline flex items-center justify-center">
-                    <ArrowLeft className="mr-1 h-4 w-4" /> Back to Sign In
-                </Link>
-            </div>
-          </CardFooter>
-        </form>
-      </Form>
-    </Card>
+            </CardContent>
+            <CardFooter className="flex flex-col items-center space-y-4">
+              <Button type="submit" className="w-full" disabled={!isTokenValid || form.formState.isSubmitting}>
+                Update Password
+              </Button>
+              <div className="text-sm text-center w-full">
+                  <Link href="/login" className="font-medium text-primary hover:underline flex items-center justify-center">
+                      <ArrowLeft className="mr-1 h-4 w-4" /> Back to Sign In
+                  </Link>
+              </div>
+            </CardFooter>
+          </form>
+        </Form>
+      </Card>
+    </div>
   );
 }
 

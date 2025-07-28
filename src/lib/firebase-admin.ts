@@ -31,8 +31,8 @@ function initializeFirebaseAdmin(): App {
       console.log('Development environment: Configuring emulators and using local service account.');
 
       // Set emulator hosts BEFORE initializing the app. This is crucial.
-      // Using port 8081 for Firestore as indicated in the firebase-debug.log.
-      process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8081';
+      // Using port 8080 for Firestore as indicated in the firebase.json.
+      process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
       process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
 
       const serviceAccount = require('../../serviceAccount.json');

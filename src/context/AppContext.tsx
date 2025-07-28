@@ -3,7 +3,8 @@
 
 import React, { createContext, useContext, useMemo, useCallback, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import { db } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { db, auth } from '@/lib/firebase';
 import {
   collection,
   onSnapshot,
@@ -38,15 +39,58 @@ import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-c
 import { format, subDays, differenceInDays } from 'date-fns';
 import { addOrUpdateMealPlan, deleteMealFromPlan, addOrUpdatePantryItem, deletePantryItem, addRecipe as addRecipeAction, updateUserProfile, addOrUpdateVitalsLog, addOrUpdateWeightLog, addOrUpdateManualMacrosLog, reportBug } from '@/app/(main)/profile/actions';
 
-// --- Client-side helper for Server Actions ---
-// This function lives on the client and is only called when an action is performed.
-const callServerActionWithAuth = async (user: any, action: (idToken: string, ...args: any[]) => Promise<any>, ...args: any[]) => {
+// --- Enhanced Client-side Helper for Server Actions ---
+const callServerActionWithAuth = async (action: (idToken: string, ...args: any[]) => Promise<any>, ...args: any[]) => {
+  const user = auth.currentUser;
   if (!user) {
-    throw new Error("You must be logged in to perform this action.");
+    throw new Error('User not authenticated');
   }
-  // This is now safe because it's only called from client-side event handlers.
-  const idToken = await user.getIdToken(true);
-  return action(idToken, ...args);
+
+  try {
+    let idToken;
+    let retries = 3;
+    
+    while (retries > 0) {
+      try {
+        idToken = await user.getIdToken(true);
+        console.log("Successfully refreshed ID token.");
+        break; // Success
+      } catch (error: any) {
+        console.warn(`Token refresh attempt failed (${4 - retries}/3):`, error.code);
+        retries--;
+        
+        if (retries === 0) {
+          console.log('Final retry failed. Attempting to get token without force refresh...');
+          try {
+            idToken = await user.getIdToken(false);
+            console.log('Fallback token retrieval succeeded.');
+            break; // Success with fallback
+          } catch (fallbackError: any) {
+            console.error("Fallback token retrieval also failed.", fallbackError);
+            throw error; // Throw the original, more informative error
+          }
+        }
+        
+        // Wait before the next retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    if (!idToken) {
+      throw new Error("Could not obtain ID token after multiple attempts.");
+    }
+    
+    return action(idToken, ...args);
+  } catch (error: any) {
+    console.error('Final authentication token error:', {
+      code: error.code,
+      message: error.message,
+      userUID: user.uid,
+      userEmail: user.email,
+    });
+    // Re-throw the error so the calling function can handle it
+    throw error;
+  }
 };
 
 
@@ -212,6 +256,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isRecipeCacheLoading, setIsRecipeCacheLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true); 
 
+  // --- Auth State Debugging ---
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log('Auth state changed:', {
+        user: user ? {
+          uid: user.uid,
+          email: user.email,
+          emailVerified: user.emailVerified,
+          isAnonymous: user.isAnonymous,
+        } : null,
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    return unsubscribe; // Cleanup subscription on component unmount
+  }, []);
+
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -290,8 +351,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [user?.uid, user?.email, isAuthLoading]);
   
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
-    await callServerActionWithAuth(user, updateUserProfile, updates);
-  }, [user]);
+    await callServerActionWithAuth(updateUserProfile, updates);
+  }, []);
 
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
     const newPlannedMeal: Partial<Omit<PlannedMeal, 'id' | 'user_id' | 'recipeDetails'>> = { 
@@ -301,12 +362,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       servings,
       status: 'planned',
     };
-    await callServerActionWithAuth(user, addOrUpdateMealPlan, newPlannedMeal);
-  }, [user]);
+    await callServerActionWithAuth(addOrUpdateMealPlan, newPlannedMeal);
+  }, []);
   
   const removeMealFromPlan = useCallback(async (plannedMealId: string) => {
-    await callServerActionWithAuth(user, deleteMealFromPlan, plannedMealId);
-  }, [user]);
+    await callServerActionWithAuth(deleteMealFromPlan, plannedMealId);
+  }, []);
 
   const updateMealServingsOrStatus = useCallback(async (plannedMealId: string, updates: Partial<Pick<PlannedMeal, 'servings' | 'status'>>) => {
       const meal = mealPlan.find(m => m.id === plannedMealId);
@@ -315,8 +376,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { recipeDetails, ...restOfMeal } = meal;
       const updatedMealData = { ...restOfMeal, ...updates };
 
-      await callServerActionWithAuth(user, addOrUpdateMealPlan, updatedMealData);
-  }, [mealPlan, user]);
+      await callServerActionWithAuth(addOrUpdateMealPlan, updatedMealData);
+  }, [mealPlan]);
   
   const addPantryItem = useCallback(async (name: string, quantity: number, unit: string, category: string, expiryDate?: string) => {
     const existingItem = pantryItems.find(item => 
@@ -338,12 +399,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             expiryDate
         };
     }
-    await callServerActionWithAuth(user, addOrUpdatePantryItem, itemToSave);
-  }, [pantryItems, user]);
+    await callServerActionWithAuth(addOrUpdatePantryItem, itemToSave);
+  }, [pantryItems]);
 
   const removePantryItem = useCallback(async (itemId: string) => {
-    await callServerActionWithAuth(user, deletePantryItem, itemId);
-  }, [user]);
+    await callServerActionWithAuth(deletePantryItem, itemId);
+  }, []);
 
   const updatePantryItemQuantity = useCallback(async (itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -354,8 +415,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     const { user_id, ...restOfItem } = item;
     const updatedItem = { ...restOfItem, quantity: newQuantity };
-    await callServerActionWithAuth(user, addOrUpdatePantryItem, updatedItem);
-  }, [pantryItems, removePantryItem, user]);
+    await callServerActionWithAuth(addOrUpdatePantryItem, updatedItem);
+  }, [pantryItems, removePantryItem]);
   
   const getConsumedMacrosForDate = useCallback((date: string): Macros => {
     const manualLog = dailyManualMacrosLog?.find(log => log.date === date);
@@ -429,10 +490,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const recommendation = await runPreppy(preppyInput);
     
-    await callServerActionWithAuth(user, updateUserProfile, { tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
+    await callServerActionWithAuth(updateUserProfile, { tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
 
     return { success: true, message: "Check-in complete!", recommendation };
-  }, [userProfile, dailyWeightLog, getConsumedMacrosForDate, user]);
+  }, [userProfile, dailyWeightLog, getConsumedMacrosForDate]);
   
   const contextValue: AppContextType = useMemo(() => ({
     userProfile,
@@ -457,10 +518,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateMealStatus: (plannedMealId: string, status: 'planned' | 'eaten') => updateMealServingsOrStatus(plannedMealId, { status }),
     clearMealPlanForDate: (date: string) => {
         const mealsToDelete = mealPlan.filter(pm => pm.date === date);
-        mealsToDelete.forEach(meal => callServerActionWithAuth(user, deleteMealFromPlan, meal.id));
+        mealsToDelete.forEach(meal => callServerActionWithAuth(deleteMealFromPlan, meal.id));
     },
     clearEntireMealPlan: () => {
-        mealPlan.forEach(meal => callServerActionWithAuth(user, deleteMealFromPlan, meal.id));
+        mealPlan.forEach(meal => callServerActionWithAuth(deleteMealFromPlan, meal.id));
     },
     toggleFavoriteRecipe: async (recipeId: number) => {
         if (!userProfile) return;
@@ -476,7 +537,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addPantryItem,
     removePantryItem,
     updatePantryItemQuantity,
-    addCustomRecipe: (recipeData: RecipeFormData) => callServerActionWithAuth(user, addRecipeAction, recipeData),
+    addCustomRecipe: (recipeData: RecipeFormData) => callServerActionWithAuth(addRecipeAction, recipeData),
     runWeeklyCheckin,
     setUserInformation,
     setMacroTargets: (targets: Macros) => setUserInformation({ macroTargets: targets }),
@@ -490,7 +551,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     assignIngredientCategory: assignCategoryUtil,
   }), [
     userProfile, userRecipes, builtInRecipes, mealPlan, pantryItems, isDataLoading, isRecipeCacheLoading, isOnline,
-    addMealToPlan, removeMealFromPlan, updateMealServingsOrStatus, user, getConsumedMacrosForDate,
+    addMealToPlan, removeMealFromPlan, updateMealServingsOrStatus, getConsumedMacrosForDate,
     setUserInformation, addPantryItem, removePantryItem, updatePantryItemQuantity, runWeeklyCheckin
   ]);
   

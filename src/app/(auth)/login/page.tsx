@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
-import { getFirebaseAuth } from '@/lib/firebase';
+import { auth } from '@/lib/firebase'; // Corrected import
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -24,19 +24,11 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const { toast } = useToast();
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [isVerificationEmailSent, setIsVerificationEmailSent] = useState(false);
+  const { user, loading } = useAuth();
   const router = useRouter();
-  const [showPassword, setShowPassword] = useState(false);
-  const [isClient, setIsClient] = useState(false);
-  const { user } = useAuth();
-  const auth = getFirebaseAuth();
-
-  useEffect(() => {
-    setIsClient(true);
-    if (user) {
-      router.push('/');
-    }
-  }, [user, router]);
+  const { toast } = useToast();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -46,131 +38,142 @@ export default function LoginPage() {
     },
   });
 
-   const handleResendVerification = async () => {
-    if (auth.currentUser) {
-      try {
-        await sendEmailVerification(auth.currentUser);
-        toast({
-          title: "Verification Email Sent",
-          description: "A new verification link has been sent to your email address.",
-        });
-      } catch (error) {
-        toast({
-          title: "Error Sending Verification",
-          description: "Could not send a new verification email. Please try again later.",
-          variant: "destructive",
-        });
-      }
+  useEffect(() => {
+    if (user) {
+      router.push('/');
     }
-  };
+  }, [user, router]);
 
   const onSubmit: SubmitHandler<LoginFormValues> = async (data) => {
-    form.clearErrors(); 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
       
-      if (!userCredential.user.emailVerified) {
+      if (userCredential.user && !userCredential.user.emailVerified) {
         toast({
-          title: "Email Not Verified",
-          description: "Please check your inbox and verify your email address to log in.",
+          title: "Verify Your Email",
+          description: "Your email is not verified. Please check your inbox for a verification link.",
           variant: "destructive",
-          action: <Button variant="outline" size="sm" onClick={handleResendVerification}><Send className="mr-2 h-4 w-4" />Resend Link</Button>,
-          duration: 10000,
         });
-        return; 
+        setIsVerificationEmailSent(true);
+        return;
       }
 
       toast({
-        title: "Login Successful!",
+        title: "Login Successful",
         description: "Welcome back!",
       });
       router.push('/');
     } catch (error: any) {
-      const errorCode = error.code;
-      let description = "An unexpected error occurred.";
-      
-      if (errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password' || errorCode === 'auth/invalid-credential') {
-        description = "Invalid email or password. Please try again.";
-      } else if (errorCode === 'auth/unverified-email') {
-        description = "Your email address is not verified. Please check your inbox for the verification link.";
-      }
-
+      console.error("Login failed:", error);
       toast({
         title: "Login Failed",
-        description,
+        description: error.message || "An unknown error occurred.",
         variant: "destructive",
       });
     }
   };
 
-  const isFormDisabled = form.formState.isSubmitting || !isClient;
+  const handleSendVerificationEmail = async () => {
+    if (auth.currentUser) {
+      try {
+        await sendEmailVerification(auth.currentUser);
+        toast({
+          title: "Verification Email Sent",
+          description: "A new verification link has been sent to your email.",
+        });
+      } catch (error: any) {
+        toast({
+          title: "Error Sending Verification Email",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   return (
-    <Card className="shadow-2xl">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl font-headline text-primary flex items-center justify-center">
-          <LogIn className="mr-2 h-6 w-6" /> Sign In
-        </CardTitle>
-        <CardDescription>Enter your credentials to access your meal plan.</CardDescription>
-      </CardHeader>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <CardContent className="space-y-6">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center"><Mail className="mr-2 h-4 w-4 text-muted-foreground" />Email</FormLabel>
-                  <FormControl>
-                    <Input type="email" placeholder="you@example.com" {...field} disabled={isFormDisabled} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-muted-foreground" />Password</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input type={showPassword ? 'text' : 'password'} placeholder="••••••••" {...field} disabled={isFormDisabled} />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-primary"
-                        aria-label={showPassword ? "Hide password" : "Show password"}
-                        disabled={isFormDisabled}
-                      >
-                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </button>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </CardContent>
-          <CardFooter className="flex flex-col items-center space-y-4">
-            <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isFormDisabled}>
-              {form.formState.isSubmitting ? 'Signing In...' : 'Sign In'}
-            </Button>
-            <div className="text-sm text-center w-full">
-              <Link href="/signup" className="font-medium text-primary hover:underline">
-                Don't have an account? Sign up
-              </Link>
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-2xl">Login</CardTitle>
+          <CardDescription>
+            Enter your credentials to access your meal planning dashboard.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                        <Input type="email" placeholder="you@example.com" {...field} className="pl-10" />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                        <Input 
+                          type={passwordVisible ? "text" : "password"}
+                          placeholder="••••••••" 
+                          {...field} 
+                          className="pl-10 pr-10"
+                        />
+                        <button 
+                          type="button" 
+                          onClick={() => setPasswordVisible(!passwordVisible)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground"
+                        >
+                          {passwordVisible ? <EyeOff /> : <Eye />}
+                        </button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full">
+                <LogIn className="mr-2 h-5 w-5" /> Login
+              </Button>
+            </form>
+          </Form>
+          {isVerificationEmailSent && (
+            <div className="mt-4 text-center">
+              <p className="text-sm text-muted-foreground">Didn't receive the email?</p>
+              <Button variant="link" onClick={handleSendVerificationEmail}>
+                <Send className="mr-2 h-4 w-4" /> Resend Verification Email
+              </Button>
             </div>
-            <div className="text-sm text-center w-full">
-              <Link href="/reset-password" className="text-xs text-muted-foreground hover:underline">
-                Forgot password?
-              </Link>
-            </div>
-          </CardFooter>
-        </form>
-      </Form>
-    </Card>
+          )}
+        </CardContent>
+        <CardFooter className="flex flex-col space-y-2">
+          <Link href="/signup" className="text-sm text-primary hover:underline">
+            Don't have an account? Sign up
+          </Link>
+          <Link href="/reset-password" passHref>
+            <Button variant="link" className="text-sm">Forgot Password?</Button>
+          </Link>
+        </CardFooter>
+      </Card>
+    </div>
   );
 }

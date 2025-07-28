@@ -16,31 +16,36 @@ const auth: Auth = getAuth(app);
 const db: Firestore = getFirestore(app);
 
 // Connect to emulators ONLY on the client-side during development.
-// The server-side code will connect to the actual Firebase backend.
-if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
-  console.log('Development mode (client-side): Connecting to emulators.');
+const isEmulatorMode = typeof window !== 'undefined' &&
+  window.location.hostname === 'localhost' &&
+  process.env.NEXT_PUBLIC_EMULATOR_HOST;
 
-  // Check if auth is already connected to an emulator
+if (isEmulatorMode) {
+  const host = process.env.NEXT_PUBLIC_EMULATOR_HOST!;
+  console.log(`Development mode (client-side): Connecting to emulators at ${host}.`);
+
   if (!auth.emulatorConfig) {
     try {
-      connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-      console.log('Auth emulator connection established.');
+      connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
+      console.log(`Auth emulator connection established at http://${host}:9099`);
     } catch (error) {
       console.warn('Could not connect to Auth emulator:', error);
     }
   }
 
-  // Check if firestore is already connected to an emulator
-  // Note: The Firestore emulator connection doesn't have a simple property like auth.emulatorConfig
-  // We'll rely on try-catch, which is safe.
-  try {
-    connectFirestoreEmulator(db, '127.0.0.1', 8080);
-    console.log('Firestore emulator connection established.');
-  } catch (error: any) {
-    // It's common for this to throw an error if already connected.
-    // We can safely ignore the 'failed-precondition' error.
-    if (error.code !== 'failed-precondition') {
+  // Firestore emulator connection
+  // Note: The Firestore client library can be aggressive about reconnecting.
+  // We check if the host is already set to avoid re-initializing.
+  if (!(db as any)._settings.host.includes(host)) {
+    try {
+      connectFirestoreEmulator(db, host, 8080);
+      console.log(`Firestore emulator connection established at ${host}:8080`);
+    } catch (error: any) {
+      // It's common to get a 'failed-precondition' error if you hot-reload,
+      // which means the connection is already established. We can safely ignore it.
+      if (error.code !== 'failed-precondition') {
         console.warn('Could not connect to Firestore emulator:', error);
+      }
     }
   }
 }
