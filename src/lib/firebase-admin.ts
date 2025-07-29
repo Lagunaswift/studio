@@ -1,8 +1,13 @@
+
 // src/lib/firebase-admin.ts
 import * as admin from 'firebase-admin';
 import type { App } from 'firebase-admin/app';
 import type { Auth } from 'firebase-admin/auth';
 import type { Firestore } from 'firebase-admin/firestore';
+import { config } from 'dotenv';
+import path from 'path';
+
+config({ path: path.resolve(process.cwd(), '.env') });
 
 let adminAppInstance: App | null = null;
 
@@ -16,6 +21,10 @@ function initializeFirebaseAdmin(): App {
     return admin.apps[0];
   }
   
+  if (adminAppInstance) {
+      return adminAppInstance;
+  }
+
   try {
     const serviceAccountKeyBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64;
     if (!serviceAccountKeyBase64) {

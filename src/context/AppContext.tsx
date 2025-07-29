@@ -37,7 +37,7 @@ import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
 import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { format, subDays, differenceInDays } from 'date-fns';
-import { addOrUpdateMealPlan, deleteMealFromPlan, addOrUpdatePantryItem, deletePantryItem, addRecipe as addRecipeAction, updateUserProfile, addOrUpdateVitalsLog, addOrUpdateWeightLog, addOrUpdateManualMacrosLog, reportBug } from '@/app/(main)/profile/actions';
+import { addOrUpdateMealPlan, deleteMealFromPlan, addOrUpdatePantryItem, deletePantryItem, addRecipe as addRecipeAction, updateUserProfile, addOrUpdateVitalsLog, addOrUpdateWeightLog, addOrUpdateManualMacrosLog } from '@/app/(main)/profile/actions';
 
 // --- Enhanced Client-side Helper for Server Actions ---
 const callServerActionWithAuth = async (action: (idToken: string, ...args: any[]) => Promise<any>, ...args: any[]) => {
@@ -47,49 +47,17 @@ const callServerActionWithAuth = async (action: (idToken: string, ...args: any[]
   }
 
   try {
-    let idToken;
-    let retries = 3;
-    
-    while (retries > 0) {
-      try {
-        idToken = await user.getIdToken(true);
-        console.log("Successfully refreshed ID token.");
-        break; // Success
-      } catch (error: any) {
-        console.warn(`Token refresh attempt failed (${4 - retries}/3):`, error.code);
-        retries--;
-        
-        if (retries === 0) {
-          console.log('Final retry failed. Attempting to get token without force refresh...');
-          try {
-            idToken = await user.getIdToken(false);
-            console.log('Fallback token retrieval succeeded.');
-            break; // Success with fallback
-          } catch (fallbackError: any) {
-            console.error("Fallback token retrieval also failed.", fallbackError);
-            throw error; // Throw the original, more informative error
-          }
-        }
-        
-        // Wait before the next retry
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-    
-    if (!idToken) {
-      throw new Error("Could not obtain ID token after multiple attempts.");
-    }
-    
+    const idToken = await user.getIdToken();
     return action(idToken, ...args);
   } catch (error: any) {
-    console.error('Final authentication token error:', {
-      code: error.code,
-      message: error.message,
-      userUID: user.uid,
-      userEmail: user.email,
-    });
-    // Re-throw the error so the calling function can handle it
-    throw error;
+    console.error('Error getting ID token or calling server action:', error);
+    // Attempt to refresh the token on specific error codes
+    if (error.code === 'auth/id-token-expired') {
+        console.log("ID token expired, attempting to refresh and retry...");
+        const newIdToken = await user.getIdToken(true); // Force refresh
+        return action(newIdToken, ...args);
+    }
+    throw error; // Re-throw other errors
   }
 };
 
@@ -256,22 +224,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isRecipeCacheLoading, setIsRecipeCacheLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true); 
 
-  // --- Auth State Debugging ---
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log('Auth state changed:', {
-        user: user ? {
-          uid: user.uid,
-          email: user.email,
-          emailVerified: user.emailVerified,
-          isAnonymous: user.isAnonymous,
-        } : null,
-        timestamp: new Date().toISOString(),
-      });
-    });
-
-    return unsubscribe; // Cleanup subscription on component unmount
-  }, []);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -333,10 +285,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }));
         });
         
-        const initialLoadTimer = setTimeout(() => setIsDataLoading(false), 2000); 
+        const initialLoadTimer = setTimeout(() => setIsDataLoading(false), 1500); 
         unsubscribes.push(() => clearTimeout(initialLoadTimer));
     } else if (!isAuthLoading) {
-        // No user and auth is not loading anymore
         setIsDataLoading(false);
         setUserProfile(null);
         setUserRecipes([]);

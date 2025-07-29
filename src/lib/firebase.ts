@@ -1,30 +1,30 @@
+
 import { initializeApp, getApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, type Firestore, connectFirestoreEmulator } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCNPp40cv3QiH_451NmshIk_Bu1BWi9WhQ",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "macro-teal-meal-planner.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "macro-teal-meal-planner",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "macro-teal-meal-planner.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "724190135561",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:724190135561:web:839c4baeb27fac063e3fd8"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
+// Initialize Firebase
 const app: FirebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth: Auth = getAuth(app);
 const db: Firestore = getFirestore(app);
 
 // Connect to emulators ONLY on the client-side during development.
-const isEmulatorMode = typeof window !== 'undefined' &&
-  window.location.hostname === 'localhost' &&
-  process.env.NEXT_PUBLIC_EMULATOR_HOST;
-
-if (isEmulatorMode) {
-  const host = process.env.NEXT_PUBLIC_EMULATOR_HOST!;
+// This check ensures that the code only runs in the browser environment.
+if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') {
+  const host = window.location.hostname;
   console.log(`Development mode (client-side): Connecting to emulators at ${host}.`);
 
-  if (!auth.emulatorConfig) {
+  // It's important to check if the emulators are already connected to avoid errors on hot-reloads.
+  if (!(auth as any)._isEmulator) {
     try {
       connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
       console.log(`Auth emulator connection established at http://${host}:9099`);
@@ -34,15 +34,11 @@ if (isEmulatorMode) {
   }
 
   // Firestore emulator connection
-  // Note: The Firestore client library can be aggressive about reconnecting.
-  // We check if the host is already set to avoid re-initializing.
-  if (!(db as any)._settings.host.includes(host)) {
-    try {
+  if (!(db as any)._settings.host.includes('localhost')) {
+     try {
       connectFirestoreEmulator(db, host, 8080);
       console.log(`Firestore emulator connection established at ${host}:8080`);
     } catch (error: any) {
-      // It's common to get a 'failed-precondition' error if you hot-reload,
-      // which means the connection is already established. We can safely ignore it.
       if (error.code !== 'failed-precondition') {
         console.warn('Could not connect to Firestore emulator:', error);
       }

@@ -2,7 +2,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import type { DailyVitalsLog, DailyManualMacrosLog, RecipeFormData, UserProfileSettings } from '@/types';
+import type { RecipeFormData, UserProfileSettings } from '@/types';
 import { getAuth, getDb } from '@/lib/firebase-admin'; 
 import { processBugReport } from '@/ai/flows/report-bug-flow';
 import type { BugReportInput, BugReportOutput } from '@/ai/flows/report-bug-flow';
