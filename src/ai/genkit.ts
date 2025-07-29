@@ -1,22 +1,28 @@
-
-import { config as dotenvConfig } from 'dotenv';
-import path from 'path';
-
-// Explicitly load .env file from the project root
-// This ensures GOOGLE_API_KEY is loaded before genkit initializes googleAI plugin
-dotenvConfig({ path: path.resolve(process.cwd(), '.env') });
-
-import { genkit } from 'genkit';
+// src/ai/genkit.ts
+import { genkit, configure } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
-import { firebase } from '@genkit-ai/firebase/lib/index.js';
+import { firebase } from '@genkit-ai/firebase';
 
+// This is the primary export that other files should use.
+export { genkit as ai };
 
-// This is the primary export that other files should use
-export const ai = genkit({
-  plugins: [
-    googleAI(),
-    firebase(), // Add the Firebase plugin for auth context
-  ],
-  logLevel: 'debug',
-  enableTracingAndMetrics: true,
-});
+// Initialize Genkit
+try {
+  console.log('Initializing Genkit...');
+  
+  configure({
+    plugins: [
+      googleAI(),
+      firebase(), // This correctly initializes Firebase functions and other resources
+    ],
+    // logLevel: 'debug', // This option is not supported in this version
+    enableTracingAndMetrics: true,
+  });
+
+  console.log('Genkit configured successfully.');
+
+} catch (error) {
+  console.error('Failed to initialize Genkit:', error);
+  // Re-throw the error to prevent the application from starting in a broken state
+  throw new Error(`Could not initialize Genkit: ${(error as Error).message}`);
+}
