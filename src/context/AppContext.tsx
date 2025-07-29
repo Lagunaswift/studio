@@ -302,7 +302,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [user?.uid, user?.email, isAuthLoading]);
   
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
-    await callServerActionWithAuth(updateUserProfile, updates);
+    const result = await callServerActionWithAuth(updateUserProfile, updates);
+    if (result.error) {
+        throw new Error(result.error);
+    }
   }, []);
 
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {

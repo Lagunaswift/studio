@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
@@ -173,7 +172,7 @@ function UserInfoPageSkeleton() {
     )
 }
 
-function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserProfileSettings, setUserInformation: (updates: Partial<UserProfileSettings>) => void }) {
+function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserProfileSettings, setUserInformation: (updates: Partial<UserProfileSettings>) => Promise<void> }) {
   const { toast } = useToast();
   const [calculationMessage, setCalculationMessage] = useState<string | null>(null);
   const [calculationError, setCalculationError] = useState<boolean>(false);
@@ -199,13 +198,21 @@ function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserPr
     return calculateLBM(watchedFormValues.weightKg, watchedFormValues.bodyFatPercentage);
   }, [watchedFormValues.weightKg, watchedFormValues.bodyFatPercentage]);
   
-  const onSubmit: SubmitHandler<UserInfoFormValues> = (data) => {
-    setUserInformation(data as Partial<UserProfileSettings>); 
-    toast({
-      title: "User Information Saved",
-      description: "Your profile details have been updated.",
-    });
-    form.reset(data, { keepDirty: false, keepValues: true });
+  const onSubmit: SubmitHandler<UserInfoFormValues> = async (data) => {
+    try {
+        await setUserInformation(data as Partial<UserProfileSettings>); 
+        toast({
+          title: "User Information Saved",
+          description: "Your profile details have been updated.",
+        });
+        form.reset(data, { keepDirty: false, keepValues: true });
+    } catch (error: any) {
+        toast({
+          title: "Error Saving Profile",
+          description: error.message || 'An unknown error occurred.',
+          variant: "destructive",
+        });
+    }
   };
   
   const handleCalculateBodyFat = () => {
