@@ -8,15 +8,10 @@ dotenvConfig({ path: path.resolve(process.cwd(), '.env') });
 
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
-import { firebase } from '@genkit-ai/firebase/lib/index.js';
+import { firebase } from '@genkit-ai/firebase/plugin';
 
 
 // This is the primary export that other files should use
-export const ai = genkit({
-  plugins: [
-    googleAI(),
-    firebase(), // Add the Firebase plugin for auth context
-  ],
-  logLevel: 'debug',
-  enableTracingAndMetrics: true,
-});
+// It is now a clean interface for defining flows, prompts, etc.
+// The plugins are configured in the API route where the flows are executed.
+export const ai = genkit();
