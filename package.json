@@ -7,7 +7,7 @@
     "dev": "next dev --turbopack -p 9002",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
-    "build": "next build",
+    "build": "node --max-old-space-size=4096 node_modules/next/dist/bin/next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
@@ -59,7 +59,9 @@
     "recharts": "^2.15.1",
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "^3.24.2"
+    "zod": "^3.24.2",
+    "@opentelemetry/exporter-jaeger": "^1.25.1",
+    "@genkit-ai/firebase": "^1.8.0"
   },
   "devDependencies": {
     "@types/node": "^20",
