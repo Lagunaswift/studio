@@ -6,9 +6,9 @@ import path from 'path';
 // This ensures GOOGLE_API_KEY is loaded before genkit initializes googleAI plugin
 dotenvConfig({ path: path.resolve(process.cwd(), '.env') });
 
-import { genkit, configureGenkit } from 'genkit';
+import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
-import { firebase } from '@genkit-ai/firebase';
+import { firebase } from '@genkit-ai/firebase/plugin';
 
 
 // This is the primary export that other files should use
