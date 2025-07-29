@@ -35,7 +35,7 @@ import {
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
-import { runPreppy, type PreppyInput, type PreppyOutput } from '@/ai/flows/pro-coach-flow';
+import { runPreppy, type PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { format, subDays, differenceInDays } from 'date-fns';
 import { addOrUpdateMealPlan, deleteMealFromPlan, addOrUpdatePantryItem, deletePantryItem, addRecipe as addRecipeAction, updateUserProfile, addOrUpdateVitalsLog, addOrUpdateWeightLog, addOrUpdateManualMacrosLog } from '@/app/(main)/profile/actions';
 
@@ -43,21 +43,16 @@ import { addOrUpdateMealPlan, deleteMealFromPlan, addOrUpdatePantryItem, deleteP
 const callServerActionWithAuth = async (action: (idToken: string, ...args: any[]) => Promise<any>, ...args: any[]) => {
   const user = auth.currentUser;
   if (!user) {
-    throw new Error('User not authenticated');
+    throw new Error('User not authenticated for server action.');
   }
 
   try {
-    const idToken = await user.getIdToken();
-    return action(idToken, ...args);
+    // Force refresh the token to ensure it's not expired.
+    const idToken = await user.getIdToken(true);
+    return await action(idToken, ...args);
   } catch (error: any) {
-    console.error('Error getting ID token or calling server action:', error);
-    // Attempt to refresh the token on specific error codes
-    if (error.code === 'auth/id-token-expired') {
-        console.log("ID token expired, attempting to refresh and retry...");
-        const newIdToken = await user.getIdToken(true); // Force refresh
-        return action(newIdToken, ...args);
-    }
-    throw error; // Re-throw other errors
+    console.error(`Error in callServerActionWithAuth for action "${action.name}":`, error);
+    throw error; // Re-throw the original error after logging
   }
 };
 
@@ -432,7 +427,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: "Calculation resulted in an invalid TDEE. Check your logged data for consistency." };
     }
     
-    const preppyInput: PreppyInput = {
+    const preppyInput = {
       primaryGoal: userProfile.primaryGoal || 'maintenance',
       targetWeightChangeRateKg: userProfile.target_weight_change_rate_kg || 0,
       dynamicTdee: newDynamicTDEE,
@@ -442,7 +437,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       currentFatTarget: userProfile.macroTargets?.fat || 0,
     };
 
-    const recommendation = await runPreppy(preppyInput);
+    const recommendation = await runPreppy(preppyInput as any);
     
     await callServerActionWithAuth(updateUserProfile, { tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
 
