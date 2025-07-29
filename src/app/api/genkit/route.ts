@@ -1,10 +1,24 @@
 
 // src/app/api/genkit/route.ts
 import { genkit } from '@/ai/genkit';
-import { createNextApiHandler } from '@genkit-ai/next';
+import { defineFlow } from 'genkit';
+import { z } from 'zod';
 
-export const POST = createNextApiHandler({
+// Example flow, replace with your actual flows
+const exampleFlow = defineFlow(
+  {
+    name: 'exampleFlow',
+    inputSchema: z.string(),
+    outputSchema: z.string(),
+  },
+  async (input) => {
+    return `Hello, ${input}!`;
+  }
+);
+
+export const POST = genkit.api({
   flows: [
-    // Add your Genkit flows here
+    exampleFlow,
+    // Add your other Genkit flows here
   ]
 });
