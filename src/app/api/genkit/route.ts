@@ -27,7 +27,7 @@ const allFlows = [
 
 // This is a simple example flow to ensure the API route works.
 // It does not require any authentication.
-const helloFlow = genkit.defineFlow(
+const helloFlow = ai.defineFlow(
   {
     name: 'helloFlow',
     inputSchema: z.string(),
