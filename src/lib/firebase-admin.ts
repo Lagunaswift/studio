@@ -12,48 +12,25 @@ let adminAppInstance: App | null = null;
  * @returns The initialized Firebase Admin App instance.
  */
 function initializeFirebaseAdmin(): App {
-  // Return the existing instance if it's already been initialized.
-  if (adminAppInstance) {
-    return adminAppInstance;
-  }
-
-  // Check if any app has already been initialized by another process
   if (admin.apps.length > 0 && admin.apps[0]) {
-    adminAppInstance = admin.apps[0];
-    return adminAppInstance;
+    return admin.apps[0];
   }
-
-  console.log('Attempting to initialize Firebase Admin SDK...');
+  
   try {
-    const isDevelopment = process.env.NODE_ENV === 'development';
-
-    if (isDevelopment) {
-      console.log('Development environment: Configuring emulators and using local service account.');
-
-      // Set emulator hosts BEFORE initializing the app. This is crucial.
-      // Using port 8080 for Firestore as indicated in the firebase.json.
-      process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
-      process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
-
-      const serviceAccount = require('../../serviceAccount.json');
-      adminAppInstance = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: serviceAccount.project_id,
-      });
-      console.log('Firebase Admin SDK initialized for development.');
-    } else {
-      console.log('Production environment: Using credentials from environment variables.');
-      if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64) {
-        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY_BASE64 environment variable not set for production.');
-      }
-      const serviceAccountJson = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64, 'base64').toString('utf8');
-      const serviceAccount = JSON.parse(serviceAccountJson);
-      adminAppInstance = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: serviceAccount.project_id,
-      });
-      console.log('Firebase Admin SDK initialized for production.');
+    const serviceAccountKeyBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64;
+    if (!serviceAccountKeyBase64) {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY_BASE64 environment variable not set.');
     }
+    
+    const serviceAccountString = Buffer.from(serviceAccountKeyBase64, 'base64').toString('utf8');
+    const serviceAccount = JSON.parse(serviceAccountString);
+
+    adminAppInstance = admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      projectId: serviceAccount.project_id,
+    });
+    
+    console.log('Firebase Admin SDK initialized successfully.');
     return adminAppInstance;
   } catch (error: any) {
     console.error("CRITICAL: Firebase Admin SDK Initialization failed.", error);

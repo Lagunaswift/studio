@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
-import { getFirebaseAuth } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 
 const loginSchema = z.object({
     email: z.string().email({ message: "Invalid email address." }),
@@ -26,7 +26,6 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [isClient, setIsClient] = useState(false);
     const { user } = useAuth();
-    const auth = getFirebaseAuth();
 
     useEffect(() => {
         setIsClient(true);
@@ -89,7 +88,7 @@ export default function LoginPage() {
             
             if (errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password' || errorCode === 'auth/invalid-credential') {
                 description = "Invalid email or password. Please try again.";
-            } else if (errorCode === 'auth/unverified-email'){
+            } else if (errorCode === 'auth/email-not-verified'){
                  description = "Your email address is not verified. Please check your inbox for the verification link.";
             }
 
