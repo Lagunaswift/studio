@@ -9,7 +9,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 import { MicronutrientsSchema } from './schemas';
 
 const MicronutrientEstimationInputSchema = z.object({
@@ -62,13 +62,13 @@ Example Output Structure:
 });
 
 
-const micronutrientEstimationFlow = ai.defineFlow(
+export const micronutrientEstimationFlow = ai.defineFlow(
   {
     name: 'micronutrientEstimationFlow',
     inputSchema: MicronutrientEstimationInputSchema,
     outputSchema: MicronutrientsSchema,
   },
-  async (input) => {
+  async (input: MicronutrientEstimationInput) => {
     if (!input.ingredients || input.ingredients.length === 0) {
       throw new Error("Ingredient list cannot be empty.");
     }

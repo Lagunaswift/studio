@@ -12,7 +12,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 import type { MealType } from '@/types'; // Ensure MealType is available if MEAL_TYPES is not directly from here
 import { MEAL_TYPES } from '@/lib/data'; // Assuming MEAL_TYPES is exported from here
 import { MacroDataSchema } from './schemas';
@@ -128,13 +128,13 @@ JSON Output Structure Reminder:
 `,
 });
 
-const suggestMealPlanFlow = ai.defineFlow(
+export const suggestMealPlanFlow = ai.defineFlow(
   {
     name: 'suggestMealPlanFlow',
     inputSchema: SuggestMealPlanInputSchema,
     outputSchema: SuggestMealPlanOutputSchema,
   },
-  async (input) => {
+  async (input: SuggestMealPlanInput) => {
     // Basic validation: Ensure meal structure and recipes are provided
     if (!input.mealStructure || input.mealStructure.length === 0) {
       throw new Error("Meal structure is required to generate a plan.");
@@ -169,11 +169,11 @@ const suggestMealPlanFlow = ai.defineFlow(
 
     // Additional check to ensure servings are positive if the AI somehow missed the prompt.
     // This is a safeguard. Ideally, the prompt handles this.
-    output.plannedMeals = output.plannedMeals.map(meal => {
+    output.plannedMeals = output.plannedMeals.map((meal: PlannedRecipeItem) => {
         if (meal.servings <= 0) {
             console.warn(`AI generated non-positive servings (${meal.servings}) for ${meal.recipeName}. Setting to 0.25.`);
             // Recalculate macros if servings are changed
-            const originalRecipe = input.availableRecipes.find(r => r.id === meal.recipeId);
+            const originalRecipe = input.availableRecipes.find((r: RecipeForAI) => r.id === meal.recipeId);
             if (originalRecipe) {
                 meal.calculatedMacros = {
                     calories: originalRecipe.macrosPerServing.calories * 0.25,

@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 import { MacroDataSchema } from './schemas'; // For reusing macro/tag structure
 
 // Schema for recipes as provided to this AI, including full ingredients
@@ -100,13 +100,13 @@ For 'missingKeyIngredients', be specific and focus on what's truly necessary. Fo
 `,
 });
 
-const suggestRecipesByIngredientsFlow = ai.defineFlow(
+export const suggestRecipesByIngredientsFlow = ai.defineFlow(
   {
     name: 'suggestRecipesByIngredientsFlow',
     inputSchema: SuggestRecipesByIngredientsInputSchema,
     outputSchema: SuggestRecipesByIngredientsOutputSchema,
   },
-  async (input) => {
+  async (input: SuggestRecipesByIngredientsInput) => {
     if (!input.userIngredients || input.userIngredients.length === 0) {
       throw new Error("User ingredients list cannot be empty.");
     }

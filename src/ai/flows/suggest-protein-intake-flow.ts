@@ -8,7 +8,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 import type { AthleteType, PrimaryGoal, Sex } from '@/types'; // Assuming types are correctly defined
 
 const KG_TO_LB = 2.20462;
@@ -105,13 +105,13 @@ Output the entire response as a single, valid JSON object that conforms EXACTLY 
 `,
 });
 
-const suggestProteinIntakeFlow = ai.defineFlow(
+export const suggestProteinIntakeFlow = ai.defineFlow(
   {
     name: 'suggestProteinIntakeFlow',
     inputSchema: SuggestProteinIntakeInputSchema,
     outputSchema: SuggestProteinIntakeOutputSchema,
   },
-  async (input) => {
+  async (input: SuggestProteinIntakeInput) => {
     if (!input.leanBodyMassKg || input.leanBodyMassKg <= 0 || !isFinite(input.leanBodyMassKg)) {
       throw new Error("Valid, finite, positive Lean Body Mass (LBM) in kg is required to suggest protein intake.");
     }

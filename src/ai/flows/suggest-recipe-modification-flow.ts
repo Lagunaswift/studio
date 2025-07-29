@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 
 // Schema for the recipe data provided to the AI for modification
 const RecipeToModifySchema = z.object({
@@ -85,13 +85,13 @@ Your Task:
 });
 
 
-const suggestRecipeModificationFlow = ai.defineFlow(
+export const suggestRecipeModificationFlow = ai.defineFlow(
   {
     name: 'suggestRecipeModificationFlow',
     inputSchema: SuggestRecipeModificationInputSchema,
     outputSchema: SuggestRecipeModificationOutputSchema,
   },
-  async (input) => {
+  async (input: SuggestRecipeModificationInput) => {
     if (!input.recipeToModify || !input.userRequest) {
       throw new Error("A recipe and a modification request are required.");
     }

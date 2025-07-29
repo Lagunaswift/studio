@@ -9,7 +9,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 import { BugReportInputSchema, BugReportOutputSchema } from './schemas';
 
 export type BugReportInput = z.infer<typeof BugReportInputSchema>;
@@ -47,13 +47,13 @@ const bugReportPrompt = ai.definePrompt({
 Output the entire response as a single, valid JSON object that conforms EXACTLY to the 'BugReportOutputSchema'. Do not include any text outside this JSON object.`,
 });
 
-const reportBugFlow = ai.defineFlow(
+export const reportBugFlow = ai.defineFlow(
   {
     name: 'reportBugFlow',
     inputSchema: BugReportInputSchema,
     outputSchema: BugReportOutputSchema,
   },
-  async (input) => {
+  async (input: BugReportInput) => {
     const { output } = await bugReportPrompt({
         ...input,
         appVersion: input.appVersion || '1.0.0', // Provide a default if not specified

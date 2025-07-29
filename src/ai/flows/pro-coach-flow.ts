@@ -1,15 +1,7 @@
 
 'use server';
-/**
- * @fileOverview The Preppy AI agent that analyzes user progress and provides new macro targets.
- *
- * - runPreppy - A function that handles the coaching analysis.
- * - PreppyInput - The input type for the runPreppy function.
- * - PreppyOutput - The return type for the runPreppy function.
- */
-
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 import { MacroDataSchema } from './schemas';
 
 // Input schema for the Preppy flow
@@ -84,13 +76,13 @@ Output the entire response as a single, valid JSON object that conforms EXACTLY 
 });
 
 
-const preppyFlow = ai.defineFlow(
+export const preppyFlow = ai.defineFlow(
   {
     name: 'preppyFlow',
     inputSchema: PreppyInputSchema,
     outputSchema: PreppyOutputSchema,
   },
-  async (input) => {
+  async (input: PreppyInput) => {
     // Basic validation
     if (!input.dynamicTdee || input.dynamicTdee <= 0) {
       throw new Error("A valid Dynamic TDEE is required for the Preppy analysis.");
