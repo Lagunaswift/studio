@@ -1,6 +1,6 @@
 
-
 import { z } from 'zod';
+import { SuggestMealPlanOutputSchema, SuggestMealPlanInputSchema } from '@/ai/flows/schemas';
 
 export interface Macros {
   protein: number; // in grams
@@ -277,3 +277,6 @@ export interface RecipeFormData {
   fat: number;
   tags?: string[];
 }
+
+export type PlannedRecipeItem = z.infer<typeof SuggestMealPlanOutputSchema>['plannedMeals'][number];
+export type RecipeForAI = z.infer<typeof SuggestMealPlanInputSchema>['availableRecipes'][number];
