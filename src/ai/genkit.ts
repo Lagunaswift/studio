@@ -1,7 +1,10 @@
 // src/ai/genkit.ts - For Genkit 1.15.5
 import { googleAI } from '@genkit-ai/googleai';
-import { firebase } from '@genkit-ai/firebase';
+import { enableFirebaseTelemetry } from '@genkit-ai/firebase'; // Use available exports
 import { genkit } from 'genkit';
+
+// Optionally enable Firebase telemetry
+enableFirebaseTelemetry();
 
 // Configure the Genkit instance - THIS is what you need to export
 export const ai = genkit({
@@ -9,9 +12,11 @@ export const ai = genkit({
     googleAI({
       apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY,
     }),
-    firebase(),
+    // The 'firebase()' plugin is not available in this version.
+    // Firebase integration for features like auth or firestore retrievers
+    // needs to be configured differently.
   ],
-  model: googleAI.model('gemini-2.0-flash-exp'), // Set default model
+  model: 'gemini-1.5-flash', // Set default model
 });
 
 // Optional: Enable logging

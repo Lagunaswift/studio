@@ -35,9 +35,11 @@ import {
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
-import { runPreppy, type PreppyOutput } from '@/ai/flows/pro-coach-flow';
+import { runProCoachFlow } from '@/ai/flows/pro-coach-flow';
+import { ProCoachOutputSchema } from '@/ai/flows/schemas';
 import { format, subDays, differenceInDays } from 'date-fns';
 import { addOrUpdateMealPlan, deleteMealFromPlan, addOrUpdatePantryItem, deletePantryItem, addRecipe as addRecipeAction, updateUserProfile, addOrUpdateVitalsLog, addOrUpdateWeightLog, addOrUpdateManualMacrosLog } from '@/app/(main)/profile/actions';
+import { z } from 'zod';
 
 // --- Enhanced Client-side Helper for Server Actions ---
 const callServerActionWithAuth = async (action: (idToken: string, ...args: any[]) => Promise<any>, ...args: any[]) => {
@@ -151,7 +153,7 @@ interface AppContextType {
   removePantryItem: (itemId: string) => Promise<void>;
   updatePantryItemQuantity: (itemId: string, newQuantity: number) => Promise<void>;
   addCustomRecipe: (recipeData: RecipeFormData) => Promise<any>;
-  runWeeklyCheckin: () => Promise<{ success: boolean; message: string; recommendation?: PreppyOutput | null }>;
+  runWeeklyCheckin: () => Promise<{ success: boolean; message: string; recommendation?: z.infer<typeof ProCoachOutputSchema> | null }>;
   
   // Profile Actions
   setUserInformation: (updates: Partial<UserProfileSettings>) => Promise<void>;
@@ -375,7 +377,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return calculateTotalMacrosUtil(mealPlan?.filter(pm => pm.date === date && pm.status === 'eaten') || [], builtInRecipes.concat(userRecipes));
   }, [mealPlan, builtInRecipes, userRecipes, dailyManualMacrosLog]);
 
-  const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: PreppyOutput | null }> => {
+  const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: z.infer<typeof ProCoachOutputSchema> | null }> => {
     if (!userProfile || !dailyWeightLog || dailyWeightLog.length < 14) {
       return { success: false, message: "At least 14 days of weight and calorie data are needed for an accurate calculation." };
     }
@@ -437,11 +439,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       currentFatTarget: userProfile.macroTargets?.fat || 0,
     };
 
-    const recommendation = await runPreppy(preppyInput as any);
-    
-    await callServerActionWithAuth(updateUserProfile, { tdee: newDynamicTDEE, last_check_in_date: format(new Date(), 'yyyy-MM-dd') });
+    const result = await runProCoachFlow(preppyInput);
 
-    return { success: true, message: "Check-in complete!", recommendation };
+    if (result && typeof result === 'object' && 'error' in result && result.error) {
+      return { success: false, message: `ProCoach flow failed: ${result.error}` };
+    }
+  
+    const output = result && typeof result === 'object' && 'data' in result ? result.data : result;
+  
+    const parsedRecommendation = ProCoachOutputSchema.safeParse(output);
+    if (!parsedRecommendation.success) {
+      return { success: false, message: "Invalid recommendation format from ProCoach: " + JSON.stringify(parsedRecommendation.error.flatten()) };
+    }
+  
+    await callServerActionWithAuth(updateUserProfile, {
+      tdee: newDynamicTDEE,
+      last_check_in_date: format(new Date(), 'yyyy-MM-dd'),
+    });
+  
+    return { success: true, message: "Check-in complete!", recommendation: parsedRecommendation.data };
   }, [userProfile, dailyWeightLog, getConsumedMacrosForDate]);
   
   const contextValue: AppContextType = useMemo(() => ({
@@ -465,12 +481,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     removeMealFromPlan,
     updatePlannedMealServings: (plannedMealId: string, newServings: number) => updateMealServingsOrStatus(plannedMealId, { servings: newServings }),
     updateMealStatus: (plannedMealId: string, status: 'planned' | 'eaten') => updateMealServingsOrStatus(plannedMealId, { status }),
-    clearMealPlanForDate: (date: string) => {
+    clearMealPlanForDate: async (date: string) => {
         const mealsToDelete = mealPlan.filter(pm => pm.date === date);
-        mealsToDelete.forEach(meal => callServerActionWithAuth(deleteMealFromPlan, meal.id));
+        await Promise.all(mealsToDelete.map(meal => callServerActionWithAuth(deleteMealFromPlan, meal.id)));
     },
-    clearEntireMealPlan: () => {
-        mealPlan.forEach(meal => callServerActionWithAuth(deleteMealFromPlan, meal.id));
+    clearEntireMealPlan: async () => {
+        await Promise.all(mealPlan.map(meal => callServerActionWithAuth(deleteMealFromPlan, meal.id)));
     },
     toggleFavoriteRecipe: async (recipeId: number) => {
         if (!userProfile) return;
@@ -491,10 +507,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUserInformation,
     setMacroTargets: (targets: Macros) => setUserInformation({ macroTargets: targets }),
     setMealStructure: (structure: MealSlotConfig[]) => setUserInformation({ mealStructure: structure }),
-    setDashboardSettings: (settings: Partial<DashboardSettings>) => {
+    setDashboardSettings: async (settings: Partial<DashboardSettings>) => {
       const defaultSettings: DashboardSettings = { showMacros: true, showMenu: true, showFeaturedRecipe: true, showQuickRecipes: true };
       const newSettings = { ...(userProfile?.dashboardSettings || defaultSettings), ...settings };
-      setUserInformation({ dashboardSettings: newSettings });
+      await setUserInformation({ dashboardSettings: newSettings });
     },
     acceptTerms: () => setUserInformation({ has_accepted_terms: true }),
     assignIngredientCategory: assignCategoryUtil,

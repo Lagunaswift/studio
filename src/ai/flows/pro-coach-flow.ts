@@ -1,9 +1,8 @@
 
 'use server';
 import { z } from 'zod';
-import { ai } from '../genkit';  // Your configured Genkit instance
+import { ai } from '../genkit';
 import { ProCoachInputSchema, ProCoachOutputSchema } from './schemas';
-import { onCallGenkit } from 'firebase-functions/v2/https';
 
 export const proCoachFlow = ai.defineFlow(
   {
@@ -12,10 +11,29 @@ export const proCoachFlow = ai.defineFlow(
     outputSchema: ProCoachOutputSchema,
   },
   async (input: z.infer<typeof ProCoachInputSchema>) => {
-    const { output } = await ai.prompt('proCoach').run(input);
+    // Use 'data' instead of 'variables' to pass input to the prompt
+    const response = await ai.generate({
+      prompt: 'proCoach', // Assumes 'proCoach' is a registered prompt identifier
+      data: input, // Pass input as data
+    });
+
+    const output = response.output();
     if (!output) {
       throw new Error('AI Preppy failed to generate a recommendation.');
     }
-    return output;
+
+    // Validate output against ProCoachOutputSchema for robustness
+    const parsedOutput = ProCoachOutputSchema.safeParse(output);
+    if (!parsedOutput.success) {
+      throw new Error('Invalid output format from AI: ' + JSON.stringify(parsedOutput.error.flatten()));
+    }
+
+    return parsedOutput.data;
   }
 );
+
+export const runProCoachFlow = async (
+  input: z.infer<typeof ProCoachInputSchema>
+) => {
+  return await proCoachFlow.run(input);
+};
