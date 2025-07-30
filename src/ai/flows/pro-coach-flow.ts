@@ -11,18 +11,17 @@ export const proCoachFlow = ai.defineFlow(
     outputSchema: ProCoachOutputSchema,
   },
   async (input: z.infer<typeof ProCoachInputSchema>) => {
-    // Use 'data' instead of 'variables' to pass input to the prompt
-    const response = await ai.generate({
-      prompt: 'proCoach', // Assumes 'proCoach' is a registered prompt identifier
-      data: input, // Pass input as data
-    });
+    // Correctly retrieve the prompt object first
+    const proCoachPrompt = ai.prompt('proCoach');
+    
+    // Invoke the executable prompt with the input
+    const response = await proCoachPrompt(input);
 
-    const output = response.output();
+    const output = response.output; // Access output as a property
     if (!output) {
       throw new Error('AI Preppy failed to generate a recommendation.');
     }
 
-    // Validate output against ProCoachOutputSchema for robustness
     const parsedOutput = ProCoachOutputSchema.safeParse(output);
     if (!parsedOutput.success) {
       throw new Error('Invalid output format from AI: ' + JSON.stringify(parsedOutput.error.flatten()));

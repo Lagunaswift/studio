@@ -15,7 +15,9 @@ export const micronutrientEstimationFlow = ai.defineFlow(
     if (!input.ingredients || input.ingredients.length === 0) {
       throw new Error("Ingredient list cannot be empty.");
     }
-    const { output } = await ai.prompt('suggestMicronutrients').run(input);
+    const suggestMicronutrientsPrompt = ai.prompt('suggestMicronutrients');
+    const response = await suggestMicronutrientsPrompt(input);
+    const output = response.output;
     if (!output) {
       throw new Error('AI failed to generate a micronutrient estimation.');
     }

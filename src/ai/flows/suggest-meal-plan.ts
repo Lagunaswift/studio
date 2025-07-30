@@ -28,7 +28,9 @@ export const suggestMealPlanFlow = ai.defineFlow(
             currentDate: input.currentDate || new Date().toISOString().split('T')[0],
         };
 
-        const { output } = await ai.prompt('suggestMealPlan').run(promptInput);
+        const suggestMealPlanPrompt = ai.prompt('suggestMealPlan');
+        const response = await suggestMealPlanPrompt(promptInput);
+        const output = response.output;
 
         if (!output) {
             throw new Error("AI failed to generate a meal plan output.");
