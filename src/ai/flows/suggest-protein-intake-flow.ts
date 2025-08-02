@@ -2,33 +2,35 @@
 'use server';
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { MicronutrientEstimationInputSchema, MicronutrientsSchema } from './schemas';
+import { SuggestProteinIntakeInputSchema, SuggestProteinIntakeOutputSchema } from './schemas';
 import { onCallGenkit } from 'firebase-functions/v2/https';
 
-export const micronutrientEstimationFlow = ai.defineFlow(
+export const suggestProteinIntakeFlow = ai.defineFlow(
   {
-    name: 'micronutrientEstimationFlow',
-    inputSchema: MicronutrientEstimationInputSchema,
-    outputSchema: MicronutrientsSchema,
+    name: 'suggestProteinIntakeFlow',
+    inputSchema: SuggestProteinIntakeInputSchema,
+    outputSchema: SuggestProteinIntakeOutputSchema,
   },
-  async (input: z.infer<typeof MicronutrientEstimationInputSchema>) => {
-    if (!input.ingredients || input.ingredients.length === 0) {
-      throw new Error("Ingredient list cannot be empty.");
-    }
+  async (input: z.infer<typeof SuggestProteinIntakeInputSchema>) => {
     
-    const { output } = await ai.prompt('suggestMicronutrients').run({
-      ingredients: input.ingredients
+    const suggestProteinIntakePrompt = await ai.prompt('suggestProteinIntake').run({
+      leanBodyMassKg: input.leanBodyMassKg,
+      sex: input.sex,
+      recommendationType: input.recommendationType,
+      unitPreference: input.unitPreference,
+      athleteType: input.athleteType,
+      primaryGoal: input.primaryGoal,
+      bodyFatPercentage: input.bodyFatPercentage,
     });
-    
+    const output = suggestProteinIntakePrompt.output();
     if (!output) {
-      throw new Error('AI failed to generate a micronutrient estimation.');
+      throw new Error('AI failed to generate a protein intake suggestion.');
     }
-    
     return output;
   }
 );
 
-export const suggestMicronutrients = onCallGenkit(
+export const suggestProteinIntake = onCallGenkit(
   {},
-  micronutrientEstimationFlow
+  suggestProteinIntakeFlow
 );

@@ -3,26 +3,14 @@
 
 import { revalidatePath } from 'next/cache'
 import type { RecipeFormData, UserProfileSettings } from '@/types';
-import { getAuth, getDb } from '@/lib/firebase-admin'; 
+import { getAuth, adminDb } from '@/lib/firebase-admin';
 import { processBugReport } from '@/ai/flows/report-bug-flow';
 import type { BugReportInput, BugReportOutput } from '@/ai/flows/report-bug-flow';
 import { FieldValue } from 'firebase-admin/firestore';
+import { debugGetUserIdFromToken } from '@/utils/authDebug';
 
-async function getUserIdFromToken(idToken: string): Promise<string> {
-  if (!idToken) {
-    throw new Error("Authentication error: No ID token provided.");
-  }
-  try {
-    const adminAuth = getAuth();
-    const decodedToken = await adminAuth.verifyIdToken(idToken);
-    if (!decodedToken.uid) {
-        throw new Error("Authentication error: Invalid token.");
-    }
-    return decodedToken.uid;
-  } catch (error) {
-    console.error("getUserIdFromToken: Error verifying ID token:", error);
-    throw new Error("Authentication error: Could not verify user.");
-  }
+export async function getUserIdFromToken(token: string): Promise<string> {
+  return await debugGetUserIdFromToken(token);
 }
 
 // --- Recipe Actions ---
@@ -57,7 +45,6 @@ export async function addRecipe(idToken: string, recipeData: Omit<RecipeFormData
     return { error: 'Failed to save the recipe.' };
   }
 }
-
 
 // --- Meal Plan Actions ---
 export async function addOrUpdateMealPlan(idToken: string, mealData: any) {
@@ -96,7 +83,6 @@ export async function deleteMealFromPlan(idToken: string, plannedMealId: string)
     }
 }
 
-
 // --- Pantry Actions ---
 export async function addOrUpdatePantryItem(idToken: string, itemData: any) {
     const userId = await getUserIdFromToken(idToken);
@@ -130,7 +116,6 @@ export async function deletePantryItem(idToken: string, itemId: string) {
         return { success: false, error: 'Could not remove item from pantry.' };
     }
 }
-
 
 // --- Daily Log Actions ---
 export async function addOrUpdateVitalsLog(idToken: string, vitalsData: any) {

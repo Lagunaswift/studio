@@ -1,3 +1,4 @@
+// src/app/(auth)/login/page.tsx
 "use client";
 
 import Link from 'next/link';
@@ -14,7 +15,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
-import { auth } from '@/lib/firebase'; // Corrected import
+import { auth } from '@/lib/firebase';
+import { tokenManager } from '@/utils/tokenManager';
+import { debugAuthenticationFlow } from '@/utils/authDebug';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -26,20 +29,17 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [isVerificationEmailSent, setIsVerificationEmailSent] = useState(false);
-  const { user, loading } = useAuth();
+  const { user, isLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
+    defaultValues: { email: '', password: '' },
   });
 
   useEffect(() => {
-    if (user) {
+    if (user && user.emailVerified) {
       router.push('/');
     }
   }, [user, router]);
@@ -47,8 +47,9 @@ export default function LoginPage() {
   const onSubmit: SubmitHandler<LoginFormValues> = async (data) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
-      
-      if (userCredential.user && !userCredential.user.emailVerified) {
+      const user = userCredential.user;
+
+      if (!user.emailVerified) {
         toast({
           title: "Verify Your Email",
           description: "Your email is not verified. Please check your inbox for a verification link.",
@@ -58,13 +59,23 @@ export default function LoginPage() {
         return;
       }
 
+      // Ensure token is stored
+      const token = await user.getIdToken();
+      localStorage.setItem('authToken', token); // Explicitly store token
+      await tokenManager.refreshToken(user); // Update tokenManager
+      console.log('Login token stored:', token);
+
+      // Debug auth state
+      const debugInfo = await debugAuthenticationFlow();
+      console.log('Auth Debug Info after login:', debugInfo);
+
       toast({
         title: "Login Successful",
         description: "Welcome back!",
       });
       router.push('/');
     } catch (error: any) {
-      console.error("Login failed:", error);
+      console.error("Login failed:", error.code, error.message);
       toast({
         title: "Login Failed",
         description: error.message || "An unknown error occurred.",
@@ -81,6 +92,18 @@ export default function LoginPage() {
           title: "Verification Email Sent",
           description: "A new verification link has been sent to your email.",
         });
+        const interval = setInterval(async () => {
+          if (auth.currentUser) {
+            await auth.currentUser.reload();
+            if (auth.currentUser.emailVerified) {
+              clearInterval(interval);
+              const token = await tokenManager.getValidToken();
+              localStorage.setItem('authToken', token); // Ensure token is updated
+              console.log('Token after email verification:', token);
+              router.push('/');
+            }
+          }
+        }, 5000);
       } catch (error: any) {
         toast({
           title: "Error Sending Verification Email",
@@ -91,18 +114,14 @@ export default function LoginPage() {
     }
   };
 
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+  if (isLoading) return <div>Loading...</div>;
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>
-            Enter your credentials to access your meal planning dashboard.
-          </CardDescription>
+          <CardDescription>Enter your credentials to access your meal planning dashboard.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -132,14 +151,14 @@ export default function LoginPage() {
                     <FormControl>
                       <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                        <Input 
+                        <Input
                           type={passwordVisible ? "text" : "password"}
-                          placeholder="••••••••" 
-                          {...field} 
+                          placeholder="••••••••"
+                          {...field}
                           className="pl-10 pr-10"
                         />
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           onClick={() => setPasswordVisible(!passwordVisible)}
                           className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground"
                         >

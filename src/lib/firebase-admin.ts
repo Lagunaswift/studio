@@ -1,65 +1,49 @@
-// src/lib/firebase-admin.ts
-import * as admin from 'firebase-admin';
-import type { App } from 'firebase-admin/app';
-import type { Auth } from 'firebase-admin/auth';
-import type { Firestore } from 'firebase-admin/firestore';
+// lib/firebase-admin.ts
+import { initializeApp, getApps, cert, ServiceAccount } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 
-let adminAppInstance: App | null = null;
+function getServiceAccount(): ServiceAccount {
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-/**
- * Initializes the Firebase Admin SDK if it hasn't been already.
- * This function is designed to be safely called multiple times.
- * In a Firebase App Hosting or Cloud Functions environment, initializeApp() 
- * with no arguments will automatically use the project's service account.
- * @returns The initialized Firebase Admin App instance.
- */
-function initializeFirebaseAdmin(): App {
-  // Check if an app is already initialized
-  if (admin.apps.length > 0 && admin.apps[0]) {
-    return admin.apps[0];
+  if (!projectId) {
+    throw new Error('FIREBASE_PROJECT_ID environment variable is required');
   }
-  
-  // Check our cached instance
-  if (adminAppInstance) {
-      return adminAppInstance;
+  if (!clientEmail) {
+    throw new Error('FIREBASE_CLIENT_EMAIL environment variable is required');
+  }
+  if (!privateKey) {
+    throw new Error('FIREBASE_PRIVATE_KEY environment variable is required');
   }
 
-  try {
-    // In Firebase App Hosting, the SDK automatically finds the credentials
-    // when initializeApp is called with no arguments.
-    adminAppInstance = admin.initializeApp();
+  return {
+    type: "service_account",
+    project_id: projectId,
+    client_email: clientEmail,
+    private_key: privateKey.replace(/\\n/g, '\n'),
+  };
+}
+
+let adminApp;
+
+try {
+  if (!getApps().length) {
+    const serviceAccount = getServiceAccount();
     
-    console.log('Firebase Admin SDK initialized successfully in the App Hosting environment.');
-    return adminAppInstance;
-  } catch (error: any) {
-    console.error("CRITICAL: Firebase Admin SDK Initialization failed.", error);
-    // This will cause server-side functions to fail.
-    throw new Error(`Could not initialize Firebase Admin SDK: ${error.message}`);
+    adminApp = initializeApp({
+      credential: cert(serviceAccount),
+    });
+    
+    console.log('Firebase Admin SDK initialized successfully');
+  } else {
+    adminApp = getApps()[0];
   }
+} catch (error) {
+  console.error('Firebase Admin initialization error:', error);
+  throw error;
 }
 
-/**
- * Gets the initialized Firestore instance.
- * @returns {Firestore} The Firestore service instance.
- */
-export function getDb(): Firestore {
-  const app = initializeFirebaseAdmin();
-  return admin.firestore(app);
-}
-
-/**
- * Gets the initialized Auth instance.
- * @returns {Auth} The Auth service instance.
- */
-export function getAuth(): Auth {
-  const app = initializeFirebaseAdmin();
-  return admin.auth(app);
-}
-
-/**
- * Gets the initialized Firebase Admin App instance.
- * @returns {App} The Firebase Admin App instance.
- */
-export function getAdminApp(): App {
-    return initializeFirebaseAdmin();
-}
+export const adminDb = getFirestore(adminApp);
+export default adminApp;
