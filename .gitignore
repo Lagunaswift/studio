@@ -33,3 +33,10 @@ next-env.d.ts
 
 # vercel
 .vercel
+
+# Firebase
+serviceaccount.json
+firebase-debug.log
+.next/
+.next/
+.next/

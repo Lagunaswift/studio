@@ -1,15 +1,27 @@
-// Authentication Recovery System
-// Place this in: /utils/authRecovery.js
-
 import { getAuth, signOut } from 'firebase/auth';
 
+interface FirebaseError extends Error {
+  code?: string;
+  message: string;
+}
+
+interface AuthRecoveryResult {
+  success: boolean;
+  newToken?: string;
+  error?: string;
+  action?: string;
+}
+
 export class AuthRecoveryManager {
+  private maxRetries: number;
+  private retryDelay: number;
+
   constructor() {
     this.maxRetries = 3;
     this.retryDelay = 1000; // 1 second
   }
 
-  async handleAuthError(error, context = 'unknown') {
+  async handleAuthError(error: FirebaseError | Error, context: string = 'unknown'): Promise<AuthRecoveryResult> {
     console.log(`Auth error in ${context}:`, error.message);
     
     // Categorize the error
@@ -29,7 +41,7 @@ export class AuthRecoveryManager {
     }
   }
 
-  categorizeError(error) {
+  categorizeError(error: FirebaseError | Error): string {
     const message = error.message.toLowerCase();
     
     if (message.includes('expired') || message.includes('token-expired')) {
@@ -47,7 +59,7 @@ export class AuthRecoveryManager {
     return 'GENERIC';
   }
 
-  async handleTokenExpired() {
+  async handleTokenExpired(): Promise<AuthRecoveryResult> {
     console.log('Handling expired token...');
     
     try {
@@ -74,13 +86,13 @@ export class AuthRecoveryManager {
       } else {
         return await this.handleMissingUser();
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Token refresh failed:', error);
       return await this.handleMissingUser();
     }
   }
 
-  async handleInvalidToken() {
+  async handleInvalidToken(): Promise<AuthRecoveryResult> {
     console.log('Handling invalid token...');
     
     // Clear invalid token
@@ -95,7 +107,7 @@ export class AuthRecoveryManager {
     return await this.handleMissingUser();
   }
 
-  async handleMissingToken() {
+  async handleMissingToken(): Promise<AuthRecoveryResult> {
     console.log('Handling missing token...');
     
     try {
@@ -110,13 +122,13 @@ export class AuthRecoveryManager {
       } else {
         return await this.handleMissingUser();
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to get token for current user:', error);
       return await this.handleMissingUser();
     }
   }
 
-  async handleFirebaseConfigError() {
+  async handleFirebaseConfigError(): Promise<AuthRecoveryResult> {
     console.error('Firebase configuration error detected');
     
     // Check if Firebase is properly initialized
@@ -129,7 +141,7 @@ export class AuthRecoveryManager {
         error: 'Firebase configuration error',
         action: 'CHECK_FIREBASE_CONFIG'
       };
-    } catch (error) {
+    } catch (error: unknown) {
       return {
         success: false,
         error: 'Firebase not initialized',
@@ -138,14 +150,14 @@ export class AuthRecoveryManager {
     }
   }
 
-  async handleMissingUser() {
+  async handleMissingUser(): Promise<AuthRecoveryResult> {
     console.log('No authenticated user found, redirecting to login...');
     
     try {
       // Sign out to clear any corrupted state
       const auth = getAuth();
       await signOut(auth);
-    } catch (error) {
+    } catch (error: unknown) {
       console.warn('Sign out failed:', error);
     }
     
@@ -166,7 +178,7 @@ export class AuthRecoveryManager {
     };
   }
 
-  async handleGenericError(error) {
+  async handleGenericError(error: FirebaseError | Error): Promise<AuthRecoveryResult> {
     console.error('Generic auth error:', error);
     
     return {
@@ -177,8 +189,8 @@ export class AuthRecoveryManager {
   }
 
   // Retry mechanism for critical operations
-  async retryOperation(operation, context = 'operation') {
-    let lastError;
+  async retryOperation<T>(operation: () => Promise<T>, context: string = 'operation'): Promise<T> {
+    let lastError: unknown;
     
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
@@ -186,17 +198,20 @@ export class AuthRecoveryManager {
         const result = await operation();
         console.log(`${context} succeeded on attempt ${attempt}`);
         return result;
-      } catch (error) {
+      } catch (error: unknown) {
         lastError = error;
-        console.warn(`${context} failed on attempt ${attempt}:`, error.message);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.warn(`${context} failed on attempt ${attempt}:`, errorMessage);
         
         if (attempt < this.maxRetries) {
-          // Try to recover from auth error
-          const recovery = await this.handleAuthError(error, context);
-          
-          if (recovery.success && recovery.newToken) {
-            // Update operation with new token if applicable
-            console.log('Auth recovery successful, retrying with new token');
+          // Try to recover from auth error - only if it's an Error object
+          if (error instanceof Error) {
+            const recovery = await this.handleAuthError(error, context);
+            
+            if (recovery.success && recovery.newToken) {
+              // Update operation with new token if applicable
+              console.log('Auth recovery successful, retrying with new token');
+            }
           }
           
           // Wait before retry
@@ -205,7 +220,8 @@ export class AuthRecoveryManager {
       }
     }
     
-    throw new Error(`${context} failed after ${this.maxRetries} attempts: ${lastError.message}`);
+    const finalErrorMessage = lastError instanceof Error ? lastError.message : 'Unknown error';
+    throw new Error(`${context} failed after ${this.maxRetries} attempts: ${finalErrorMessage}`);
   }
 }
 
@@ -213,11 +229,11 @@ export class AuthRecoveryManager {
 export const authRecovery = new AuthRecoveryManager();
 
 // Enhanced wrapper for Firestore operations
-export const withAuthRecovery = (operation) => {
-  return async (...args) => {
+export const withAuthRecovery = <T extends (...args: any[]) => Promise<any>>(operation: T): T => {
+  return (async (...args: Parameters<T>): Promise<ReturnType<T>> => {
     return await authRecovery.retryOperation(
       () => operation(...args),
       operation.name || 'firestore-operation'
     );
-  };
+  }) as T;
 };

@@ -1,7 +1,8 @@
 // lib/firebase-admin.ts
-import { initializeApp, getApps, cert, ServiceAccount } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
+import { initializeApp, getApps, cert, type ServiceAccount, type App } from 'firebase-admin/app';
+import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { getAuth, type Auth } from 'firebase-admin/auth';
+import * as admin from 'firebase-admin';
 
 function getServiceAccount(): ServiceAccount {
   const projectId = process.env.FIREBASE_PROJECT_ID;
@@ -18,32 +19,80 @@ function getServiceAccount(): ServiceAccount {
     throw new Error('FIREBASE_PRIVATE_KEY environment variable is required');
   }
 
+  // Return only the properties that ServiceAccount expects
   return {
-    type: "service_account",
-    project_id: projectId,
-    client_email: clientEmail,
-    private_key: privateKey.replace(/\\n/g, '\n'),
-  };
+    projectId,
+    clientEmail,
+    privateKey: privateKey.replace(/\\n/g, '\n'),
+  } as ServiceAccount;
 }
 
-let adminApp;
+let adminApp: App;
+let adminDb: Firestore;
+let adminAuth: Auth;
 
-try {
-  if (!getApps().length) {
-    const serviceAccount = getServiceAccount();
+function initializeFirebaseAdmin(): void {
+  try {
+    // Check if app is already initialized
+    const existingApps = getApps();
     
-    adminApp = initializeApp({
-      credential: cert(serviceAccount),
-    });
+    if (existingApps.length === 0) {
+      const serviceAccount = getServiceAccount();
+      
+      adminApp = initializeApp({
+        credential: cert(serviceAccount),
+        projectId: process.env.FIREBASE_PROJECT_ID,
+      });
+      
+      console.log('Firebase Admin SDK initialized successfully');
+    } else {
+      // Use existing app
+      adminApp = existingApps[0];
+      console.log('Using existing Firebase Admin app');
+    }
     
-    console.log('Firebase Admin SDK initialized successfully');
-  } else {
-    adminApp = getApps()[0];
+    // Initialize services
+    adminDb = getFirestore(adminApp);
+    adminAuth = getAuth(adminApp);
+    
+  } catch (error) {
+    console.error('Firebase Admin initialization error:', error);
+    throw error;
   }
-} catch (error) {
-  console.error('Firebase Admin initialization error:', error);
-  throw error;
 }
 
-export const adminDb = getFirestore(adminApp);
-export default adminApp;
+// Initialize immediately
+initializeFirebaseAdmin();
+
+// Getter functions to ensure services are available
+export function getAdminApp(): App {
+  if (!adminApp) {
+    initializeFirebaseAdmin();
+  }
+  return adminApp;
+}
+
+export function getAdminDb(): Firestore {
+  if (!adminDb) {
+    initializeFirebaseAdmin();
+  }
+  return adminDb;
+}
+
+export function getAdminAuth(): Auth {
+  if (!adminAuth) {
+    initializeFirebaseAdmin();
+  }
+  return adminAuth;
+}
+
+// Export the services and admin namespace
+export { adminDb, adminAuth, adminApp };
+export { admin };
+
+// Alternative exports for backward compatibility
+export const firebaseAdmin = {
+  app: () => getAdminApp(),
+  db: () => getAdminDb(),
+  auth: () => getAdminAuth(),
+};

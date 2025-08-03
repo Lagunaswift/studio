@@ -14,7 +14,7 @@ import { Mail, Lock, LogIn, Eye, EyeOff, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendEmailVerification, User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { tokenManager } from '@/utils/tokenManager';
 import { debugAuthenticationFlow } from '@/utils/authDebug';
@@ -47,25 +47,22 @@ export default function LoginPage() {
   const onSubmit: SubmitHandler<LoginFormValues> = async (data) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
-      const user = userCredential.user;
+      const user: User = userCredential.user;
 
       if (!user.emailVerified) {
+        await sendEmailVerification(user);
         toast({
           title: "Verify Your Email",
-          description: "Your email is not verified. Please check your inbox for a verification link.",
+          description: "A verification link has been sent to your email.",
           variant: "destructive",
         });
         setIsVerificationEmailSent(true);
         return;
       }
 
-      // Ensure token is stored
-      const token = await user.getIdToken();
-      localStorage.setItem('authToken', token); // Explicitly store token
-      await tokenManager.refreshToken(user); // Update tokenManager
-      console.log('Login token stored:', token);
+      await tokenManager.refreshToken(user);
+      console.log('Login token refreshed:', tokenManager.getTokenInfo());
 
-      // Debug auth state
       const debugInfo = await debugAuthenticationFlow();
       console.log('Auth Debug Info after login:', debugInfo);
 
@@ -97,14 +94,16 @@ export default function LoginPage() {
             await auth.currentUser.reload();
             if (auth.currentUser.emailVerified) {
               clearInterval(interval);
-              const token = await tokenManager.getValidToken();
-              localStorage.setItem('authToken', token); // Ensure token is updated
-              console.log('Token after email verification:', token);
+              await tokenManager.refreshToken(auth.currentUser);
+              console.log('Token after email verification:', tokenManager.getTokenInfo());
+              const debugInfo = await debugAuthenticationFlow();
+              console.log('Auth Debug Info after verification:', debugInfo);
               router.push('/');
             }
           }
         }, 5000);
       } catch (error: any) {
+        console.error("Verification email error:", error.code, error.message);
         toast({
           title: "Error Sending Verification Email",
           description: error.message,
