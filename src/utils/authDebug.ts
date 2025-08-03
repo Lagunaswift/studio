@@ -1,94 +1,91 @@
 // src/utils/authDebug.ts
-import { getAuth } from '@/lib/firebase-admin'; // Correct import
+import { getAdminAuth } from '@/lib/firebase-admin'; // Fixed import
 import { getAuth as getClientAuth, onAuthStateChanged } from 'firebase/auth';
 
 interface AuthDebugResult {
-  hasToken: boolean;
-  hasFirebaseUser: boolean;
-  uid?: string;
-  tokenLength: number;
-  error?: string;
+  serverValid: boolean;
+  clientUser: any;
+  serverError?: string;
+  clientError?: string;
 }
 
-export const debugAuthenticationFlow = async (): Promise<AuthDebugResult> => {
-  console.log('=== AUTHENTICATION DEBUG START ===');
-  try {
-    const isClient = typeof window !== 'undefined';
-    console.log('Environment:', isClient ? 'Client' : 'Server');
-    if (isClient) {
-      const token = localStorage.getItem('authToken') ||
-                   sessionStorage.getItem('authToken') ||
-                   document.cookie.split(';').find(c => c.trim().startsWith('authToken='))?.split('=')[1];
-      console.log('Client Token Present:', !!token);
-      console.log('Token Type:', typeof token);
-      console.log('Token Length:', token?.length || 0);
-      const auth = getClientAuth();
-      return new Promise((resolve) => {
-        onAuthStateChanged(auth, (user) => {
-          console.log('Firebase Auth User:', !!user);
-          console.log('User UID:', user?.uid || 'Not available');
-          console.log('User Email:', user?.email || 'Not available');
-          console.log('Token Valid:', !!user?.accessToken);
-          resolve({
-            hasToken: !!token,
-            hasFirebaseUser: !!user,
-            uid: user?.uid,
-            tokenLength: token?.length || 0,
-          });
-        });
-      });
-    }
-    return {
-      hasToken: false,
-      hasFirebaseUser: false,
-      tokenLength: 0,
-      error: 'Not running on client side',
-    };
-  } catch (error: any) {
-    console.error('Debug Error:', error.message);
-    return {
-      hasToken: false,
-      hasFirebaseUser: false,
-      tokenLength: 0,
-      error: error.message,
-    };
-  } finally {
-    console.log('=== AUTHENTICATION DEBUG END ===');
-  }
-};
+export async function debugAuth(): Promise<AuthDebugResult> {
+  const result: AuthDebugResult = {
+    serverValid: false,
+    clientUser: null,
+  };
 
-export const debugGetUserIdFromToken = async (token: string): Promise<string> => {
-  console.log('🔍 Token verification debug started');
-  console.log('Token present:', !!token);
-  console.log('Token type:', typeof token);
-  console.log('Token length:', token?.length || 0);
-  if (!token) {
-    console.error('❌ No token provided');
-    throw new Error('No authentication token provided');
-  }
   try {
-    const cleanToken = token.replace(/^Bearer\s+/i, '');
-    console.log('Cleaned token length:', cleanToken.length);
-    console.log('📡 Attempting token verification...');
-    const auth = getAuth(); // Use exported getAuth
-    const decodedToken = await auth.verifyIdToken(cleanToken);
-    console.log('✅ Token verified successfully');
-    console.log('User ID:', decodedToken.uid);
-    console.log('Token expiry:', new Date(decodedToken.exp * 1000));
+    // Client-side auth check
+    const auth = getClientAuth();
+    const user = auth.currentUser;
+    
+    if (user) {
+      result.clientUser = {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+      };
+
+      // Get the ID token (not accessToken)
+      const idToken = await user.getIdToken();
+      
+      // Verify with server
+      try {
+        const decodedToken = await getAdminAuth().verifyIdToken(idToken);
+        result.serverValid = true;
+        console.log('✅ Server token verification successful:', decodedToken.uid);
+      } catch (serverError: any) {
+        result.serverError = serverError.message;
+        console.error('❌ Server token verification failed:', serverError);
+      }
+    } else {
+      result.clientError = 'No authenticated user';
+      console.log('❌ No authenticated user on client');
+    }
+  } catch (clientError: any) {
+    result.clientError = clientError.message;
+    console.error('❌ Client auth error:', clientError);
+  }
+
+  return result;
+}
+
+export async function debugGetUserIdFromToken(idToken: string): Promise<string> {
+  try {
+    const decodedToken = await getAdminAuth().verifyIdToken(idToken);
+    console.log('✅ Token verified successfully for user:', decodedToken.uid);
     return decodedToken.uid;
   } catch (error: any) {
-    console.error('❌ Token verification failed');
-    console.error('Error message:', error.message);
-    console.error('Error code:', error.code);
-    if (error.message.includes('default Firebase app does not exist')) {
-      console.error('🔥 Firebase Admin not initialized properly');
-      throw new Error('Firebase Admin SDK not initialized. Check server configuration.');
-    } else if (error.message.includes('expired')) {
-      throw new Error('Authentication token has expired. Please sign in again.');
-    } else if (error.message.includes('invalid')) {
-      throw new Error('Invalid authentication token. Please sign in again.');
-    } else {
-      throw new Error(`Authentication error: ${error.message}`);
-    }
+    console.error('❌ Token verification failed:', error);
+    throw new Error(`Token verification failed: ${error.message}`);
   }
-};
+}
+
+// Helper function to get current user's ID token
+export async function getCurrentUserIdToken(): Promise<string | null> {
+  try {
+    const auth = getClientAuth();
+    const user = auth.currentUser;
+    
+    if (!user) {
+      return null;
+    }
+    
+    return await user.getIdToken();
+  } catch (error: any) {
+    console.error('❌ Failed to get ID token:', error);
+    return null;
+  }
+}
+
+// Promise-based auth state listener
+export function waitForAuthState(): Promise<any> {
+  return new Promise((resolve) => {
+    const auth = getClientAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe();
+      resolve(user);
+    });
+  });
+}

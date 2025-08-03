@@ -5,7 +5,9 @@ import { revalidatePath } from 'next/cache';
 import { serverFirestore } from '@/utils/firestoreRecovery';
 import { debugGetUserIdFromToken } from '@/utils/authDebug';
 import type { UserProfileSettings } from '@/types';
-import { admin } from '@/lib/firebase-admin';
+import { getAdminFirestore } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
+import { mergeWithDefaults } from '@/utils/profileDefaults';
 
 export async function getUserIdFromToken(idToken: string): Promise<string> {
   return await debugGetUserIdFromToken(idToken);
@@ -15,12 +17,40 @@ export async function updateUserProfile(idToken: string, updates: Partial<Omit<U
   try {
     const decodedToken = await serverFirestore.verifyToken(idToken);
     const userId = decodedToken.uid;
-    const result = await serverFirestore.updateUserProfile(idToken, userId, {
-      ...updates,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    
+    // Get existing profile data from Firestore
+    const db = getAdminFirestore();
+    const userDoc = await db.collection('users').doc(userId).get();
+    const existingData = userDoc.exists ? userDoc.data() : {};
+    
+    // Merge existing data with updates and defaults
+    const completeProfileData = mergeWithDefaults(
+      { ...existingData, ...updates }, 
+      userId
+    );
+    
+    // Update with server timestamp
+    const updateData = {
+      ...completeProfileData,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    
+    const result = await serverFirestore.updateUserProfile(idToken, userId, updateData);
+    
     revalidatePath('/profile', 'layout');
     revalidatePath('/', 'layout');
+    
+    // Return only serializable data
+    if (result.success) {
+      return { 
+        success: true, 
+        data: {
+          ...completeProfileData,
+          updatedAt: new Date().toISOString() // Convert to serializable format
+        }
+      };
+    }
+    
     return result;
   } catch (error: any) {
     console.error('updateUserProfile error:', {
@@ -32,11 +62,48 @@ export async function updateUserProfile(idToken: string, updates: Partial<Omit<U
   }
 }
 
+// MEAL PLAN FUNCTIONS
+export async function addOrUpdateMealPlan(idToken: string, mealData: any) {
+  try {
+    const decodedToken = await serverFirestore.verifyToken(idToken);
+    const userId = decodedToken.uid;
+    
+    const db = getAdminFirestore();
+    const mealPlanRef = db.collection('users').doc(userId).collection('mealPlan');
+    
+    if (mealData.id) {
+      // Update existing meal
+      await mealPlanRef.doc(mealData.id).update({
+        ...mealData,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    } else {
+      // Add new meal
+      await mealPlanRef.add({
+        ...mealData,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+    
+    revalidatePath('/meal-plan');
+    return { success: true };
+  } catch (error: any) {
+    console.error('addOrUpdateMealPlan error:', {
+      code: error.code,
+      message: error.message,
+      stack: error.stack,
+    });
+    return { success: false, error: `Could not save meal plan: ${error.message}` };
+  }
+}
+
 export async function deleteMealFromPlan(idToken: string, mealId: string) {
   try {
     const decodedToken = await serverFirestore.verifyToken(idToken);
     const userId = decodedToken.uid;
-    await admin.firestore().collection('users').doc(userId).collection('mealPlan').doc(mealId).delete();
+    const db = getAdminFirestore();
+    await db.collection('users').doc(userId).collection('mealPlan').doc(mealId).delete();
     revalidatePath('/meal-plan');
     return { success: true };
   } catch (error: any) {
@@ -49,11 +116,48 @@ export async function deleteMealFromPlan(idToken: string, mealId: string) {
   }
 }
 
+// PANTRY FUNCTIONS
+export async function addOrUpdatePantryItem(idToken: string, itemData: any) {
+  try {
+    const decodedToken = await serverFirestore.verifyToken(idToken);
+    const userId = decodedToken.uid;
+    
+    const db = getAdminFirestore();
+    const pantryRef = db.collection('users').doc(userId).collection('pantry');
+    
+    if (itemData.id) {
+      // Update existing item
+      await pantryRef.doc(itemData.id).update({
+        ...itemData,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    } else {
+      // Add new item
+      await pantryRef.add({
+        ...itemData,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+    
+    revalidatePath('/pantry');
+    return { success: true };
+  } catch (error: any) {
+    console.error('addOrUpdatePantryItem error:', {
+      code: error.code,
+      message: error.message,
+      stack: error.stack,
+    });
+    return { success: false, error: `Could not save pantry item: ${error.message}` };
+  }
+}
+
 export async function deletePantryItem(idToken: string, itemId: string) {
   try {
     const decodedToken = await serverFirestore.verifyToken(idToken);
     const userId = decodedToken.uid;
-    await admin.firestore().collection('users').doc(userId).collection('pantry').doc(itemId).delete();
+    const db = getAdminFirestore();
+    await db.collection('users').doc(userId).collection('pantry').doc(itemId).delete();
     revalidatePath('/pantry');
     return { success: true };
   } catch (error: any) {
@@ -63,5 +167,140 @@ export async function deletePantryItem(idToken: string, itemId: string) {
       stack: error.stack,
     });
     return { success: false, error: `Could not delete pantry item: ${error.message}` };
+  }
+}
+
+// RECIPE FUNCTIONS
+export async function addRecipe(idToken: string, recipeData: any) {
+  try {
+    const decodedToken = await serverFirestore.verifyToken(idToken);
+    const userId = decodedToken.uid;
+    
+    const db = getAdminFirestore();
+    const recipesRef = db.collection('users').doc(userId).collection('recipes');
+    
+    const docRef = await recipesRef.add({
+      ...recipeData,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    
+    revalidatePath('/recipes');
+    return { success: true, id: docRef.id };
+  } catch (error: any) {
+    console.error('addRecipe error:', {
+      code: error.code,
+      message: error.message,
+      stack: error.stack,
+    });
+    return { success: false, error: `Could not add recipe: ${error.message}` };
+  }
+}
+
+// VITALS LOG FUNCTIONS
+export async function addOrUpdateVitalsLog(idToken: string, vitalsData: any) {
+  try {
+    const decodedToken = await serverFirestore.verifyToken(idToken);
+    const userId = decodedToken.uid;
+    
+    const db = getAdminFirestore();
+    const vitalsRef = db.collection('users').doc(userId).collection('vitalsLogs');
+    
+    if (vitalsData.id) {
+      // Update existing log
+      await vitalsRef.doc(vitalsData.id).update({
+        ...vitalsData,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    } else {
+      // Add new log
+      await vitalsRef.add({
+        ...vitalsData,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+    
+    revalidatePath('/vitals');
+    return { success: true };
+  } catch (error: any) {
+    console.error('addOrUpdateVitalsLog error:', {
+      code: error.code,
+      message: error.message,
+      stack: error.stack,
+    });
+    return { success: false, error: `Could not save vitals log: ${error.message}` };
+  }
+}
+
+// WEIGHT LOG FUNCTIONS
+export async function addOrUpdateWeightLog(idToken: string, weightData: any) {
+  try {
+    const decodedToken = await serverFirestore.verifyToken(idToken);
+    const userId = decodedToken.uid;
+    
+    const db = getAdminFirestore();
+    const weightRef = db.collection('users').doc(userId).collection('weightLogs');
+    
+    if (weightData.id) {
+      // Update existing log
+      await weightRef.doc(weightData.id).update({
+        ...weightData,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    } else {
+      // Add new log
+      await weightRef.add({
+        ...weightData,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+    
+    revalidatePath('/weight');
+    return { success: true };
+  } catch (error: any) {
+    console.error('addOrUpdateWeightLog error:', {
+      code: error.code,
+      message: error.message,
+      stack: error.stack,
+    });
+    return { success: false, error: `Could not save weight log: ${error.message}` };
+  }
+}
+
+// MANUAL MACROS LOG FUNCTIONS
+export async function addOrUpdateManualMacrosLog(idToken: string, macrosData: any) {
+  try {
+    const decodedToken = await serverFirestore.verifyToken(idToken);
+    const userId = decodedToken.uid;
+    
+    const db = getAdminFirestore();
+    const macrosRef = db.collection('users').doc(userId).collection('manualMacrosLogs');
+    
+    if (macrosData.id) {
+      // Update existing log
+      await macrosRef.doc(macrosData.id).update({
+        ...macrosData,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    } else {
+      // Add new log
+      await macrosRef.add({
+        ...macrosData,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+    
+    revalidatePath('/macros');
+    return { success: true };
+  } catch (error: any) {
+    console.error('addOrUpdateManualMacrosLog error:', {
+      code: error.code,
+      message: error.message,
+      stack: error.stack,
+    });
+    return { success: false, error: `Could not save macros log: ${error.message}` };
   }
 }
