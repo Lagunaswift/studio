@@ -12,8 +12,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
-import type { UserProfileSettings, Sex, ActivityLevel, AthleteType, PrimaryGoal, TrainingExperienceLevel } from '@/types';
-import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS, TRAINING_EXPERIENCE_OPTIONS } from '@/types';
+import type { UserProfileSettings, Sex, ActivityLevel, AthleteType, PrimaryGoal, TrainingExperienceLevel, MenopauseStatus } from '@/types';
+import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS, TRAINING_EXPERIENCE_OPTIONS, MENOPAUSE_STATUS_OPTIONS } from '@/types';
 import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale, Award } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from 'next/link';
@@ -103,6 +103,7 @@ const userInfoSchema = z.object({
   weightKg: z.coerce.number().min(20, "Weight must be at least 20kg").max(500, "Weight must be at most 500kg").nullable().optional(),
   age: z.coerce.number().min(1, "Age must be at least 1").max(120, "Age must be at most 120").nullable().optional(),
   sex: z.enum(['male', 'female'], { errorMap: () => ({ message: 'Please select a sex.' }) }).nullable(),
+  menopauseStatus: z.enum(MENOPAUSE_STATUS_OPTIONS).nullable().optional(),
   activityLevel: z.enum(ACTIVITY_LEVEL_OPTIONS.map(o => o.value) as [ActivityLevel, ...ActivityLevel[]]).nullable().optional(),
   training_experience_level: z.enum(TRAINING_EXPERIENCE_OPTIONS.map(o => o.value) as [TrainingExperienceLevel, ...TrainingExperienceLevel[]]).nullable().optional(),
   bodyFatPercentage: z.coerce.number().min(1, "Body fat % must be at least 1").max(70, "Body fat % must be at most 70").nullable().optional(),
@@ -356,6 +357,7 @@ function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserPr
                           if (value === 'male') {
                               form.setValue('waist_circumference_cm', null, { shouldValidate: true });
                               form.setValue('hip_circumference_cm', null, { shouldValidate: true });
+                              form.setValue('menopauseStatus', 'notSpecified', { shouldValidate: true });
                           } else if (value === 'female') {
                               form.setValue('abdomen_circumference_cm', null, { shouldValidate: true });
                           }
@@ -377,6 +379,28 @@ function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserPr
                   </FormItem>
                 )} />
               </div>
+              {watchedFormValues.sex === 'female' && (
+                <FormField control={form.control} name="menopauseStatus" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Menopause Status</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || 'notSpecified'}>
+                            <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select status" />
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                {MENOPAUSE_STATUS_OPTIONS.map(option => (
+                                    <SelectItem key={option} value={option}>
+                                        {option === 'notSpecified' ? 'Not Specified' : option === 'pre' ? 'Pre-menopause' : 'Post-menopause'}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+              )}
                <div className="grid sm:grid-cols-2 gap-6">
                  <FormField control={form.control} name="training_experience_level" render={({ field }) => (
                   <FormItem>

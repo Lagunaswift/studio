@@ -35,6 +35,7 @@ import {
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
+import { getRdaProfile } from '@/lib/rda';
 import { runProCoachFlow } from '@/ai/flows/pro-coach-flow';
 import { ProCoachOutputSchema } from '@/ai/flows/schemas';
 import { format, subDays, differenceInDays } from 'date-fns';
@@ -72,7 +73,7 @@ const processProfile = (profileData: UserProfileSettings | undefined | null): Us
     const p = { ...validation.data };
     p.tdee = calculateTDEE(p.weightKg, p.heightCm, p.age, p.sex, p.activityLevel);
     p.leanBodyMassKg = calculateLBM(p.weightKg, p.bodyFatPercentage);
-    p.rda = getRdaProfile(p.sex, p.age);
+    p.rda = getRdaProfile(p.sex, p.age, p.menopauseStatus, p.weightKg);
     return p;
 };
 
@@ -103,23 +104,6 @@ const calculateTDEE = (
     return Math.round(tdee);
   }
   return null;
-};
-
-const getRdaProfile = (sex: Sex | null | undefined, age: number | null | undefined): RDA | null => {
-    if (!sex || !age) {
-        return null;
-    }
-    // Simplified RDA values for demonstration. A real app would use a more complex table.
-    // Values are for adults aged 19-50.
-    if (age >= 19 && age <= 50) {
-        if (sex === 'male') {
-            return { iron: 8, calcium: 1000, potassium: 3400, vitaminA: 900, vitaminC: 90, vitaminD: 15 };
-        } else { // female
-            return { iron: 18, calcium: 1000, potassium: 2600, vitaminA: 700, vitaminC: 75, vitaminD: 15 };
-        }
-    }
-    // Default for other age groups for now
-    return { iron: 10, calcium: 1200, potassium: 3000, vitaminA: 800, vitaminC: 80, vitaminD: 15 };
 };
 
 
@@ -190,6 +174,7 @@ function getDefaultUserProfile(userId: string, userEmail: string | null): UserPr
     weightKg: null,
     age: null,
     sex: 'notSpecified',
+    menopauseStatus: 'notSpecified',
     activityLevel: 'notSpecified',
     training_experience_level: 'notSpecified',
     bodyFatPercentage: null,
@@ -305,14 +290,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [user?.uid, user?.email, isAuthLoading]);
   
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
-    if (JSON.stringify(updates) === JSON.stringify(initialUserProfile)) {
-      return;
+    if (!userProfile) {
+        throw new Error("User profile not loaded yet.");
     }
-    const result = await callServerActionWithAuth(updateUserProfile, updates);
+    const updatedProfile = { ...userProfile, ...updates };
+
+    const recalculatedProfile = processProfile(updatedProfile);
+    
+    const result = await callServerActionWithAuth(updateUserProfile, recalculatedProfile);
     if (result.error) {
         throw new Error(result.error);
     }
-  }, [initialUserProfile]);
+  }, [userProfile]);
 
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
     const newPlannedMeal: Partial<Omit<PlannedMeal, 'id' | 'user_id' | 'recipeDetails'>> = { 

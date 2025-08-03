@@ -1,13 +1,45 @@
+
 'use server';
 
-// src/app/(main)/profile/actions.ts
 import { revalidatePath } from 'next/cache';
 import { serverFirestore } from '@/utils/firestoreRecovery';
 import { debugGetUserIdFromToken } from '@/utils/authDebug';
-import type { UserProfileSettings } from '@/types';
+import type { UserProfileSettings, Sex, ActivityLevel } from '@/types';
+import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { getAdminFirestore } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { mergeWithDefaults } from '@/utils/profileDefaults';
+
+// --- Calculation Helpers ---
+const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
+  if (weightKg && weightKg > 0 && bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
+    const lbm = weightKg * (1 - bodyFatPercentage / 100);
+    if (isNaN(lbm) || !isFinite(lbm) || lbm <= 0) return null;
+    return parseFloat(lbm.toFixed(1));
+  }
+  return null;
+};
+
+const calculateTDEE = (
+  weightKg: number | null,
+  heightCm: number | null,
+  age: number | null,
+  sex: Sex | null,
+  activityLevel: ActivityLevel | null
+): number | null => {
+  if (!weightKg || !heightCm || !age || !sex || !activityLevel) return null;
+  let bmr: number;
+  if (sex === 'male') bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
+  else bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
+  const activity = ACTIVITY_LEVEL_OPTIONS.find(opt => opt.value === activityLevel);
+  if (activity) {
+    const tdee = bmr * activity.multiplier;
+    if (isNaN(tdee) || !isFinite(tdee) || tdee <= 0) return null;
+    return Math.round(tdee);
+  }
+  return null;
+};
+
 
 export async function getUserIdFromToken(idToken: string): Promise<string> {
   return await debugGetUserIdFromToken(idToken);
@@ -18,40 +50,40 @@ export async function updateUserProfile(idToken: string, updates: Partial<Omit<U
     const decodedToken = await serverFirestore.verifyToken(idToken);
     const userId = decodedToken.uid;
     
-    // Get existing profile data from Firestore
     const db = getAdminFirestore();
-    const userDoc = await db.collection('users').doc(userId).get();
+    const userDocRef = db.collection('profiles').doc(userId);
+    const userDoc = await userDocRef.get();
     const existingData = userDoc.exists ? userDoc.data() : {};
     
-    // Merge existing data with updates and defaults
-    const completeProfileData = mergeWithDefaults(
-      { ...existingData, ...updates }, 
-      userId
+    const mergedData = { ...existingData, ...updates };
+
+    const completeProfileData = mergeWithDefaults(mergedData, userId);
+    
+    // Recalculate derived values on the server
+    completeProfileData.tdee = calculateTDEE(
+        completeProfileData.weightKg,
+        completeProfileData.heightCm,
+        completeProfileData.age,
+        completeProfileData.sex,
+        completeProfileData.activityLevel
+    );
+    completeProfileData.leanBodyMassKg = calculateLBM(
+        completeProfileData.weightKg,
+        completeProfileData.bodyFatPercentage
     );
     
-    // Update with server timestamp
     const updateData = {
       ...completeProfileData,
       updatedAt: FieldValue.serverTimestamp(),
     };
     
-    const result = await serverFirestore.updateUserProfile(idToken, userId, updateData);
+    await userDocRef.set(updateData, { merge: true });
     
     revalidatePath('/profile', 'layout');
     revalidatePath('/', 'layout');
     
-    // Return only serializable data
-    if (result.success) {
-      return { 
-        success: true, 
-        data: {
-          ...completeProfileData,
-          updatedAt: new Date().toISOString() // Convert to serializable format
-        }
-      };
-    }
-    
-    return result;
+    return { success: true };
+
   } catch (error: any) {
     console.error('updateUserProfile error:', {
       code: error.code,
@@ -69,7 +101,7 @@ export async function addOrUpdateMealPlan(idToken: string, mealData: any) {
     const userId = decodedToken.uid;
     
     const db = getAdminFirestore();
-    const mealPlanRef = db.collection('users').doc(userId).collection('mealPlan');
+    const mealPlanRef = db.collection('profiles').doc(userId).collection('mealPlan');
     
     if (mealData.id) {
       // Update existing meal
@@ -103,7 +135,7 @@ export async function deleteMealFromPlan(idToken: string, mealId: string) {
     const decodedToken = await serverFirestore.verifyToken(idToken);
     const userId = decodedToken.uid;
     const db = getAdminFirestore();
-    await db.collection('users').doc(userId).collection('mealPlan').doc(mealId).delete();
+    await db.collection('profiles').doc(userId).collection('mealPlan').doc(mealId).delete();
     revalidatePath('/meal-plan');
     return { success: true };
   } catch (error: any) {
@@ -123,7 +155,7 @@ export async function addOrUpdatePantryItem(idToken: string, itemData: any) {
     const userId = decodedToken.uid;
     
     const db = getAdminFirestore();
-    const pantryRef = db.collection('users').doc(userId).collection('pantry');
+    const pantryRef = db.collection('profiles').doc(userId).collection('pantry');
     
     if (itemData.id) {
       // Update existing item
@@ -157,7 +189,7 @@ export async function deletePantryItem(idToken: string, itemId: string) {
     const decodedToken = await serverFirestore.verifyToken(idToken);
     const userId = decodedToken.uid;
     const db = getAdminFirestore();
-    await db.collection('users').doc(userId).collection('pantry').doc(itemId).delete();
+    await db.collection('profiles').doc(userId).collection('pantry').doc(itemId).delete();
     revalidatePath('/pantry');
     return { success: true };
   } catch (error: any) {
@@ -177,7 +209,7 @@ export async function addRecipe(idToken: string, recipeData: any) {
     const userId = decodedToken.uid;
     
     const db = getAdminFirestore();
-    const recipesRef = db.collection('users').doc(userId).collection('recipes');
+    const recipesRef = db.collection('profiles').doc(userId).collection('recipes');
     
     const docRef = await recipesRef.add({
       ...recipeData,
@@ -204,7 +236,7 @@ export async function addOrUpdateVitalsLog(idToken: string, vitalsData: any) {
     const userId = decodedToken.uid;
     
     const db = getAdminFirestore();
-    const vitalsRef = db.collection('users').doc(userId).collection('vitalsLogs');
+    const vitalsRef = db.collection('profiles').doc(userId).collection('vitalsLogs');
     
     if (vitalsData.id) {
       // Update existing log
@@ -240,7 +272,7 @@ export async function addOrUpdateWeightLog(idToken: string, weightData: any) {
     const userId = decodedToken.uid;
     
     const db = getAdminFirestore();
-    const weightRef = db.collection('users').doc(userId).collection('weightLogs');
+    const weightRef = db.collection('profiles').doc(userId).collection('weightLogs');
     
     if (weightData.id) {
       // Update existing log
@@ -276,7 +308,7 @@ export async function addOrUpdateManualMacrosLog(idToken: string, macrosData: an
     const userId = decodedToken.uid;
     
     const db = getAdminFirestore();
-    const macrosRef = db.collection('users').doc(userId).collection('manualMacrosLogs');
+    const macrosRef = db.collection('profiles').doc(userId).collection('manualMacrosLogs');
     
     if (macrosData.id) {
       // Update existing log
