@@ -210,6 +210,7 @@ function getDefaultUserProfile(userId: string, userEmail: string | null): UserPr
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoading: isAuthLoading } = useAuth();
   const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
+  const [initialUserProfile, setInitialUserProfile] = useState<UserProfileSettings | null>(null);
   const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
   const [builtInRecipes, setBuiltInRecipes] = useState<Recipe[]>([]);
   const [mealPlan, setMealPlan] = useState<PlannedMeal[]>([]);
@@ -257,10 +258,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const profileUnsub = onSnapshot(doc(db, "profiles", user.uid), (doc) => {
             if (doc.exists()) {
                 const data = doc.data() as UserProfileSettings;
-                setUserProfile(processProfile(data));
+                const processedProfile = processProfile(data);
+                setUserProfile(processedProfile);
+                setInitialUserProfile(processedProfile);
             } else {
                  const defaultProfile = getDefaultUserProfile(user.uid, user.email);
-                 setUserProfile(processProfile(defaultProfile));
+                 const processedProfile = processProfile(defaultProfile);
+                 setUserProfile(processedProfile);
+                 setInitialUserProfile(processedProfile);
             }
         });
         unsubscribes.push(profileUnsub);
@@ -287,6 +292,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else if (!isAuthLoading) {
         setIsDataLoading(false);
         setUserProfile(null);
+        setInitialUserProfile(null);
         setUserRecipes([]);
         setMealPlan([]);
         setPantryItems([]);
@@ -299,11 +305,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [user?.uid, user?.email, isAuthLoading]);
   
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
+    if (JSON.stringify(updates) === JSON.stringify(initialUserProfile)) {
+      return;
+    }
     const result = await callServerActionWithAuth(updateUserProfile, updates);
     if (result.error) {
         throw new Error(result.error);
     }
-  }, []);
+  }, [initialUserProfile]);
 
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
     const newPlannedMeal: Partial<Omit<PlannedMeal, 'id' | 'user_id' | 'recipeDetails'>> = { 

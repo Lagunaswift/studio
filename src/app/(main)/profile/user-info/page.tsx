@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { getDefaultUserProfile } from '@/utils/profileDefaults';
 
 
 const calculateLBM = (weightKg: number | null | undefined, bodyFatPercentage: number | null | undefined): number | null => {
@@ -176,17 +177,22 @@ function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserPr
   const { toast } = useToast();
   const [calculationMessage, setCalculationMessage] = useState<string | null>(null);
   const [calculationError, setCalculationError] = useState<boolean>(false);
+
+  // Create a stable default value object by merging defaults with the actual profile
+  const defaultValues = useMemo(() => ({
+    ...getDefaultUserProfile(),
+    ...userProfile,
+  }), [userProfile]);
   
   const form = useForm<UserInfoFormValues>({
     resolver: zodResolver(userInfoSchema),
-    // This effect ensures the form is re-initialized when the userProfile data becomes available.
-    defaultValues: userProfile,
+    defaultValues: defaultValues,
   });
   
-  // This effect synchronizes the form state if the userProfile from context changes after initial load.
+  // This effect synchronizes the form state if the userProfile from context changes.
   useEffect(() => {
-    form.reset(userProfile);
-  }, [userProfile, form.reset]);
+    form.reset(defaultValues);
+  }, [defaultValues, form.reset]);
 
   const watchedFormValues = form.watch();
 
@@ -557,12 +563,19 @@ function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserPr
 export default function UserInfoPage() {
   const { userProfile, setUserInformation, isAppDataLoading } = useAppContext();
   
+  // Create a merged profile that includes defaults for any missing values.
+  // This ensures the form component always receives a complete profile object.
+  const formProfile = useMemo(() => ({
+    ...getDefaultUserProfile(),
+    ...userProfile,
+  }), [userProfile]);
+
   return (
     <PageWrapper title="User Information">
-      {isAppDataLoading || !userProfile ? (
+      {isAppDataLoading ? (
         <UserInfoPageSkeleton />
       ) : (
-        <UserInfoForm userProfile={userProfile} setUserInformation={setUserInformation} />
+        <UserInfoForm userProfile={formProfile} setUserInformation={setUserInformation} />
       )}
     </PageWrapper>
   );
