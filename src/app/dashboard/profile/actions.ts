@@ -1,4 +1,3 @@
-
 'use server';
 
 import { revalidatePath } from 'next/cache';
@@ -9,6 +8,11 @@ import { adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { mergeWithDefaults } from '@/utils/profileDefaults';
 import { getUserProfile } from '@/lib/user-profile';
+
+// --- Type Guard Helper ---
+function isValidActivityLevel(value: any): value is ActivityLevel {
+  return value && ACTIVITY_LEVEL_OPTIONS.some(option => option.value === value);
+}
 
 // --- Calculation Helpers ---
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
@@ -27,10 +31,12 @@ const calculateTDEE = (
   sex: Sex | null,
   activityLevel: ActivityLevel | null
 ): number | null => {
-  if (!weightKg || !heightCm || !age || !sex || !activityLevel) return null;
+  if (!weightKg || !heightCm || !age || !sex || !activityLevel || !isValidActivityLevel(activityLevel)) return null;
+  
   let bmr: number;
   if (sex === 'male') bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
   else bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
+  
   const activity = ACTIVITY_LEVEL_OPTIONS.find(opt => opt.value === activityLevel);
   if (activity) {
     const tdee = bmr * activity.multiplier;
@@ -40,16 +46,18 @@ const calculateTDEE = (
   return null;
 };
 
-
 export async function updateUserProfile(userId: string, updates: Partial<Omit<UserProfileSettings, 'id'>>) {
   try {
-    
     const userDocRef = adminDb.collection('profiles').doc(userId);
     const userProfile = await getUserProfile(userId);
     
     const mergedData = { ...userProfile, ...updates };
-
     const completeProfileData = mergeWithDefaults(mergedData, userId);
+    
+    // Validate and normalize activityLevel before calculations
+    const normalizedActivityLevel = isValidActivityLevel(completeProfileData.activityLevel) 
+      ? completeProfileData.activityLevel 
+      : null;
     
     // Recalculate derived values on the server
     completeProfileData.tdee = calculateTDEE(
@@ -57,12 +65,15 @@ export async function updateUserProfile(userId: string, updates: Partial<Omit<Us
         completeProfileData.heightCm,
         completeProfileData.age,
         completeProfileData.sex,
-        completeProfileData.activityLevel
+        normalizedActivityLevel // Use normalized value
     );
     completeProfileData.leanBodyMassKg = calculateLBM(
         completeProfileData.weightKg,
         completeProfileData.bodyFatPercentage
     );
+    
+    // Ensure activityLevel is properly typed for storage
+    completeProfileData.activityLevel = normalizedActivityLevel;
     
     const updateData = {
       ...completeProfileData,
