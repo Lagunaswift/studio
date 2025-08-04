@@ -10,10 +10,9 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/context/AuthContext';
-import { useUserProfile } from '@/hooks/useUserProfile'; // ✅ Add this import
-// Remove unused imports and state
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { useToast } from '@/hooks/use-toast';
-import type { MacroTargets, TrainingExperienceLevel } from '@/types';
+import type { TrainingExperienceLevel } from '@/types'; // ✅ Remove MacroTargets import
 import { useEffect, useState, useMemo } from 'react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -24,6 +23,14 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
+// ✅ Define MacroTargets locally if not in types
+interface MacroTargets {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
 const macroTargetSchema = z.object({
   calories: z.coerce.number().min(0, "Calories must be positive").default(0),
   protein: z.coerce.number().min(0, "Protein must be positive").default(0),
@@ -32,6 +39,12 @@ const macroTargetSchema = z.object({
 });
 
 type MacroTargetFormValues = z.infer<typeof macroTargetSchema>;
+
+// ✅ Define FatSuggestion interface locally
+interface FatSuggestion {
+  suggestedFatGrams: number;
+  justification: string;
+}
 
 // ✅ Replace AI with simple calculation functions
 interface ProteinSuggestion {
@@ -126,8 +139,16 @@ const calculateFatIntake = (tdee: number, sex: string | null): FatSuggestion => 
   };
 };
 
-const getMonthlyGainKg = (sex: 'male' | 'female' | null | 'notSpecified', level: TrainingExperienceLevel | null): number => {
+// ✅ Fix type for getMonthlyGainKg function - only use valid TrainingExperienceLevel values
+const getMonthlyGainKg = (
+  sex: 'male' | 'female' | null | 'notSpecified', 
+  level: TrainingExperienceLevel | null
+): number => {
     if (!sex || sex === 'notSpecified' || !level || level === 'notSpecified') return 0;
+    
+    // ✅ Only use the actual TrainingExperienceLevel values
+    const validLevels = ['beginner', 'intermediate', 'advanced'] as const;
+    if (!validLevels.includes(level as any)) return 0;
     
     if (sex === 'female') {
         switch(level) {
@@ -248,7 +269,14 @@ export default function DietaryTargetsPage() {
     if (!userProfile?.tdee || !userProfile.sex || !userProfile.training_experience_level) {
       return { monthlyGainKg: 0, calorieTarget: 0, enabled: false, reason: "Please specify your sex and training experience in your User Info to get a muscle gain target." };
     }
-    const monthlyGainKg = getMonthlyGainKg(userProfile.sex, userProfile.training_experience_level);
+    
+    // ✅ Add type validation for training_experience_level - only use valid values
+    const validLevels = ['beginner', 'intermediate', 'advanced'] as const;
+    const level = validLevels.includes(userProfile.training_experience_level as any) 
+      ? userProfile.training_experience_level as TrainingExperienceLevel 
+      : null;
+    
+    const monthlyGainKg = getMonthlyGainKg(userProfile.sex, level);
     if (monthlyGainKg === 0) {
         return { monthlyGainKg: 0, calorieTarget: 0, enabled: false, reason: "Please specify your sex and training experience in your User Info to get a muscle gain target." };
     }
@@ -302,7 +330,7 @@ export default function DietaryTargetsPage() {
       }
       
       // ✅ Use server action instead of context function
-      const { updateUserProfile } = await import('@/app/(main)/profile/actions');
+      const { updateUserProfile } = await import('@/app/dashboard/profile/actions');
       await updateUserProfile(user.uid, {
         macroTargets: data,
         target_weight_change_rate_kg: newTargetRateKg
@@ -672,7 +700,6 @@ export default function DietaryTargetsPage() {
                             <AlertTitle>Missing Information</AlertTitle>
                             <AlertDescription>
                                 Please complete your <Link href="/dashboard/profile/user-info" className="underline">User Info</Link> (Weight, Height, Age, Activity Level) to use this calculator.
-                                {/* ✅ Debug info */}
                                 <br />
                                 <small className="text-xs opacity-70">
                                   Debug: TDEE = {userProfile?.tdee || 'null'}, Weight = {userProfile?.weightKg || 'null'}
