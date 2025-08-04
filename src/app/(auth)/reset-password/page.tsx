@@ -12,7 +12,7 @@ import { Mail, KeyRound, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '@/lib/firebase'; // Corrected import
+import { auth } from '@/lib/firebase-client';
 
 const resetPasswordSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),

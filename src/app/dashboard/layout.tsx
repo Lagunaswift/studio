@@ -1,4 +1,4 @@
-//src/app/(main)/layout.tsx
+//src/app/dashboard/layout.tsx
 "use client";
 
 import Link from 'next/link';
@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { Footer } from '@/components/layout/Footer';
 import { ThemeToggleButton } from '@/components/layout/ThemeToggleButton';
 import { TermsAcceptanceModal } from '@/components/legal/TermsAcceptanceModal';
-import { PreppyHelp } from '@/components/shared/SimpleHelpWidget'; // Import the new component
+import { SimpleHelpWidget } from '@/components/shared/SimpleHelpWidget';
 import {
   Accordion,
   AccordionContent,
@@ -47,38 +47,38 @@ interface NavItem {
   exact?: boolean;
 }
 
-const dashboardNavItem: NavItem = { href: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true };
+const dashboardNavItem: NavItem = { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true };
 
 const planNavItems: NavItem[] = [
-    { href: '/ai-suggestions', label: 'Preppy: Plan Generator', icon: Sparkles },
-    { href: '/meal-plan', label: 'Daily/Weekly View', icon: CalendarDays },
-    { href: '/shopping-list', label: 'Shopping List', icon: ShoppingBag },
-    { href: '/pantry', label: 'Pantry', icon: Archive },
+    { href: '/dashboard/ai-suggestions', label: 'Preppy: Plan Generator', icon: Sparkles },
+    { href: '/dashboard/meal-plan', label: 'Daily/Weekly View', icon: CalendarDays },
+    { href: '/dashboard/shopping-list', label: 'Shopping List', icon: ShoppingBag },
+    { href: '/dashboard/pantry', label: 'Pantry', icon: Archive },
 ];
 
 const recipesNavItems: NavItem[] = [
-  { href: '/ai-recipe-finder', label: 'Preppy: Pantry Chef', icon: ChefHat },
-  { href: '/recipes', label: 'My Saved Recipes', icon: UtensilsCrossed },
+  { href: '/dashboard/ai-recipe-finder', label: 'Preppy: Pantry Chef', icon: ChefHat },
+  { href: '/dashboard/recipes', label: 'My Saved Recipes', icon: UtensilsCrossed },
 ];
 
 const progressNavItems: NavItem[] = [
-    { href: '/daily-log', label: 'Daily Log', icon: ClipboardList },
-    { href: '/weekly-check-in', label: 'Preppy: Weekly Check-in', icon: CheckSquare },
+    { href: '/dashboard/daily-log', label: 'Daily Log', icon: ClipboardList },
+    { href: '/dashboard/weekly-check-in', label: 'Preppy: Weekly Check-in', icon: CheckSquare },
 ];
 
 const settingsNavItems: NavItem[] = [
-  { href: '/profile/user-info', label: 'My Profile', icon: UserCircle2 },
-  { href: '/profile/targets', label: 'My Goals & Targets', icon: Target },
-  { href: '/profile/diet-type', label: 'Diet & Allergens', icon: Leaf },
-  { href: '/profile/meal-structure', label: 'Meal Structure', icon: ListChecks },
-  { href: '/profile/dashboard-settings', label: 'Customize Dashboard', icon: SlidersHorizontal },
+  { href: '/dashboard/profile/user-info', label: 'My Profile', icon: UserCircle2 },
+  { href: '/dashboard/profile/targets', label: 'My Goals & Targets', icon: Target },
+  { href: '/dashboard/profile/diet-type', label: 'Diet & Allergens', icon: Leaf },
+  { href: '/dashboard/profile/meal-structure', label: 'Meal Structure', icon: ListChecks },
+  { href: '/dashboard/profile/dashboard-settings', label: 'Customize Dashboard', icon: SlidersHorizontal },
 ];
 
 const helpNavItems: NavItem[] = [
-    { href: '/guide', label: 'App Guide', icon: BookOpen },
-    { href: '/updates', label: 'Updates & Feedback', icon: Megaphone },
-    { href: '/terms', label: 'Terms of Service', icon: FileText },
-    { href: '/privacy', label: 'Privacy Policy', icon: Shield },
+    { href: '/dashboard/guide', label: 'App Guide', icon: BookOpen },
+    { href: '/dashboard/updates', label: 'Updates & Feedback', icon: Megaphone },
+    { href: '/dashboard/terms', label: 'Terms of Service', icon: FileText },
+    { href: '/dashboard/privacy', label: 'Privacy Policy', icon: Shield },
 ];
 
 const mainSections = [
@@ -103,7 +103,7 @@ function LogoutButton() {
 
   const handleLogout = async () => {
     await signOut();
-    router.push('/login');
+    router.push('/');
   };
 
   return (
@@ -164,7 +164,7 @@ function SidebarSearch() {
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
     if (search.trim()) {
-      router.push(`/recipes?q=${encodeURIComponent(search.trim())}`);
+      router.push(`/dashboard/recipes?q=${encodeURIComponent(search.trim())}`);
     }
   };
 
@@ -227,18 +227,18 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
   const getCurrentPageTitle = () => {
     // Specific titles for AI pages
-    if (pathname === '/ai-suggestions') return 'Preppy: Plan Generator';
-    if (pathname === '/ai-recipe-finder') return 'Preppy: Pantry Chef';
-    if (pathname === '/weekly-check-in') return 'Preppy: Weekly Check-in';
+    if (pathname === '/dashboard/ai-suggestions') return 'Preppy: Plan Generator';
+    if (pathname === '/dashboard/ai-recipe-finder') return 'Preppy: Pantry Chef';
+    if (pathname === '/dashboard/weekly-check-in') return 'Preppy: Weekly Check-in';
     
     // General titles
-    if (pathname === '/') return 'Dashboard';
-    if (pathname.startsWith('/recipes/add')) return 'Add New Recipe';
-    if (pathname.match(/^\/recipes\/\d+$/)) return 'Recipe Details';
+    if (pathname === '/dashboard') return 'Dashboard';
+    if (pathname.startsWith('/dashboard/recipes/add')) return 'Add New Recipe';
+    if (pathname.match(/^\/dashboard\/recipes\/\d+$/)) return 'Recipe Details';
     
     let bestMatch: { href: string; label: string; } | undefined;
     for (const item of allNavItems) {
-      if (item.href === '/') continue; 
+      if (item.href === '/dashboard') continue; 
       if (pathname.startsWith(item.href)) {
         if (!bestMatch || item.href.length > bestMatch.href.length) {
           bestMatch = item;
@@ -256,7 +256,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     <div className="flex flex-1">
       <Sidebar>
         <SidebarHeader className="p-4 border-b border-sidebar-border">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex items-center gap-2">
             <UtensilsCrossed className="h-7 w-7 text-sidebar-primary" />
             <div className="group-data-[collapsible=icon]:hidden">
               {isMobile ? (
@@ -389,7 +389,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         </main>
       </SidebarInset>
       <DevStatusIndicator />
-      <PreppyHelp /> {/* Add the help component */}
+      <SimpleHelpWidget /> {/* Add the help component */}
       <TermsAcceptanceModal
         isOpen={showTerms}
         onAccept={handleAcceptTerms}

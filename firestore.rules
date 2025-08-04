@@ -9,7 +9,8 @@ service cloud.firestore {
 
     // Recipes: readable if public or by owner. Writable only by owner.
     match /recipes/{recipeId} {
-      allow read: if resource.data.user_id == null || request.auth.uid == resource.data.user_id;
+      allow get: if resource.data.user_id == null || request.auth.uid == resource.data.user_id;
+      allow list: if isAuthenticated();
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
       allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
     }

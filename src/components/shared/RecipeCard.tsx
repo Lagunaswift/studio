@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
-import { useAppContext } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -29,7 +29,7 @@ export function RecipeCard({
   className,
   pantryMatchStatus = null,
 }: RecipeCardProps) {
-  const { toggleFavoriteRecipe, isRecipeFavorite } = useAppContext();
+  const { toggleFavoriteRecipe, isRecipeFavorite } = useAuth();
   
   const [imageError, setImageError] = useState(false);
 

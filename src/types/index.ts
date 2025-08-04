@@ -30,7 +30,6 @@ export const PRIMARY_GOAL_OPTIONS = [
     { value: 'fatLoss', label: 'Fat Loss' },
     { value: 'muscleGain', label: 'Muscle Gain' },
     { value: 'maintenance', label: 'Maintenance' },
-    { value: 'performance', label: 'Improve Performance' },
 ] as const;
 export type PrimaryGoal = typeof PRIMARY_GOAL_OPTIONS[number]['value'];
 
@@ -87,16 +86,15 @@ export const UserProfileSettingsSchema = z.object({
   heightCm: z.number().nullable(),
   weightKg: z.number().nullable(),
   age: z.number().nullable(),
-  sex: z.enum(SEX_OPTIONS),
+  sex: z.enum(SEX_OPTIONS).nullable(),
   menopauseStatus: z.enum(MENOPAUSE_STATUS_OPTIONS).nullable().optional(),
-  activityLevel: z.string(),
+  activityLevel: z.string().nullable(),
   training_experience_level: z.string().nullable(),
   bodyFatPercentage: z.number().nullable(),
   athleteType: z.string().nullable(),
   primaryGoal: z.string().nullable(),
   tdee: z.number().nullable(),
   leanBodyMassKg: z.number().nullable(),
-  rda: z.any().nullable(),
   subscription_status: z.string().nullable(),
   has_accepted_terms: z.boolean(),
   last_check_in_date: z.string().nullable(),
@@ -106,8 +104,15 @@ export const UserProfileSettingsSchema = z.object({
     showMenu: z.boolean(),
     showFeaturedRecipe: z.boolean(),
     showQuickRecipes: z.boolean(),
-  }),
-  favorite_recipe_ids: z.array(z.number()),
+  }).nullable(),
+  favorite_recipe_ids: z.array(z.number()).nullable(),
+  dailyWeightLog: z.array(z.any()).nullable(),
+  dailyVitalsLog: z.array(z.any()).nullable(),
+  dailyManualMacrosLog: z.array(z.any()).nullable(),
+  neck_circumference_cm: z.number().nullable(),
+  abdomen_circumference_cm: z.number().nullable(),
+  waist_circumference_cm: z.number().nullable(),
+  hip_circumference_cm: z.number().nullable(),
 });
 
 
@@ -169,7 +174,6 @@ export interface Recipe {
     ingredients: { name: string; quantity: number; unit: string; }[];
     instructions: string[];
     macrosPerServing: Macros;
-    micronutrients?: any;
     imageUrl: string;
     tags: string[];
 }
@@ -200,34 +204,3 @@ export interface DailyManualMacrosLog {
 }
 
 export type SubscriptionStatus = 'active' | 'inactive' | 'trialing' | 'none';
-
-export interface RDA {
-    thiamine?: number;
-    riboflavin?: number;
-    niacin?: number;
-    pantothenicAcid?: number;
-    pyridoxine?: number;
-    cobalamin?: number;
-    biotin?: number;
-    choline?: number;
-    folate?: number;
-    vitaminA?: number;
-    vitaminC?: number;
-    vitaminD?: number;
-    vitaminE?: number;
-    vitaminK?: number;
-    calcium?: number;
-    chromium?: number;
-    copper?: number;
-    fluoride?: number;
-    iodine?: number;
-    iron?: number;
-    magnesium?: number;
-    manganese?: number;
-    molybdenum?: number;
-    phosphorus?: number;
-    potassium?: number;
-    selenium?: number;
-    sodium?: number;
-    zinc?: number;
-}

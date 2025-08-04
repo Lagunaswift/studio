@@ -1,4 +1,4 @@
-// src/app/(auth)/login/page.tsx
+// src/app/page.tsx
 "use client";
 
 import Link from 'next/link';
@@ -39,7 +39,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user && user.emailVerified) {
-      router.push('/');
+      router.push('/dashboard');
     }
   }, [user, router]);
 
@@ -66,7 +66,7 @@ export default function LoginPage() {
         title: "Login Successful",
         description: "Welcome back!",
       });
-      router.push('/');
+      router.push('/dashboard');
     } catch (error: any) {
       console.error("Login failed:", error.code, error.message);
       toast({
@@ -92,7 +92,7 @@ export default function LoginPage() {
               clearInterval(interval);
               await tokenManager.refreshToken(auth.currentUser);
               console.log('Token after email verification:', tokenManager.getTokenInfo());
-              router.push('/');
+              router.push('/dashboard');
             }
           }
         }, 5000);

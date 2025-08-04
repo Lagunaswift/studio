@@ -1,5 +1,5 @@
 // src/utils/authDebug.ts
-import { getAdminAuth } from '@/lib/firebase-admin'; // Fixed import
+import { adminAuth } from '@/lib/firebase-admin'; // Fixed import
 import { getAuth as getClientAuth, onAuthStateChanged } from 'firebase/auth';
 
 interface AuthDebugResult {
@@ -32,7 +32,7 @@ export async function debugAuth(): Promise<AuthDebugResult> {
       
       // Verify with server
       try {
-        const decodedToken = await getAdminAuth().verifyIdToken(idToken);
+        const decodedToken = await adminAuth().verifyIdToken(idToken);
         result.serverValid = true;
         console.log('✅ Server token verification successful:', decodedToken.uid);
       } catch (serverError: any) {
@@ -53,7 +53,7 @@ export async function debugAuth(): Promise<AuthDebugResult> {
 
 export async function debugGetUserIdFromToken(idToken: string): Promise<string> {
   try {
-    const decodedToken = await getAdminAuth().verifyIdToken(idToken);
+    const decodedToken = await adminAuth().verifyIdToken(idToken);
     console.log('✅ Token verified successfully for user:', decodedToken.uid);
     return decodedToken.uid;
   } catch (error: any) {

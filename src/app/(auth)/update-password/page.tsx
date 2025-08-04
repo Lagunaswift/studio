@@ -13,7 +13,7 @@ import { Lock, KeyRound, AlertTriangle, ArrowLeft, Eye, EyeOff } from 'lucide-re
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
-import { auth } from '@/lib/firebase'; // Corrected import
+import { auth } from '@/lib/firebase-client';
 
 const updatePasswordSchema = z.object({
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),

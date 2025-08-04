@@ -13,8 +13,7 @@ import { Mail, Lock, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
-import { auth } from '@/lib/firebase'; // Corrected import
-import { useAuth } from '@/context/AuthContext';
+import { auth } from '@/lib/firebase-client';
 
 const signupSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -32,7 +31,6 @@ export default function SignupPage() {
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-  const { signUp } = useAuth();
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),

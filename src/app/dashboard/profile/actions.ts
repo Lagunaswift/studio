@@ -3,12 +3,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { serverFirestore } from '@/utils/firestoreRecovery';
-import { debugGetUserIdFromToken } from '@/utils/authDebug';
 import type { UserProfileSettings, Sex, ActivityLevel } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { mergeWithDefaults } from '@/utils/profileDefaults';
+import { getUserProfile } from '@/lib/user-profile';
 
 // --- Calculation Helpers ---
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
@@ -41,20 +41,13 @@ const calculateTDEE = (
 };
 
 
-export async function getUserIdFromToken(idToken: string): Promise<string> {
-  return await debugGetUserIdFromToken(idToken);
-}
-
-export async function updateUserProfile(idToken: string, updates: Partial<Omit<UserProfileSettings, 'id'>>) {
+export async function updateUserProfile(userId: string, updates: Partial<Omit<UserProfileSettings, 'id'>>) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
     
     const userDocRef = adminDb.collection('profiles').doc(userId);
-    const userDoc = await userDocRef.get();
-    const existingData = userDoc.exists ? userDoc.data() : {};
+    const userProfile = await getUserProfile(userId);
     
-    const mergedData = { ...existingData, ...updates };
+    const mergedData = { ...userProfile, ...updates };
 
     const completeProfileData = mergeWithDefaults(mergedData, userId);
     
@@ -325,5 +318,18 @@ export async function addOrUpdateManualMacrosLog(idToken: string, macrosData: an
       stack: error.stack,
     });
     return { success: false, error: `Could not save macros log: ${error.message}` };
+  }
+}
+
+export async function reportBug(description: string, userId: string) {
+  try {
+    await adminDb.collection('bug_reports').add({
+      description,
+      userId,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
   }
 }
