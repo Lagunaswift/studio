@@ -1,4 +1,4 @@
-//studio/src/app/(main)/profile/targets/page.tsx
+//studio/src/app/dashboard/profile/targets/page.tsx
 
 "use client";
 
@@ -9,20 +9,19 @@ import { Input } from '@/components/ui/input';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useAuth } from '@/context/AuthContext';
-import { useUserProfile } from '@/hooks/useUserProfile'; // ✅ Add this import
-// Remove unused imports and state
+import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import type { MacroTargets, TrainingExperienceLevel } from '@/types';
 import { useEffect, useState, useMemo } from 'react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Lightbulb, Droplets, AlertTriangle, HelpCircle, Calculator, Info } from "lucide-react";
+import { Sparkles, Loader2, Info, Lightbulb, Droplets, AlertTriangle, HelpCircle, Calculator } from "lucide-react";
 import Link from 'next/link';
 import { Slider } from '@/components/ui/slider';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 
 const macroTargetSchema = z.object({
   calories: z.coerce.number().min(0, "Calories must be positive").default(0),
@@ -33,102 +32,15 @@ const macroTargetSchema = z.object({
 
 type MacroTargetFormValues = z.infer<typeof macroTargetSchema>;
 
-// ✅ Replace AI with simple calculation functions
-interface ProteinSuggestion {
-  minProteinGramsPerDay: number;
-  maxProteinGramsPerDay: number;
-  minProteinFactor: number;
-  maxProteinFactor: number;
-  displayUnit: string;
+interface FatSuggestion {
+  suggestedFatGrams: number;
   justification: string;
 }
-
-const calculateProteinIntake = (
-  leanBodyMassKg: number,
-  recommendationType: 'average' | 'safe' | 'flexible',
-  sex: string | null,
-  primaryGoal: string | null,
-  unitPreference: 'g/kgLBM' | 'g/lbLBM' = 'g/kgLBM'
-): ProteinSuggestion => {
-  // Lookup table from your AI prompt
-  let factorGPerKg: number;
-  
-  switch (recommendationType) {
-    case 'average':
-      factorGPerKg = 2.35;
-      break;
-    case 'safe':
-      factorGPerKg = 2.75;
-      break;
-    case 'flexible':
-      factorGPerKg = (sex === 'female') ? 1.95 : 2.20;
-      break;
-    default:
-      factorGPerKg = 2.35;
-  }
-  
-  // Calculate daily protein
-  const dailyProteinGrams = Math.round(factorGPerKg * leanBodyMassKg);
-  
-  // Convert factor for display
-  const factorGPerLb = factorGPerKg * 0.453592; // Convert kg to lb
-  const displayFactor = unitPreference === 'g/kgLBM' ? factorGPerKg : factorGPerLb;
-  
-  // Generate justification (same templates as AI)
-  let justification: string;
-  const goalText = primaryGoal || 'your fitness goals';
-  
-  switch (recommendationType) {
-    case 'average':
-      justification = `You selected the 'average' target. This is a strong, evidence-based goal designed to be enough to maximize muscle growth for most people. Based on your lean body mass, your daily protein target is around ${dailyProteinGrams}g. This intake will effectively support your primary goal of ${goalText}.`;
-      break;
-    case 'safe':
-      justification = `You opted for the 'safe' approach. This is our 'better safe than sorry' recommendation, providing a slightly higher intake to ensure you're getting more than enough protein to fuel your results. For your lean body mass, this comes out to a daily target of about ${dailyProteinGrams}g. This is particularly effective for supporting your goal of ${goalText}.`;
-      break;
-    case 'flexible':
-      justification = `You chose the 'flexible' target. This is a great option if you prefer a lower protein intake to allow for more dietary variety with carbs and fats, while still making great gains. Your target is around ${dailyProteinGrams}g per day. It's worth noting this is an estimate based on a general guideline, applied to your specific lean body mass for accuracy.`;
-      break;
-    default:
-      justification = `Based on your lean body mass, your daily protein target is around ${dailyProteinGrams}g.`;
-  }
-  
-  return {
-    minProteinGramsPerDay: dailyProteinGrams,
-    maxProteinGramsPerDay: dailyProteinGrams,
-    minProteinFactor: displayFactor,
-    maxProteinFactor: displayFactor,
-    displayUnit: unitPreference,
-    justification
-  };
-};
-
-const calculateFatIntake = (tdee: number, sex: string | null): FatSuggestion => {
-  let percentage: number;
-  let rangeText: string;
-
-  if (sex === 'female') {
-    percentage = 0.30;
-    rangeText = "25-35%";
-  } else if (sex === 'male') {
-    percentage = 0.25;
-    rangeText = "20-30%";
-  } else {
-    percentage = 0.275;
-    rangeText = "20-35%";
-  }
-
-  const suggestedFatGrams = Math.round((tdee * percentage) / 9);
-  const justificationText = `For a ${sex || 'user'}, a balanced starting point for dietary fat is ${rangeText} of total daily calories. Based on your estimated TDEE of ~${tdee.toFixed(0)} kcal, a target of ${Math.round(percentage * 100)}% suggests approximately ${suggestedFatGrams}g of fat per day. This provides essential fatty acids and supports hormone function.`;
-
-  return {
-    suggestedFatGrams,
-    justification: justificationText,
-  };
-};
 
 const getMonthlyGainKg = (sex: 'male' | 'female' | null | 'notSpecified', level: TrainingExperienceLevel | null): number => {
     if (!sex || sex === 'notSpecified' || !level || level === 'notSpecified') return 0;
     
+    // Adjusted to reflect a wider range of training experience levels
     if (sex === 'female') {
         switch(level) {
             case 'beginner': return 0.75;
@@ -147,25 +59,23 @@ const getMonthlyGainKg = (sex: 'male' | 'female' | null | 'notSpecified', level:
 };
 
 export default function DietaryTargetsPage() {
-  // ✅ Updated to use new data fetching pattern
-  const { user } = useAuth(); // Only for auth status
-  const { profile: userProfile, loading, error } = useUserProfile(user); // ✅ Use new hook
-  
+  const { userProfile, setMacroTargets, setUserInformation } = useAppContext();
   const { toast } = useToast();
-  const [proteinSuggestion, setProteinSuggestion] = useState<ProteinSuggestion | null>(null);
-  const [aiError, setAiError] = useState<string | null>(null);
+  
   const [fatSuggestion, setFatSuggestion] = useState<FatSuggestion | null>(null);
   const [fatSuggestionError, setFatSuggestionError] = useState<string | null>(null);
+
   const [weightLossWarning, setWeightLossWarning] = useState<string | null>(null);
   const [energyAvailabilityWarning, setEnergyAvailabilityWarning] = useState<string | null>(null);
+  
   const [lossPercentage, setLossPercentage] = useState<number>(0.75);
+
 
   const macroForm = useForm<MacroTargetFormValues>({
     resolver: zodResolver(macroTargetSchema),
     defaultValues: userProfile?.macroTargets || { calories: 0, protein: 150, carbs: 200, fat: 60 },
   });
 
-  // ✅ Updated to use profile from new hook
   useEffect(() => {
     if (userProfile?.macroTargets) {
       macroForm.reset(userProfile.macroTargets);
@@ -257,6 +167,7 @@ export default function DietaryTargetsPage() {
     return { monthlyGainKg, calorieTarget, enabled: true };
   }, [userProfile?.tdee, userProfile?.sex, userProfile?.training_experience_level]);
 
+
   const handleApplyCalorieTarget = (calorieTarget: number) => {
     const proteinGrams = macroForm.getValues("protein") || 0;
     const fatGrams = macroForm.getValues("fat") || 0;
@@ -276,116 +187,33 @@ export default function DietaryTargetsPage() {
     const suggestedCarbs = Math.round(remainingCaloriesForCarbs / 4);
     macroForm.setValue("carbs", suggestedCarbs, { shouldDirty: true });
     
-    // The useEffect will automatically update the calories field now
     toast({
         title: "Calorie Target Applied",
         description: `Carbs have been set to ${suggestedCarbs}g to meet your new calorie goal. Click 'Save Macro Targets' to confirm.`
     });
   };
 
-  // ✅ Updated to use server action instead of old updateUserData
-  const handleMacroSubmit: SubmitHandler<MacroTargetFormValues> = async (data) => {
-    if (!user?.uid) {
-      toast({
-        title: "Authentication Error",
-        description: "Please log in to save your targets.",
-        variant: "destructive",
-      });
-      return;
-    }
 
-    try {
-      let newTargetRateKg: number | null = null;
-      if (userProfile?.tdee && data.calories > 0) {
-          const dailyDeficitOrSurplus = data.calories - userProfile.tdee;
-          newTargetRateKg = (dailyDeficitOrSurplus * 7) / 7700;
-      }
-      
-      // ✅ Use server action instead of context function
-      const { updateUserProfile } = await import('@/app/(main)/profile/actions');
-      await updateUserProfile(user.uid, {
-        macroTargets: data,
-        target_weight_change_rate_kg: newTargetRateKg
-      });
-
-      toast({
-        title: "Macro Targets Updated",
-        description: "Your daily caloric and macro targets have been saved.",
-      });
-      macroForm.reset(data); 
-    } catch (error: any) {
-      toast({
-        title: "Error Saving Targets",
-        description: error.message || 'An unknown error occurred.',
-        variant: "destructive",
-      });
+  const handleMacroSubmit: SubmitHandler<MacroTargetFormValues> = (data) => {
+    let newTargetRateKg: number | null = null;
+    if (userProfile?.tdee && data.calories > 0) {
+        const dailyDeficitOrSurplus = data.calories - userProfile.tdee;
+        newTargetRateKg = (dailyDeficitOrSurplus * 7) / 7700;
     }
+    
+    setUserInformation({
+      macroTargets: data,
+      target_weight_change_rate_kg: newTargetRateKg
+    });
+
+    toast({
+      title: "Macro Targets Updated",
+      description: "Your daily caloric and macro targets have been saved.",
+    });
+    macroForm.reset(data); 
   };
-
-  // ✅ Simplified protein suggestion (no AI needed)
-  const handleGetProteinSuggestion = (recommendationType: 'average' | 'safe' | 'flexible') => {
-    if (!userProfile || !userProfile.leanBodyMassKg) {
-      setAiError("Please complete your User Information (especially weight and body fat %) to calculate Lean Body Mass for an accurate protein suggestion.");
-      toast({
-        title: "User Info Needed",
-        description: (
-          <span>
-            Complete your <Link href="/dashboard/profile/user-info" className="underline">User Information</Link> to get a protein suggestion.
-          </span>
-        ),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Clear previous states
-    setProteinSuggestion(null);
-    setAiError(null);
-    setFatSuggestion(null); 
-    setFatSuggestionError(null);
-
-    try {
-      // ✅ Use local calculation instead of AI API
-      const suggestion = calculateProteinIntake(
-        userProfile.leanBodyMassKg,
-        recommendationType,
-        userProfile.sex,
-        userProfile.primaryGoal,
-        'g/kgLBM'
-      );
-      
-      setProteinSuggestion(suggestion);
-      
-      toast({
-        title: "Protein Target Calculated",
-        description: `Suggested ${suggestion.minProteinGramsPerDay}g protein based on your lean body mass.`,
-      });
-    } catch (error: any) {
-      console.error("Protein Calculation Error:", error);
-      setAiError("Failed to calculate protein suggestion. Please try again.");
-      toast({
-        title: "Calculation Error",
-        description: "Failed to calculate protein suggestion. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const applyProteinSuggestion = () => {
-    if (proteinSuggestion) {
-      const averageProtein = Math.round((proteinSuggestion.minProteinGramsPerDay + proteinSuggestion.maxProteinGramsPerDay) / 2);
-      macroForm.setValue("protein", averageProtein, { shouldValidate: true, shouldDirty: true });
-      toast({
-        title: "Protein Target Applied",
-        description: `Protein set to ${averageProtein}g. Adjust other macros as needed.`,
-      });
-    }
-  };
-
-  // ✅ Simplified fat suggestion (no AI needed)
+  
   const handleGetFatSuggestion = () => {
-    setProteinSuggestion(null);
-    setAiError(null);
     setFatSuggestion(null);
     setFatSuggestionError(null);
 
@@ -407,24 +235,27 @@ export default function DietaryTargetsPage() {
         return;
     }
 
-    try {
-      // ✅ Use local calculation instead of complex logic
-      const suggestion = calculateFatIntake(userProfile.tdee, userProfile.sex);
-      setFatSuggestion(suggestion);
-      
-      toast({
-        title: "Fat Target Calculated",
-        description: `Suggested ${suggestion.suggestedFatGrams}g fat based on your TDEE.`,
-      });
-    } catch (error: any) {
-      console.error("Fat Calculation Error:", error);
-      setFatSuggestionError("Failed to calculate fat suggestion. Please try again.");
-      toast({
-        title: "Calculation Error",
-        description: "Failed to calculate fat suggestion. Please try again.",
-        variant: "destructive",
-      });
+    let percentage: number;
+    let rangeText: string;
+
+    if (userProfile.sex === 'female') {
+        percentage = 0.34;
+        rangeText = "33-35%";
+    } else if (userProfile.sex === 'male') {
+        percentage = 0.25;
+        rangeText = "20-30%";
+    } else {
+        percentage = 0.275;
+        rangeText = "20-35%";
     }
+
+    const suggestedFatGrams = (userProfile.tdee * percentage) / 9;
+    const justificationText = `For a ${userProfile.sex || 'user'}, a balanced starting point for dietary fat is ${rangeText} of total daily calories. Based on your estimated TDEE of ~${userProfile.tdee.toFixed(0)} kcal, a target of ${Math.round(percentage * 100)}% suggests approximately ${Math.round(suggestedFatGrams)}g of fat per day. This provides essential fatty acids and supports hormone function.`;
+
+    setFatSuggestion({
+        suggestedFatGrams: Math.round(suggestedFatGrams),
+        justification: justificationText,
+    });
   };
 
   const applyFatSuggestion = () => {
@@ -437,39 +268,6 @@ export default function DietaryTargetsPage() {
     }
   };
 
-  // ✅ Add loading and error states
-  if (loading || !user) {
-    return (
-      <PageWrapper title="Dietary Targets">
-        <div className="grid md:grid-cols-2 gap-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Loading...</CardTitle>
-              <CardDescription>Loading your profile data...</CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
-      </PageWrapper>
-    );
-  }
-
-  if (error) {
-    return (
-      <PageWrapper title="Dietary Targets">
-        <Alert variant="destructive">
-          <AlertTitle>Error Loading Profile</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      </PageWrapper>
-    );
-  }
-
-  // ✅ Debug: Log TDEE value
-  console.log('🔍 Targets Page Debug:', {
-    userProfile: userProfile ? 'Profile loaded' : 'No profile',
-    tdee: userProfile?.tdee,
-    hasRequiredData: !!(userProfile?.tdee && userProfile?.weightKg)
-  });
 
   return (
     <PageWrapper title="Dietary Targets">
@@ -478,7 +276,7 @@ export default function DietaryTargetsPage() {
             <Card>
                 <CardHeader>
                 <CardTitle>Caloric & Macro Targets</CardTitle>
-                <CardDescription>Set your nutritional goals. Use the helper tools below to get suggestions for protein, fat, and calories for weight loss.</CardDescription>
+                <CardDescription>Set your nutritional goals. Use the helper tools below to get suggestions for fat and calories for your goal.</CardDescription>
                 </CardHeader>
                 <Form {...macroForm}>
                 <form onSubmit={macroForm.handleSubmit(handleMacroSubmit)}>
@@ -493,54 +291,9 @@ export default function DietaryTargetsPage() {
                             <Input type="number" {...field} />
                             </FormControl>
                             <FormMessage />
-                            <Card className="bg-muted/50 mt-4">
-                                <CardHeader className="p-4">
-                                    <CardTitle className="text-base flex items-center">
-                                        <Calculator className="mr-2 h-4 w-4 text-accent" />
-                                        Protein Calculator
-                                    </CardTitle>
-                                    <CardDescription className="text-xs">
-                                        Get a protein target based on your Lean Body Mass (LBM). Select your preferred target type.
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="p-4 pt-0">
-                                    <div className="flex flex-wrap gap-2">
-                                        <Button type="button" size="sm" variant="outline" onClick={() => handleGetProteinSuggestion('average')}>
-                                            Average
-                                        </Button>
-                                        <Button type="button" size="sm" variant="outline" onClick={() => handleGetProteinSuggestion('safe')}>
-                                            Safe
-                                        </Button>
-                                        <Button type="button" size="sm" variant="outline" onClick={() => handleGetProteinSuggestion('flexible')}>
-                                            Flexible
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
                         </FormItem>
                         )}
                     />
-                    {proteinSuggestion && (
-                        <Card className="bg-secondary/50 p-4">
-                        <CardHeader className="p-0 pb-2">
-                            <CardTitle className="text-md flex items-center text-primary">
-                            <Lightbulb className="w-5 h-5 mr-2 text-accent" /> Protein Suggestion
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0 text-sm space-y-2">
-                            <p>
-                            Suggested Protein: <strong>{proteinSuggestion.minProteinGramsPerDay}g per day</strong>
-                            </p>
-                            <p>
-                            (Factor: {proteinSuggestion.minProteinFactor.toFixed(2)} {proteinSuggestion.displayUnit})
-                            </p>
-                            <p className="text-xs text-muted-foreground italic">Justification: {proteinSuggestion.justification}</p>
-                            <Button type="button" size="sm" onClick={applyProteinSuggestion} className="mt-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-                            Apply Suggestion ({proteinSuggestion.minProteinGramsPerDay}g)
-                            </Button>
-                        </CardContent>
-                        </Card>
-                    )}
                     <FormField
                         control={macroForm.control}
                         name="fat"
@@ -638,13 +391,7 @@ export default function DietaryTargetsPage() {
                 </form>
                 </Form>
             </Card>
-            {aiError && (
-                <Alert variant="destructive">
-                <Info className="h-4 w-4" />
-                <AlertTitle>AI Suggestion Error</AlertTitle>
-                <AlertDescription>{aiError}</AlertDescription>
-                </Alert>
-            )}
+            
              {fatSuggestionError && (
                 <Alert variant="destructive">
                   <Info className="h-4 w-4" />
@@ -672,11 +419,6 @@ export default function DietaryTargetsPage() {
                             <AlertTitle>Missing Information</AlertTitle>
                             <AlertDescription>
                                 Please complete your <Link href="/dashboard/profile/user-info" className="underline">User Info</Link> (Weight, Height, Age, Activity Level) to use this calculator.
-                                {/* ✅ Debug info */}
-                                <br />
-                                <small className="text-xs opacity-70">
-                                  Debug: TDEE = {userProfile?.tdee || 'null'}, Weight = {userProfile?.weightKg || 'null'}
-                                </small>
                             </AlertDescription>
                         </Alert>
                     ) : (
@@ -777,7 +519,7 @@ export default function DietaryTargetsPage() {
                 <AlertDescription>
                 <ul className="list-disc pl-5 mt-2 space-y-1 text-sm">
                     <li>First, complete your <Link href="/dashboard/profile/user-info" className="underline hover:text-primary">User Info</Link> page to calculate your TDEE (Total Daily Energy Expenditure).</li>
-                    <li>Use the 'Suggest Protein' and 'Suggest Fat' buttons to get AI-powered and calculated starting points for these macros.</li>
+                    <li>Use the 'Suggest Fat' button to get a calculated starting point.</li>
                     <li>Use the 'Goal Calculator' to find a calorie target for your goal, and apply it. This will adjust your 'Carbohydrates' to meet the target.</li>
                     <li>For **muscle gain**, use the 'Muscle Gain' tab. For **fat loss**, use the 'Fat Loss' tab.</li>
                 </ul>
@@ -787,4 +529,5 @@ export default function DietaryTargetsPage() {
        </div>
     </PageWrapper>
   );
+
 }

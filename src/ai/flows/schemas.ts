@@ -17,39 +17,6 @@ export const MacroDataSchema = z.object({
   fat: z.number().finite().nonnegative().describe("Total fat in grams"),
 });
 
-// Reusable schema for micronutrient data
-export const MicronutrientsSchema = z.object({
-  iron: z.number().nullable().describe('Estimated iron in milligrams (mg).'),
-  calcium: z.number().nullable().describe('Estimated calcium in milligrams (mg).'),
-  potassium: z.number().nullable().describe('Estimated potassium in milligrams (mg).'),
-  vitaminA: z.number().nullable().describe('Estimated Vitamin A in micrograms (mcg).'),
-  vitaminC: z.number().nullable().describe('Estimated Vitamin C in milligrams (mg).'),
-  vitaminD: z.number().nullable().describe('Estimated Vitamin D in micrograms (mcg).'),
-});
-
-// Schema for Bug Reporting Flow
-export const BugReportInputSchema = z.object({
-  description: z.string().min(20, "Please provide a detailed description of the bug.").describe("The user's detailed description of the issue they encountered."),
-  appVersion: z.string().optional().describe("The version of the app the user is on."),
-  userId: z.string().optional().describe("The user's ID for tracking purposes."),
-});
-
-export const BugReportOutputSchema = z.object({
-  title: z.string().describe("A short, descriptive title for the bug report (e.g., 'Recipe fails to save', 'Macro chart not updating')."),
-  summary: z.string().describe("A concise one-paragraph summary of the user's issue."),
-  category: z.enum(['UI/UX', 'Performance', 'Data', 'Authentication', 'AI/Preppy', 'Other']).describe("The best-fitting category for the reported bug."),
-  priority: z.enum(['Low', 'Medium', 'High', 'Critical']).describe("The estimated priority based on the bug's impact (e.g., 'Critical' for crashes, 'Low' for typos)."),
-  stepsToReproduce: z.array(z.string()).optional().describe("A list of steps to reproduce the bug, if discernible from the user's description."),
-});
-
-// Schema for App Guide Flow
-export const AppGuideInputSchema = z.object({
-  question: z.string().describe('The users question about how to use the app.'),
-});
-
-export const AppGuideOutputSchema = z.object({
-  answer: z.string().describe('A helpful answer based on the provided app guide context.'),
-});
 
 // Schema for Pro Coach Flow
 export const ProCoachInputSchema = z.object({
@@ -108,35 +75,6 @@ export const SuggestMealPlanOutputSchema = z.object({
     fitnessAssessment: z.string().describe("A brief assessment of how well the plan meets the targets (e.g., 'Calories are slightly over, protein target met.'). Consider macro percentages too."),
 });
 
-// Schemas for Suggest Micronutrients Flow
-export const MicronutrientEstimationInputSchema = z.object({
-    ingredients: z.array(z.string()).describe('A list of ingredients for a single serving of a recipe, including quantities and units (e.g., ["100g chicken breast", "50g broccoli"]).'),
-});
-
-// Schemas for Suggest Protein Intake Flow
-export const SuggestProteinIntakeInputSchema = z.object({
-    leanBodyMassKg: z.number().finite().positive().describe("User's lean body mass in kilograms (kg). This is required."),
-    sex: z.enum(['male', 'female', 'notSpecified']).optional().default('notSpecified')
-        .describe("User's sex, used to select appropriate targets when not using LBM."),
-    recommendationType: z.enum(['average', 'safe', 'flexible']).default('average')
-        .describe("The type of recommendation desired: 'average' for a standard target, 'safe' for a 'better safe than sorry' higher target, or 'flexible' for a lower intake."),
-    unitPreference: z.enum(['g/kgLBM', 'g/lbLBM']).default('g/kgLBM')
-        .describe("Preferred unit for displaying protein factors: grams per kg LBM or grams per lb LBM."),
-    athleteType: z.enum(['endurance', 'strengthPower', 'generalFitness', 'notSpecified']).optional().default('notSpecified')
-        .describe("Type of athlete (e.g., endurance, strength/power). Used for context in the justification text only."),
-    primaryGoal: z.enum(['fatLoss', 'muscleGain', 'maintenance', 'notSpecified']).optional().default('notSpecified')
-        .describe("Primary training goal (e.g., fat loss, muscle gain). Used for context in the justification text only."),
-    bodyFatPercentage: z.number().finite().positive().optional().nullable().describe("User's body fat percentage. Used for context only."),
-});
-
-export const SuggestProteinIntakeOutputSchema = z.object({
-    minProteinGramsPerDay: z.number().finite().nonnegative().describe("Minimum suggested daily protein intake in grams."),
-    maxProteinGramsPerDay: z.number().finite().nonnegative().describe("Maximum suggested daily protein intake in grams. Will often be the same as the minimum for a specific target."),
-    minProteinFactor: z.number().finite().nonnegative().describe("The lower-bound multiplier used for calculation (e.g., 2.35 if displayUnit is 'g/kg LBM')."),
-    maxProteinFactor: z.number().finite().nonnegative().describe("The upper-bound multiplier used for calculation (e.g., 2.75 if displayUnit is 'g/kg LBM')."),
-    displayUnit: z.enum(['g/kg LBM', 'g/lb LBM']).describe("The unit in which min/maxProteinFactor are expressed."),
-    justification: z.string().describe("Explanation of the protein recommendation based on the provided inputs and guidelines."),
-});
 
 // Schemas for Suggest Recipe Modification Flow
 const RecipeToModifySchema = z.object({
