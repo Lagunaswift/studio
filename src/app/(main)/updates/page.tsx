@@ -78,7 +78,6 @@ export default function UpdatesAndFeedbackPage() {
                     <ul className="list-disc pl-5 space-y-2 text-sm">
                         <li><span className="font-semibold text-primary">Core Functionality:</span> Recipe management, meal planning, and macro tracking are live.</li>
                         <li><span className="font-semibold text-primary">AI Features:</span> Preppy can generate meal plans, suggest recipes from your pantry, and tweak existing recipes.</li>
-                        <li><span className="font-semibold text-primary">Firebase Migration:</span> The app is now fully powered by Firebase Authentication and Firestore for a secure and scalable experience.</li>
                         <li><span className="font-semibold text-primary">Pantry & Shopping List:</span> Keep track of your ingredients and automatically generate a shopping list.</li>
                     </ul>
                   </AccordionContent>
@@ -87,8 +86,7 @@ export default function UpdatesAndFeedbackPage() {
                   <AccordionTrigger>Coming Soon...</AccordionTrigger>
                   <AccordionContent>
                      <ul className="list-disc pl-5 space-y-2 text-sm">
-                        <li><span className="font-semibold text-accent">Barcode Scanning:</span> Easily add pantry items and get nutritional information by scanning barcodes.</li>
-                        <li><span className="font-semibold text-accent">Shared Recipe Books:</span> Collaborate on recipe collections with family and friends.</li>
+                        
                         <li><span className="font-semibold text-accent">Advanced Analytics:</span> Deeper insights into your nutritional trends and progress over time.</li>
                         <li><span className="font-semibold text-accent">Wearable Integrations:</span> Sync your activity data from popular fitness trackers.</li>
                     </ul>
