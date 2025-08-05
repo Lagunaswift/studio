@@ -36,6 +36,7 @@ import {
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
+import { getRdaProfile } from '@/lib/rda';
 import { runProCoachFlow } from '@/ai/flows/pro-coach-flow';
 import { ProCoachOutputSchema } from '@/ai/flows/schemas';
 import { format, subDays, differenceInDays } from 'date-fns';
@@ -155,6 +156,30 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
+
+export function SubscriptionDebug() {
+  const { userProfile, isSubscribed } = useAppContext();
+  
+  if (!userProfile) return null;
+  
+  return (
+    <div style={{ 
+      position: 'fixed', 
+      top: 10, 
+      right: 10, 
+      background: 'black', 
+      color: 'white', 
+      padding: '10px', 
+      zIndex: 9999,
+      fontSize: '12px'
+    }}>
+      <div>🔍 Subscription Debug:</div>
+      <div>Status: {userProfile.subscription_status}</div>
+      <div>isSubscribed: {isSubscribed ? '✅' : '❌'}</div>
+      <div>Profile ID: {userProfile.id}</div>
+    </div>
+  );
+}
 
 function getDefaultUserProfile(userId: string, userEmail: string | null): UserProfileSettings {
   return {
@@ -426,8 +451,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   
     return { success: true, message: "Check-in complete!", recommendation: parsedRecommendation.data };
-  }, [userProfile, dailyWeightLog, dailyManualMacrosLog, getConsumedMacrosForDate]);
+  }, [userProfile, dailyWeightLog, dailyManualMacrosLog]);
   
+  const isSubscribed = useMemo(() => {
+    if (!userProfile) return false;
+    
+    // Check if subscription_status is 'active'
+    const hasActiveSubscription = userProfile.subscription_status === 'active';
+    
+    return hasActiveSubscription;
+  }, [userProfile]);
+
   const contextValue: AppContextType = useMemo(() => ({
     userProfile,
     userRecipes,
@@ -435,7 +469,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     pantryItems,
     isAppDataLoading: isDataLoading,
     isRecipeCacheLoading,
-    isSubscribed: userProfile?.subscription_status === 'active',
+    isSubscribed,
     isOnline,
     allRecipesCache: Array.from(new Map([...builtInRecipes, ...userRecipes].map(recipe => [recipe.id, recipe])).values()),
     shoppingList: generateShoppingListUtil(mealPlan, [...builtInRecipes, ...userRecipes], pantryItems),
@@ -483,7 +517,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     acceptTerms: () => setUserInformation({ has_accepted_terms: true }),
     assignIngredientCategory: assignCategoryUtil,
   }), [
-    userProfile, userRecipes, builtInRecipes, mealPlan, pantryItems, isDataLoading, isRecipeCacheLoading, isOnline,
+    userProfile, userRecipes, builtInRecipes, mealPlan, pantryItems, isDataLoading, isRecipeCacheLoading, isOnline, isSubscribed,
     addMealToPlan, removeMealFromPlan, updateMealServingsOrStatus, getConsumedMacrosForDate,
     setUserInformation, addPantryItem, removePantryItem, updatePantryItemQuantity, runWeeklyCheckin
   ]);

@@ -1,4 +1,4 @@
-//src/app/dashboard/layout.tsx
+
 "use client";
 
 import Link from 'next/link';
@@ -37,7 +37,7 @@ import { Input } from '@/components/ui/input';
 import { useState, type FormEvent, useEffect, useTransition } from 'react';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/context/AuthContext';
-import { useAppContext } from '@/context/AppContext';
+import { useAppContext, SubscriptionDebug } from '@/context/AppContext';
 import { Button } from '@/components/ui/button';
 
 interface NavItem {
@@ -390,6 +390,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
       </SidebarInset>
       <DevStatusIndicator />
       <SimpleHelpWidget />
+      <SubscriptionDebug />
       <TermsAcceptanceModal
         isOpen={showTerms}
         onAccept={handleAcceptTerms}
