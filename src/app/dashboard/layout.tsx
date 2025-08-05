@@ -389,7 +389,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         </main>
       </SidebarInset>
       <DevStatusIndicator />
-      <SimpleHelpWidget /> {/* Add the help component */}
+      <SimpleHelpWidget />
       <TermsAcceptanceModal
         isOpen={showTerms}
         onAccept={handleAcceptTerms}

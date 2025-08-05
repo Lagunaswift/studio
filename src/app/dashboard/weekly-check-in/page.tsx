@@ -1,152 +1,170 @@
 
 "use client";
-
-import { useState } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { useAppContext } from '@/context/AppContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Sparkles, CheckSquare, Info, AlertTriangle, TrendingUp, TrendingDown, Lock } from 'lucide-react';
-import type { PreppyOutput } from '@/ai/flows/pro-coach-flow';
-import { MacroDisplay } from '@/components/shared/MacroDisplay';
-import { Separator } from '@/components/ui/separator';
-import { cn } from '@/lib/utils';
-import Link from 'next/link';
-import { ProFeature } from '@/components/shared/ProFeature';
+import { useAppContext } from '@/context/AppContext';
+import { Loader2, Zap, AlertTriangle } from 'lucide-react';
+import { ProCoachOutputSchema } from '@/ai/flows/schemas';
+import { z } from 'zod';
+import { useToast } from '@/hooks/use-toast';
+import { generateTestCoachingData } from '@/lib/tdee/test-data-generator';
+import { addOrUpdateWeightLog, addOrUpdateManualMacrosLog } from '@/app/dashboard/profile/actions';
 
-export default function WeeklyCheckinPage() {
-  const { userProfile, runWeeklyCheckin, setMacroTargets, isAppDataLoading, isSubscribed } = useAppContext();
-  
+type Recommendation = z.infer<typeof ProCoachOutputSchema>;
+
+export default function WeeklyCheckInPage() {
+  const { userProfile, runWeeklyCheckin, setUserInformation } = useAppContext();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [recommendation, setRecommendation] = useState<PreppyOutput | null>(null);
-
-  const handleRunCheckin = async () => {
+  const [isTestDataLoading, setIsTestDataLoading] = useState(false);
+  const [checkInResult, setCheckInResult] = useState<{
+    success: boolean;
+    message: string;
+    recommendation?: Recommendation | null;
+  } | null>(null);
+  const { toast } = useToast();
+  
+  const handleRunCheckin = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
-    setRecommendation(null);
-
+    setCheckInResult(null);
     try {
       const result = await runWeeklyCheckin();
-      if (result.success && result.recommendation) {
-        setRecommendation(result.recommendation);
+      setCheckInResult(result);
+      if (result.success) {
+        toast({
+          title: "Check-in Complete",
+          description: result.message,
+        });
       } else {
-        setError(result.message || "An unknown error occurred during the check-in.");
+        toast({
+          title: "Check-in Incomplete",
+          description: result.message,
+          variant: "destructive",
+        });
       }
-    } catch (e: any) {
-      console.error("Weekly Check-in Error:", e);
-      setError(e.message || "A critical error occurred. Please check the console.");
+    } catch (error: any) {
+      setCheckInResult({
+        success: false,
+        message: error.message || "An unexpected error occurred."
+      });
+      toast({
+        title: "Check-in Error",
+        description: error.message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
+  }, [runWeeklyCheckin, toast]);
+
+  const handleGenerateTestData = async (goal: 'fatLoss' | 'muscleGain' | 'maintenance') => {
+    setIsTestDataLoading(true);
+    try {
+        if (!userProfile) {
+            toast({ title: "Profile not loaded", description: "Please wait for your profile to load before generating data.", variant: "destructive" });
+            return;
+        }
+        const { dailyWeightLog, dailyManualMacrosLog } = generateTestCoachingData(userProfile, goal);
+        
+        // This is a simplified approach. A more robust solution might use batch writes.
+        for (const log of dailyWeightLog) {
+            await addOrUpdateWeightLog(log);
+        }
+        for (const log of dailyManualMacrosLog) {
+            await addOrUpdateManualMacrosLog(log);
+        }
+
+        toast({
+            title: "Test Data Generated",
+            description: `Generated 21 days of mock data for a ${goal} scenario.`,
+        });
+    } catch (error: any) {
+        toast({
+            title: "Failed to Generate Test Data",
+            description: error.message,
+            variant: "destructive",
+        });
+    } finally {
+        setIsTestDataLoading(false);
+    }
   };
 
-  const handleApplyTargets = async () => {
-    if (!recommendation?.newMacroTargets) return;
-    await setMacroTargets(recommendation.newMacroTargets);
-    setError("New targets have been applied! You're all set for the week ahead.");
-    setRecommendation(null); // Clear the recommendation to prevent re-applying
-  };
-
-  const isCheckinDisabled = !userProfile?.dailyWeightLog || userProfile.dailyWeightLog.length < 14;
-
-  if (!isSubscribed) {
-    return (
-        <PageWrapper title="Preppy: Weekly Check-in">
-            <ProFeature featureName="Weekly Check-in" description="This is the core of our adaptive coaching. Preppy analyzes your weight trend and calorie intake to calculate your true energy expenditure, then provides optimized macro targets to ensure you stay on track with your goals." />
-        </PageWrapper>
-    );
-  }
-
-  if (isAppDataLoading) {
-     return (
-      <PageWrapper title="Preppy: Weekly Check-in">
-        <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
-          <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
-          <p className="text-lg">Loading your data...</p>
-        </div>
-      </PageWrapper>
-    );
-  }
+  const canCheckIn = useMemo(() => {
+    if (!userProfile) return { can: false, reason: "Your profile is still loading." };
+    if (!userProfile.weightKg || !userProfile.tdee) return { can: false, reason: "Please complete your User Info and set your initial Macro Targets." };
+    return { can: true, reason: "" };
+  }, [userProfile]);
 
   return (
     <PageWrapper title="Preppy: Weekly Check-in">
-      <div className="space-y-8">
-        <Card className="shadow-lg">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <Card>
           <CardHeader>
-            <CardTitle className="font-headline text-primary flex items-center">
-              <CheckSquare className="w-6 h-6 mr-2 text-accent" />
-              Your Weekly Check-in with Preppy
-            </CardTitle>
+            <CardTitle>Your Weekly Review</CardTitle>
             <CardDescription>
-              This is where my AI coaching shines. Based on your logged weight and food intake, I'll calculate your true energy expenditure (TDEE) and adjust your targets to keep you perfectly on track.
+              Let Preppy analyze your weight and calorie data from the past few weeks to dynamically adjust your TDEE and macro targets. For best results, log your weight and intake daily.
             </CardDescription>
           </CardHeader>
           <CardContent>
-             {isCheckinDisabled ? (
-                <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>More Data Needed</AlertTitle>
-                    <AlertDescription>
-                        The weekly check-in requires at least 14 days of logged weight and consumed meals to accurately calculate your TDEE. Keep logging your progress daily on the <Link href="/" className="underline">Dashboard</Link> and <Link href="/meal-plan" className="underline">Meal Plan</Link> pages!
-                    </AlertDescription>
-                </Alert>
+            {canCheckIn.can ? (
+              <Button onClick={handleRunCheckin} disabled={isLoading} className="w-full">
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4" />}
+                {isLoading ? 'Analyzing Your Progress...' : 'Start My Weekly Check-in'}
+              </Button>
             ) : (
-                <Button onClick={handleRunCheckin} disabled={isLoading} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                    Start My Check-in
-                </Button>
+              <div className="text-center p-4 bg-muted rounded-md">
+                <p className="font-semibold text-destructive">{canCheckIn.reason}</p>
+              </div>
             )}
           </CardContent>
+           {process.env.NODE_ENV === 'development' && (
+              <CardFooter className="flex-col space-y-2 items-start border-t pt-4">
+                  <h3 className="font-semibold text-destructive">Dev Tools: Test Data</h3>
+                  <p className="text-xs text-muted-foreground">Click to populate your logs with 21 days of sample data to test the check-in feature.</p>
+                  <div className="flex gap-2">
+                      <Button onClick={() => handleGenerateTestData('fatLoss')} disabled={isTestDataLoading} size="sm" variant="outline">
+                         {isTestDataLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Fat Loss Data
+                      </Button>
+                      <Button onClick={() => handleGenerateTestData('muscleGain')} disabled={isTestDataLoading} size="sm" variant="outline">
+                         {isTestDataLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Muscle Gain Data
+                      </Button>
+                  </div>
+              </CardFooter>
+           )}
         </Card>
-
-        {isLoading && (
-          <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
-            <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
-            <p className="text-lg">Analyzing your progress...</p>
-            <p className="text-sm">This might take a moment.</p>
-          </div>
-        )}
-
-        {error && !recommendation && (
-          <Alert variant={error.includes("applied") ? "default" : "destructive"} className={error.includes("applied") ? "border-green-500" : ""}>
-            <Info className="h-4 w-4" />
-            <AlertTitle>{error.includes("applied") ? "Success" : "Check-in Error"}</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {recommendation && !isLoading && (
-          <Card className="shadow-xl">
-            <CardHeader>
-              <CardTitle className="font-headline text-primary">Your Weekly Check-in Results</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                <div>
-                    <h3 className="text-lg font-semibold mb-1 text-primary-focus flex items-center">
-                        <Sparkles className="w-5 h-5 mr-2 text-accent" /> My Coaching Summary
-                    </h3>
-                    <p className="text-sm text-foreground/80 bg-secondary/30 p-3 rounded-md whitespace-pre-wrap">{recommendation.coachingSummary}</p>
+        
+        <Card className={checkInResult ? '' : 'flex items-center justify-center bg-muted/30'}>
+            {checkInResult ? (
+                 <CardHeader>
+                    <CardTitle className={checkInResult.success ? "text-primary" : "text-destructive"}>
+                        {checkInResult.success ? "Check-in Analysis Complete" : "Check-in Failed"}
+                    </CardTitle>
+                    <CardDescription>{checkInResult.message}</CardDescription>
+                 </CardHeader>
+            ) : (
+                <div className="text-center p-8">
+                    <p className="text-muted-foreground">Your check-in results will appear here.</p>
                 </div>
-
-                <Separator />
-                
-                <div>
-                    <h3 className="text-xl font-semibold font-headline text-primary-focus mb-2">New Recommended Targets:</h3>
-                    {recommendation.newMacroTargets ? (
-                         <MacroDisplay macros={recommendation.newMacroTargets} title="" highlightTotal className="shadow-md" />
-                    ) : <p>No new targets were recommended.</p>}
-                   
-                </div>
-            </CardContent>
-            <CardFooter>
-                 <Button onClick={handleApplyTargets} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                    <CheckSquare className="mr-2 h-5 w-5" /> Accept & Start New Week
-                </Button>
-            </CardFooter>
-          </Card>
-        )}
+            )}
+            {checkInResult?.recommendation && (
+                <CardContent className="space-y-4">
+                    <div>
+                        <h4 className="font-semibold">Coaching Summary</h4>
+                        <p className="text-sm">{checkInResult.recommendation.coachingSummary}</p>
+                    </div>
+                     <div>
+                        <h4 className="font-semibold">New Macro Targets</h4>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                            <p>Calories: <span className="font-bold">{checkInResult.recommendation.newMacroTargets.calories.toFixed(0)} kcal</span></p>
+                            <p>Protein: <span className="font-bold">{checkInResult.recommendation.newMacroTargets.protein.toFixed(0)} g</span></p>
+                            <p>Carbs: <span className="font-bold">{checkInResult.recommendation.newMacroTargets.carbs.toFixed(0)} g</span></p>
+                            <p>Fat: <span className="font-bold">{checkInResult.recommendation.newMacroTargets.fat.toFixed(0)} g</span></p>
+                        </div>
+                    </div>
+                </CardContent>
+            )}
+        </Card>
       </div>
     </PageWrapper>
   );

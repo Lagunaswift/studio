@@ -1,171 +1,108 @@
-'use client';
 
-import { useState } from 'react';
+"use client";
+
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { HelpCircle, Search, Book, ExternalLink } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-
-// Simple FAQ data - no AI needed
-const FAQ_DATA = [
-  {
-    id: 1,
-    question: "How do I add a recipe to my meal plan?",
-    answer: "Go to Plan → Daily/Weekly View, click on a meal slot, then browse and select recipes to add.",
-    keywords: ["recipe", "meal plan", "add", "planning"],
-    category: "Meal Planning"
-  },
-  {
-    id: 2,
-    question: "How do I set my macro targets?",
-    answer: "Go to Profile → Dietary Targets. Use the Goal Calculator for automatic suggestions or set them manually.",
-    keywords: ["macro", "targets", "calories", "protein", "goals"],
-    category: "Goals & Targets"
-  },
-  {
-    id: 3,
-    question: "How do I track my daily weight?",
-    answer: "On the Dashboard, use the Daily Weight Log widget to quickly record your weight each day.",
-    keywords: ["weight", "tracking", "log", "dashboard"],
-    category: "Tracking"
-  },
-  {
-    id: 4,
-    question: "How do I use the pantry feature?",
-    answer: "Go to Pantry & Shopping → My Pantry. Add ingredients you have at home, and the app will generate shopping lists based on what you need.",
-    keywords: ["pantry", "ingredients", "shopping", "inventory"],
-    category: "Pantry & Shopping"
-  },
-  {
-    id: 5,
-    question: "How do I mark meals as eaten?",
-    answer: "In your meal plan, click the checkbox next to each meal to mark it as consumed. This is important for accurate macro tracking.",
-    keywords: ["eaten", "consumed", "tracking", "checkbox", "meals"],
-    category: "Meal Planning"
-  },
-  {
-    id: 6,
-    question: "How do I calculate my TDEE?",
-    answer: "Go to Profile → User Information and fill out your height, weight, age, sex, and activity level. Your TDEE will be calculated automatically.",
-    keywords: ["tdee", "energy", "expenditure", "calculate", "profile"],
-    category: "Profile Setup"
-  },
-  {
-    id: 7,
-    question: "How do I filter recipes by dietary preferences?",
-    answer: "Go to Profile → Diet & Allergens to set your preferences. Recipes will be automatically filtered throughout the app.",
-    keywords: ["filter", "dietary", "preferences", "vegetarian", "allergens"],
-    category: "Recipes"
-  },
-  {
-    id: 8,
-    question: "How do I create custom meal slots?",
-    answer: "Go to Profile → Meal Structure to define your daily meals (e.g., 'Post-Workout', 'Evening Snack').",
-    keywords: ["meal structure", "custom", "slots", "breakfast", "dinner"],
-    category: "Profile Setup"
-  }
-];
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Bot, Loader2 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { reportBug } from '@/app/dashboard/profile/actions';
+import { useToast } from '@/hooks/use-toast';
 
 export function SimpleHelpWidget() {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  // Simple search function - no AI needed
-  const searchResults = FAQ_DATA.filter(faq => {
-    if (!searchQuery.trim()) return true;
-    
-    const query = searchQuery.toLowerCase();
-    return (
-      faq.question.toLowerCase().includes(query) ||
-      faq.answer.toLowerCase().includes(query) ||
-      faq.keywords.some(keyword => keyword.toLowerCase().includes(query)) ||
-      faq.category.toLowerCase().includes(query)
-    );
-  });
+  const [isBugReportOpen, setIsBugReportOpen] = useState(false);
+  const [bugDescription, setBugDescription] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user } = useAuth();
+  const { toast } = useToast();
 
-  const handleOpenChange = (open: boolean) => {
-    setIsOpen(open);
-    if (!open) {
-      setSearchQuery('');
+  const handleBugReportSubmit = async () => {
+    if (!bugDescription.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please provide a description of the bug.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const result = await reportBug(bugDescription, user?.uid || 'anonymous');
+      if (result.success) {
+        toast({
+          title: 'Bug Report Submitted',
+          description: 'Thank you for your feedback!',
+        });
+        setBugDescription('');
+        setIsBugReportOpen(false);
+      } else {
+        throw new Error(result.error || 'Failed to submit bug report.');
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button
-          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50 bg-accent hover:bg-accent/90 text-accent-foreground flex items-center justify-center"
-          aria-label="Get help"
-        >
-          <HelpCircle className="h-7 w-7" />
+    <>
+      <div className="fixed bottom-4 right-4 z-50">
+        <Button onClick={() => setIsOpen(true)} className="rounded-full w-14 h-14 shadow-lg">
+          <Bot size={28} />
         </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center text-xl font-headline text-primary">
-            <Book className="w-6 h-6 mr-2 text-accent" />
-            Help & FAQ
-          </DialogTitle>
-          <DialogDescription>
-            Search our frequently asked questions or browse by category
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="flex-1 space-y-4 overflow-hidden">
-          {/* Search Bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search for help... (e.g., 'add recipe', 'macro targets')"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+      </div>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>How can I help?</DialogTitle>
+            <DialogDescription>
+              If you've encountered an issue or have a question, let us know.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <Button onClick={() => { setIsOpen(false); setIsBugReportOpen(true); }} className="w-full">
+              Report a Bug
+            </Button>
+            {/* Add more buttons for other help options here */}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isBugReportOpen} onOpenChange={setIsBugReportOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Report a Bug</DialogTitle>
+            <DialogDescription>
+              Please describe the issue you're facing in as much detail as possible.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              value={bugDescription}
+              onChange={(e) => setBugDescription(e.target.value)}
+              placeholder="E.g., When I click the 'Save Recipe' button, the page crashes."
+              rows={5}
             />
           </div>
-
-          {/* Results */}
-          <div className="overflow-y-auto max-h-[400px] space-y-3">
-            {searchResults.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>No help articles found for "{searchQuery}"</p>
-                <p className="text-sm mt-2">Try searching for: "recipe", "macro", "weight", or "pantry"</p>
-              </div>
-            ) : (
-              searchResults.map((faq) => (
-                <Card key={faq.id} className="border-l-4 border-l-accent">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">{faq.question}</CardTitle>
-                    <CardDescription className="text-xs text-accent">{faq.category}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-foreground/80">{faq.answer}</p>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
-
-          {/* Additional Help */}
-          <div className="border-t pt-4 mt-4">
-            <p className="text-sm text-muted-foreground text-center">
-              Still need help? 
-              <Button variant="link" className="p-0 ml-1 h-auto text-sm" asChild>
-                <a href="/feedback" className="flex items-center">
-                  Contact Support <ExternalLink className="ml-1 h-3 w-3" />
-                </a>
-              </Button>
-            </p>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBugReportOpen(false)}>Cancel</Button>
+            <Button onClick={handleBugReportSubmit} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Submit Report
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
+
+export const PreppyHelp = SimpleHelpWidget;

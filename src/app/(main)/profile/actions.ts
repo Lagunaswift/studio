@@ -40,6 +40,19 @@ const calculateTDEE = (
   return null;
 };
 
+export async function reportBug(description: string, userId: string) {
+  try {
+    const { adminDb, FieldValue } = await import('@/lib/firebase-admin');
+    await adminDb.collection('bug_reports').add({
+      description,
+      userId,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
 
 export async function getUserIdFromToken(idToken: string): Promise<string> {
   return await debugGetUserIdFromToken(idToken);

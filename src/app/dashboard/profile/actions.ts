@@ -1,18 +1,14 @@
+
 'use server';
 
 import { revalidatePath } from 'next/cache';
 import { serverFirestore } from '@/utils/firestoreRecovery';
+import { debugGetUserIdFromToken } from '@/utils/authDebug';
 import type { UserProfileSettings, Sex, ActivityLevel } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
-import { adminDb } from '@/lib/firebase-admin';
+import { getAdminFirestore } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { mergeWithDefaults } from '@/utils/profileDefaults';
-import { getUserProfile } from '@/lib/user-profile';
-
-// --- Type Guard Helper ---
-function isValidActivityLevel(value: any): value is ActivityLevel {
-  return value && ACTIVITY_LEVEL_OPTIONS.some(option => option.value === value);
-}
 
 // --- Calculation Helpers ---
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
@@ -31,12 +27,10 @@ const calculateTDEE = (
   sex: Sex | null,
   activityLevel: ActivityLevel | null
 ): number | null => {
-  if (!weightKg || !heightCm || !age || !sex || !activityLevel || !isValidActivityLevel(activityLevel)) return null;
-  
+  if (!weightKg || !heightCm || !age || !sex || !activityLevel) return null;
   let bmr: number;
   if (sex === 'male') bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
   else bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
-  
   const activity = ACTIVITY_LEVEL_OPTIONS.find(opt => opt.value === activityLevel);
   if (activity) {
     const tdee = bmr * activity.multiplier;
@@ -46,18 +40,24 @@ const calculateTDEE = (
   return null;
 };
 
-export async function updateUserProfile(userId: string, updates: Partial<Omit<UserProfileSettings, 'id'>>) {
+
+export async function getUserIdFromToken(idToken: string): Promise<string> {
+  return await debugGetUserIdFromToken(idToken);
+}
+
+export async function updateUserProfile(idToken: string, updates: Partial<Omit<UserProfileSettings, 'id'>>) {
   try {
-    const userDocRef = adminDb.collection('profiles').doc(userId);
-    const userProfile = await getUserProfile(userId);
+    const decodedToken = await serverFirestore.verifyToken(idToken);
+    const userId = decodedToken.uid;
     
-    const mergedData = { ...userProfile, ...updates };
+    const db = getAdminFirestore();
+    const userDocRef = db.collection('profiles').doc(userId);
+    const userDoc = await userDocRef.get();
+    const existingData = userDoc.exists ? userDoc.data() : {};
+    
+    const mergedData = { ...existingData, ...updates };
+
     const completeProfileData = mergeWithDefaults(mergedData, userId);
-    
-    // Validate and normalize activityLevel before calculations
-    const normalizedActivityLevel = isValidActivityLevel(completeProfileData.activityLevel) 
-      ? completeProfileData.activityLevel 
-      : null;
     
     // Recalculate derived values on the server
     completeProfileData.tdee = calculateTDEE(
@@ -65,15 +65,12 @@ export async function updateUserProfile(userId: string, updates: Partial<Omit<Us
         completeProfileData.heightCm,
         completeProfileData.age,
         completeProfileData.sex,
-        normalizedActivityLevel // Use normalized value
+        completeProfileData.activityLevel
     );
     completeProfileData.leanBodyMassKg = calculateLBM(
         completeProfileData.weightKg,
         completeProfileData.bodyFatPercentage
     );
-    
-    // Ensure activityLevel is properly typed for storage
-    completeProfileData.activityLevel = normalizedActivityLevel;
     
     const updateData = {
       ...completeProfileData,
@@ -97,13 +94,29 @@ export async function updateUserProfile(userId: string, updates: Partial<Omit<Us
   }
 }
 
+export async function reportBug(description: string, userId: string) {
+  try {
+    const { getAdminFirestore, FieldValue } = await import('@/lib/firebase-admin');
+    const adminDb = getAdminFirestore();
+    await adminDb.collection('bug_reports').add({
+      description,
+      userId,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 // MEAL PLAN FUNCTIONS
 export async function addOrUpdateMealPlan(idToken: string, mealData: any) {
   try {
     const decodedToken = await serverFirestore.verifyToken(idToken);
     const userId = decodedToken.uid;
     
-    const mealPlanRef = adminDb.collection('profiles').doc(userId).collection('mealPlan');
+    const db = getAdminFirestore();
+    const mealPlanRef = db.collection('profiles').doc(userId).collection('mealPlan');
     
     if (mealData.id) {
       // Update existing meal
@@ -136,7 +149,8 @@ export async function deleteMealFromPlan(idToken: string, mealId: string) {
   try {
     const decodedToken = await serverFirestore.verifyToken(idToken);
     const userId = decodedToken.uid;
-    await adminDb.collection('profiles').doc(userId).collection('mealPlan').doc(mealId).delete();
+    const db = getAdminFirestore();
+    await db.collection('profiles').doc(userId).collection('mealPlan').doc(mealId).delete();
     revalidatePath('/meal-plan');
     return { success: true };
   } catch (error: any) {
@@ -155,7 +169,8 @@ export async function addOrUpdatePantryItem(idToken: string, itemData: any) {
     const decodedToken = await serverFirestore.verifyToken(idToken);
     const userId = decodedToken.uid;
     
-    const pantryRef = adminDb.collection('profiles').doc(userId).collection('pantry');
+    const db = getAdminFirestore();
+    const pantryRef = db.collection('profiles').doc(userId).collection('pantry');
     
     if (itemData.id) {
       // Update existing item
@@ -188,7 +203,8 @@ export async function deletePantryItem(idToken: string, itemId: string) {
   try {
     const decodedToken = await serverFirestore.verifyToken(idToken);
     const userId = decodedToken.uid;
-    await adminDb.collection('profiles').doc(userId).collection('pantry').doc(itemId).delete();
+    const db = getAdminFirestore();
+    await db.collection('profiles').doc(userId).collection('pantry').doc(itemId).delete();
     revalidatePath('/pantry');
     return { success: true };
   } catch (error: any) {
@@ -207,7 +223,8 @@ export async function addRecipe(idToken: string, recipeData: any) {
     const decodedToken = await serverFirestore.verifyToken(idToken);
     const userId = decodedToken.uid;
     
-    const recipesRef = adminDb.collection('profiles').doc(userId).collection('recipes');
+    const db = getAdminFirestore();
+    const recipesRef = db.collection('profiles').doc(userId).collection('recipes');
     
     const docRef = await recipesRef.add({
       ...recipeData,
@@ -233,7 +250,8 @@ export async function addOrUpdateVitalsLog(idToken: string, vitalsData: any) {
     const decodedToken = await serverFirestore.verifyToken(idToken);
     const userId = decodedToken.uid;
     
-    const vitalsRef = adminDb.collection('profiles').doc(userId).collection('vitalsLogs');
+    const db = getAdminFirestore();
+    const vitalsRef = db.collection('profiles').doc(userId).collection('vitalsLogs');
     
     if (vitalsData.id) {
       // Update existing log
@@ -268,7 +286,8 @@ export async function addOrUpdateWeightLog(idToken: string, weightData: any) {
     const decodedToken = await serverFirestore.verifyToken(idToken);
     const userId = decodedToken.uid;
     
-    const weightRef = adminDb.collection('profiles').doc(userId).collection('weightLogs');
+    const db = getAdminFirestore();
+    const weightRef = db.collection('profiles').doc(userId).collection('weightLogs');
     
     if (weightData.id) {
       // Update existing log
@@ -303,7 +322,8 @@ export async function addOrUpdateManualMacrosLog(idToken: string, macrosData: an
     const decodedToken = await serverFirestore.verifyToken(idToken);
     const userId = decodedToken.uid;
     
-    const macrosRef = adminDb.collection('profiles').doc(userId).collection('manualMacrosLogs');
+    const db = getAdminFirestore();
+    const macrosRef = db.collection('profiles').doc(userId).collection('manualMacrosLogs');
     
     if (macrosData.id) {
       // Update existing log
@@ -329,18 +349,5 @@ export async function addOrUpdateManualMacrosLog(idToken: string, macrosData: an
       stack: error.stack,
     });
     return { success: false, error: `Could not save macros log: ${error.message}` };
-  }
-}
-
-export async function reportBug(description: string, userId: string) {
-  try {
-    await adminDb.collection('bug_reports').add({
-      description,
-      userId,
-      createdAt: FieldValue.serverTimestamp(),
-    });
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
   }
 }

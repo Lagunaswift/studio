@@ -17,6 +17,29 @@ export const MacroDataSchema = z.object({
   fat: z.number().finite().nonnegative().describe("Total fat in grams"),
 });
 
+// Schema for Bug Reporting Flow
+export const BugReportInputSchema = z.object({
+  description: z.string().min(20, "Please provide a detailed description of the bug.").describe("The user's detailed description of the issue they encountered."),
+  appVersion: z.string().optional().describe("The version of the app the user is on."),
+  userId: z.string().optional().describe("The user's ID for tracking purposes."),
+});
+
+export const BugReportOutputSchema = z.object({
+  title: z.string().describe("A short, descriptive title for the bug report (e.g., 'Recipe fails to save', 'Macro chart not updating')."),
+  summary: z.string().describe("A concise one-paragraph summary of the user's issue."),
+  category: z.enum(['UI/UX', 'Performance', 'Data', 'Authentication', 'AI/Preppy', 'Other']).describe("The best-fitting category for the reported bug."),
+  priority: z.enum(['Low', 'Medium', 'High', 'Critical']).describe("The estimated priority based on the bug's impact (e.g., 'Critical' for crashes, 'Low' for typos)."),
+  stepsToReproduce: z.array(z.string()).optional().describe("A list of steps to reproduce the bug, if discernible from the user's description."),
+});
+
+// Schema for App Guide Flow
+export const AppGuideInputSchema = z.object({
+  question: z.string().describe('The users question about how to use the app.'),
+});
+
+export const AppGuideOutputSchema = z.object({
+  answer: z.string().describe('A helpful answer based on the provided app guide context.'),
+});
 
 // Schema for Pro Coach Flow
 export const ProCoachInputSchema = z.object({
@@ -75,7 +98,6 @@ export const SuggestMealPlanOutputSchema = z.object({
     fitnessAssessment: z.string().describe("A brief assessment of how well the plan meets the targets (e.g., 'Calories are slightly over, protein target met.'). Consider macro percentages too."),
 });
 
-
 // Schemas for Suggest Recipe Modification Flow
 const RecipeToModifySchema = z.object({
     name: z.string().describe("The original name of the recipe."),
@@ -99,7 +121,7 @@ export const SuggestRecipeModificationOutputSchema = z.object({
 });
 
 // Schemas for Suggest Recipes By Ingredients Flow
-const RecipeWithIngredientsSchema = z.object({
+export const RecipeWithIngredientsSchema = z.object({
     id: z.number().describe("Unique ID of the recipe"),
     name: z.string().describe("Name of the recipe"),
     ingredients: z.array(z.string()).describe("The full list of ingredients for this recipe. Example: ['1 cup flour', '2 large eggs', '100g sugar']"),
