@@ -348,7 +348,7 @@ export default function HomePage() {
                         />
                     ) : (
                         <Alert>
-                        <UtensilsCrossed className="h-4 w-4" />
+                        <UtensilsCrossed className="h-4" />
                         <AlertTitle>No Recipes Available</AlertTitle>
                         </Alert>
                     )}

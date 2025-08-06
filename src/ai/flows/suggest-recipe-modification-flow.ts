@@ -15,7 +15,8 @@ export const suggestRecipeModificationFlow = ai.defineFlow(
     if (!input.recipeToModify || !input.userRequest) {
       throw new Error("A recipe and a modification request are required.");
     }
-    const { output } = await ai.prompt('suggestRecipeModification').run(input);
+    const prompt = ai.prompt('suggestRecipeModification');
+    const { output } = await prompt.run(input);
     if (!output) {
       throw new Error('AI failed to generate a recipe modification.');
     }

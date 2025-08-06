@@ -29,7 +29,7 @@ export const suggestMealPlanFlow = ai.defineFlow(
         };
 
         const suggestMealPlanPrompt = ai.prompt('suggestMealPlan');
-        const response = await suggestMealPlanPrompt(promptInput);
+        const response = await suggestMealPlanPrompt.run({ data: promptInput });
         const output = response.output;
 
         if (!output) {

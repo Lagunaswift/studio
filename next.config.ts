@@ -32,6 +32,12 @@ const nextConfig: NextConfig = {
       test: /\.hbs$/,
       loader: 'handlebars-loader',
     });
+
+    config.module.rules.push({
+      test: /\.prompt$/,
+      type: 'asset/source',
+    });
+
     return config;
   },
 };

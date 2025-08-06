@@ -95,7 +95,6 @@ export const UserProfileSettingsSchema = z.object({
   primaryGoal: z.enum(PRIMARY_GOAL_OPTIONS.map(o => o.value) as [PrimaryGoal, ...PrimaryGoal[]]).nullable(),
   tdee: z.number().nullable(),
   leanBodyMassKg: z.number().nullable(),
-  rda: z.any().nullable(),
   subscription_status: z.string().nullable(),
   has_accepted_terms: z.boolean(),
   last_check_in_date: z.string().nullable(),
@@ -172,7 +171,6 @@ export interface Recipe {
     ingredients: { name: string; quantity: number; unit: string; }[];
     instructions: string[];
     macrosPerServing: Macros;
-    micronutrients?: any;
     imageUrl: string;
     tags: string[];
 }
@@ -204,34 +202,3 @@ export interface DailyManualMacrosLog {
 }
 
 export type SubscriptionStatus = 'active' | 'inactive' | 'trialing' | 'none';
-
-export interface RDA {
-    thiamine?: number;
-    riboflavin?: number;
-    niacin?: number;
-    pantothenicAcid?: number;
-    pyridoxine?: number;
-    cobalamin?: number;
-    biotin?: number;
-    choline?: number;
-    folate?: number;
-    vitaminA?: number;
-    vitaminC?: number;
-    vitaminD?: number;
-    vitaminE?: number;
-    vitaminK?: number;
-    calcium?: number;
-    chromium?: number;
-    copper?: number;
-    fluoride?: number;
-    iodine?: number;
-    iron?: number;
-    magnesium?: number;
-    manganese?: number;
-    molybdenum?: number;
-    phosphorus?: number;
-    potassium?: number;
-    selenium?: number;
-    sodium?: number;
-    zinc?: number;
-}

@@ -1,10 +1,12 @@
 
 import { z } from 'zod';
-import { suggestRecipesByIngredients as suggestRecipesByIngredientsPrompt } from './suggestRecipesByIngredients.prompt';
+import { ai } from '@/ai/genkit';
 import { SuggestRecipesByIngredientsInputSchema, SuggestRecipesByIngredientsOutputSchema, RecipeWithIngredientsSchema } from './schemas';
 
 export async function suggestRecipesByIngredients(input: z.infer<typeof SuggestRecipesByIngredientsInputSchema>) {
-  const result = await suggestRecipesByIngredientsPrompt.generate({
+  const prompt = ai.prompt('suggestRecipesByIngredients');
+  
+  const result = await prompt.generate({
     input,
   });
 

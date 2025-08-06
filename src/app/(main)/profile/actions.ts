@@ -42,7 +42,6 @@ const calculateTDEE = (
 
 export async function reportBug(description: string, userId: string) {
   try {
-    const { adminDb, FieldValue } = await import('@/lib/firebase-admin');
     await adminDb.collection('bug_reports').add({
       description,
       userId,
