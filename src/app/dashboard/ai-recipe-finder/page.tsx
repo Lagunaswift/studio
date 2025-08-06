@@ -14,28 +14,48 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { ProFeature } from '@/components/shared/ProFeature';
-import type { Recipe, Macros } from '@/types';
 
-// Local type definitions to avoid importing from AI flows
-type RecipeWithIngredients = {
+// ✅ LOCAL TYPE DEFINITIONS (instead of importing from AI flows)
+interface RecipeWithIngredients {
   id: number;
   name: string;
-  ingredients: string[];
+  ingredients: { name: string; quantity: number; unit: string; }[];
   tags: string[];
-  macrosPerServing: Macros;
-};
+  macrosPerServing: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+}
 
-type SuggestRecipesByIngredientsOutput = {
-  suggestedRecipes: {
-    recipeId: number;
-    recipeName: string;
-    utilizationScore: number;
-    matchedIngredients: string[];
-    missingKeyIngredients: string[];
-    notes: string;
-  }[];
+interface SuggestedRecipe {
+  recipeId: number;
+  recipeName: string;
+  matchPercentage: number;
+  availableIngredients: string[];
+  missingIngredients: string[];
+  tags: string[];
+  macrosPerServing: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+}
+
+interface AIRecipeSuggestionResult {
+  suggestedRecipes: SuggestedRecipe[];
   aiGeneralNotes: string;
-};
+}
+
+interface SuggestRecipesByIngredientsInput {
+  userIngredients: string[];
+  availableRecipes: RecipeWithIngredients[];
+  dietaryPreferences: string[];
+  allergens: string[];
+  maxResults: number;
+}
 
 export default function AIRecipeFinderPage() {
   const { allRecipesCache, isRecipeCacheLoading, userProfile, isSubscribed } = useAppContext();
@@ -43,7 +63,7 @@ export default function AIRecipeFinderPage() {
 
   const [ingredients, setIngredients] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [suggestion, setSuggestion] = useState<SuggestRecipesByIngredientsOutput | null>(null);
+  const [suggestion, setSuggestion] = useState<AIRecipeSuggestionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleGenerateSuggestions = async () => {
@@ -63,34 +83,39 @@ export default function AIRecipeFinderPage() {
     const recipesForAI: RecipeWithIngredients[] = allRecipesCache.map(r => ({
       id: r.id,
       name: r.name,
-      ingredients: r.ingredients.map(i => `${i.quantity} ${i.unit} ${i.name}`),
+      ingredients: r.ingredients,
       tags: r.tags,
       macrosPerServing: r.macrosPerServing,
     }));
     
     const userIngredients = ingredients.split(',').map(s => s.trim()).filter(Boolean);
 
+    const input: SuggestRecipesByIngredientsInput = {
+      userIngredients: userIngredients,
+      availableRecipes: recipesForAI,
+      dietaryPreferences: userProfile?.dietaryPreferences || [],
+      allergens: userProfile?.allergens || [],
+      maxResults: 5,
+    };
+
     try {
+      // ✅ CALL API ROUTE instead of AI flow directly
       const response = await fetch('/api/ai/suggest-recipes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userIngredients,
-          availableRecipes: recipesForAI,
-          dietaryPreferences: userProfile?.dietaryPreferences || [],
-          allergens: userProfile?.allergens || [],
-          maxResults: 5,
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(input),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.details || 'Failed to generate suggestions');
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const result = await response.json();
+      const result: AIRecipeSuggestionResult = await response.json();
       setSuggestion(result);
-
+      
       if (result.suggestedRecipes.length === 0) {
         toast({
             title: "No Matching Recipes Found",
@@ -99,7 +124,11 @@ export default function AIRecipeFinderPage() {
       }
     } catch (err: any) {
       console.error("AI Recipe Suggestion Error:", err);
-      setError(err.message);
+      let detailedMessage = "Failed to get recipe suggestions. Please try again.";
+      if (err.message) {
+        detailedMessage = err.message;
+      }
+      setError(detailedMessage);
     } finally {
       setIsGenerating(false);
     }
@@ -123,7 +152,6 @@ export default function AIRecipeFinderPage() {
       </PageWrapper>
     );
   }
-
 
   return (
     <PageWrapper title="Preppy: Pantry Chef">
@@ -196,49 +224,63 @@ export default function AIRecipeFinderPage() {
 
               <h3 className="text-xl font-semibold font-headline text-primary-focus">Suggested Recipes:</h3>
               {suggestion.suggestedRecipes.length > 0 ? (
-                <div className="space-y-4">
-                  {suggestion.suggestedRecipes.map((item) => (
-                    <Card key={item.recipeId} className="bg-card/70 border border-border hover:shadow-md transition-shadow">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-lg text-accent flex items-start h-[3.5rem] overflow-hidden">
-                          <CookingPot className="w-5 h-5 mr-2 shrink-0 mt-1"/>
-                          <Link href={`/recipes/${item.recipeId}`} className="hover:underline text-primary line-clamp-2 break-words" title={item.recipeName}>{item.recipeName}</Link>
-                        </CardTitle>
-                        <div className="flex items-center gap-x-4 text-sm text-muted-foreground pt-1">
-                          <div className="flex items-center" title="How well your ingredients are used in this recipe.">
-                            <BadgePercent className="w-4 h-4 mr-1 text-primary"/>
-                            Utilization Score: {Math.round(item.utilizationScore * 100)}%
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-3 text-sm">
-                        {item.notes && <p className="text-sm text-foreground/80 bg-muted/50 p-2 rounded-md italic">"{item.notes}"</p>}
-                        
+                <div className="grid gap-4">
+                  {suggestion.suggestedRecipes.map((suggestedRecipe) => (
+                    <Card key={suggestedRecipe.recipeId} className="p-4 border-l-4 border-l-accent">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="text-lg font-semibold text-primary">
+                          <Link href={`/recipes/${suggestedRecipe.recipeId}`} className="hover:underline">
+                            {suggestedRecipe.recipeName}
+                          </Link>
+                        </h4>
+                        <Badge variant="secondary" className="ml-2">
+                          <BadgePercent className="w-3 h-3 mr-1" />
+                          {suggestedRecipe.matchPercentage}% match
+                        </Badge>
+                      </div>
+                      
+                      <div className="grid md:grid-cols-2 gap-4 mb-3">
                         <div>
-                          <h4 className="font-semibold flex items-center text-green-700 dark:text-green-400">
-                            <CheckCircle2 className="w-4 h-4 mr-2" /> Matched Ingredients:
-                          </h4>
-                          <div className="flex flex-wrap gap-1 p-2">
-                             {item.matchedIngredients.length > 0 ? item.matchedIngredients.map(ing => <Badge key={ing} variant="secondary">{ing}</Badge>) : <span className="text-muted-foreground text-xs">None</span>}
-                          </div>
+                          <p className="text-sm font-medium text-green-700 dark:text-green-400 mb-1 flex items-center">
+                            <CheckCircle2 className="w-4 h-4 mr-1" />
+                            Ingredients You Have ({suggestedRecipe.availableIngredients.length}):
+                          </p>
+                          <p className="text-xs text-foreground/70">{suggestedRecipe.availableIngredients.join(', ')}</p>
                         </div>
-
-                        {item.missingKeyIngredients && item.missingKeyIngredients.length > 0 && (
+                        
+                        {suggestedRecipe.missingIngredients.length > 0 && (
                           <div>
-                            <h4 className="font-semibold flex items-center text-orange-600 dark:text-orange-400">
-                              <AlertTriangle className="w-4 h-4 mr-2" /> Missing Key Ingredients:
-                            </h4>
-                            <div className="flex flex-wrap gap-1 p-2">
-                              {item.missingKeyIngredients.map(ing => <Badge key={ing} variant="outline">{ing}</Badge>)}
-                            </div>
+                            <p className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-1 flex items-center">
+                              <AlertTriangle className="w-4 h-4 mr-1" />
+                              Missing Ingredients ({suggestedRecipe.missingIngredients.length}):
+                            </p>
+                            <p className="text-xs text-foreground/70">{suggestedRecipe.missingIngredients.join(', ')}</p>
                           </div>
                         )}
-                      </CardContent>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {suggestedRecipe.tags.map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                      
+                      <div className="text-xs text-muted-foreground">
+                        Macros: {Math.round(suggestedRecipe.macrosPerServing.calories)} cal, 
+                        {Math.round(suggestedRecipe.macrosPerServing.protein)}g protein, 
+                        {Math.round(suggestedRecipe.macrosPerServing.carbs)}g carbs, 
+                        {Math.round(suggestedRecipe.macrosPerServing.fat)}g fat
+                      </div>
                     </Card>
                   ))}
                 </div>
               ) : (
-                <p className="text-center text-muted-foreground py-4">No specific recipes found. Try adding more ingredients or check your spelling.</p>
+                <p className="text-muted-foreground text-center py-8">
+                  No recipes found with those ingredients. 
+                  Try adding more ingredients or check your spelling.
+                </p>
               )}
             </CardContent>
           </Card>

@@ -18,33 +18,60 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ProFeature } from '@/components/shared/ProFeature';
 
-// Local type definitions
-type RecipeForAI = {
+// ✅ LOCAL TYPE DEFINITIONS
+interface RecipeForAI {
   id: number;
   name: string;
-  macrosPerServing: Macros;
+  macrosPerServing: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
   tags: string[];
-};
+}
 
-type MealSlotForAI = {
+interface MealSlotForAI {
   id: string;
   name: string;
   type: string;
-};
+}
 
-type SuggestMealPlanOutput = {
-  plannedMeals: {
-    recipeId: number;
-    recipeName: string;
-    mealSlotId: string;
-    mealSlotName: string;
-    servings: number;
-    calculatedMacros: Macros;
-  }[];
-  totalAchievedMacros: Macros;
-  aiJustification: string;
-  fitnessAssessment: string;
-};
+interface PlannedRecipeItem {
+  recipeId: number;
+  recipeName: string;
+  mealSlotId: string;
+  mealSlotName: string;
+  servings: number;
+  calculatedMacros: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+}
+
+interface SuggestMealPlanInput {
+  macroTargets: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  } | null;
+  dietaryPreferences: string[];
+  allergens: string[];
+  mealStructure: MealSlotForAI[];
+  availableRecipes: RecipeForAI[];
+  currentDate: string;
+}
+
+interface SuggestMealPlanOutput {
+    plannedMeals: PlannedRecipeItem[];
+    totalAchievedMacros: Macros;
+    aiJustification: string;
+    fitnessAssessment: string;
+}
+
 
 export default function AISuggestionsPage() {
   const {
@@ -113,26 +140,30 @@ export default function AISuggestionsPage() {
       type: ms.type,
     }));
 
+    const input: SuggestMealPlanInput = {
+      macroTargets: userSettingsToUse.macroTargets,
+      dietaryPreferences: userSettingsToUse.dietaryPreferences || [],
+      allergens: userSettingsToUse.allergens || [],
+      mealStructure: mealStructureForAI,
+      availableRecipes: recipesForAI,
+      currentDate: format(new Date(), 'yyyy-MM-dd'),
+    };
+
     try {
       const response = await fetch('/api/ai/suggest-meal-plan', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          macroTargets: userSettingsToUse.macroTargets,
-          dietaryPreferences: userSettingsToUse.dietaryPreferences || [],
-          allergens: userSettingsToUse.allergens || [],
-          mealStructure: mealStructureForAI,
-          availableRecipes: recipesForAI,
-          currentDate: format(new Date(), 'yyyy-MM-dd'),
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(input),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.details || 'Failed to generate meal plan');
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const result = await response.json();
+      const result: SuggestMealPlanOutput = await response.json();
       setSuggestion(result);
     } catch (err: any) {
       console.error("AI Suggestion Error:", err);

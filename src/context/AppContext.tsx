@@ -35,11 +35,20 @@ import {
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
-import { runProCoachFlow } from '@/ai/flows/pro-coach-flow';
-import { ProCoachOutputSchema } from '@/ai/flows/schemas';
 import { format, subDays, differenceInDays } from 'date-fns';
 import { addOrUpdateMealPlan, deleteMealFromPlan, addOrUpdatePantryItem, deletePantryItem, addRecipe as addRecipeAction, updateUserProfile, addOrUpdateVitalsLog, addOrUpdateWeightLog, addOrUpdateManualMacrosLog } from '@/app/dashboard/profile/actions';
 import { z } from 'zod';
+
+// Local type definition to avoid importing server-side schema
+type ProCoachRecommendation = {
+  newCalorieTarget: number;
+  newProteinTarget: number;
+  newFatTarget: number;
+  newCarbTarget: number;
+  summary: string;
+  positiveFeedback: string;
+  improvementSuggestion: string;
+};
 
 // --- Enhanced Client-side Helper for Server Actions ---
 const callServerActionWithAuth = async (action: (idToken: string, ...args: any[]) => Promise<any>, ...args: any[]) => {
@@ -49,12 +58,11 @@ const callServerActionWithAuth = async (action: (idToken: string, ...args: any[]
   }
 
   try {
-    // Force refresh the token to ensure it's not expired.
     const idToken = await user.getIdToken(true);
     return await action(idToken, ...args);
   } catch (error: any) {
     console.error(`Error in callServerActionWithAuth for action "${action.name}":`, error);
-    throw error; // Re-throw the original error after logging
+    throw error;
   }
 };
 
@@ -106,23 +114,16 @@ const calculateTDEE = (
 
 
 interface AppContextType {
-  // State from DB
   mealPlan: PlannedMeal[];
   pantryItems: PantryItem[];
   userRecipes: Recipe[];
   userProfile: UserProfileSettings | null;
-  
-  // Computed State
   allRecipesCache: Recipe[];
   shoppingList: ShoppingListItem[];
   isOnline: boolean;
   isSubscribed: boolean;
-
-  // Loaders
   isAppDataLoading: boolean;
   isRecipeCacheLoading: boolean;
-
-  // Actions
   addMealToPlan: (recipe: Recipe, date: string, mealType: MealType, servings: number) => Promise<void>;
   removeMealFromPlan: (plannedMealId: string) => Promise<void>;
   updatePlannedMealServings: (plannedMealId: string, newServings: number) => Promise<void>;
@@ -135,17 +136,13 @@ interface AppContextType {
   removePantryItem: (itemId: string) => Promise<void>;
   updatePantryItemQuantity: (itemId: string, newQuantity: number) => Promise<void>;
   addCustomRecipe: (recipeData: RecipeFormData) => Promise<any>;
-  runWeeklyCheckin: () => Promise<{ success: boolean; message: string; recommendation?: z.infer<typeof ProCoachOutputSchema> | null }>;
-  
-  // Profile Actions
+  runWeeklyCheckin: () => Promise<{ success: boolean; message: string; recommendation?: ProCoachRecommendation | null }>;
   setUserInformation: (updates: Partial<UserProfileSettings>) => Promise<void>;
   setMacroTargets: (targets: Macros) => Promise<void>;
   setMealStructure: (structure: MealSlotConfig[]) => Promise<void>;
   setDashboardSettings: (settings: Partial<DashboardSettings>) => Promise<void>;
   acceptTerms: () => Promise<void>;
   assignIngredientCategory: (ingredientName: string) => UKSupermarketCategory;
-
-  // Getters
   getConsumedMacrosForDate: (date: string) => Macros;
   getPlannedMacrosForDate: (date: string) => Macros;
   getMealsForDate: (date: string) => PlannedMeal[];
@@ -154,68 +151,9 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-export function SubscriptionDebug() {
-  const { userProfile, isSubscribed } = useAppContext();
-  
-  if (!userProfile) return null;
-  
-  return (
-    <div style={{ 
-      position: 'fixed', 
-      top: 10, 
-      right: 10, 
-      background: 'black', 
-      color: 'white', 
-      padding: '10px', 
-      zIndex: 9999,
-      fontSize: '12px'
-    }}>
-      <div>🔍 Subscription Debug:</div>
-      <div>Status: {userProfile.subscription_status}</div>
-      <div>isSubscribed: {isSubscribed ? '✅' : '❌'}</div>
-      <div>Profile ID: {userProfile.id}</div>
-    </div>
-  );
-}
-
-function getDefaultUserProfile(userId: string, userEmail: string | null): UserProfileSettings {
-  return {
-    id: userId,
-    email: userEmail,
-    name: null,
-    macroTargets: null,
-    dietaryPreferences: [],
-    allergens: [],
-    mealStructure: [
-      { id: '1', name: 'Breakfast', type: 'Breakfast' },
-      { id: '2', name: 'Lunch', type: 'Lunch' },
-      { id: '3', name: 'Dinner', type: 'Dinner' },
-      { id: '4', name: 'Snack', type: 'Snack' },
-    ],
-    heightCm: null,
-    weightKg: null,
-    age: null,
-    sex: 'notSpecified',
-    activityLevel: 'notSpecified',
-    training_experience_level: 'notSpecified',
-    bodyFatPercentage: null,
-    athleteType: 'notSpecified',
-    primaryGoal: 'notSpecified',
-    tdee: null,
-    leanBodyMassKg: null,
-    subscription_status: 'none',
-    has_accepted_terms: false,
-    last_check_in_date: null,
-    target_weight_change_rate_kg: null,
-    dashboardSettings: { showMacros: true, showMenu: true, showFeaturedRecipe: true, showQuickRecipes: true },
-    favorite_recipe_ids: [],
-  };
-}
-
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoading: isAuthLoading } = useAuth();
   const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
-  const [initialUserProfile, setInitialUserProfile] = useState<UserProfileSettings | null>(null);
   const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
   const [builtInRecipes, setBuiltInRecipes] = useState<Recipe[]>([]);
   const [mealPlan, setMealPlan] = useState<PlannedMeal[]>([]);
@@ -243,71 +181,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  useEffect(() => {
-    const unsubscribes: (() => void)[] = [];
-
-    setIsRecipeCacheLoading(true);
-    const builtInQuery = query(collection(db, "recipes"), where("user_id", "==", null));
-    unsubscribes.push(onSnapshot(builtInQuery, (snapshot) => {
-      const recipes = snapshot.docs.map(doc => ({ id: parseInt(doc.id, 10), ...doc.data() } as Recipe));
-      setBuiltInRecipes(recipes);
-      setIsRecipeCacheLoading(false);
-    }, (error) => {
-      console.error("Error fetching built-in recipes:", error);
-      setIsRecipeCacheLoading(false);
-    }));
-    
-    if (user?.uid) {
-        setIsDataLoading(true);
-
-        const profileUnsub = onSnapshot(doc(db, "profiles", user.uid), (doc) => {
-            if (doc.exists()) {
-                const data = doc.data() as UserProfileSettings;
-                const processedProfile = processProfile(data);
-                setUserProfile(processedProfile);
-                setInitialUserProfile(processedProfile);
-            } else {
-                 const defaultProfile = getDefaultUserProfile(user.uid, user.email);
-                 const processedProfile = processProfile(defaultProfile);
-                 setUserProfile(processedProfile);
-                 setInitialUserProfile(processedProfile);
-            }
-        });
-        unsubscribes.push(profileUnsub);
-
-        const collections: {name: string, setter: React.Dispatch<any>}[] = [
-            { name: "recipes", setter: setUserRecipes },
-            { name: "planned_meals", setter: setMealPlan },
-            { name: "pantry_items", setter: setPantryItems },
-            { name: "daily_weight_logs", setter: setDailyWeightLog },
-            { name: "daily_vitals_logs", setter: setDailyVitalsLog },
-            { name: "daily_manual_macros_logs", setter: setDailyManualMacrosLog },
-        ];
-        
-        collections.forEach(c => {
-            const q = query(collection(db, c.name), where("user_id", "==", user.uid));
-            unsubscribes.push(onSnapshot(q, (querySnapshot) => {
-                const items = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                c.setter(items);
-            }));
-        });
-        
-        const initialLoadTimer = setTimeout(() => setIsDataLoading(false), 1500); 
-        unsubscribes.push(() => clearTimeout(initialLoadTimer));
-    } else if (!isAuthLoading) {
-        setIsDataLoading(false);
-        setUserProfile(null);
-        setInitialUserProfile(null);
-        setUserRecipes([]);
-        setMealPlan([]);
-        setPantryItems([]);
-        setDailyWeightLog([]);
-        setDailyVitalsLog([]);
-        setDailyManualMacrosLog([]);
+  const getConsumedMacrosForDate = useCallback((date: string): Macros => {
+    const manualLog = dailyManualMacrosLog?.find(log => log.date === date);
+    if (manualLog) {
+      return manualLog.macros;
     }
-
-    return () => unsubscribes.forEach(unsub => unsub());
-  }, [user?.uid, user?.email, isAuthLoading]);
+    return calculateTotalMacrosUtil(mealPlan?.filter(pm => pm.date === date && pm.status === 'eaten') || [], builtInRecipes.concat(userRecipes));
+  }, [mealPlan, builtInRecipes, userRecipes, dailyManualMacrosLog]);
   
   const setUserInformation = useCallback(async (updates: Partial<UserProfileSettings>) => {
     if (!userProfile) {
@@ -317,12 +197,92 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const recalculatedProfile = processProfile(updatedProfile);
     
-    const result = await callServerActionWithAuth(updateUserProfile, recalculatedProfile);
+    const result = await callServerActionWithAuth(updateUserProfile, recalculatedProfile as UserProfileSettings);
     if (result.error) {
         throw new Error(result.error);
     }
   }, [userProfile]);
 
+  const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: ProCoachRecommendation | null }> => {
+    if (!userProfile || !dailyWeightLog || !dailyManualMacrosLog) {
+      return { success: false, message: "User profile and logs are not loaded yet." };
+    }
+
+    const logsWithTrend = calculateTrendWeight(dailyWeightLog);
+    const validTrendLogs = logsWithTrend.filter(log => log.trendWeightKg !== undefined);
+    if (validTrendLogs.length < 7) {
+      return { success: false, message: "Not enough consistent data to establish a weight trend." };
+    }
+    const endDate = new Date(validTrendLogs[0].date);
+    const startDate = subDays(endDate, 21);
+    const recentWeightLogs = validTrendLogs.filter(log => new Date(log.date) >= startDate);
+    if (recentWeightLogs.length < 14) {
+      return { success: false, message: `Need at least 14 days of weight data in the last 3 weeks.` };
+    }
+    const datesInPeriod = recentWeightLogs.map(l => l.date);
+    let totalCalories = 0;
+    let daysWithCalorieData = 0;
+    for (const date of datesInPeriod) {
+        const consumed = getConsumedMacrosForDate(date);
+        if (consumed && consumed.calories > 0) {
+            totalCalories += consumed.calories;
+            daysWithCalorieData++;
+        }
+    }
+    if (daysWithCalorieData < 7) {
+      return { success: false, message: `Need at least 7 days of calorie logs in the analysis period.` };
+    }
+    const averageDailyCalories = totalCalories / daysWithCalorieData;
+    const latestTrendWeight = recentWeightLogs[0].trendWeightKg!;
+    const oldestTrendWeight = recentWeightLogs[recentWeightLogs.length - 1].trendWeightKg!;
+    const weightChangeKg = latestTrendWeight - oldestTrendWeight;
+    const durationDays = differenceInDays(new Date(recentWeightLogs[0].date), new Date(recentWeightLogs[recentWeightLogs.length - 1].date)) || 1;
+    const actualWeeklyWeightChangeKg = (weightChangeKg / durationDays) * 7;
+    const caloriesFromWeightChange = weightChangeKg * 7700;
+    const averageDailyDeficitOrSurplus = caloriesFromWeightChange / durationDays;
+    const newDynamicTDEE = Math.round(averageDailyCalories - averageDailyDeficitOrSurplus);
+
+    if (isNaN(newDynamicTDEE) || newDynamicTDEE <= 0) {
+      return { success: false, message: "Calculation resulted in an invalid TDEE." };
+    }
+    
+    const preppyInput = {
+      primaryGoal: userProfile.primaryGoal || 'maintenance',
+      targetWeightChangeRateKg: userProfile.target_weight_change_rate_kg || 0,
+      dynamicTdee: newDynamicTDEE,
+      actualAvgCalories: averageDailyCalories,
+      actualWeeklyWeightChangeKg: actualWeeklyWeightChangeKg,
+      currentProteinTarget: userProfile.macroTargets?.protein || 0,
+      currentFatTarget: userProfile.macroTargets?.fat || 0,
+    };
+
+    try {
+      const response = await fetch('/api/genkit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(preppyInput),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API request failed with status ${response.status}`);
+      }
+      
+      const recommendation = await response.json();
+
+      await callServerActionWithAuth(updateUserProfile, {
+        tdee: newDynamicTDEE,
+        last_check_in_date: format(new Date(), 'yyyy-MM-dd'),
+      });
+    
+      return { success: true, message: "Check-in complete!", recommendation };
+
+    } catch (error: any) {
+      console.error("Weekly check-in API call failed:", error);
+      return { success: false, message: error.message || "An unexpected error occurred during the AI check-in." };
+    }
+  }, [userProfile, dailyWeightLog, dailyManualMacrosLog, getConsumedMacrosForDate]);
+  
   const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
     const newPlannedMeal: Partial<Omit<PlannedMeal, 'id' | 'user_id' | 'recipeDetails'>> = { 
       recipeId: recipe.id, 
@@ -386,67 +346,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedItem = { ...restOfItem, quantity: newQuantity };
     await callServerActionWithAuth(addOrUpdatePantryItem, updatedItem);
   }, [pantryItems, removePantryItem]);
-  
-  const getConsumedMacrosForDate = useCallback((date: string): Macros => {
-    const manualLog = dailyManualMacrosLog?.find(log => log.date === date);
-    if (manualLog) {
-      return manualLog.macros;
-    }
-    return calculateTotalMacrosUtil(mealPlan?.filter(pm => pm.date === date && pm.status === 'eaten') || [], builtInRecipes.concat(userRecipes));
-  }, [mealPlan, builtInRecipes, userRecipes, dailyManualMacrosLog]);
-
-  const runWeeklyCheckin = useCallback(async (): Promise<{ success: boolean; message: string; recommendation?: z.infer<typeof ProCoachOutputSchema> | null }> => {
-    if (!userProfile || !dailyWeightLog || !dailyManualMacrosLog) {
-      return { success: false, message: "User profile and logs are not loaded yet." };
-    }
-  
-    // This is a placeholder for the advanced TDEE calculation logic.
-    // You will replace this with the logic from your new TDEE library.
-    const mockTdeeResult = {
-        dynamicTdee: userProfile.tdee || 2000,
-        weeklyWeightChangeKg: -0.5,
-        avgDailyCalories: (userProfile.tdee || 2000) - 500,
-        confidence: 'high',
-        dataQuality: {
-            weightCompleteness: 100,
-            macroCompleteness: 100,
-            overallQuality: 'high',
-            missingDays: 0,
-            interpolatedDays: 0
-        },
-        analysisWindows: []
-    };
-    
-    const preppyInput = {
-      primaryGoal: userProfile.primaryGoal || 'maintenance',
-      targetWeightChangeRateKg: userProfile.target_weight_change_rate_kg || 0,
-      dynamicTdee: mockTdeeResult.dynamicTdee,
-      actualAvgCalories: mockTdeeResult.avgDailyCalories,
-      actualWeeklyWeightChangeKg: mockTdeeResult.weeklyWeightChangeKg,
-      currentProteinTarget: userProfile.macroTargets?.protein || 0,
-      currentFatTarget: userProfile.macroTargets?.fat || 0,
-    };
-
-    const result = await runProCoachFlow(preppyInput as { primaryGoal: PrimaryGoal; targetWeightChangeRateKg: number; dynamicTdee: number; actualAvgCalories: number; actualWeeklyWeightChangeKg: number; currentProteinTarget: number; currentFatTarget: number; });
-
-    if (result && typeof result === 'object' && 'error' in result && result.error) {
-      return { success: false, message: `ProCoach flow failed: ${result.error}` };
-    }
-  
-    const output = result && typeof result === 'object' && 'data' in result ? result.data : result;
-  
-    const parsedRecommendation = ProCoachOutputSchema.safeParse(output);
-    if (!parsedRecommendation.success) {
-      return { success: false, message: "Invalid recommendation format from ProCoach: " + JSON.stringify(parsedRecommendation.error.flatten()) };
-    }
-  
-    await callServerActionWithAuth(updateUserProfile, {
-      tdee: mockTdeeResult.dynamicTdee,
-      last_check_in_date: format(new Date(), 'yyyy-MM-dd'),
-    });
-  
-    return { success: true, message: "Check-in complete!", recommendation: parsedRecommendation.data };
-  }, [userProfile, dailyWeightLog, dailyManualMacrosLog]);
   
   const isSubscribed = useMemo(() => {
     if (!userProfile) return false;
@@ -516,7 +415,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addMealToPlan, removeMealFromPlan, updateMealServingsOrStatus, getConsumedMacrosForDate,
     setUserInformation, addPantryItem, removePantryItem, updatePantryItemQuantity, runWeeklyCheckin
   ]);
-  
+
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 };
 

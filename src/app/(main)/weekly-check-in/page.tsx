@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { ProFeature } from '@/components/shared/ProFeature';
+import { SubscriptionDebug } from '@/context/AppContext';
 
 export default function WeeklyCheckinPage() {
   const { userProfile, runWeeklyCheckin, setMacroTargets, isAppDataLoading, isSubscribed } = useAppContext();
@@ -100,7 +101,7 @@ export default function WeeklyCheckinPage() {
             )}
           </CardContent>
         </Card>
-
+        <SubscriptionDebug />
         {isLoading && (
           <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
             <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
