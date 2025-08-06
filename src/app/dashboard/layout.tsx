@@ -37,7 +37,7 @@ import { Input } from '@/components/ui/input';
 import { useState, type FormEvent, useEffect, useTransition } from 'react';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/context/AuthContext';
-import { useAppContext, SubscriptionDebug } from '@/context/AppContext';
+import { useOptimizedAppContext } from '@/context/OptimizedAppContext';
 import { Button } from '@/components/ui/button';
 
 interface NavItem {
@@ -122,7 +122,7 @@ function LogoutButton() {
 }
 
 function ServiceStatusBanner() {
-  const { isOnline } = useAppContext();
+  const { isOnline } = useOptimizedAppContext();
 
   if (isOnline) {
     return null;
@@ -137,7 +137,7 @@ function ServiceStatusBanner() {
 }
 
 function DevStatusIndicator() {
-  const { isOnline } = useAppContext();
+  const { isOnline } = useOptimizedAppContext();
 
   if (process.env.NODE_ENV !== 'development') {
     return null;
@@ -203,7 +203,7 @@ function SidebarSearch() {
 // Inner component to use hooks within SidebarProvider context
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { userProfile, acceptTerms: acceptTermsContext, isAppDataLoading } = useAppContext();
+  const { userProfile, updateUserData, isAppDataLoading } = useOptimizedAppContext();
   const { user, isLoading: isAuthLoading } = useAuth();
   const [isPending, startTransition] = useTransition();
 
@@ -220,7 +220,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
   const handleAcceptTerms = () => {
       startTransition(async () => {
-          await acceptTermsContext();
+          await updateUserData({ has_accepted_terms: true });
           setShowTerms(false); // This will now run after the context update succeeds.
       });
   };
@@ -390,7 +390,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
       </SidebarInset>
       <DevStatusIndicator />
       <SimpleHelpWidget />
-      <SubscriptionDebug />
       <TermsAcceptanceModal
         isOpen={showTerms}
         onAccept={handleAcceptTerms}
