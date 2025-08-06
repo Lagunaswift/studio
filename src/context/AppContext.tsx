@@ -27,7 +27,6 @@ import {
   type DailyManualMacrosLog,
   type Sex,
   type ActivityLevel,
-  type RDA,
   type MealSlotConfig,
   type DashboardSettings,
   type SubscriptionStatus,
@@ -36,7 +35,6 @@ import {
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
-import { getRdaProfile } from '@/lib/rda';
 import { runProCoachFlow } from '@/ai/flows/pro-coach-flow';
 import { ProCoachOutputSchema } from '@/ai/flows/schemas';
 import { format, subDays, differenceInDays } from 'date-fns';
@@ -74,7 +72,6 @@ const processProfile = (profileData: UserProfileSettings | undefined | null): Us
     const p = { ...validation.data };
     p.tdee = calculateTDEE(p.weightKg, p.heightCm, p.age, p.sex, p.activityLevel);
     p.leanBodyMassKg = calculateLBM(p.weightKg, p.bodyFatPercentage);
-    p.rda = getRdaProfile(p.sex, p.age, p.menopauseStatus ?? null, p.weightKg);
     return p;
 };
 
@@ -199,7 +196,6 @@ function getDefaultUserProfile(userId: string, userEmail: string | null): UserPr
     weightKg: null,
     age: null,
     sex: 'notSpecified',
-    menopauseStatus: 'notSpecified',
     activityLevel: 'notSpecified',
     training_experience_level: 'notSpecified',
     bodyFatPercentage: null,
@@ -207,7 +203,6 @@ function getDefaultUserProfile(userId: string, userEmail: string | null): UserPr
     primaryGoal: 'notSpecified',
     tdee: null,
     leanBodyMassKg: null,
-    rda: null,
     subscription_status: 'none',
     has_accepted_terms: false,
     last_check_in_date: null,

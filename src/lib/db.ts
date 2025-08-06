@@ -63,7 +63,6 @@ export async function getOrCreateUserProfile(userId: string, userEmail: string |
       primaryGoal: 'notSpecified',
       tdee: null,
       leanBodyMassKg: null,
-      rda: null,
       subscription_status: 'none',
       has_accepted_terms: false,
       last_check_in_date: null,

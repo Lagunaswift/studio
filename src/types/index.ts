@@ -42,8 +42,6 @@ export const TRAINING_EXPERIENCE_OPTIONS = [
 
 export type TrainingExperienceLevel = typeof TRAINING_EXPERIENCE_OPTIONS[number]['value'];
 
-export const MENOPAUSE_STATUS_OPTIONS = ['notSpecified', 'pre', 'post'] as const;
-export type MenopauseStatus = typeof MENOPAUSE_STATUS_OPTIONS[number];
 
 
 export interface Macros {
@@ -87,7 +85,6 @@ export const UserProfileSettingsSchema = z.object({
   weightKg: z.number().nullable(),
   age: z.number().nullable(),
   sex: z.enum(SEX_OPTIONS),
-  menopauseStatus: z.enum(MENOPAUSE_STATUS_OPTIONS).nullable().optional(),
   activityLevel: z.enum(ACTIVITY_LEVEL_OPTIONS.map(o => o.value) as [ActivityLevel, ...ActivityLevel[]]),
   training_experience_level: z.enum(TRAINING_EXPERIENCE_OPTIONS.map(o => o.value) as [TrainingExperienceLevel, ...TrainingExperienceLevel[]]).nullable(),
   bodyFatPercentage: z.number().nullable(),

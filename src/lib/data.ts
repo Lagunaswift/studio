@@ -1,7 +1,7 @@
 
 
 
-import type { PlannedMeal, Macros, MealType, DailyWeightLog, Sex, RDA, Recipe, PantryItem, UKSupermarketCategory, ShoppingListItem } from '@/types';
+import type { PlannedMeal, Macros, MealType, DailyWeightLog, Sex, Recipe, PantryItem, UKSupermarketCategory, ShoppingListItem } from '@/types';
 
 export const MEAL_TYPES: MealType[] = ["Breakfast", "Lunch", "Dinner", "Snack"];
 

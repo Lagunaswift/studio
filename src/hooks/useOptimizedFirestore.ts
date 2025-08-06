@@ -27,7 +27,7 @@ export function useOptimizedProfile(userId: string | undefined) {
         return;
       }
       
-      setIsLoading(true);
+      setLoading(true);
       const docRef = doc(db, 'profiles', userId);
       const docSnap = await getDoc(docRef);
       

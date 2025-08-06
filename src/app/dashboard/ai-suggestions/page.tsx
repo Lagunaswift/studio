@@ -3,7 +3,6 @@
 
 import { useState, useEffect } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { suggestMealPlan, type SuggestMealPlanInput, type SuggestMealPlanOutput, type RecipeForAI, type MealSlotForAI } from '@/ai/flows/suggest-meal-plan';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Settings, Info, PlusCircle, Lock } from 'lucide-react';
@@ -18,6 +17,34 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ProFeature } from '@/components/shared/ProFeature';
+
+// Local type definitions
+type RecipeForAI = {
+  id: number;
+  name: string;
+  macrosPerServing: Macros;
+  tags: string[];
+};
+
+type MealSlotForAI = {
+  id: string;
+  name: string;
+  type: string;
+};
+
+type SuggestMealPlanOutput = {
+  plannedMeals: {
+    recipeId: number;
+    recipeName: string;
+    mealSlotId: string;
+    mealSlotName: string;
+    servings: number;
+    calculatedMacros: Macros;
+  }[];
+  totalAchievedMacros: Macros;
+  aiJustification: string;
+  fitnessAssessment: string;
+};
 
 export default function AISuggestionsPage() {
   const {
@@ -86,30 +113,30 @@ export default function AISuggestionsPage() {
       type: ms.type,
     }));
 
-    const input: SuggestMealPlanInput = {
-      macroTargets: userSettingsToUse.macroTargets,
-      dietaryPreferences: userSettingsToUse.dietaryPreferences || [],
-      allergens: userSettingsToUse.allergens || [],
-      mealStructure: mealStructureForAI,
-      availableRecipes: recipesForAI,
-      currentDate: format(new Date(), 'yyyy-MM-dd'),
-    };
-
     try {
-      const result = await suggestMealPlan(input);
+      const response = await fetch('/api/ai/suggest-meal-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          macroTargets: userSettingsToUse.macroTargets,
+          dietaryPreferences: userSettingsToUse.dietaryPreferences || [],
+          allergens: userSettingsToUse.allergens || [],
+          mealStructure: mealStructureForAI,
+          availableRecipes: recipesForAI,
+          currentDate: format(new Date(), 'yyyy-MM-dd'),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to generate meal plan');
+      }
+
+      const result = await response.json();
       setSuggestion(result);
     } catch (err: any) {
       console.error("AI Suggestion Error:", err);
-      let detailedMessage = "Failed to get meal suggestion. Please try again.";
-      if (err.message) {
-        detailedMessage = err.message;
-      }
-      if (err.digest) { 
-        detailedMessage += ` Server error digest: ${err.digest}. Check server logs for more details. Ensure your GOOGLE_API_KEY is correctly set up.`;
-      } else {
-        detailedMessage += " This might be a server-side issue. Check server logs for more details and ensure your GOOGLE_API_KEY is correctly set up if using AI features.";
-      }
-      setError(detailedMessage);
+      setError(err.message);
     } finally {
       setIsGeneratingPlan(false);
     }

@@ -3,7 +3,6 @@
 
 import { useState } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { suggestRecipesByIngredients, type SuggestRecipesByIngredientsInput, type SuggestRecipesByIngredientsOutput, type RecipeWithIngredients } from '@/ai/flows/suggest-recipes-by-ingredients-flow';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Bot, Info, CookingPot, BadgePercent, CheckCircle2, AlertTriangle, Search, Lock } from 'lucide-react';
@@ -15,6 +14,28 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { ProFeature } from '@/components/shared/ProFeature';
+import type { Recipe, Macros } from '@/types';
+
+// Local type definitions to avoid importing from AI flows
+type RecipeWithIngredients = {
+  id: number;
+  name: string;
+  ingredients: string[];
+  tags: string[];
+  macrosPerServing: Macros;
+};
+
+type SuggestRecipesByIngredientsOutput = {
+  suggestedRecipes: {
+    recipeId: number;
+    recipeName: string;
+    utilizationScore: number;
+    matchedIngredients: string[];
+    missingKeyIngredients: string[];
+    notes: string;
+  }[];
+  aiGeneralNotes: string;
+};
 
 export default function AIRecipeFinderPage() {
   const { allRecipesCache, isRecipeCacheLoading, userProfile, isSubscribed } = useAppContext();
@@ -42,24 +63,34 @@ export default function AIRecipeFinderPage() {
     const recipesForAI: RecipeWithIngredients[] = allRecipesCache.map(r => ({
       id: r.id,
       name: r.name,
-      ingredients: r.ingredients,
+      ingredients: r.ingredients.map(i => `${i.quantity} ${i.unit} ${i.name}`),
       tags: r.tags,
       macrosPerServing: r.macrosPerServing,
     }));
     
     const userIngredients = ingredients.split(',').map(s => s.trim()).filter(Boolean);
 
-    const input: SuggestRecipesByIngredientsInput = {
-      userIngredients: userIngredients,
-      availableRecipes: recipesForAI,
-      dietaryPreferences: userProfile?.dietaryPreferences || [],
-      allergens: userProfile?.allergens || [],
-      maxResults: 5,
-    };
-
     try {
-      const result = await suggestRecipesByIngredients(input);
+      const response = await fetch('/api/ai/suggest-recipes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userIngredients,
+          availableRecipes: recipesForAI,
+          dietaryPreferences: userProfile?.dietaryPreferences || [],
+          allergens: userProfile?.allergens || [],
+          maxResults: 5,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to generate suggestions');
+      }
+
+      const result = await response.json();
       setSuggestion(result);
+
       if (result.suggestedRecipes.length === 0) {
         toast({
             title: "No Matching Recipes Found",
@@ -68,16 +99,7 @@ export default function AIRecipeFinderPage() {
       }
     } catch (err: any) {
       console.error("AI Recipe Suggestion Error:", err);
-      let detailedMessage = "Failed to get recipe suggestions. Please try again.";
-      if (err.message) {
-        detailedMessage = err.message;
-      }
-      if (err.digest) { 
-        detailedMessage += ` Server error digest: ${err.digest}. Check server logs for more details. Ensure your GOOGLE_API_KEY is correctly set up.`;
-      } else {
-        detailedMessage += " This might be a server-side issue. Check server logs for more details and ensure your GOOGLE_API_KEY is correctly set up if using AI features.";
-      }
-      setError(detailedMessage);
+      setError(err.message);
     } finally {
       setIsGenerating(false);
     }

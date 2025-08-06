@@ -37,7 +37,7 @@ import { Input } from '@/components/ui/input';
 import { useState, type FormEvent, useEffect, useTransition } from 'react';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/context/AuthContext';
-import { useOptimizedAppContext } from '@/context/OptimizedAppContext';
+import { useAppContext } from '@/context/AppContext'; // CHANGED: Use regular AppContext instead
 import { Button } from '@/components/ui/button';
 
 interface NavItem {
@@ -122,7 +122,7 @@ function LogoutButton() {
 }
 
 function ServiceStatusBanner() {
-  const { isOnline } = useOptimizedAppContext();
+  const { isOnline } = useAppContext(); // CHANGED: Use regular AppContext which has isOnline
 
   if (isOnline) {
     return null;
@@ -137,7 +137,7 @@ function ServiceStatusBanner() {
 }
 
 function DevStatusIndicator() {
-  const { isOnline } = useOptimizedAppContext();
+  const { isOnline } = useAppContext(); // CHANGED: Use regular AppContext
 
   if (process.env.NODE_ENV !== 'development') {
     return null;
@@ -199,14 +199,12 @@ function SidebarSearch() {
   );
 }
 
-
 // Inner component to use hooks within SidebarProvider context
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { userProfile, updateUserData, isAppDataLoading } = useOptimizedAppContext();
+  const { userProfile, updateUserProfile, isAppDataLoading } = useAppContext(); // CHANGED: Use regular AppContext
   const { user, isLoading: isAuthLoading } = useAuth();
   const [isPending, startTransition] = useTransition();
-
   const [showTerms, setShowTerms] = useState(false);
 
   useEffect(() => {
@@ -220,8 +218,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
   const handleAcceptTerms = () => {
       startTransition(async () => {
-          await updateUserData({ has_accepted_terms: true });
-          setShowTerms(false); // This will now run after the context update succeeds.
+          await updateUserProfile({ has_accepted_terms: true });
+          setShowTerms(false);
       });
   };
 
@@ -250,7 +248,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   
   const currentPageTitle = getCurrentPageTitle();
   const { isMobile, isCollapsed } = useSidebar();
-
 
   return (
     <div className="flex flex-1">
@@ -305,16 +302,25 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                   <AccordionContent className="pl-4">
                      <SidebarMenu className="py-1 space-y-1">
                       {section.items.map((item) => {
-                        const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+                        const isActive = item.exact 
+                          ? pathname === item.href 
+                          : pathname.startsWith(item.href);
                         return (
-                          <SidebarMenuItem key={item.href}>
-                            <SidebarMenuButton asChild isActive={isActive} size="sm" className="h-8 font-normal">
-                              <Link href={item.href}>
-                                <item.icon />
-                                <span>{item.label}</span>
-                              </Link>
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
+                          <Tooltip key={item.href}>
+                              <TooltipTrigger asChild>
+                                  <SidebarMenuItem>
+                                    <SidebarMenuButton asChild isActive={isActive}>
+                                      <Link href={item.href}>
+                                        <item.icon />
+                                        <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                                      </Link>
+                                    </SidebarMenuButton>
+                                  </SidebarMenuItem>
+                              </TooltipTrigger>
+                              <TooltipContent side="right" align="center" hidden={!isCollapsed}>
+                                {item.label}
+                              </TooltipContent>
+                          </Tooltip>
                         );
                       })}
                     </SidebarMenu>
@@ -322,57 +328,42 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                 </AccordionItem>
               ))}
             </Accordion>
-
-            <div className="hidden flex-col gap-1 group-data-[collapsible=icon]:flex">
-              {mainSections.map(section => (
-                <Tooltip key={`collapsed-${section.label}`}>
-                    <TooltipTrigger asChild>
-                        <SidebarMenuItem>
-                            <SidebarMenuButton asChild isActive={section.items.some(item => pathname.startsWith(item.href))}>
-                              <Link href={section.items[0].href}>
-                                <section.icon />
-                                <span className="group-data-[collapsible=icon]:hidden">{section.label}</span>
-                              </Link>
-                            </SidebarMenuButton>
-                        </SidebarMenuItem>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" align="center" hidden={!isCollapsed}>
-                      {section.label}
-                    </TooltipContent>
-                </Tooltip>
-              ))}
+            
+            <div className="px-2 py-1 group-data-[collapsible=icon]:hidden">
+                <p className="text-xs text-sidebar-muted-foreground font-semibold mb-2">Help & Support</p>
+                <SidebarMenu className="space-y-1">
+                  {helpNavItems.map((item) => {
+                    const isActive = item.exact 
+                      ? pathname === item.href 
+                      : pathname.startsWith(item.href);
+                    return (
+                      <Tooltip key={item.href}>
+                          <TooltipTrigger asChild>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton asChild isActive={isActive}>
+                                  <Link href={item.href}>
+                                    <item.icon />
+                                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                                  </Link>
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" align="center" hidden={!isCollapsed}>
+                            {item.label}
+                          </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </SidebarMenu>
             </div>
-
-          </SidebarMenu>
-          
-          <SidebarMenu className="mt-auto">
-             {helpNavItems.map((item) => {
-              const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-              return (
-                <Tooltip key={item.href}>
-                    <TooltipTrigger asChild>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild isActive={isActive}>
-                            <Link href={item.href}>
-                              <item.icon />
-                              <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" align="center" hidden={!isCollapsed}>
-                      {item.label}
-                    </TooltipContent>
-                </Tooltip>
-              );
-            })}
+            
             {!isAuthLoading && user && <LogoutButton />}
           </SidebarMenu>
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
         <header className="flex h-16 items-center border-b px-4 sticky top-0 bg-background z-40">
-           <div className="w-10"> {/* Container for SidebarTrigger */}
+           <div className="w-10">
             <SidebarTrigger className="text-primary hover:text-accent">
               <PanelLeft />
             </SidebarTrigger>
@@ -380,7 +371,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           <h1 className="flex-grow text-center text-xl font-bold font-headline text-primary">
             {currentPageTitle}
           </h1>
-          <div className="w-10 flex justify-end"> {/* Container for ThemeToggleButton */}
+          <div className="w-10 flex justify-end">
             <ThemeToggleButton />
           </div>
         </header>
@@ -398,7 +389,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
 
 export default function MainLayout({
   children,
