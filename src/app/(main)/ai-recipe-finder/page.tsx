@@ -1,9 +1,7 @@
-
 "use client";
 
 import { useState } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { suggestRecipesByIngredients, type SuggestRecipesByIngredientsInput, type SuggestRecipesByIngredientsOutput, type RecipeWithIngredients } from '@/ai/flows/suggest-recipes-by-ingredients-flow';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Bot, Info, CookingPot, BadgePercent, CheckCircle2, AlertTriangle, Search, Lock } from 'lucide-react';
@@ -16,13 +14,42 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { ProFeature } from '@/components/shared/ProFeature';
 
+// ✅ Use type imports only - no direct flow imports
+type SuggestRecipesByIngredientsInput = {
+  userIngredients: string[];
+  availableRecipes: RecipeWithIngredients[];
+  dietaryPreferences?: string[];
+  allergens?: string[];
+  maxResults?: number;
+};
+
+type RecipeWithIngredients = {
+  id: number;
+  name: string;
+  ingredients: string[];
+  tags?: string[];
+  macrosPerServing?: any;
+};
+
+type AIRecipeSuggestionResult = {
+  suggestedRecipes: Array<{
+    recipeId: number;
+    recipeName: string;
+    utilizationScore: number;
+    matchedIngredients: string[];
+    missingKeyIngredients?: string[];
+    notes?: string;
+  }>;
+  aiGeneralNotes?: string;
+};
+
 export default function AIRecipeFinderPage() {
   const { allRecipesCache, isRecipeCacheLoading, userProfile, isSubscribed } = useAppContext();
   const { toast } = useToast();
 
   const [ingredients, setIngredients] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [suggestion, setSuggestion] = useState<SuggestRecipesByIngredientsOutput | null>(null);
+  const [suggestion, setSuggestion] = useState<AIRecipeSuggestionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleGenerateSuggestions = async () => {
@@ -42,7 +69,7 @@ export default function AIRecipeFinderPage() {
     const recipesForAI: RecipeWithIngredients[] = allRecipesCache.map(r => ({
       id: r.id,
       name: r.name,
-      ingredients: r.ingredients,
+      ingredients: r.ingredients.map(i => i.name),
       tags: r.tags,
       macrosPerServing: r.macrosPerServing,
     }));
@@ -58,8 +85,23 @@ export default function AIRecipeFinderPage() {
     };
 
     try {
-      const result = await suggestRecipesByIngredients(input);
+      // ✅ CALL API ROUTE instead of AI flow directly
+      const response = await fetch('/api/ai/suggest-recipes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(input),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result: AIRecipeSuggestionResult = await response.json();
       setSuggestion(result);
+      
       if (result.suggestedRecipes.length === 0) {
         toast({
             title: "No Matching Recipes Found",
@@ -72,11 +114,6 @@ export default function AIRecipeFinderPage() {
       if (err.message) {
         detailedMessage = err.message;
       }
-      if (err.digest) { 
-        detailedMessage += ` Server error digest: ${err.digest}. Check server logs for more details. Ensure your GOOGLE_API_KEY is correctly set up.`;
-      } else {
-        detailedMessage += " This might be a server-side issue. Check server logs for more details and ensure your GOOGLE_API_KEY is correctly set up if using AI features.";
-      }
       setError(detailedMessage);
     } finally {
       setIsGenerating(false);
@@ -86,138 +123,175 @@ export default function AIRecipeFinderPage() {
   if (!isSubscribed) {
     return (
       <PageWrapper title="Preppy: Pantry Chef">
-        <ProFeature featureName="The Pantry Chef" description="Let our AI, Preppy, suggest recipes you can make right now based on the ingredients you have on hand. No more wondering what's for dinner!" />
-      </PageWrapper>
-    )
-  }
-
-  if (isRecipeCacheLoading) {
-    return (
-      <PageWrapper title="Preppy: Pantry Chef">
-        <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
-          <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
-          <p className="text-lg">Loading recipes for AI analysis...</p>
-        </div>
+        <ProFeature 
+          featureName="The Pantry Chef" 
+          description="Let our AI, Preppy, suggest recipes you can make right now based on the ingredients you have on hand. No more wondering what's for dinner!"
+        />
       </PageWrapper>
     );
   }
 
-
   return (
     <PageWrapper title="Preppy: Pantry Chef">
-      <div className="space-y-8">
-        <Card className="shadow-lg">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="text-center space-y-2">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <ChefHat className="h-8 w-8 text-primary" />
+            <Sparkles className="h-6 w-6 text-yellow-500" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">Pantry Chef</h1>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Tell me what ingredients you have, and I'll suggest recipes you can make right now from your collection.
+          </p>
+        </div>
+
+        {/* Input Section */}
+        <Card>
           <CardHeader>
-            <CardTitle className="font-headline text-primary flex items-center">
-              <ChefHat className="w-6 h-6 mr-2 text-accent" />
-              What Can We Make?
+            <CardTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              What's in your kitchen?
             </CardTitle>
             <CardDescription>
-              Enter the ingredients you have on hand, and I'll find the best recipes from your collection that you can make right now.
+              List the ingredients you have available (comma-separated)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Textarea
-              placeholder="e.g., chicken breast, broccoli, onion, soy sauce"
-              rows={4}
+              placeholder="e.g., chicken breast, broccoli, onion, soy sauce, rice..."
               value={ingredients}
               onChange={(e) => setIngredients(e.target.value)}
+              rows={3}
               disabled={isGenerating}
             />
-            <Button onClick={handleGenerateSuggestions} disabled={isGenerating || isRecipeCacheLoading} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+            <Button 
+              onClick={handleGenerateSuggestions}
+              disabled={isGenerating || !ingredients.trim()}
+              className="w-full"
+            >
               {isGenerating ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Finding recipes...
+                </>
               ) : (
-                <Search className="mr-2 h-4 w-4" />
+                <>
+                  <Send className="mr-2 h-4 w-4" />
+                  Find Recipes
+                </>
               )}
-              Find Recipes
             </Button>
           </CardContent>
         </Card>
 
-        {isGenerating && (
-          <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
-            <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
-            <p className="text-lg">I'm searching for recipes...</p>
-            <p className="text-sm">This might take a moment.</p>
-          </div>
-        )}
-
+        {/* Error Display */}
         {error && (
           <Alert variant="destructive">
-            <Info className="h-4 w-4" />
-            <AlertTitle>Error Generating Suggestions</AlertTitle>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        {suggestion && !isGenerating && (
-          <Card className="shadow-xl">
-            <CardHeader>
-              <CardTitle className="font-headline text-primary flex items-center">
-                <Lightbulb className="w-7 h-7 mr-3 text-accent" />
-                My Recipe Suggestions
-              </CardTitle>
-              <CardDescription>
-                Based on your ingredients, here are some recipes you could make.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {suggestion.aiGeneralNotes && (
-                 <div>
-                    <h3 className="text-lg font-semibold mb-1 text-primary-focus">My Chef's Notes:</h3>
-                    <p className="text-sm text-foreground/80 bg-secondary/30 p-3 rounded-md">{suggestion.aiGeneralNotes}</p>
-                </div>
-              )}
-             
-              <Separator />
+        {/* Results */}
+        {suggestion && suggestion.suggestedRecipes.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Bot className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-semibold">Recipe Suggestions</h2>
+            </div>
 
-              <h3 className="text-xl font-semibold font-headline text-primary-focus">Suggested Recipes:</h3>
-              {suggestion.suggestedRecipes.length > 0 ? (
-                <div className="space-y-4">
-                  {suggestion.suggestedRecipes.map((item) => (
-                    <Card key={item.recipeId} className="bg-card/70 border border-border hover:shadow-md transition-shadow">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-lg text-accent flex items-start h-[3.5rem] overflow-hidden">
-                          <CookingPot className="w-5 h-5 mr-2 shrink-0 mt-1"/>
-                          <Link href={`/recipes/${item.recipeId}`} className="hover:underline text-primary line-clamp-2 break-words" title={item.recipeName}>{item.recipeName}</Link>
-                        </CardTitle>
-                        <div className="flex items-center gap-x-4 text-sm text-muted-foreground pt-1">
-                          <div className="flex items-center" title="How well your ingredients are used in this recipe.">
-                            <BadgePercent className="w-4 h-4 mr-1 text-primary"/>
-                            Utilization Score: {Math.round(item.utilizationScore * 100)}%
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-3 text-sm">
-                        {item.notes && <p className="text-sm text-foreground/80 bg-muted/50 p-2 rounded-md italic">"{item.notes}"</p>}
-                        
-                        <div>
-                          <h4 className="font-semibold flex items-center text-green-700 dark:text-green-400">
-                            <CheckCircle2 className="w-4 h-4 mr-2" /> Matched Ingredients:
-                          </h4>
-                          <div className="flex flex-wrap gap-1 p-2">
-                             {item.matchedIngredients.length > 0 ? item.matchedIngredients.map(ing => <Badge key={ing} variant="secondary">{ing}</Badge>) : <span className="text-muted-foreground text-xs">None</span>}
+            {suggestion.aiGeneralNotes && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertTitle>Chef's Notes</AlertTitle>
+                <AlertDescription>{suggestion.aiGeneralNotes}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="grid gap-4">
+              {suggestion.suggestedRecipes.map((recipe) => {
+                const fullRecipe = allRecipesCache.find(r => r.id === recipe.recipeId);
+                
+                return (
+                  <Card key={recipe.recipeId} className="border-l-4 border-l-primary">
+                    <CardContent className="pt-6">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1">
+                            <h3 className="text-lg font-semibold">{recipe.recipeName}</h3>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="flex items-center gap-1">
+                                <BadgePercent className="h-3 w-3" />
+                                {Math.round(recipe.utilizationScore * 100)}% match
+                              </Badge>
+                            </div>
                           </div>
                         </div>
 
-                        {item.missingKeyIngredients && item.missingKeyIngredients.length > 0 && (
-                          <div>
-                            <h4 className="font-semibold flex items-center text-orange-600 dark:text-orange-400">
-                              <AlertTriangle className="w-4 h-4 mr-2" /> Missing Key Ingredients:
-                            </h4>
-                            <div className="flex flex-wrap gap-1 p-2">
-                              {item.missingKeyIngredients.map(ing => <Badge key={ing} variant="outline">{ing}</Badge>)}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-green-500" />
+                            <span className="text-sm font-medium">You have:</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {recipe.matchedIngredients.map((ingredient) => (
+                              <Badge key={ingredient} variant="outline" className="text-xs">
+                                {ingredient}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+
+                        {recipe.missingKeyIngredients && recipe.missingKeyIngredients.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <CookingPot className="h-4 w-4 text-orange-500" />
+                              <span className="text-sm font-medium">You'll need:</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {recipe.missingKeyIngredients.map((ingredient) => (
+                                <Badge key={ingredient} variant="secondary" className="text-xs">
+                                  {ingredient}
+                                </Badge>
+                              ))}
                             </div>
                           </div>
                         )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-muted-foreground py-4">No specific recipes found. Try adding more ingredients or check your spelling.</p>
-              )}
+
+                        {recipe.notes && (
+                          <p className="text-sm text-muted-foreground italic">{recipe.notes}</p>
+                        )}
+                      </div>
+                    </CardContent>
+                    {fullRecipe && (
+                      <CardFooter>
+                        <Button asChild className="w-full">
+                          <Link href={`/recipes/${fullRecipe.id}`}>
+                            View Full Recipe
+                          </Link>
+                        </Button>
+                      </CardFooter>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {suggestion && suggestion.suggestedRecipes.length === 0 && (
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <div className="space-y-2">
+                <Lightbulb className="h-8 w-8 text-yellow-500 mx-auto" />
+                <h3 className="text-lg font-semibold">No Perfect Matches</h3>
+                <p className="text-muted-foreground">
+                  I couldn't find recipes that closely match your available ingredients. 
+                  Try adding more common ingredients or check your <Link href="/recipes" className="text-primary underline">recipe collection</Link>.
+                </p>
+              </div>
             </CardContent>
           </Card>
         )}

@@ -804,7 +804,7 @@ export default function DietaryTargetsPage() {
                 <AlertDescription>
                 <ul className="list-disc pl-5 mt-2 space-y-1 text-sm">
                     <li>First, complete your <Link href="/dashboard/profile/user-info" className="underline hover:text-primary">User Info</Link> page to calculate your TDEE (Total Daily Energy Expenditure).</li>
-                    <li>Use the 'Suggest Protein' and 'Suggest Fat' buttons to get AI-powered and calculated starting points for these macros.</li>
+                    <li>Use the 'Suggest Protein' and 'Suggest Fat' buttons to get starting points for these macros.</li>
                     <li>Use the 'Goal Calculator' to find a calorie target for your goal, and apply it. This will adjust your 'Carbohydrates' to meet the target.</li>
                     <li>For **muscle gain**, use the 'Muscle Gain' tab. For **fat loss**, use the 'Fat Loss' tab.</li>
                 </ul>

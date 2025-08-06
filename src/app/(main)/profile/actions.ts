@@ -1,4 +1,5 @@
 
+// src/app/(main)/profile/actions.ts
 'use server';
 
 import { revalidatePath } from 'next/cache';
@@ -9,6 +10,7 @@ import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { mergeWithDefaults } from '@/utils/profileDefaults';
+import { migrateEnumValues, validateAndFallbackEnums } from '@/utils/enumMigration';
 
 // --- Calculation Helpers ---
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
@@ -57,18 +59,54 @@ export async function getUserIdFromToken(idToken: string): Promise<string> {
   return await debugGetUserIdFromToken(idToken);
 }
 
-export async function updateUserProfile(idToken: string, updates: Partial<Omit<UserProfileSettings, 'id'>>) {
+// ✅ UNIFIED updateUserProfile function that handles both signatures
+export async function updateUserProfile(userIdOrToken: string, updates: Partial<Omit<UserProfileSettings, 'id'>>) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    let userId: string;
+    
+    // Determine if first parameter is userId or idToken
+    if (userIdOrToken.length > 50) {
+      // Looks like an idToken (JWT tokens are much longer)
+      const decodedToken = await serverFirestore.verifyToken(userIdOrToken);
+      userId = decodedToken.uid;
+    } else {
+      // Looks like a userId (short string)
+      userId = userIdOrToken;
+    }
+
+    console.log('🔍 Raw updates received:', {
+      userId,
+      athleteType: updates.athleteType,
+      primaryGoal: updates.primaryGoal,
+      activityLevel: updates.activityLevel,
+    });
     
     const userDocRef = adminDb.collection('profiles').doc(userId);
     const userDoc = await userDocRef.get();
-    const existingData = userDoc.exists ? userDoc.data() : {};
+    let existingData = userDoc.exists ? (userDoc.data() || {}) : {};
     
-    const mergedData = { ...existingData, ...updates };
+    // ✅ APPLY ENUM MIGRATION
+    existingData = migrateEnumValues(existingData as Partial<UserProfileSettings>);
+    const migratedUpdates = migrateEnumValues(updates);
+    
+    console.log('🔍 After migration:', {
+      athleteType: migratedUpdates.athleteType,
+      primaryGoal: migratedUpdates.primaryGoal,
+      activityLevel: migratedUpdates.activityLevel,
+    });
+    
+    const mergedData = { ...existingData, ...migratedUpdates };
+    
+    // ✅ VALIDATE AND FALLBACK
+    const validatedData = validateAndFallbackEnums(mergedData);
+    
+    console.log('🔍 After validation:', {
+      athleteType: validatedData.athleteType,
+      primaryGoal: validatedData.primaryGoal,
+      activityLevel: validatedData.activityLevel,
+    });
 
-    const completeProfileData = mergeWithDefaults(mergedData, userId);
+    const completeProfileData = mergeWithDefaults(validatedData, userId);
     
     // Recalculate derived values on the server
     completeProfileData.tdee = calculateTDEE(
@@ -336,6 +374,6 @@ export async function addOrUpdateManualMacrosLog(idToken: string, macrosData: an
       message: error.message,
       stack: error.stack,
     });
-    return { success: false, error: `Could not save macros log: ${error.message}` };
+    return { success: false, error: `Could not save manual macros log: ${error.message}` };
   }
 }

@@ -4,44 +4,51 @@ import type { UserProfileSettings } from '@/types';
 export function getDefaultUserProfile(userId: string): UserProfileSettings {
   return {
     id: userId,
+    email: null, // ✅ ADDED missing field
+    name: null,  // ✅ ADDED missing field
     macroTargets: {
-      protein: 120,    // grams
-      carbs: 200,      // grams  
-      fat: 60,         // grams
-      calories: 1800   // calories
+      protein: 120,
+      carbs: 200,
+      fat: 60,
+      calories: 1800
     },
-    dietaryPreferences: [], // empty array for no specific preferences
-    allergens: [],          // empty array for no allergies
-    mealStructure: [        // Array of meal objects based on your type
+    dietaryPreferences: [],
+    allergens: [],
+    mealStructure: [
       { id: 'breakfast', name: 'Breakfast', type: 'Breakfast' },
       { id: 'lunch', name: 'Lunch', type: 'Lunch' },
       { id: 'dinner', name: 'Dinner', type: 'Dinner' },
       { id: 'snack1', name: 'Morning Snack', type: 'Snack' },
       { id: 'snack2', name: 'Evening Snack', type: 'Snack' }
     ],
-    heightCm: 170,            // 5'7" average height
-    weightKg: 70,             // 154 lbs average weight
-    age: 30,                  // default age
-    sex: 'notSpecified',      // Fixed: using correct enum value
-    activityLevel: 'moderate', // moderate activity level
-    training_experience_level: 'beginner',
-    bodyFatPercentage: 18,    // healthy average
-    athleteType: null,        // Fixed: using null as it's nullable
-    primaryGoal: null,        // Fixed: using null as it's nullable
-    tdee: 1800,              // total daily energy expenditure
-    leanBodyMassKg: 57,      // calculated from weight and body fat
-    rda: {                   // Fixed: using correct property names
-      iron: 8,
-      calcium: 1000,
-      potassium: 2500,
-      vitaminA: 900,
-      vitaminC: 90,          // Fixed: was vitamin_c, now vitaminC
-      vitaminD: 20,          // Fixed: was vitamin_d, now vitaminD
+    heightCm: 170,
+    weightKg: 70,
+    age: 30,
+    sex: 'notSpecified', // ✅ CORRECT
+    activityLevel: 'lightlyActive', // ✅ FIXED: was 'moderate'
+    training_experience_level: 'notSpecified', // ✅ CORRECT
+    bodyFatPercentage: 18,
+    athleteType: 'notSpecified', // ✅ FIXED: ensure valid enum
+    primaryGoal: 'notSpecified', // ✅ FIXED: ensure valid enum
+    tdee: 1800,
+    leanBodyMassKg: 57,
+    subscription_status: 'inactive',
+    has_accepted_terms: true,
+    last_check_in_date: null, // ✅ ADDED missing field
+    target_weight_change_rate_kg: null, // ✅ ADDED missing field
+    dashboardSettings: { // ✅ ADDED missing field
+      showMacros: true,
+      showMenu: true,
+      showFeaturedRecipe: true,
+      showQuickRecipes: true,
     },
-    subscription_status: 'inactive',  // Fixed: using correct enum value
-    has_accepted_terms: true
-    // FIXED: Removed createdAt as it doesn't exist in UserProfileSettings type
-    // If you need timestamps, add them to your type definition first
+    favorite_recipe_ids: [], // ✅ ADDED missing field
+    // Add body measurement fields
+    neck_circumference_cm: null,
+    abdomen_circumference_cm: null,
+    waist_circumference_cm: null,
+    hip_circumference_cm: null,
+    menopauseStatus: null,
   };
 }
 

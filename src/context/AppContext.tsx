@@ -38,6 +38,7 @@ import { calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList 
 import { format, subDays, differenceInDays } from 'date-fns';
 import { addOrUpdateMealPlan, deleteMealFromPlan, addOrUpdatePantryItem, deletePantryItem, addRecipe as addRecipeAction, updateUserProfile, addOrUpdateVitalsLog, addOrUpdateWeightLog, addOrUpdateManualMacrosLog } from '@/app/dashboard/profile/actions';
 import { z } from 'zod';
+import { migrateEnumValues, validateAndFallbackEnums } from '@/utils/enumMigration';
 
 // Local type definition to avoid importing server-side schema
 type ProCoachRecommendation = {
@@ -69,18 +70,22 @@ const callServerActionWithAuth = async (action: (idToken: string, ...args: any[]
 
 // --- Calculation Helpers ---
 const processProfile = (profileData: UserProfileSettings | undefined | null): UserProfileSettings | null => {
-    if (!profileData) return null;
+  if (!profileData) return null;
 
-    const validation = UserProfileSettingsSchema.safeParse(profileData);
-    if (!validation.success) {
-      console.warn("Invalid user profile data, using defaults. Errors:", validation.error.flatten());
-      return null;
-    }
+  // ✅ APPLY ENUM MIGRATION before validation
+  let migratedData = migrateEnumValues(profileData);
+  migratedData = validateAndFallbackEnums(migratedData);
 
-    const p = { ...validation.data };
-    p.tdee = calculateTDEE(p.weightKg, p.heightCm, p.age, p.sex, p.activityLevel);
-    p.leanBodyMassKg = calculateLBM(p.weightKg, p.bodyFatPercentage);
-    return p;
+  const validation = UserProfileSettingsSchema.safeParse(migratedData);
+  if (!validation.success) {
+    console.warn("Invalid user profile data, using defaults. Errors:", validation.error.flatten());
+    return null;
+  }
+
+  const p = { ...validation.data };
+  p.tdee = calculateTDEE(p.weightKg, p.heightCm, p.age, p.sex, p.activityLevel);
+  p.leanBodyMassKg = calculateLBM(p.weightKg, p.bodyFatPercentage);
+  return p;
 };
 
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {

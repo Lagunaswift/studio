@@ -7,29 +7,30 @@ export const SEX_OPTIONS = ['male', 'female', 'notSpecified'] as const;
 export type Sex = typeof SEX_OPTIONS[number];
 
 export const ACTIVITY_LEVEL_OPTIONS = [
-    { value: 'sedentary', label: 'Sedentary (little or no exercise)', multiplier: 1.2 },
-    { value: 'lightlyActive', label: 'Lightly Active (light exercise/sports 1-3 days/week)', multiplier: 1.375 },
-    { value: 'moderatelyActive', label: 'Moderately Active (moderate exercise/sports 3-5 days/week)', multiplier: 1.55 },
-    { value: 'veryActive', label: 'Very Active (hard exercise/sports 6-7 days a week)', multiplier: 1.725 },
-    { value: 'extraActive', label: 'Extra Active (very hard exercise/sports & physical job)', multiplier: 1.9 },
-    { value: 'notSpecified', label: 'Not Specified', multiplier: 1.2 }
+  { value: 'notSpecified', label: 'Not Specified', multiplier: 1.2 },
+  { value: 'sedentary', label: 'Sedentary (little or no exercise)', multiplier: 1.2 },
+  { value: 'lightlyActive', label: 'Lightly Active (light exercise/sports 1-3 days/week)', multiplier: 1.375 }, // ✅ CORRECT
+  { value: 'moderatelyActive', label: 'Moderately Active (moderate exercise/sports 3-5 days/week)', multiplier: 1.55 },
+  { value: 'veryActive', label: 'Very Active (hard exercise/sports 6-7 days a week)', multiplier: 1.725 },
+  { value: 'extraActive', label: 'Extra Active (very hard exercise/sports & physical job)', multiplier: 1.9 }
 ] as const;
 export type ActivityLevel = typeof ACTIVITY_LEVEL_OPTIONS[number]['value'];
 
+// ✅ FIXED ATHLETE TYPE OPTIONS
 export const ATHLETE_TYPE_OPTIONS = [
-    { value: 'notSpecified', label: 'Not Specified' },
-    { value: 'endurance', label: 'Endurance Athlete' },
-    { value: 'strengthPower', label: 'Strength/Power Athlete' },
-    { value: 'teamSport', label: 'Team Sport Athlete' },
-    { value: 'weekendWarrior', label: 'Weekend Warrior' },
+  { value: 'notSpecified', label: 'Not Specified' },
+  { value: 'endurance', label: 'Endurance Athlete' },
+  { value: 'strength', label: 'Strength/Power Athlete' }, // ✅ FIXED: was 'strengthPower'
 ] as const;
 export type AthleteType = typeof ATHLETE_TYPE_OPTIONS[number]['value'];
 
+// ✅ FIXED PRIMARY GOAL OPTIONS
 export const PRIMARY_GOAL_OPTIONS = [
-    { value: 'notSpecified', label: 'Not Specified' },
-    { value: 'fatLoss', label: 'Fat Loss' },
-    { value: 'muscleGain', label: 'Muscle Gain' },
-    { value: 'maintenance', label: 'Maintenance' },
+  { value: 'notSpecified', label: 'Not Specified' },
+  { value: 'weightLoss', label: 'Fat Loss' }, // ✅ FIXED: was 'fatLoss'
+  { value: 'muscleGain', label: 'Muscle Gain' },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'performance', label: 'Performance' }, // ✅ ADDED: missing option
 ] as const;
 export type PrimaryGoal = typeof PRIMARY_GOAL_OPTIONS[number]['value'];
 

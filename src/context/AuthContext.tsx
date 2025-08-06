@@ -13,6 +13,10 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   isRecipeFavorite: (recipeId: number) => boolean;
   toggleFavoriteRecipe: (recipeId: number) => Promise<void>;
+  // ✅ Add profile data to the context
+  profile: ReturnType<typeof useUserProfile>['profile'];
+  profileLoading: boolean;
+  profileError: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,11 +24,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { userProfile, loading: isProfileLoading, error } = useUserProfile(user?.uid);
+  
+  // ✅ Fix: Pass user correctly to useUserProfile hook
+  const { profile, loading: profileLoading, error: profileError } = useUserProfile(user);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
       setIsLoading(false);
     });
 
@@ -35,22 +41,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await firebaseSignOut(auth);
   };
 
-  const isRecipeFavorite = (recipeId: number) => {
-    return userProfile?.favorite_recipe_ids?.includes(recipeId) || false;
+  const isRecipeFavorite = (recipeId: number): boolean => {
+    return profile?.favorite_recipe_ids?.includes(recipeId) || false;
   };
 
-  const toggleFavoriteRecipe = async (recipeId: number) => {
-    if (!userProfile || !user) return;
+  const toggleFavoriteRecipe = async (recipeId: number): Promise<void> => {
+    if (!profile || !user) return;
 
-    const currentFavorites = userProfile.favorite_recipe_ids || [];
+    const currentFavorites = profile.favorite_recipe_ids || [];
     const newFavorites = currentFavorites.includes(recipeId)
-      ? currentFavorites.filter(id => id !== recipeId)
+      ? currentFavorites.filter((id: number) => id !== recipeId)
       : [...currentFavorites, recipeId];
 
     await updateUserProfile(user.uid, { favorite_recipe_ids: newFavorites });
   };
 
-  const value = { user, isLoading, signOut, isRecipeFavorite, toggleFavoriteRecipe };
+  const value = { 
+    user, 
+    isLoading, 
+    signOut, 
+    isRecipeFavorite, 
+    toggleFavoriteRecipe,
+    profile,
+    profileLoading,
+    profileError
+  };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
