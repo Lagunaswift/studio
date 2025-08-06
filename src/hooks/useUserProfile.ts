@@ -5,13 +5,14 @@ import { User } from 'firebase/auth';
 import { UserProfileSettings } from '@/types';
 import { mergeWithDefaults } from '@/utils/profileDefaults';
 
+// ✅ Fix: Proper typing for the hook
 export function useUserProfile(user: User | null) {
   const [profile, setProfile] = useState<UserProfileSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user || !user.uid) {
+    if (!user?.uid) {
       console.log('🚫 No user or user.uid, skipping Firestore setup');
       setProfile(null);
       setLoading(false);
@@ -26,7 +27,6 @@ export function useUserProfile(user: User | null) {
         authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ? 'Present' : 'Missing',
       });
 
-      // Use default Firestore instance (should work if Firebase is initialized)
       const db = getFirestore();
       
       console.log('🔥 Firestore instance:', db);
@@ -35,7 +35,7 @@ export function useUserProfile(user: User | null) {
         throw new Error('Firestore not initialized');
       }
 
-      // Ensure user.uid is a valid string
+      // ✅ Ensure user.uid is valid string
       if (typeof user.uid !== 'string' || user.uid.length === 0) {
         throw new Error(`Invalid user.uid: ${user.uid}`);
       }
@@ -88,7 +88,7 @@ export function useUserProfile(user: User | null) {
       setError('Failed to initialize Firestore connection');
       setLoading(false);
     }
-  }, [user]);
+  }, [user?.uid]); // ✅ Fix: Only depend on user.uid, not the entire user object
 
   return { profile, loading, error };
 }
