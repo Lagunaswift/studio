@@ -1,9 +1,8 @@
-
 "use client";
 
 import React, { createContext, useContext, useMemo, useCallback, useState, useEffect } from 'react';
-import { useAuth } from './AuthContext';
-import { db, auth } from '@/lib/firebase';
+import { useAuth } from '@/context/AuthContext';
+import { db, auth } from '@/lib/firebase-client';
 import {
   UserProfileSettingsSchema,
   type PlannedMeal,
@@ -58,7 +57,6 @@ const callServerActionWithAuth = async (action: (idToken: string, ...args: any[]
   }
 };
 
-
 // --- Calculation Helpers ---
 const processProfile = (profileData: UserProfileSettings | undefined | null): UserProfileSettings | null => {
   if (!profileData) return null;
@@ -107,7 +105,6 @@ const calculateTDEE = (
   return null;
 };
 
-
 interface AppContextType {
   mealPlan: PlannedMeal[];
   pantryItems: PantryItem[];
@@ -147,10 +144,13 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isLoading: isAuthLoading } = useAuth();
+  // ✅ FIX: Move useAuth call inside the component
+  const { user, isLoading: isAuthLoading, profile: authProfile } = useAuth();
   const userId = user?.uid;
 
-  const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
+  // ✅ FIX: Use the profile from AuthContext
+  const userProfile = authProfile;
+  
   const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
   const [builtInRecipes, setBuiltInRecipes] = useState<Recipe[]>([]);
   const [mealPlan, setMealPlan] = useState<PlannedMeal[]>([]);
@@ -162,7 +162,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isRecipeCacheLoading, setIsRecipeCacheLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
 
-  const recipeHookResults = useOptimizedRecipes();
+  // ✅ FIX: Pass userId to the hook
+  const recipeHookResults = useOptimizedRecipes(userId);
 
   useEffect(() => {
     console.log('🔥 Recipe hook results changed:', {
@@ -184,7 +185,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsRecipeCacheLoading(false);
     }
   }, [recipeHookResults.loading, recipeHookResults.recipes, recipeHookResults.error, userId]);
-
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -367,12 +367,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await callServerActionWithAuth(addOrUpdatePantryItem, updatedItem);
   }, [pantryItems, removePantryItem]);
   
+  // ✅ Enhanced subscription debug with manual check
   const isSubscribed = useMemo(() => {
-    if (!userProfile) return false;
+    console.log('🔍 SUBSCRIPTION DEBUG:', {
+      userProfile: !!userProfile,
+      authProfile: !!authProfile,
+      subscription_status: userProfile?.subscription_status,
+      type: typeof userProfile?.subscription_status,
+      rawValue: JSON.stringify(userProfile?.subscription_status),
+      isEqual: userProfile?.subscription_status === 'active',
+    });
+    
+    if (!userProfile) {
+      console.log('🔍 No userProfile - returning false');
+      return false;
+    }
     
     const hasActiveSubscription = userProfile.subscription_status === 'active';
+    console.log('🔍 Final subscription check:', hasActiveSubscription);
     
     return hasActiveSubscription;
+  }, [userProfile, authProfile]);
+
+  // ✅ Add manual subscription check
+  useEffect(() => {
+    if (userProfile) {
+      console.log('🔎 MANUAL SUBSCRIPTION CHECK:');
+      console.log('Raw userProfile.subscription_status:', userProfile.subscription_status);
+      console.log('Type:', typeof userProfile.subscription_status);
+      console.log('Length:', userProfile.subscription_status?.length);
+      console.log('Direct equality test:', userProfile.subscription_status === 'active');
+      console.log('Lowercase test:', userProfile.subscription_status?.toLowerCase() === 'active');
+      console.log('Trimmed test:', userProfile.subscription_status?.trim() === 'active');
+    }
   }, [userProfile]);
 
   const contextValue: AppContextType = useMemo(() => ({
@@ -438,6 +465,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 };
 
+// SubscriptionDebug Component - for debugging subscription status
+export const SubscriptionDebug: React.FC = () => {
+  const { userProfile, isSubscribed } = useAppContext();
+  
+  // Only show in development mode
+  if (process.env.NODE_ENV !== 'development') {
+    return null;
+  }
+
+  return (
+    <div className="fixed bottom-4 right-4 bg-black/80 text-white p-3 rounded-lg text-xs font-mono z-50 max-w-xs">
+      <div className="font-bold text-yellow-400 mb-1">🔧 Subscription Debug</div>
+      <div>Status: <span className="text-green-400">{userProfile?.subscription_status || 'undefined'}</span></div>
+      <div>isSubscribed: <span className="text-blue-400">{isSubscribed ? 'true' : 'false'}</span></div>
+      <div>User ID: <span className="text-purple-400">{userProfile?.id?.slice(0, 8) || 'undefined'}</span></div>
+      <div className="mt-1 text-gray-300">
+        {isSubscribed ? '✅ Pro features enabled' : '❌ Free tier only'}
+      </div>
+    </div>
+  );
+};
 
 export const useAppContext = (): AppContextType => {
   const context = useContext(AppContext);

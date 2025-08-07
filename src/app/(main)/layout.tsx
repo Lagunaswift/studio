@@ -57,16 +57,15 @@ const planNavItems: NavItem[] = [
     { href: '/meal-plan', label: 'Daily/Weekly View', icon: CalendarDays },
     { href: '/shopping-list', label: 'Shopping List', icon: ShoppingBag },
     { href: '/pantry', label: 'Pantry', icon: Archive },
-    { href: "/debug", label: "🔧 Debug", icon: Database, }
 ];
 
 const recipesNavItems: NavItem[] = [
   { href: '/ai-recipe-finder', label: 'Preppy: Pantry Chef', icon: ChefHat },
-  { href: '/recipes', label: 'My Saved Recipes', icon: UtensilsCrossed },
+  { href: '/recipes', label: 'Recipes', icon: UtensilsCrossed },
 ];
 
 const progressNavItems: NavItem[] = [
-    { href: '/daily-log', label: 'Daily Log', icon: ClipboardList },
+    { href: '/daily-Log', label: 'Daily Check-In', icon: ClipboardList },
     { href: '/weekly-check-in', label: 'Preppy: Weekly Check-in', icon: CheckSquare },
 ];
 
@@ -86,15 +85,14 @@ const helpNavItems: NavItem[] = [
 ];
 
 const mainSections = [
-  { label: 'Plan', icon: CalendarDays, items: planNavItems },
-  { label: 'Recipes', icon: UtensilsCrossed, items: recipesNavItems },
+  { label: 'Planner', icon: CalendarDays, items: planNavItems },
+  { label: 'Recipe Book', icon: UtensilsCrossed, items: recipesNavItems },
   { label: 'Progress', icon: TrendingUp, items: progressNavItems },
   { label: 'Settings', icon: Settings, items: settingsNavItems },
 ];
 
 const allNavItems = [
     dashboardNavItem,
-    { href: "/debug", label: "🔧 Debug", icon: Database },
     ...planNavItems,
     ...recipesNavItems,
     ...progressNavItems,
