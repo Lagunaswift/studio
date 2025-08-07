@@ -1,16 +1,30 @@
+// src/app/(auth)/layout.tsx
+"use client";
 
-import type React from 'react';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 
 export default function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-      <main className="w-full max-w-md">
-        {children}
-      </main>
-    </div>
-  );
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    // If auth is done loading and we have a user, redirect them to the main page.
+    if (!isLoading && user) {
+      router.push('/'); 
+    }
+  }, [user, isLoading, router]);
+
+  // While loading, show a blank screen or a spinner to prevent flicker
+  if (isLoading || user) {
+    return null; 
+  }
+
+  // If not loading and no user, show the auth page (login, signup, etc.)
+  return <>{children}</>;
 }

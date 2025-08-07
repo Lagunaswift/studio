@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Textarea } from '@/components/ui/textarea';
 import { Bot, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { reportBug } from '@/app/dashboard/profile/actions';
+import { reportBug } from '@/app/(main)/profile/actions';
 import { useToast } from '@/hooks/use-toast';
 
 export function SimpleHelpWidget() {

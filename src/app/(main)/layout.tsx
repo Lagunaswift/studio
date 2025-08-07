@@ -25,6 +25,9 @@ import {
   SidebarInset,
   SidebarTrigger,
   useSidebar,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarSeparator,
 } from '@/components/ui/sidebar';
 import { SheetTitle } from '@/components/ui/sheet';
 import { 
@@ -102,6 +105,7 @@ const allNavItems = [
 function LogoutButton() {
   const { signOut } = useAuth();
   const router = useRouter();
+  const { isCollapsed } = useSidebar();
 
   const handleLogout = async () => {
     await signOut();
@@ -112,13 +116,13 @@ function LogoutButton() {
     <Tooltip>
         <TooltipTrigger asChild>
             <SidebarMenuItem>
-              <SidebarMenuButton onClick={handleLogout}>
+              <SidebarMenuButton onClick={handleLogout} className="mt-2">
                 <LogOut />
                 <span className="group-data-[collapsible=icon]:hidden">Log Out</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
         </TooltipTrigger>
-        <TooltipContent side="right" align="center">Log Out</TooltipContent>
+        <TooltipContent side="right" align="center" hidden={!isCollapsed}>Log Out</TooltipContent>
     </Tooltip>
   );
 }
@@ -347,29 +351,37 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
           </SidebarMenu>
           
-          <SidebarMenu className="mt-auto">
-             {helpNavItems.map((item) => {
-              const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-              return (
-                <Tooltip key={item.href}>
-                    <TooltipTrigger asChild>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild isActive={isActive}>
-                            <Link href={item.href}>
-                              <item.icon />
-                              <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" align="center" hidden={!isCollapsed}>
-                      {item.label}
-                    </TooltipContent>
-                </Tooltip>
-              );
-            })}
+          <div className="mt-auto p-2">
+            <SidebarGroup>
+                <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Help & Support</SidebarGroupLabel>
+                <SidebarMenu>
+                    {helpNavItems.map((item) => {
+                    const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+                    return (
+                        <Tooltip key={item.href}>
+                            <TooltipTrigger asChild>
+                                <SidebarMenuItem>
+                                <SidebarMenuButton asChild isActive={isActive}>
+                                    <Link href={item.href}>
+                                    <item.icon />
+                                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                                    </Link>
+                                </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" align="center" hidden={!isCollapsed}>
+                            {item.label}
+                            </TooltipContent>
+                        </Tooltip>
+                    );
+                    })}
+                </SidebarMenu>
+            </SidebarGroup>
+            
+            <SidebarSeparator className="my-2" />
+            
             {!isAuthLoading && user && <LogoutButton />}
-          </SidebarMenu>
+          </div>
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
