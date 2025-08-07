@@ -1,7 +1,7 @@
 
 // src/app/(main)/profile/actions.ts
 'use server';
-
+import { optimizedFirestore } from '@/lib/firestore/OptimizedFirestore';
 import { revalidatePath } from 'next/cache';
 import { serverFirestore } from '@/utils/firestoreRecovery';
 import { debugGetUserIdFromToken } from '@/utils/authDebug';
@@ -59,87 +59,80 @@ export async function getUserIdFromToken(idToken: string): Promise<string> {
   return await debugGetUserIdFromToken(idToken);
 }
 
-// ✅ UNIFIED updateUserProfile function that handles both signatures
-export async function updateUserProfile(userIdOrToken: string, updates: Partial<Omit<UserProfileSettings, 'id'>>) {
+export async function updateUserProfile(
+  userId: string, 
+  updates: Partial<UserProfileSettings>
+): Promise<{ success: boolean; error?: string }> {
   try {
-    let userId: string;
+    console.log('🔄 Optimized profile update:', { userId, updates });
     
-    // Determine if first parameter is userId or idToken
-    if (userIdOrToken.length > 50) {
-      // Looks like an idToken (JWT tokens are much longer)
-      const decodedToken = await serverFirestore.verifyToken(userIdOrToken);
-      userId = decodedToken.uid;
-    } else {
-      // Looks like a userId (short string)
-      userId = userIdOrToken;
-    }
-
-    console.log('🔍 Raw updates received:', {
-      userId,
-      athleteType: updates.athleteType,
-      primaryGoal: updates.primaryGoal,
-      activityLevel: updates.activityLevel,
-    });
+    // Get existing profile with caching
+    const existingProfile = await optimizedFirestore.getDocument<UserProfileSettings>(
+      `profiles/${userId}`,
+      5 * 60 * 1000 // 5 minute cache
+    );
     
-    const userDocRef = adminDb.collection('profiles').doc(userId);
-    const userDoc = await userDocRef.get();
-    let existingData = userDoc.exists ? (userDoc.data() || {}) : {};
-    
-    // ✅ APPLY ENUM MIGRATION
-    existingData = migrateEnumValues(existingData as Partial<UserProfileSettings>);
+    // Apply enum migrations and validation
+    const existingData = existingProfile || {};
+    const migratedData = migrateEnumValues(existingData as any);
     const migratedUpdates = migrateEnumValues(updates);
     
-    console.log('🔍 After migration:', {
-      athleteType: migratedUpdates.athleteType,
-      primaryGoal: migratedUpdates.primaryGoal,
-      activityLevel: migratedUpdates.activityLevel,
-    });
-    
-    const mergedData = { ...existingData, ...migratedUpdates };
-    
-    // ✅ VALIDATE AND FALLBACK
+    const mergedData = { ...migratedData, ...migratedUpdates };
     const validatedData = validateAndFallbackEnums(mergedData);
-    
-    console.log('🔍 After validation:', {
-      athleteType: validatedData.athleteType,
-      primaryGoal: validatedData.primaryGoal,
-      activityLevel: validatedData.activityLevel,
-    });
-
     const completeProfileData = mergeWithDefaults(validatedData, userId);
     
-    // Recalculate derived values on the server
+    // Recalculate derived values
     completeProfileData.tdee = calculateTDEE(
-        completeProfileData.weightKg,
-        completeProfileData.heightCm,
-        completeProfileData.age,
-        completeProfileData.sex,
-        completeProfileData.activityLevel
+      completeProfileData.weightKg,
+      completeProfileData.heightCm,
+      completeProfileData.age,
+      completeProfileData.sex,
+      completeProfileData.activityLevel
     );
+    
     completeProfileData.leanBodyMassKg = calculateLBM(
-        completeProfileData.weightKg,
-        completeProfileData.bodyFatPercentage
+      completeProfileData.weightKg,
+      completeProfileData.bodyFatPercentage
     );
     
-    const updateData = {
-      ...completeProfileData,
-      updatedAt: FieldValue.serverTimestamp(),
-    };
+    // Use batch write for performance
+    optimizedFirestore.batchWrite(`profiles/${userId}`, completeProfileData, 'set');
     
-    await userDocRef.set(updateData, { merge: true });
+    // Commit immediately for profile updates (critical data)
+    await optimizedFirestore.flushBatch();
     
+    // Revalidate cache
     revalidatePath('/profile', 'layout');
     revalidatePath('/', 'layout');
     
     return { success: true };
 
   } catch (error: any) {
-    console.error('updateUserProfile error:', {
-      code: error.code,
-      message: error.message,
-      stack: error.stack,
-    });
-    return { success: false, error: `Could not update profile: ${error.message}` };
+    console.error('❌ Optimized profile update failed:', error);
+    return { 
+      success: false, 
+      error: `Profile update failed: ${error.message}` 
+    };
+  }
+}
+
+// Batch multiple profile updates
+export async function batchUpdateUserProfile(
+  userId: string,
+  updates: Array<{ field: string; value: any }>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Combine all updates into single object
+    const combinedUpdates = updates.reduce((acc, update) => {
+      acc[update.field] = update.value;
+      return acc;
+    }, {} as any);
+    
+    // Single batch operation instead of multiple individual updates
+    return await updateUserProfile(userId, combinedUpdates);
+    
+  } catch (error: any) {
+    return { success: false, error: error.message };
   }
 }
 

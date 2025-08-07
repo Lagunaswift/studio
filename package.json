@@ -71,6 +71,7 @@
     "@types/caseless": "^0.12.5",
     "@types/eslint": "^9.6.1",
     "@types/estree": "^1.0.8",
+    "@types/lru-cache": "^7.10.9",
     "@types/memcached": "^2.2.10",
     "@types/mysql": "^2.15.27",
     "@types/node": "^20",

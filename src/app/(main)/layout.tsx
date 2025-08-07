@@ -65,7 +65,7 @@ const recipesNavItems: NavItem[] = [
 ];
 
 const progressNavItems: NavItem[] = [
-    { href: '/daily-Log', label: 'Daily Check-In', icon: ClipboardList },
+    { href: '/daily-check-in', label: 'Daily Check-In', icon: ClipboardList },
     { href: '/weekly-check-in', label: 'Preppy: Weekly Check-in', icon: CheckSquare },
 ];
 

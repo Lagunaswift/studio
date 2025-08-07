@@ -1,44 +1,103 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+import { PWAInstaller } from '@/components/PWAInstaller';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { AppProvider } from '@/context/AppContext';
-import { AuthProvider } from '@/context/AuthContext'; // <-- IMPORT
+import { AuthProvider } from '@/context/AuthContext';
 import { ThemeProvider } from "next-themes";
 
 export const metadata: Metadata = {
-  title: 'MealPlannerPro',
-  description: 'Plan your meals, track macros, and generate shopping lists with AI suggestions.',
+  title: 'MealPlannerPro - Smart Nutrition & Meal Planning',
+  description: 'AI-powered meal planning with nutrition tracking, recipe management, and smart shopping lists',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'MealPlannerPro',
+    startupImage: [
+      '/icons/apple-splash-2048-2732.png',
+      '/icons/apple-splash-1668-2224.png',
+      '/icons/apple-splash-1536-2048.png',
+      '/icons/apple-splash-1125-2436.png',
+      '/icons/apple-splash-1242-2208.png',
+      '/icons/apple-splash-750-1334.png',
+      '/icons/apple-splash-828-1792.png'
+    ]
+  },
+  formatDetection: {
+    telephone: false
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'MealPlannerPro',
+    title: 'MealPlannerPro - Smart Nutrition & Meal Planning',
+    description: 'AI-powered meal planning with nutrition tracking',
+    images: ['/og-image.png']
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'MealPlannerPro - Smart Nutrition & Meal Planning',
+    description: 'AI-powered meal planning with nutrition tracking',
+    images: ['/twitter-image.png']
+  },
   icons: {
-    icon: '/favicon.ico', // Assuming a favicon might be added later
+    icon: '/icons/icon-192x192.png',
+    apple: '/icons/apple-icon-180x180.png'
   }
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#2563eb'
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet" />
+        <link rel="icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" href="/icons/apple-icon-180x180.png" />
+        <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#2563eb" />
+        <meta name="msapplication-TileColor" content="#2563eb" />
+        <meta name="msapplication-config" content="/browserconfig.xml" />
       </head>
-      <body className="font-body antialiased min-h-screen flex flex-col">
+      <body>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider> {/* <-- WRAP HERE */}
+          <AuthProvider>
             <AppProvider>
               {children}
               <Toaster />
+              <PWAInstaller />
             </AppProvider>
-          </AuthProvider> {/* <-- WRAP HERE */}
+          </AuthProvider>
         </ThemeProvider>
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js')
+                  .then(function(registration) {
+                    console.log('✅ SW registered: ', registration);
+                  })
+                  .catch(function(registrationError) {
+                    console.log('❌ SW registration failed: ', registrationError);
+                  });
+              });
+            }
+          `
+        }} />
       </body>
     </html>
   );
