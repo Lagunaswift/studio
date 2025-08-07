@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2, Info, Wheat, Milk, Shell, Fish, Egg, TreeDeciduous, Drumstick, Heart, Plus, Bean as Peanut } from 'lucide-react'; // Added Plus
+import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2, Info, Wheat, Milk, Shell, Fish, Egg, TreeDeciduous, Drumstick, Heart, Plus, Bean as Peanut, ChevronLeft, ChevronRight } from 'lucide-react'; // Added Plus
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -64,10 +64,16 @@ function RecipesPageComponent() {
   const [planMealType, setPlanMealType] = useState<MealType | undefined>(MEAL_TYPES[0]);
   const [planServings, setPlanServings] = useState<number>(1);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recipesPerPage, setRecipesPerPage] = useState(20);
 
   useEffect(() => {
     setSearchTerm(searchTermFromUrl);
   }, [searchTermFromUrl]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, recipesPerPage, showFavoritesOnly, userProfile]);
 
   const activeDietaryFilters = useMemo(() => userProfile?.dietaryPreferences || [], [userProfile]);
   const activeAllergenFilters = useMemo(() => userProfile?.allergens || [], [userProfile]);
@@ -83,7 +89,7 @@ function RecipesPageComponent() {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
-  const finalRecipesForDisplay = useMemo(() => {
+  const filteredRecipes = useMemo(() => {
     if (isRecipeCacheLoading) return [];
     
     let recipes = allRecipesCache;
@@ -130,6 +136,16 @@ function RecipesPageComponent() {
     }
     return recipes;
   }, [allRecipesCache, searchTerm, activeDietaryFilters, activeAllergenFilters, showFavoritesOnly, isRecipeFavorite, isRecipeCacheLoading]);
+  
+  const finalRecipesForDisplay = useMemo(() => {
+    const startIndex = (currentPage - 1) * recipesPerPage;
+    const endIndex = startIndex + recipesPerPage;
+    return filteredRecipes.slice(startIndex, endIndex);
+  }, [filteredRecipes, currentPage, recipesPerPage]);
+
+  const totalPages = useMemo(() => {
+    return Math.ceil(filteredRecipes.length / recipesPerPage);
+  }, [filteredRecipes, recipesPerPage]);
   
   const calculatePantryMatch = useCallback((recipe: Recipe, pantryItems: PantryItem[]) => {
       if (!pantryItems || pantryItems.length === 0 || !recipe.ingredients) {
@@ -258,6 +274,7 @@ function RecipesPageComponent() {
           <p className="ml-2 text-muted-foreground">Loading recipes...</p>
         </div>
       ) : finalRecipesForDisplay.length > 0 ? (
+        <>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {finalRecipesForDisplay.map((recipe) => {
             const { matched, total } = calculatePantryMatch(recipe, pantryItems);
@@ -280,6 +297,48 @@ function RecipesPageComponent() {
             )
           })}
         </div>
+        {totalPages > 1 && (
+            <div className="mt-8 flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <span>Recipes per page:</span>
+                <Select
+                  value={String(recipesPerPage)}
+                  onValueChange={(value) => setRecipesPerPage(Number(value))}
+                >
+                  <SelectTrigger className="w-[70px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       ) : (
          <Card className="text-center py-10 shadow-none border-dashed">
           <CardHeader>

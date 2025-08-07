@@ -68,7 +68,7 @@ const progressNavItems: NavItem[] = [
 
 const settingsNavItems: NavItem[] = [
   { href: '/dashboard/profile/user-info', label: 'My Profile', icon: UserCircle2 },
-  { href: '/dashboard/profile/targets', label: 'My Goals & Targets', icon: Target },
+  { href: '/api/profile/targets', label: 'My Goals & Targets', icon: Target },
   { href: '/dashboard/profile/diet-type', label: 'Diet & Allergens', icon: Leaf },
   { href: '/dashboard/profile/meal-structure', label: 'Meal Structure', icon: ListChecks },
   { href: '/dashboard/profile/dashboard-settings', label: 'Customize Dashboard', icon: SlidersHorizontal },

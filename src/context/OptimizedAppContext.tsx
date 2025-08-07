@@ -1,115 +1,111 @@
-// src/context/OptimizedAppContext.tsx
-"use client";
-
-import React, { createContext, useContext, useMemo, useCallback, useState, useEffect } from 'react';
-import { useAuth } from './AuthContext';
-import { useOptimizedProfile, useOptimizedRecipes } from '@/hooks/useOptimizedFirestore';
+// Fixed version of useOptimizedFirestore.ts
+import { useState, useEffect, useRef } from 'react';
+import { onSnapshot, doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase-client';
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import type { PlannedMeal, ShoppingListItem, PantryItem, Recipe, MealType, Macros, UserProfileSettings, RecipeFormData, UKSupermarketCategory } from '@/types';
-import { calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, assignCategory as assignCategoryUtil } from '@/lib/data';
-import { addOrUpdateMealPlan, deleteMealFromPlan, addOrUpdatePantryItem, deletePantryItem, addRecipe as addRecipeAction } from '@/app/(main)/profile/actions';
+import type { UserProfileSettings, Recipe } from '@/types';
 
-interface OptimizedAppContextType {
-  userProfile: UserProfileSettings | null;
-  allRecipesCache: Recipe[];
-  mealPlan: PlannedMeal[];
-  pantryItems: PantryItem[];
-  isAppDataLoading: boolean;
-  isRecipeCacheLoading: boolean;
-  shoppingList: ShoppingListItem[];
-  // Re-add your essential functions here
-  addMealToPlan: (recipe: Recipe, date: string, mealType: MealType, servings: number) => Promise<void>;
-  removeMealFromPlan: (plannedMealId: string) => Promise<void>;
-  getConsumedMacrosForDate: (date: string) => Macros;
-}
+const PROFILE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const RECIPES_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 
-const OptimizedAppContext = createContext<OptimizedAppContextType | undefined>(undefined);
+export function useOptimizedRecipes(userId: string | undefined) {
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const cacheRef = useRef<{ data: Recipe[]; timestamp: number }>({ data: [], timestamp: 0 });
 
-export const OptimizedAppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
-  const { profile: userProfile, loading: profileLoading } = useOptimizedProfile(user?.uid);
-  const { recipes: allRecipesCache, loading: recipesLoading } = useOptimizedRecipes(user?.uid);
-  
-  const [mealPlan, setMealPlan] = useState<PlannedMeal[]>([]);
-  const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
-
-  // Real-time listeners for critical, frequently updated data
   useEffect(() => {
-    if (!user?.uid) {
-        setMealPlan([]);
-        setPantryItems([]);
-        return;
-    }
+      console.log('🔄 useOptimizedRecipes effect triggered with userId:', userId);
+      
+      const loadRecipes = async () => {
+          try {
+              console.log('📊 Starting recipe loading process...');
+              const now = Date.now();
+              
+              // Check cache first
+              if (cacheRef.current.data.length > 0 && now - cacheRef.current.timestamp < RECIPES_CACHE_DURATION) {
+                  console.log('🎯 Using cached recipes:', cacheRef.current.data.length);
+                  setRecipes(cacheRef.current.data);
+                  setLoading(false);
+                  setError(null);
+                  return;
+              }
 
-    const mealPlanQuery = query(collection(db, `profiles/${user.uid}/mealPlan`));
-    const pantryQuery = query(collection(db, `profiles/${user.uid}/pantry`));
-    
-    const unsubMealPlan = onSnapshot(mealPlanQuery, (snapshot) => {
-        const meals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PlannedMeal));
-        setMealPlan(meals);
-    });
+              console.log('🔍 Cache miss, loading fresh data...');
+              setLoading(true);
+              setError(null);
 
-    const unsubPantry = onSnapshot(pantryQuery, (snapshot) => {
-        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PantryItem));
-        setPantryItems(items);
-    });
+              // Load built-in recipes from root collection
+              console.log('📚 Querying built-in recipes...');
+              const builtInQuery = query(collection(db, "recipes"), where("user_id", "==", null));
+              const builtInSnapshot = await getDocs(builtInQuery);
+              console.log('📚 Built-in recipes found:', builtInSnapshot.docs.length);
+              
+              const builtInRecipes = builtInSnapshot.docs.map(doc => {
+                  console.log('📖 Built-in recipe doc:', doc.id, doc.data());
+                  return { id: parseInt(doc.id, 10), ...doc.data() } as Recipe;
+              });
+              
+              let userRecipes: Recipe[] = [];
+              if (userId) {
+                  console.log('👤 Querying user recipes for userId:', userId);
+                  // Try both collection paths to see which one has data
+                  
+                  // Method 1: Root collection with user_id filter
+                  const userQueryRoot = query(collection(db, "recipes"), where("user_id", "==", userId));
+                  const userSnapshotRoot = await getDocs(userQueryRoot);
+                  console.log('👤 User recipes in root collection:', userSnapshotRoot.docs.length);
+                  
+                  // Method 2: User subcollection
+                  const userRecipesRef = collection(db, `profiles/${userId}/recipes`);
+                  const userSnapshotSub = await getDocs(userRecipesRef);
+                  console.log('👤 User recipes in subcollection:', userSnapshotSub.docs.length);
+                  
+                  // Use whichever has more recipes
+                  const useSubcollection = userSnapshotSub.docs.length > userSnapshotRoot.docs.length;
+                  const userSnapshot = useSubcollection ? userSnapshotSub : userSnapshotRoot;
+                  
+                  console.log('👤 Using', useSubcollection ? 'subcollection' : 'root collection', 'for user recipes');
+                  
+                  userRecipes = userSnapshot.docs.map(doc => {
+                      console.log('👤 User recipe doc:', doc.id, doc.data());
+                      return { id: parseInt(doc.id, 10), ...doc.data() } as Recipe;
+                  });
+              } else {
+                  console.log('❌ No userId provided, skipping user recipes');
+              }
 
-    return () => {
-        unsubMealPlan();
-        unsubPantry();
-    };
-  }, [user?.uid]);
-  
-  const callServerActionWithAuth = async (action: (idToken: string, ...args: any[]) => Promise<any>, ...args: any[]) => {
-    if (!user) throw new Error('User not authenticated');
-    const idToken = await user.getIdToken(true);
-    return action(idToken, ...args);
-  };
-  
-  const addMealToPlan = useCallback(async (recipe: Recipe, date: string, mealType: MealType, servings: number) => {
-    const newMeal = { recipeId: recipe.id, date, mealType, servings, status: 'planned' };
-    await callServerActionWithAuth(addOrUpdateMealPlan, newMeal);
-  }, [user]);
-  
-  const removeMealFromPlan = useCallback(async (mealId: string) => {
-    await callServerActionWithAuth(deleteMealFromPlan, mealId);
-  }, [user]);
+              const allRecipes = [...builtInRecipes, ...userRecipes];
+              console.log('✅ Total recipes loaded:', allRecipes.length);
+              
+              // Update cache and state
+              cacheRef.current = { data: allRecipes, timestamp: now };
+              setRecipes(allRecipes);
+              setLoading(false);
+              setError(null);
+              
+          } catch (err: any) {
+              console.error('❌ Recipe loading error:', err);
+              setError(err.message || 'Failed to load recipes');
+              setLoading(false);
+              setRecipes([]); // Set empty array so app doesn't break
+          }
+      };
 
-  const getConsumedMacrosForDate = useCallback((date: string): Macros => {
-    const meals = mealPlan.filter(pm => pm.date === date && pm.status === 'eaten');
-    return calculateTotalMacrosUtil(meals, allRecipesCache);
-  }, [mealPlan, allRecipesCache]);
+      // Always call loadRecipes immediately
+      loadRecipes();
+      
+      // Set up interval for periodic refresh
+      const interval = setInterval(() => {
+          console.log('🔄 Periodic recipe refresh triggered');
+          loadRecipes();
+      }, RECIPES_CACHE_DURATION);
+      
+      return () => {
+          console.log('🧹 Cleaning up recipe loading interval');
+          clearInterval(interval);
+      };
+  }, [userId]); // Only depend on userId
 
-  const shoppingList = useMemo(() => {
-    return generateShoppingListUtil(mealPlan, allRecipesCache, pantryItems);
-  }, [mealPlan, allRecipesCache, pantryItems]);
-
-
-  const contextValue = useMemo(() => ({
-    userProfile,
-    allRecipesCache,
-    mealPlan,
-    pantryItems,
-    isAppDataLoading: profileLoading,
-    isRecipeCacheLoading: recipesLoading,
-    shoppingList,
-    addMealToPlan,
-    removeMealFromPlan,
-    getConsumedMacrosForDate,
-  }), [userProfile, allRecipesCache, mealPlan, pantryItems, profileLoading, recipesLoading, shoppingList, addMealToPlan, removeMealFromPlan, getConsumedMacrosForDate]);
-
-  return (
-    <OptimizedAppContext.Provider value={contextValue}>
-      {children}
-    </OptimizedAppContext.Provider>
-  );
-};
-
-export const useOptimizedAppContext = () => {
-  const context = useContext(OptimizedAppContext);
-  if (context === undefined) {
-    throw new Error('useOptimizedAppContext must be used within OptimizedAppProvider');
-  }
-  return context;
-};
+  console.log('📊 Hook state - loading:', loading, 'recipes:', recipes.length, 'error:', error);
+  return { recipes, loading, error };
+}
