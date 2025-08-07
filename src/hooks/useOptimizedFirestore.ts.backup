@@ -1,0 +1,126 @@
+// src/hooks/useOptimizedFirestore.ts
+import { useState, useEffect, useRef } from 'react';
+import { onSnapshot, doc, getDoc, collection, query, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase-client';
+import type { UserProfileSettings, Recipe } from '@/types';
+import { useAuth } from '@/context/AuthContext';
+
+const PROFILE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const RECIPES_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
+
+export function useOptimizedRecipes() {
+    const { user } = useAuth();
+    const userId = user?.uid;
+    const [recipes, setRecipes] = useState<Recipe[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    
+    const builtInRecipesCacheRef = useRef<{ data: Recipe[]; timestamp: number }>({ data: [], timestamp: 0 });
+    const unsubscribeUserRecipesRef = useRef<() => void | null>(null);
+
+    useEffect(() => {
+        const loadBuiltInRecipes = async () => {
+            const now = Date.now();
+            if (builtInRecipesCacheRef.current.data.length > 0 && now - builtInRecipesCacheRef.current.timestamp < RECIPES_CACHE_DURATION) {
+                return builtInRecipesCacheRef.current.data;
+            }
+            try {
+                const builtInRecipesRef = collection(db, "recipes");
+                const snapshot = await getDocs(builtInRecipesRef);
+                const builtInRecipes = snapshot.docs.map(doc => ({ id: parseInt(doc.id, 10), ...doc.data() } as Recipe));
+                
+                builtInRecipesCacheRef.current = { data: builtInRecipes, timestamp: now };
+                return builtInRecipes;
+            } catch (err) {
+                console.error("Error fetching built-in recipes:", err);
+                setError('Could not load public recipes.');
+                return [];
+            }
+        };
+
+        const setupDataSource = async () => {
+            setLoading(true);
+            setError(null);
+
+            const builtInRecipes = await loadBuiltInRecipes();
+
+            if (userId) {
+                const userRecipesRef = collection(db, 'profiles', userId, 'recipes');
+                
+                if (unsubscribeUserRecipesRef.current) {
+                    unsubscribeUserRecipesRef.current();
+                }
+
+                unsubscribeUserRecipesRef.current = onSnapshot(userRecipesRef, (snapshot) => {
+                    const userRecipes = snapshot.docs.map(doc => ({ id: parseInt(doc.id, 10), ...doc.data() } as Recipe));
+                    setRecipes([...builtInRecipes, ...userRecipes]);
+                    setLoading(false);
+                }, (err) => {
+                    console.error("Error fetching user recipes:", err);
+                    setError('Could not load your saved recipes.');
+                    setRecipes(builtInRecipes); 
+                    setLoading(false);
+                });
+            } else {
+                setRecipes(builtInRecipes);
+                setLoading(false);
+            }
+        };
+
+        setupDataSource();
+
+        return () => {
+            if (unsubscribeUserRecipesRef.current) {
+                unsubscribeUserRecipesRef.current();
+            }
+        };
+    }, [userId]);
+
+    return { recipes, loading, error };
+}
+
+// Keep existing profile hook unchanged
+export function useOptimizedProfile(userId: string | undefined) {
+  const [profile, setProfile] = useState<UserProfileSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const cacheRef = useRef<{ data: UserProfileSettings | null; timestamp: number }>({ data: null, timestamp: 0 });
+
+  useEffect(() => {
+    if (!userId) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
+
+    const loadProfile = async () => {
+      const now = Date.now();
+      if (cacheRef.current.data && now - cacheRef.current.timestamp < PROFILE_CACHE_DURATION) {
+        setProfile(cacheRef.current.data);
+        setLoading(false);
+        return;
+      }
+      
+      setLoading(true);
+      const docRef = doc(db, 'profiles', userId);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data() as UserProfileSettings;
+        cacheRef.current = { data, timestamp: now };
+        setProfile(data);
+      } else {
+        setProfile(null);
+      }
+      setLoading(false);
+    };
+
+    loadProfile();
+    
+    const interval = setInterval(loadProfile, PROFILE_CACHE_DURATION);
+    
+    return () => clearInterval(interval);
+
+  }, [userId]);
+
+  return { profile, loading };
+}

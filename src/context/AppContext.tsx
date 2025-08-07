@@ -3,15 +3,7 @@
 
 import React, { createContext, useContext, useMemo, useCallback, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '@/lib/firebase';
-import {
-  collection,
-  onSnapshot,
-  query,
-  where,
-  doc,
-} from "firebase/firestore";
 import {
   UserProfileSettingsSchema,
   type PlannedMeal,
@@ -29,9 +21,7 @@ import {
   type ActivityLevel,
   type MealSlotConfig,
   type DashboardSettings,
-  type SubscriptionStatus,
   type UKSupermarketCategory,
-  type PrimaryGoal
 } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
@@ -39,6 +29,7 @@ import { format, subDays, differenceInDays } from 'date-fns';
 import { addOrUpdateMealPlan, deleteMealFromPlan, addOrUpdatePantryItem, deletePantryItem, addRecipe as addRecipeAction, updateUserProfile, addOrUpdateVitalsLog, addOrUpdateWeightLog, addOrUpdateManualMacrosLog } from '@/app/(main)/profile/actions';
 import { z } from 'zod';
 import { migrateEnumValues, validateAndFallbackEnums } from '@/utils/enumMigration';
+import { useOptimizedRecipes, useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
 
 // Local type definition to avoid importing server-side schema
 type ProCoachRecommendation = {
@@ -72,7 +63,6 @@ const callServerActionWithAuth = async (action: (idToken: string, ...args: any[]
 const processProfile = (profileData: UserProfileSettings | undefined | null): UserProfileSettings | null => {
   if (!profileData) return null;
 
-  // ✅ APPLY ENUM MIGRATION before validation
   let migratedData = migrateEnumValues(profileData);
   migratedData = validateAndFallbackEnums(migratedData);
 
@@ -158,6 +148,8 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoading: isAuthLoading } = useAuth();
+  const userId = user?.uid;
+
   const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
   const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
   const [builtInRecipes, setBuiltInRecipes] = useState<Recipe[]>([]);
@@ -168,7 +160,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [dailyManualMacrosLog, setDailyManualMacrosLog] = useState<DailyManualMacrosLog[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [isRecipeCacheLoading, setIsRecipeCacheLoading] = useState(true);
-  const [isOnline, setIsOnline] = useState(true); 
+  const [isOnline, setIsOnline] = useState(true);
+
+  const recipeHookResults = useOptimizedRecipes();
+
+  useEffect(() => {
+    console.log('🔥 Recipe hook results changed:', {
+      loading: recipeHookResults.loading,
+      recipesCount: recipeHookResults.recipes.length,
+      error: recipeHookResults.error
+    });
+    
+    if (!recipeHookResults.loading && recipeHookResults.recipes.length > 0) {
+      const builtIn = recipeHookResults.recipes.filter(r => !r.user_id);
+      const userOwned = recipeHookResults.recipes.filter(r => r.user_id === userId);
+      
+      console.log('🔥 Setting recipes - Built-in:', builtIn.length, 'User:', userOwned.length);
+      setBuiltInRecipes(builtIn);
+      setUserRecipes(userOwned);
+      setIsRecipeCacheLoading(false);
+    } else if (recipeHookResults.error) {
+      console.error('🔥 Recipe loading error:', recipeHookResults.error);
+      setIsRecipeCacheLoading(false);
+    }
+  }, [recipeHookResults.loading, recipeHookResults.recipes, recipeHookResults.error, userId]);
 
 
   useEffect(() => {
@@ -355,7 +370,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isSubscribed = useMemo(() => {
     if (!userProfile) return false;
     
-    // Check if subscription_status is 'active'
     const hasActiveSubscription = userProfile.subscription_status === 'active';
     
     return hasActiveSubscription;

@@ -1,4 +1,4 @@
-// src/hooks/useOptimizedFirestore.ts - NULL QUERY WORKAROUND VERSION
+// src/hooks/useOptimizedFirestore.ts - COMPREHENSIVE FIX VERSION
 import { useState, useEffect, useRef } from 'react';
 import { onSnapshot, doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase-client';
@@ -34,184 +34,238 @@ export function useOptimizedRecipes(userId: string | undefined) {
                 setLoading(true);
                 setError(null);
 
-                // 🚨 WORKAROUND: Load ALL recipes and filter client-side
-                // This bypasses potential Firestore null query issues
-                console.log('📚 Loading all recipes and filtering client-side...');
-                const allRecipesRef = collection(db, "recipes");
-                const allSnapshot = await getDocs(allRecipesRef);
-                console.log('📚 Total recipes in database:', allSnapshot.docs.length);
+                // 🚀 ROBUST RECIPE LOADING STRATEGY
+                // Strategy 1: Try to load built-in recipes with multiple approaches
+                console.log('📚 Loading built-in recipes...');
+                let builtInRecipes: Recipe[] = [];
                 
-                const builtInRecipes: Recipe[] = [];
-                const userRecipes: Recipe[] = [];
-                const parseErrors: string[] = [];
+                try {
+                    // Approach 1A: Query for null user_id (original approach)
+                    console.log('📖 Attempting null user_id query...');
+                    const builtInQuery = query(collection(db, "recipes"), where("user_id", "==", null));
+                    const builtInSnapshot = await getDocs(builtInQuery);
+                    console.log('📖 Built-in recipes from null query:', builtInSnapshot.docs.length);
+                    
+                    if (builtInSnapshot.docs.length > 0) {
+                        builtInRecipes = builtInSnapshot.docs.map(doc => {
+                            console.log('📖 Built-in recipe (null):', doc.id, doc.data().name || 'Unnamed');
+                            return { id: parseInt(doc.id, 10), ...doc.data() } as Recipe;
+                        });
+                    }
+                } catch (nullQueryError) {
+                    console.warn('⚠️ Null query failed:', nullQueryError);
+                }
+
+                // Approach 1B: If null query failed, try missing user_id field
+                if (builtInRecipes.length === 0) {
+                    try {
+                        console.log('📖 Attempting missing user_id field query...');
+                        // Load all recipes and filter client-side for those without user_id
+                        const allRecipesRef = collection(db, "recipes");
+                        const allSnapshot = await getDocs(allRecipesRef);
+                        console.log('📖 Total recipes in database:', allSnapshot.docs.length);
+                        
+                        builtInRecipes = allSnapshot.docs
+                            .filter(doc => {
+                                const data = doc.data();
+                                // Consider built-in if user_id is null, undefined, or empty string
+                                return !data.user_id || data.user_id === null || data.user_id === '';
+                            })
+                            .map(doc => {
+                                console.log('📖 Built-in recipe (filtered):', doc.id, doc.data().name || 'Unnamed');
+                                return { id: parseInt(doc.id, 10), ...doc.data() } as Recipe;
+                            });
+                        
+                        console.log('📖 Built-in recipes from client filtering:', builtInRecipes.length);
+                    } catch (filterError) {
+                        console.warn('⚠️ Client filtering failed:', filterError);
+                    }
+                }
+
+                // Approach 1C: If still no built-in recipes, try a specific collection
+                if (builtInRecipes.length === 0) {
+                    try {
+                        console.log('📖 Attempting default-recipes collection...');
+                        const defaultRecipesRef = collection(db, "default-recipes");
+                        const defaultSnapshot = await getDocs(defaultRecipesRef);
+                        console.log('📖 Default recipes collection:', defaultSnapshot.docs.length);
+                        
+                        if (defaultSnapshot.docs.length > 0) {
+                            builtInRecipes = defaultSnapshot.docs.map(doc => {
+                                console.log('📖 Default recipe:', doc.id, doc.data().name || 'Unnamed');
+                                return { id: parseInt(doc.id, 10), ...doc.data() } as Recipe;
+                            });
+                        }
+                    } catch (defaultError) {
+                        console.warn('⚠️ Default recipes collection not found:', defaultError);
+                    }
+                }
+
+                console.log('✅ Built-in recipes loaded:', builtInRecipes.length);
+
+                // Strategy 2: Load user-specific recipes
+                let userRecipes: Recipe[] = [];
                 
-                allSnapshot.docs.forEach(doc => {
-                    const data = doc.data();
+                if (userId) {
+                    console.log('👤 Loading user recipes for userId:', userId);
                     
                     try {
-                        // Parse the document ID as integer
-                        const numericId = parseInt(doc.id, 10);
-                        if (isNaN(numericId)) {
-                            console.warn(`⚠️ Document ${doc.id} has non-numeric ID, skipping`);
-                            parseErrors.push(`Non-numeric ID: ${doc.id}`);
-                            return;
-                        }
-
-                        const recipe = { 
-                            id: numericId,
-                            ...data 
-                        } as Recipe;
+                        // Approach 2A: Root collection with user_id filter
+                        console.log('👤 Querying root collection for user recipes...');
+                        const userQueryRoot = query(collection(db, "recipes"), where("user_id", "==", userId));
+                        const userSnapshotRoot = await getDocs(userQueryRoot);
+                        console.log('👤 User recipes in root collection:', userSnapshotRoot.docs.length);
                         
-                        // 🔧 CLIENT-SIDE FILTERING: Check user_id field
-                        const docUserId = data.user_id;
-                        
-                        if (docUserId === null || docUserId === undefined || !('user_id' in data)) {
-                            // Built-in recipe (user_id is null, undefined, or missing)
-                            builtInRecipes.push(recipe);
-                            console.log(`📖 Built-in recipe: ${recipe.name || `ID:${recipe.id}`} (user_id: ${docUserId})`);
-                        } else if (userId && docUserId === userId) {
-                            // User-specific recipe
-                            userRecipes.push(recipe);
-                            console.log(`👤 User recipe: ${recipe.name || `ID:${recipe.id}`} (user_id: ${docUserId})`);
-                        } else {
-                            // Recipe belongs to different user - skip
-                            console.log(`👥 Other user's recipe: ${recipe.name || `ID:${recipe.id}`} (user_id: ${docUserId})`);
-                        }
-                        
-                    } catch (parseError) {
-                        console.warn(`⚠️ Failed to parse recipe doc ${doc.id}:`, parseError);
-                        parseErrors.push(`Parse error for ${doc.id}: ${parseError}`);
+                        userRecipes = userSnapshotRoot.docs.map(doc => {
+                            console.log('👤 User recipe (root):', doc.id, doc.data().name || 'Unnamed');
+                            return { id: parseInt(doc.id, 10), ...doc.data() } as Recipe;
+                        });
+                    } catch (userRootError) {
+                        console.warn('⚠️ User root query failed:', userRootError);
                     }
-                });
 
-                // Also check user subcollection as fallback
-                if (userId) {
-                    console.log('👤 Checking user subcollection for additional recipes...');
+                    // Approach 2B: User subcollection as additional source
                     try {
+                        console.log('👤 Checking user subcollection...');
                         const userRecipesRef = collection(db, `profiles/${userId}/recipes`);
                         const userSnapshotSub = await getDocs(userRecipesRef);
                         console.log('👤 User recipes in subcollection:', userSnapshotSub.docs.length);
                         
+                        // Add subcollection recipes, avoiding duplicates
                         userSnapshotSub.docs.forEach(doc => {
                             const data = doc.data();
-                            try {
-                                const recipe = { 
-                                    id: parseInt(doc.id, 10), 
-                                    ...data 
-                                } as Recipe;
-                                
-                                // Check for duplicates (same ID already in userRecipes)
-                                if (!userRecipes.some(r => r.id === recipe.id)) {
-                                    userRecipes.push(recipe);
-                                    console.log('👤 Added subcollection recipe:', recipe.name || `ID:${recipe.id}`);
-                                } else {
-                                    console.log('👤 Duplicate recipe in subcollection, skipping:', recipe.id);
-                                }
-                            } catch (parseError) {
-                                console.warn('⚠️ Failed to parse subcollection recipe doc:', doc.id, parseError);
-                                parseErrors.push(`Subcollection parse error for ${doc.id}: ${parseError}`);
+                            const recipe = { id: parseInt(doc.id, 10), ...data } as Recipe;
+                            
+                            // Check for duplicates (same ID already in userRecipes)
+                            if (!userRecipes.some(r => r.id === recipe.id)) {
+                                userRecipes.push(recipe);
+                                console.log('👤 Added subcollection recipe:', recipe.name || `ID:${recipe.id}`);
+                            } else {
+                                console.log('👤 Duplicate recipe in subcollection, skipping:', recipe.id);
                             }
                         });
-                    } catch (subError) {
-                        console.log('ℹ️ User subcollection not accessible:', subError);
+                    } catch (userSubError) {
+                        console.log('ℹ️ User subcollection not accessible (normal if empty):', userSubError);
                     }
+                } else {
+                    console.log('❌ No userId provided, skipping user recipes');
                 }
 
+                // Strategy 3: Combine and validate results
                 const allRecipes = [...builtInRecipes, ...userRecipes];
                 
-                console.log('✅ Recipe loading complete!');
-                console.log('📊 Final breakdown:', {
-                    builtInRecipes: builtInRecipes.length,
-                    userRecipes: userRecipes.length,
-                    totalRecipes: allRecipes.length,
-                    parseErrors: parseErrors.length,
-                    sampleBuiltInNames: builtInRecipes.slice(0, 3).map(r => r.name || `ID:${r.id}`),
-                    errors: parseErrors.length > 0 ? parseErrors : undefined
-                });
-                
+                console.log('🎯 Recipe loading summary:');
+                console.log('├── Built-in recipes:', builtInRecipes.length);
+                console.log('├── User recipes:', userRecipes.length); 
+                console.log('├── Total recipes:', allRecipes.length);
+                console.log('└── Sample built-in names:', builtInRecipes.slice(0, 3).map(r => r.name || `ID:${r.id}`));
+
+                // Strategy 4: Handle edge cases and set appropriate state
                 if (allRecipes.length === 0) {
-                    const warningMsg = `No recipes loaded. Database has ${allSnapshot.docs.length} documents, but none matched filtering criteria.`;
-                    console.warn('⚠️', warningMsg);
+                    const warningMsg = 'No recipes found in database. This might indicate:\n' +
+                        '1. Database is empty or not properly seeded\n' +
+                        '2. Permission issues accessing recipes\n' +
+                        '3. Network connectivity problems\n' +
+                        '4. Recipe collection structure differs from expected format';
+                    
+                    console.warn('⚠️ No recipes loaded:', warningMsg);
                     setError(warningMsg);
+                    setRecipes([]); // Ensure clean state
                 } else {
+                    console.log('✅ Successfully loaded recipes!');
                     setError(null);
+                    setRecipes(allRecipes);
                 }
                 
-                // Update cache and state
+                // Strategy 5: Update cache for future requests
                 cacheRef.current = { data: allRecipes, timestamp: now };
-                setRecipes(allRecipes);
                 setLoading(false);
                 
-            } catch (err: any) {
-                console.error('❌ Recipe loading error:', err);
-                setError(err.message || 'Failed to load recipes');
+            } catch (globalError: any) {
+                console.error('❌ Critical recipe loading error:', globalError);
+                const errorMsg = `Failed to load recipes: ${globalError.message || 'Unknown error'}`;
+                setError(errorMsg);
                 setLoading(false);
-                setRecipes([]); // Set empty array so app doesn't break
+                setRecipes([]); // Ensure clean state on error
             }
         };
 
-        // Always call loadRecipes immediately
+        // Execute loading immediately
         loadRecipes();
         
-        // Set up interval for periodic refresh
-        const interval = setInterval(() => {
+        // Set up periodic refresh for cache invalidation
+        const refreshInterval = setInterval(() => {
             console.log('🔄 Periodic recipe refresh triggered');
             loadRecipes();
         }, RECIPES_CACHE_DURATION);
         
+        // Cleanup function
         return () => {
             console.log('🧹 Cleaning up recipe loading interval');
-            clearInterval(interval);
+            clearInterval(refreshInterval);
         };
-    }, [userId]); // Only depend on userId
+        
+    }, [userId]); // Only re-run when userId changes
 
-    console.log('📊 Hook state - loading:', loading, 'recipes:', recipes.length, 'error:', error);
+    // Debug logging for hook state
+    console.log('📊 useOptimizedRecipes state:', {
+        loading,
+        recipesCount: recipes.length,
+        hasError: !!error,
+        cacheTimestamp: cacheRef.current.timestamp
+    });
+
     return { recipes, loading, error };
 }
 
-// Keep existing profile hook unchanged
+// Keep the existing profile hook unchanged for now
 export function useOptimizedProfile(userId: string | undefined) {
-  const [profile, setProfile] = useState<UserProfileSettings | null>(null);
-  const [loading, setLoading] = useState(true);
-  const cacheRef = useRef<{ data: UserProfileSettings | null; timestamp: number }>({ data: null, timestamp: 0 });
+    const [profile, setProfile] = useState<UserProfileSettings | null>(null);
+    const [loading, setLoading] = useState(true);
+    const cacheRef = useRef<{ data: UserProfileSettings | null; timestamp: number }>({ data: null, timestamp: 0 });
 
-  useEffect(() => {
-    if (!userId) {
-      setProfile(null);
-      setLoading(false);
-      return;
-    }
+    useEffect(() => {
+        if (!userId) {
+            setProfile(null);
+            setLoading(false);
+            return;
+        }
 
-    const loadProfile = async () => {
-      const now = Date.now();
-      if (cacheRef.current.data && now - cacheRef.current.timestamp < PROFILE_CACHE_DURATION) {
-        setProfile(cacheRef.current.data);
-        setLoading(false);
-        return;
-      }
-      
-      setLoading(true);
-      const docRef = doc(db, 'profiles', userId);
-      const docSnap = await getDoc(docRef);
-      
-      if (docSnap.exists()) {
-        const data = docSnap.data() as UserProfileSettings;
-        cacheRef.current = { data, timestamp: now };
-        setProfile(data);
-      } else {
-        setProfile(null);
-      }
-      setLoading(false);
-    };
+        const loadProfile = async () => {
+            const now = Date.now();
+            if (cacheRef.current.data && now - cacheRef.current.timestamp < PROFILE_CACHE_DURATION) {
+                setProfile(cacheRef.current.data);
+                setLoading(false);
+                return;
+            }
+            
+            setLoading(true);
+            try {
+                const docRef = doc(db, 'profiles', userId);
+                const docSnap = await getDoc(docRef);
+                
+                if (docSnap.exists()) {
+                    const data = docSnap.data() as UserProfileSettings;
+                    cacheRef.current = { data, timestamp: now };
+                    setProfile(data);
+                } else {
+                    setProfile(null);
+                }
+            } catch (error) {
+                console.error('Error loading profile:', error);
+                setProfile(null);
+            }
+            setLoading(false);
+        };
 
-    loadProfile();
-    
-    // Refresh data periodically
-    const interval = setInterval(loadProfile, PROFILE_CACHE_DURATION);
-    
-    return () => clearInterval(interval);
+        loadProfile();
+        
+        // Refresh data periodically
+        const interval = setInterval(loadProfile, PROFILE_CACHE_DURATION);
+        
+        return () => clearInterval(interval);
 
-  }, [userId]);
+    }, [userId]);
 
-  return { profile, loading };
+    return { profile, loading };
 }
