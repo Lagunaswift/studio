@@ -12,6 +12,12 @@ interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 
+declare global {
+  interface Window {
+    gtag: (...args: any[]) => void;
+  }
+}
+
 export function PWAInstaller() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
@@ -52,8 +58,8 @@ export function PWAInstaller() {
       setDeferredPrompt(null);
       
       // Track installation
-      if (typeof gtag !== 'undefined') {
-        gtag('event', 'pwa_install', {
+      if (typeof window.gtag !== 'undefined') {
+        window.gtag('event', 'pwa_install', {
           method: 'browser_prompt'
         });
       }
@@ -95,8 +101,8 @@ export function PWAInstaller() {
     localStorage.setItem('pwa-install-dismissed', 'true');
     
     // Track dismissal
-    if (typeof gtag !== 'undefined') {
-      gtag('event', 'pwa_install_dismissed');
+    if (typeof window.gtag !== 'undefined') {
+      window.gtag('event', 'pwa_install_dismissed');
     }
   };
 

@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { updateUserProfile } from '@/app/dashboard/profile/actions';
+import { updateUserProfile } from '@/app/(main)/profile/actions';
 
 export async function POST(request: NextRequest) {
   try {

@@ -10,9 +10,7 @@ const STATIC_ASSETS = [
   '/dashboard/recipes',
   '/dashboard/meal-plan',
   '/offline',
-  '/manifest.json',
-  // Add your key CSS and JS files
-  '/_next/static/css/app.css',
+ '/_next/static/css/app.css',
   '/_next/static/chunks/main.js',
   // Icons
   '/icons/icon-192x192.png',
@@ -85,6 +83,11 @@ self.addEventListener('fetch', (event) => {
   if (url.protocol === 'chrome-extension:') {
     return;
   }
+
+ // Skip manifest.json in Cloud Workstation environment
+ if (url.pathname === '/manifest.json' && url.hostname.includes('cloudworkstations.dev')) {
+  return;
+}
 
   // Handle different types of requests
   if (url.pathname.startsWith('/api/')) {
