@@ -1,4 +1,5 @@
 
+// src/app/(main)/recipes/page.tsx - FIXED VERSION
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
@@ -14,7 +15,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Filter, Search, PlusCircle, Loader2, Info, Wheat, Milk, Shell, Fish, Egg, TreeDeciduous, Drumstick, Heart, Plus, Bean as Peanut, ChevronLeft, ChevronRight } from 'lucide-react'; // Added Plus
+import { 
+  Calendar as CalendarIcon, 
+  Filter, 
+  Search, 
+  PlusCircle, 
+  Loader2, 
+  Info, 
+  Heart, 
+  Plus, 
+  ChevronLeft, 
+  ChevronRight,
+  AlertTriangle 
+} from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -118,13 +131,18 @@ function RecipesPageComponent() {
           const keywords = ALLERGEN_KEYWORD_MAP[allergen.toLowerCase()];
           if (!keywords) return false;
           if (containsAllergenKeyword(recipe.name, keywords)) return true;
-          if (recipe.ingredients.some(ing => containsAllergenKeyword(ing, keywords))) return true;
+          // ✅ FIXED: Handle ingredients properly - they are objects with name property
+          if (recipe.ingredients && recipe.ingredients.some(ingredient => 
+            containsAllergenKeyword(ingredient.name, keywords)
+          )) return true;
           if (allergen.toLowerCase() === 'nuts' && recipe.tags?.includes('N')) return true;
           const isGlutenAllergen = allergen.toLowerCase() === 'gluten';
           const isDietaryGlutenFree = activeDietaryFilters.includes("Gluten-Free");
           if (isGlutenAllergen && !isDietaryGlutenFree && !recipe.tags?.includes('GF')) {
              if (containsAllergenKeyword(recipe.name, ALLERGEN_KEYWORD_MAP.gluten)) return true;
-             if (recipe.ingredients.some(ing => containsAllergenKeyword(ing, ALLERGEN_KEYWORD_MAP.gluten))) return true;
+             if (recipe.ingredients && recipe.ingredients.some(ingredient => 
+               containsAllergenKeyword(ingredient.name, ALLERGEN_KEYWORD_MAP.gluten)
+             )) return true;
           }
           return false;
         })
@@ -147,6 +165,7 @@ function RecipesPageComponent() {
     return Math.ceil(filteredRecipes.length / recipesPerPage);
   }, [filteredRecipes, recipesPerPage]);
   
+  // ✅ FIXED: Handle pantry match calculation properly for object ingredients
   const calculatePantryMatch = useCallback((recipe: Recipe, pantryItems: PantryItem[]) => {
       if (!pantryItems || pantryItems.length === 0 || !recipe.ingredients) {
         return { matched: 0, total: recipe.ingredients?.length || 0 };
@@ -155,19 +174,22 @@ function RecipesPageComponent() {
       const pantryIngredientNames = pantryItems.map(p => p.name.toLowerCase().trim());
       let matchedCount = 0;
 
-      recipe.ingredients.forEach(ingString => {
-          const parsedIngredient = parseIngredientString(ingString);
-          if (!parsedIngredient || !parsedIngredient.name) return;
-          const parsedNameLower = parsedIngredient.name.toLowerCase().trim();
+      recipe.ingredients.forEach(ingredientObj => {
+          // Ingredients are objects with name, quantity, unit properties
+          if (!ingredientObj || !ingredientObj.name) return;
+          const ingredientNameLower = ingredientObj.name.toLowerCase().trim();
           
-          if (pantryIngredientNames.some(pName => parsedNameLower === pName || parsedNameLower.includes(pName) || pName.includes(parsedNameLower))) {
+          if (pantryIngredientNames.some(pName => 
+            ingredientNameLower === pName || 
+            ingredientNameLower.includes(pName) || 
+            pName.includes(ingredientNameLower)
+          )) {
               matchedCount++;
           }
       });
 
       return { matched: matchedCount, total: recipe.ingredients.length };
   }, []);
-
 
   const handleOpenAddToPlanDialog = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
@@ -186,88 +208,88 @@ function RecipesPageComponent() {
       setShowAddToPlanDialog(false);
       setSelectedRecipe(null);
     } else {
-      toast({ title: "Error", description: "Please fill all fields.", variant: 'destructive' });
-    }
-  };
-
-  const getIconForPreference = (preference: string) => {
-    switch (preference.toLowerCase()) {
-      case 'vegetarian': case 'vegan': return <Wheat className="h-4 w-4 mr-1 text-green-600" />;
-      case 'gluten-free': return <Drumstick className="h-4 w-4 mr-1 text-yellow-600" />;
-      default: return <Filter className="h-4 w-4 mr-1 text-blue-600" />;
-    }
-  };
-
-  const getIconForAllergen = (allergen: string) => {
-     switch (allergen.toLowerCase()) {
-      case 'nuts':
-         return <TreeDeciduous className="h-4 w-4 mr-1 text-orange-600"/>;
-      case 'peanuts':
-         return <Peanut className="h-4 w-4 mr-1 text-orange-600"/>;
-      case 'dairy': return <Milk className="h-4 w-4 mr-1 text-blue-400" />;
-      case 'eggs': return <Egg className="h-4 w-4 mr-1 text-yellow-500" />;
-      case 'fish': return <Fish className="h-4 w-4 mr-1 text-sky-500" />;
-      case 'shellfish': return <Shell className="h-4 w-4 mr-1 text-pink-500" />;
-      default: return <Info className="h-4 w-4 mr-1 text-red-600" />;
+      toast({ title: "Error", description: "Please fill all fields." });
     }
   };
 
   return (
-    <PageWrapper>
-      <div className="mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
-        <div className="relative flex-grow w-full md:w-auto">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search recipes by name, description, or tag..."
-            className="pl-10"
-            value={searchTerm}
-            onChange={(e) => handleSearchChange(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center space-x-4 self-start md:self-center">
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="favorites-filter"
-              checked={showFavoritesOnly}
-              onCheckedChange={setShowFavoritesOnly}
-              aria-label="Show favorites only"
-            />
-            <Label htmlFor="favorites-filter" className="flex items-center text-sm text-muted-foreground">
-              <Heart className="w-4 h-4 mr-1 text-accent/80" /> Favorites
-            </Label>
-          </div>
-          <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
-            <Link href="/recipes/add">
-              <Plus className="mr-2 h-4 w-4" /> Add New Recipe
-            </Link>
-          </Button>
-        </div>
+    // ✅ FIXED: Removed description prop that doesn't exist on PageWrapper
+    <PageWrapper title="Recipes">
+      <div className="mb-6 text-muted-foreground">
+        Browse, search, and manage your recipe collection.
       </div>
 
-      {(activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0) && (
-        <Card className="mb-6 bg-secondary/30 border-accent/30">
-          <CardHeader className="p-4">
-            <CardTitle className="text-sm text-accent font-semibold mb-2">Filters from your profile are active:</CardTitle>
-            <CardDescription className="flex flex-wrap gap-2">
-              {activeDietaryFilters.map(pref => (
-                <Badge key={pref} variant="outline" className="border-green-600 text-green-700 bg-green-100">
-                  {getIconForPreference(pref)} {pref}
-                </Badge>
-              ))}
-              {activeAllergenFilters.map(allergen => (
-                <Badge key={allergen} variant="outline" className="border-red-600 text-red-700 bg-red-100">
-                  {getIconForAllergen(allergen)} Avoiding: {allergen}
-                </Badge>
-              ))}
-            </CardDescription>
-             <p className="text-xs text-muted-foreground pt-2">
-              To change these filters, visit your <Link href="/profile/diet-type" className="underline hover:text-primary">Diet Type</Link> or <Link href="/profile/allergens" className="underline hover:text-primary">Allergens</Link> settings.
-            </p>
-          </CardHeader>
-        </Card>
-      )}
+      {/* Search and Filter Section */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              type="text"
+              placeholder="Search recipes by name, description, or tags..."
+              value={searchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Heart className="h-4 w-4 text-red-500" />
+            <Label htmlFor="favorites-only" className="text-sm font-medium">
+              Favorites only
+            </Label>
+            <Switch
+              id="favorites-only"
+              checked={showFavoritesOnly}
+              onCheckedChange={setShowFavoritesOnly}
+            />
+          </div>
+        </div>
 
+        {/* Active Filters Display */}
+        {(activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0) && (
+          <div className="flex flex-wrap gap-2">
+            <span className="text-sm text-muted-foreground">Active filters:</span>
+            {activeDietaryFilters.map((filter) => (
+              <Badge key={filter} variant="secondary" className="text-xs">
+                {filter}
+              </Badge>
+            ))}
+            {activeAllergenFilters.map((filter) => (
+              <Badge key={filter} variant="destructive" className="text-xs">
+                No {filter}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Add New Recipe Button */}
+      <div className="flex justify-end">
+        <Button asChild>
+          <Link href="/recipes/add">
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Add New Recipe
+          </Link>
+        </Button>
+      </div>
+
+      {/* Results Summary */}
+      <div className="text-sm text-muted-foreground">
+        {!isRecipeCacheLoading && (
+          <>
+            {filteredRecipes.length === allRecipesCache.length 
+              ? `Showing all ${allRecipesCache.length} recipes`
+              : `Found ${filteredRecipes.length} of ${allRecipesCache.length} recipes`
+            }
+            {filteredRecipes.length > recipesPerPage && (
+              <span> (Page {currentPage} of {totalPages})</span>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Recipe Display */}
       {isRecipeCacheLoading ? (
         <div className="flex justify-center items-center min-h-[200px]">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -275,29 +297,29 @@ function RecipesPageComponent() {
         </div>
       ) : finalRecipesForDisplay.length > 0 ? (
         <>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {finalRecipesForDisplay.map((recipe) => {
-            const { matched, total } = calculatePantryMatch(recipe, pantryItems);
-            const matchPercentage = total > 0 ? (matched / total) * 100 : 0;
-            let pantryMatchStatus: 'make' | 'almost' | null = null;
-            if (matchPercentage >= 80) {
-              pantryMatchStatus = 'make';
-            } else if (matchPercentage >= 50) {
-              pantryMatchStatus = 'almost';
-            }
-            return (
-              <RecipeCard
-                key={recipe.id}
-                recipe={recipe}
-                onAddToMealPlan={handleOpenAddToPlanDialog}
-                showAddToMealPlanButton={true}
-                showViewDetailsButton={true}
-                pantryMatchStatus={pantryMatchStatus}
-              />
-            )
-          })}
-        </div>
-        {totalPages > 1 && (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {finalRecipesForDisplay.map((recipe) => {
+              const { matched, total } = calculatePantryMatch(recipe, pantryItems);
+              const matchPercentage = total > 0 ? (matched / total) * 100 : 0;
+              let pantryMatchStatus: 'make' | 'almost' | null = null;
+              if (matchPercentage >= 80) {
+                pantryMatchStatus = 'make';
+              } else if (matchPercentage >= 50) {
+                pantryMatchStatus = 'almost';
+              }
+              return (
+                <RecipeCard
+                  key={recipe.id}
+                  recipe={recipe}
+                  onAddToMealPlan={handleOpenAddToPlanDialog}
+                  showAddToMealPlanButton={true}
+                  showViewDetailsButton={true}
+                  pantryMatchStatus={pantryMatchStatus}
+                />
+              )
+            })}
+          </div>
+          {totalPages > 1 && (
             <div className="mt-8 flex items-center justify-between">
               <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                 <span>Recipes per page:</span>
@@ -349,86 +371,104 @@ function RecipesPageComponent() {
           <CardContent>
             <p className="text-muted-foreground mb-4">
               {searchTerm || activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0 || showFavoritesOnly 
-                ? "No recipes match your current search and profile filters." 
-                : "Your recipe book is empty. Let's add your first one!"
+                ? "No recipes match your current search criteria or filters. Try adjusting your search or removing some filters."
+                : "You haven't added any recipes yet. Start building your recipe collection!"
               }
             </p>
-            {(activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0 || showFavoritesOnly) && (
-              <p className="text-sm text-muted-foreground mb-4">
-                Try adjusting your <Link href="/profile/diet-type" className="underline hover:text-primary">Diet Type</Link>, <Link href="/profile/allergens" className="underline hover:text-primary">Allergens</Link> settings, or the favorites filter.
-              </p>
-            )}
-             <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
+            <Button asChild>
               <Link href="/recipes/add">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add a New Recipe
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Add Your First Recipe
               </Link>
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {selectedRecipe && (
-        <Dialog open={showAddToPlanDialog} onOpenChange={setShowAddToPlanDialog}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle className="font-headline text-primary">Add "{selectedRecipe.name}" to Meal Plan</DialogTitle>
-              <DialogDescription>
-                Select the date, meal type, and servings for this recipe.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="date" className="text-right">Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant={"outline"} className="col-span-3 justify-start text-left font-normal">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {planDate ? format(planDate, "PPP") : <span>Pick a date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single" selected={planDate} onSelect={setPlanDate}
-                      disabled={undefined} initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="mealType" className="text-right">Meal Type</Label>
-                <Select value={planMealType} onValueChange={(value: MealType) => setPlanMealType(value)}>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select meal type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MEAL_TYPES.map(type => (<SelectItem key={type} value={type}>{type}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="servings" className="text-right">Servings</Label>
-                <Input id="servings" type="number" min="1" value={planServings}
-                  onChange={(e) => setPlanServings(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                  className="col-span-3" />
-              </div>
+      {/* Add to Meal Plan Dialog */}
+      <Dialog open={showAddToPlanDialog} onOpenChange={setShowAddToPlanDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add to Meal Plan</DialogTitle>
+            <DialogDescription>
+              Add {selectedRecipe?.name} to your meal plan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="plan-date">Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {planDate ? format(planDate, 'PPP') : 'Pick a date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={planDate}
+                    onSelect={setPlanDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAddToPlanDialog(false)}>Cancel</Button>
-              <Button onClick={handleAddToMealPlan} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add to Plan
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+            <div className="grid gap-2">
+              <Label htmlFor="plan-meal-type">Meal Type</Label>
+              <Select
+                value={planMealType}
+                onValueChange={(value) => setPlanMealType(value as MealType)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select meal type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MEAL_TYPES.map((mealType) => (
+                    <SelectItem key={mealType} value={mealType}>
+                      {mealType}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="plan-servings">Servings</Label>
+              <Input
+                id="plan-servings"
+                type="number"
+                min="1"
+                value={planServings}
+                onChange={(e) => setPlanServings(parseInt(e.target.value, 10) || 1)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="submit" onClick={handleAddToMealPlan}>
+              Add to Meal Plan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageWrapper>
   );
 }
 
 export default function RecipesPage() {
-    return (
-        <Suspense fallback={<div>Loading...</div>}>
-            <RecipesPageComponent />
-        </Suspense>
-    )
+  return (
+    <Suspense fallback={
+      // ✅ FIXED: Removed description prop here too
+      <PageWrapper title="Recipes">
+        <div className="flex justify-center items-center min-h-[200px]">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="ml-2 text-muted-foreground">Loading...</p>
+        </div>
+      </PageWrapper>
+    }>
+      <RecipesPageComponent />
+    </Suspense>
+  );
 }
