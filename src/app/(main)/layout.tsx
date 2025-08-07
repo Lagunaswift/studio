@@ -54,6 +54,7 @@ const planNavItems: NavItem[] = [
     { href: '/meal-plan', label: 'Daily/Weekly View', icon: CalendarDays },
     { href: '/shopping-list', label: 'Shopping List', icon: ShoppingBag },
     { href: '/pantry', label: 'Pantry', icon: Archive },
+    { href: "/debug", label: "🔧 Debug", icon: Database, }
 ];
 
 const recipesNavItems: NavItem[] = [
@@ -90,6 +91,7 @@ const mainSections = [
 
 const allNavItems = [
     dashboardNavItem,
+    { href: "/debug", label: "🔧 Debug", icon: Database },
     ...planNavItems,
     ...recipesNavItems,
     ...progressNavItems,

@@ -18,9 +18,8 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import type { MacroTargets, Macros, Recipe, PlannedMeal, RDA } from '@/types';
+import type { MacroTargets, Macros, Recipe, PlannedMeal } from '@/types';
 import { RecipeCard } from '@/components/shared/RecipeCard';
-import { NutritionTable } from '@/components/shared/NutritionTable';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -355,9 +354,6 @@ export default function HomePage() {
                     )}
                     </section>
                 )}
-            </div>
-             <div className="lg:col-span-3">
-                <NutritionTable nutritionData={consumedTodayMacros} rdaData={appContextUserProfile?.rda || null} />
             </div>
         </div>
 
