@@ -65,3 +65,6 @@ export const suggestMealPlan = onCallGenkit(
     {},
     suggestMealPlanFlow
 );
+
+export type SuggestMealPlanInput = z.infer<typeof SuggestMealPlanInputSchema>;
+export type SuggestMealPlanOutput = z.infer<typeof SuggestMealPlanOutputSchema>;

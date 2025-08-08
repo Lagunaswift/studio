@@ -218,3 +218,4 @@ export function EnhancedPWAInstaller() {
 
 // Export for use in layout
 export default EnhancedPWAInstaller;
+export { EnhancedPWAInstaller as PWAInstaller };

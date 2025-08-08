@@ -5,7 +5,6 @@ import { User } from 'firebase/auth';
 import { UserProfileSettings } from '@/types';
 import { mergeWithDefaults } from '@/utils/profileDefaults';
 
-// ✅ Fix: Proper typing for the hook
 export function useUserProfile(user: User | null) {
   const [profile, setProfile] = useState<UserProfileSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,7 +34,6 @@ export function useUserProfile(user: User | null) {
         throw new Error('Firestore not initialized');
       }
 
-      // ✅ Ensure user.uid is valid string
       if (typeof user.uid !== 'string' || user.uid.length === 0) {
         throw new Error(`Invalid user.uid: ${user.uid}`);
       }
@@ -45,7 +43,6 @@ export function useUserProfile(user: User | null) {
       console.log('🔥 Setting up Firestore listener for user:', user.uid);
       console.log('🔥 Looking in collection: profiles/' + user.uid);
 
-      // Set up real-time listener
       const unsubscribe = onSnapshot(
         userDocRef,
         (docSnapshot) => {
@@ -54,12 +51,10 @@ export function useUserProfile(user: User | null) {
               const firestoreData = docSnapshot.data();
               console.log('📊 Firestore data fetched:', firestoreData);
               
-              // Merge with defaults to ensure all required fields exist
               const completeProfile = mergeWithDefaults(firestoreData, user.uid);
               setProfile(completeProfile);
             } else {
               console.log('📊 No profile document found, using defaults');
-              // Create profile with defaults for new users
               const defaultProfile = mergeWithDefaults({}, user.uid);
               setProfile(defaultProfile);
             }
@@ -78,7 +73,6 @@ export function useUserProfile(user: User | null) {
         }
       );
 
-      // Cleanup listener on unmount
       return () => {
         console.log('🧹 Cleaning up Firestore listener');
         unsubscribe();
@@ -88,7 +82,7 @@ export function useUserProfile(user: User | null) {
       setError('Failed to initialize Firestore connection');
       setLoading(false);
     }
-  }, [user?.uid]); // ✅ Fix: Only depend on user.uid, not the entire user object
+  }, [user]);
 
   return { profile, loading, error };
 }

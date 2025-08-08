@@ -1,5 +1,4 @@
 
-// src/app/(main)/recipes/page.tsx - FIXED VERSION
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
@@ -106,9 +105,9 @@ function RecipesPageComponent() {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
-  const isRecipeFavorite = (recipeId: number) => {
+  const isRecipeFavorite = useCallback((recipeId: number) => {
     return userProfile?.favorite_recipe_ids?.includes(recipeId) || false;
-  }
+  }, [userProfile]);
 
   const filteredRecipes = useMemo(() => {
     if (isRecipeCacheLoading) return [];
@@ -160,7 +159,7 @@ function RecipesPageComponent() {
       recipes = recipes.filter(recipe => isRecipeFavorite(recipe.id));
     }
     return recipes;
-  }, [allRecipesCache, searchTerm, activeDietaryFilters, activeAllergenFilters, showFavoritesOnly, isRecipeCacheLoading]);
+  }, [allRecipesCache, searchTerm, activeDietaryFilters, activeAllergenFilters, showFavoritesOnly, isRecipeCacheLoading, isRecipeFavorite]);
   
   const finalRecipesForDisplay = useMemo(() => {
     const startIndex = (currentPage - 1) * recipesPerPage;

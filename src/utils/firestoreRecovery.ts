@@ -17,24 +17,29 @@ export class FirestoreRecoveryWrapper {
       console.log('Updating user profile for:', userId);
       console.log('Profile data:', profileData);
 
-      const response = await fetch(`${this.baseUrl}/api/user/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          userId,
-          ...profileData,
+      const response = await Promise.race([
+        fetch(`${this.baseUrl}/api/user/profile`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            userId,
+            ...profileData,
+          }),
         }),
-      });
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout')), 10000)
+        )
+      ]);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`Profile update failed: ${response.status} - ${errorData.message || response.statusText}`);
+      if (!(response as Response).ok) {
+        const errorData = await (response as Response).json().catch(() => ({}));
+        throw new Error(`Profile update failed: ${(response as Response).status} - ${errorData.message || (response as Response).statusText}`);
       }
 
-      const result = await response.json();
+      const result = await (response as Response).json();
       console.log('Profile updated successfully:', result);
       return result;
     }, 'updateUserProfile');
@@ -45,26 +50,31 @@ export class FirestoreRecoveryWrapper {
       const token = await tokenManager.getValidToken();
       console.log(`Writing to Firestore: ${collection}/${docId}`);
 
-      const response = await fetch(`${this.baseUrl}/api/firestore/write`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          collection,
-          docId,
-          data,
-          merge,
+      const response = await Promise.race([
+        fetch(`${this.baseUrl}/api/firestore/write`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            collection,
+            docId,
+            data,
+            merge,
+          }),
         }),
-      });
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout')), 10000)
+        )
+      ]);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`Firestore write failed: ${response.status} - ${errorData.message || response.statusText}`);
+      if (!(response as Response).ok) {
+        const errorData = await (response as Response).json().catch(() => ({}));
+        throw new Error(`Firestore write failed: ${(response as Response).status} - ${errorData.message || (response as Response).statusText}`);
       }
 
-      return await response.json();
+      return await (response as Response).json();
     }, `writeToFirestore-${collection}`);
   }
 
@@ -73,19 +83,24 @@ export class FirestoreRecoveryWrapper {
       const token = await tokenManager.getValidToken();
       console.log(`Reading from Firestore: ${collection}/${docId}`);
 
-      const response = await fetch(`${this.baseUrl}/api/firestore/read?collection=${collection}&docId=${docId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await Promise.race([
+        fetch(`${this.baseUrl}/api/firestore/read?collection=${collection}&docId=${docId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout')), 10000)
+        )
+      ]);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`Firestore read failed: ${response.status} - ${errorData.message || response.statusText}`);
+      if (!(response as Response).ok) {
+        const errorData = await (response as Response).json().catch(() => ({}));
+        throw new Error(`Firestore read failed: ${(response as Response).status} - ${errorData.message || (response as Response).statusText}`);
       }
 
-      return await response.json();
+      return await (response as Response).json();
     }, `readFromFirestore-${collection}`);
   }
 
@@ -94,21 +109,26 @@ export class FirestoreRecoveryWrapper {
       const token = await tokenManager.getValidToken();
       console.log(`Performing batch write with ${operations.length} operations`);
 
-      const response = await fetch(`${this.baseUrl}/api/firestore/batch`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ operations }),
-      });
+      const response = await Promise.race([
+        fetch(`${this.baseUrl}/api/firestore/batch`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ operations }),
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout')), 10000)
+        )
+      ]);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`Batch write failed: ${response.status} - ${errorData.message || response.statusText}`);
+      if (!(response as Response).ok) {
+        const errorData = await (response as Response).json().catch(() => ({}));
+        throw new Error(`Batch write failed: ${(response as Response).status} - ${errorData.message || (response as Response).statusText}`);
       }
 
-      return await response.json();
+      return await (response as Response).json();
     }, 'batchWrite');
   }
 }

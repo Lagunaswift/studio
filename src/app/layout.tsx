@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { OptimizedAppProvider } from '@/context/OptimizedAppContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { ThemeProvider } from "next-themes";
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export const metadata: Metadata = {
   title: 'MealPlannerPro - Smart Nutrition & Meal Planning',
@@ -69,20 +70,22 @@ export default function RootLayout({
         <meta name="msapplication-config" content="/browserconfig.xml" />
       </head>
       <body>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <AuthProvider>
-            <OptimizedAppProvider>
-              {children}
-              <Toaster />
-              <PWAInstaller />
-            </OptimizedAppProvider>
-          </AuthProvider>
-        </ThemeProvider>
+        <ErrorBoundary>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <AuthProvider>
+              <OptimizedAppProvider>
+                {children}
+                <Toaster />
+                <PWAInstaller />
+              </OptimizedAppProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
         <script dangerouslySetInnerHTML={{
           __html: `
             if ('serviceWorker' in navigator) {

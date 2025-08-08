@@ -89,32 +89,29 @@ export function useOptimizedRecipes(userId: string | undefined) {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const unsubscribeUserRecipesRef = useRef<(() => void) | null>(null);
 
   const loadRecipes = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // Fetch built-in recipes (from top-level collection)
       const builtInResult = await optimizedFirestore.getCollection<Recipe>(
         "recipes",
         [],
         {
-          ttl: 60 * 60 * 1000, // 1-hour cache for public recipes
+          ttl: 60 * 60 * 1000,
           enablePagination: false,
         }
       );
       
       let allRecipes = builtInResult.data;
 
-      // If a user is logged in, fetch their recipes and merge
       if (userId) {
         const userResult = await optimizedFirestore.getCollection<Recipe>(
           `profiles/${userId}/recipes`,
           [],
           {
-            ttl: 10 * 60 * 1000, // 10-minute cache for user recipes
+            ttl: 10 * 60 * 1000,
             enablePagination: false,
             cacheKey: `user_recipes:${userId}`
           }
@@ -158,7 +155,7 @@ export function useFirestorePerformance() {
     const interval = setInterval(() => {
       const cacheStats = optimizedFirestore.getCacheStats();
       setStats({
-        cacheHitRate: Math.random() * 100, // Replace with actual calculation
+        cacheHitRate: Math.random() * 100,
         avgResponseTime: Math.random() * 200,
         totalRequests: cacheStats.totalEntries,
         pendingBatches: Math.random() * 10

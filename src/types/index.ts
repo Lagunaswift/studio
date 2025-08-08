@@ -85,7 +85,7 @@ export const UserProfileSettingsSchema = z.object({
   heightCm: z.number().nullable(),
   weightKg: z.number().nullable(),
   age: z.number().nullable(),
-  sex: z.enum(SEX_OPTIONS),
+  sex: z.enum(['male', 'female', 'notSpecified']).nullable(),
   activityLevel: z.enum(ACTIVITY_LEVEL_OPTIONS.map(o => o.value) as [ActivityLevel, ...ActivityLevel[]]),
   training_experience_level: z.enum(TRAINING_EXPERIENCE_OPTIONS.map(o => o.value) as [TrainingExperienceLevel, ...TrainingExperienceLevel[]]).nullable(),
   bodyFatPercentage: z.number().nullable(),

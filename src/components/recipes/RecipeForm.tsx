@@ -14,8 +14,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Checkbox } from '@/components/ui/checkbox';
 import { PlusCircle, Trash2, Save } from 'lucide-react';
 
-
-  const AVAILABLE_TAGS = [
+const AVAILABLE_TAGS = [
   'Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Low Carb', 
   'High Protein', 'Quick Meal', 'Meal Prep', 'Snack', 
   'Breakfast', 'Lunch', 'Dinner', 'Contains Nuts'
@@ -45,14 +44,26 @@ interface RecipeFormProps {
   initialData?: Partial<RecipeFormData>; // For future edit functionality
 }
 
-export default function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
+function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
   const [isPending, startTransition] = useTransition();
 
   const form = useForm<RecipeFormValues>({
     resolver: zodResolver(recipeFormSchema),
     defaultValues: initialData ? {
-      ...initialData,
-      tags: initialData.tags || [] 
+      name: initialData.name || '',
+      description: initialData.description || '',
+      image: initialData.imageUrl || '',
+      servings: initialData.servings || 1,
+      prepTime: initialData.prepTime?.toString() || '',
+      cookTime: initialData.cookTime?.toString() || '',
+      chillTime: initialData.chillTime?.toString() || '',
+      ingredients: initialData.ingredients?.map(ing => ({ value: ing })) || [{ value: '' }],
+      instructions: initialData.instructions?.map(inst => ({ value: inst })) || [{ value: '' }],
+      calories: initialData.macrosPerServing?.calories || 0,
+      protein: initialData.macrosPerServing?.protein || 0,
+      carbs: initialData.macrosPerServing?.carbs || 0,
+      fat: initialData.macrosPerServing?.fat || 0,
+      tags: initialData.tags || [],
     } : {
       name: '',
       description: '',
@@ -83,7 +94,26 @@ export default function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
 
   const handleFormSubmit: SubmitHandler<RecipeFormValues> = (data) => {
     startTransition(() => {
-        onSubmit(data);
+      // ✅ Transform form data to match RecipeFormData type
+      const recipeData: RecipeFormData = {
+        name: data.name,
+        description: data.description,
+        servings: data.servings,
+        prepTime: parseInt(data.prepTime.replace(/\D/g, '')) || 0, // Extract numbers from string
+        cookTime: parseInt(data.cookTime.replace(/\D/g, '')) || 0, // Extract numbers from string
+        chillTime: data.chillTime ? parseInt(data.chillTime.replace(/\D/g, '')) : undefined,
+        ingredients: data.ingredients.map(ing => ing.value),
+        instructions: data.instructions.map(inst => inst.value),
+        macrosPerServing: {
+          calories: data.calories,
+          protein: data.protein,
+          carbs: data.carbs,
+          fat: data.fat
+        },
+        imageUrl: data.image || undefined,
+        tags: data.tags || []
+      };
+      onSubmit(recipeData);
     });
   };
 
@@ -311,3 +341,5 @@ export default function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
   );
 }
 
+// ✅ SINGLE default export only
+export default RecipeForm;

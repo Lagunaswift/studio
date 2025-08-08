@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import LRUCache from 'lru-cache';
+import { LRUCache } from 'lru-cache';
 
 interface AIRequest {
   prompt: string;

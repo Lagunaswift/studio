@@ -89,7 +89,7 @@ async function handleAPIRequest(request) {
       return cachedResponse;
     }
     
-    // Return meaningful offline response
+    // ✅ FIX: Add proper offline response
     return new Response(
       JSON.stringify({ 
         error: 'Offline', 
@@ -103,29 +103,6 @@ async function handleAPIRequest(request) {
       }
     );
   }
-}
-
-// Cache First for images with fallback
-async function handleImageRequest(request) {
-  const cache = await caches.open(IMAGE_CACHE);
-  const cachedResponse = await cache.match(request);
-  
-  if (cachedResponse) {
-    return cachedResponse;
-  }
-  
-  try {
-    const networkResponse = await fetch(request);
-    if (networkResponse.ok) {
-      cache.put(request, networkResponse.clone());
-      return networkResponse;
-    }
-  } catch (error) {
-    console.log('🖼️ Image load failed:', request.url);
-  }
-  
-  // Return placeholder image for failed loads
-  return new Response('', { status: 404 });
 }
 
 // Stale While Revalidate for pages
