@@ -14,7 +14,8 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Checkbox } from '@/components/ui/checkbox';
 import { PlusCircle, Trash2, Save } from 'lucide-react';
 
-const AVAILABLE_TAGS = [
+
+  const AVAILABLE_TAGS = [
   'Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Low Carb', 
   'High Protein', 'Quick Meal', 'Meal Prep', 'Snack', 
   'Breakfast', 'Lunch', 'Dinner', 'Contains Nuts'
@@ -44,7 +45,7 @@ interface RecipeFormProps {
   initialData?: Partial<RecipeFormData>; // For future edit functionality
 }
 
-export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
+export default function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
   const [isPending, startTransition] = useTransition();
 
   const form = useForm<RecipeFormValues>({
@@ -309,3 +310,4 @@ export function RecipeForm({ onSubmit, initialData }: RecipeFormProps) {
     </Form>
   );
 }
+

@@ -24,7 +24,7 @@ interface AISuggestionFormProps {
   isLoading: boolean;
 }
 
-export function AISuggestionForm({ onSubmit, isLoading }: AISuggestionFormProps) {
+export default function AISuggestionForm({ onSubmit, isLoading }: AISuggestionFormProps) {
   const form = useForm<AISuggestionFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {

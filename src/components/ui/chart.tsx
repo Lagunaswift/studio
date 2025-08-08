@@ -363,3 +363,7 @@ export {
   ChartLegendContent,
   ChartStyle,
 }
+
+export default function Chart() {
+  return <div>Chart Component</div>
+}
