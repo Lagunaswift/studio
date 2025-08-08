@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Sparkles, CheckSquare, Info, AlertTriangle, TrendingUp, TrendingDown, Lock } from 'lucide-react';
+import { Loader2, Wand2, CheckSquare, Info, AlertTriangle, TrendingUp, TrendingDown, Lock } from 'lucide-react';
 import type { PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Separator } from '@/components/ui/separator';
@@ -100,7 +100,7 @@ export default function WeeklyCheckinPage() {
                 </Alert>
             ) : (
                 <Button onClick={handleRunCheckin} disabled={isLoading} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                     Start My Check-in
                 </Button>
             )}
@@ -130,7 +130,7 @@ export default function WeeklyCheckinPage() {
             <CardContent className="space-y-6">
                 <div>
                     <h3 className="text-lg font-semibold mb-1 text-primary-focus flex items-center">
-                        <Sparkles className="w-5 h-5 mr-2 text-accent" /> My Coaching Summary
+                        <Wand2 className="w-5 h-5 mr-2 text-accent" /> My Coaching Summary
                     </h3>
                     <p className="text-sm text-foreground/80 bg-secondary/30 p-3 rounded-md whitespace-pre-wrap">{recommendation.coachingSummary}</p>
                 </div>

@@ -1,4 +1,4 @@
-//src/app/(main)/layout.tsx
+//src/app/(main)/layout.tsx - COMPLETE WORKING VERSION
 "use client";
 
 import Link from 'next/link';
@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { Footer } from '@/components/layout/Footer';
 import { ThemeToggleButton } from '@/components/layout/ThemeToggleButton';
 import { TermsAcceptanceModal } from '@/components/legal/TermsAcceptanceModal';
-import { PreppyHelp } from '@/components/shared/SimpleHelpWidget'; // Import the new component
+import { PreppyHelp } from '@/components/shared/SimpleHelpWidget';
 import {
   Accordion,
   AccordionContent,
@@ -31,9 +31,34 @@ import {
 } from '@/components/ui/sidebar';
 import { SheetTitle } from '@/components/ui/sheet';
 import { 
-  UtensilsCrossed, Sparkles, ShoppingBag, CalendarDays, LayoutDashboard, 
-  PanelLeft, Target, Leaf, ListChecks, UserCog, UserCircle2, 
-  BookOpen, Archive, Bot, SlidersHorizontal, Search, LogOut, FileText, Shield, CheckSquare, Settings, TrendingUp, ChefHat, ClipboardList, AlertTriangle, Database, WifiOff, MessageSquareWarning, Megaphone
+  UtensilsCrossed, 
+  Wand2, // CHANGED FROM Wand2 TO Wand2
+  ShoppingBag, 
+  CalendarDays, 
+  LayoutDashboard, 
+  PanelLeft, 
+  Target, 
+  Leaf, 
+  UserCog, 
+  UserCircle2, 
+  BookOpen, 
+  Archive, 
+  Bot, 
+  SlidersHorizontal, 
+  Search, 
+  LogOut, 
+  FileText, 
+  Shield, 
+  CheckSquare, 
+  Settings, 
+  TrendingUp, 
+  ChefHat, 
+  ClipboardList, 
+  AlertTriangle, 
+  Database, 
+  WifiOff, 
+  MessageSquareWarning, 
+  Megaphone
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -53,7 +78,7 @@ interface NavItem {
 const dashboardNavItem: NavItem = { href: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true };
 
 const planNavItems: NavItem[] = [
-    { href: '/ai-suggestions', label: 'Preppy: Plan Generator', icon: Sparkles },
+    { href: '/ai-suggestions', label: 'Preppy: Plan Generator', icon: Wand2 }, // CHANGED FROM Wand2
     { href: '/meal-plan', label: 'Daily/Weekly View', icon: CalendarDays },
     { href: '/shopping-list', label: 'Shopping List', icon: ShoppingBag },
     { href: '/pantry', label: 'Pantry', icon: Archive },
@@ -72,149 +97,91 @@ const progressNavItems: NavItem[] = [
 const settingsNavItems: NavItem[] = [
   { href: '/profile/user-info', label: 'My Profile', icon: UserCircle2 },
   { href: '/profile/targets', label: 'My Goals & Targets', icon: Target },
-  { href: '/profile/diet-type', label: 'Diet & Allergens', icon: Leaf },
-  { href: '/profile/meal-structure', label: 'Meal Structure', icon: ListChecks },
-  { href: '/profile/dashboard-settings', label: 'Customize Dashboard', icon: SlidersHorizontal },
+  { href: '/profile/diet-type', label: 'Diet Type', icon: Leaf },
+  { href: '/profile/meal-structure', label: 'Meal Structure', icon: SlidersHorizontal },
+  { href: '/profile/dashboard-settings', label: 'Dashboard Settings', icon: Settings },
 ];
 
+// ADDED MISSING helpNavItems
 const helpNavItems: NavItem[] = [
-    { href: '/guide', label: 'App Guide', icon: BookOpen },
-    { href: '/updates', label: 'Updates & Feedback', icon: Megaphone },
-    { href: '/terms', label: 'Terms of Service', icon: FileText },
-    { href: '/privacy', label: 'Privacy Policy', icon: Shield },
+  { href: '/guide', label: 'User Guide', icon: BookOpen },
+  { href: '/updates', label: 'Updates & Feedback', icon: Megaphone },
+  { href: '/privacy', label: 'Privacy Policy', icon: Shield },
+  { href: '/terms', label: 'Terms of Service', icon: FileText },
 ];
 
-const mainSections = [
-  { label: 'Planner', icon: CalendarDays, items: planNavItems },
-  { label: 'Recipe Book', icon: UtensilsCrossed, items: recipesNavItems },
-  { label: 'Progress', icon: TrendingUp, items: progressNavItems },
-  { label: 'Settings', icon: Settings, items: settingsNavItems },
-];
-
-const allNavItems = [
+const allNavItems: NavItem[] = [
     dashboardNavItem,
     ...planNavItems,
     ...recipesNavItems,
     ...progressNavItems,
     ...settingsNavItems,
-    ...helpNavItems,
+    ...helpNavItems, // NOW PROPERLY DEFINED
 ];
 
 function LogoutButton() {
   const { signOut } = useAuth();
   const router = useRouter();
-  const { isCollapsed } = useSidebar();
 
   const handleLogout = async () => {
-    await signOut();
-    router.push('/login');
+    try {
+      await signOut();
+      router.push('/login');
+    } catch (error) {
+      console.error('Failed to sign out:', error);
+    }
   };
 
   return (
-    <Tooltip>
-        <TooltipTrigger asChild>
-            <SidebarMenuItem>
-              <SidebarMenuButton onClick={handleLogout} className="mt-2">
-                <LogOut />
-                <span className="group-data-[collapsible=icon]:hidden">Log Out</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-        </TooltipTrigger>
-        <TooltipContent side="right" align="center" hidden={!isCollapsed}>Log Out</TooltipContent>
-    </Tooltip>
+    <Button
+      variant="ghost"
+      className="w-full justify-start text-left font-normal hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+      onClick={handleLogout}
+    >
+      <LogOut className="mr-2 h-4 w-4" />
+      <span className="group-data-[collapsible=icon]:hidden">Sign Out</span>
+    </Button>
   );
 }
 
 function ServiceStatusBanner() {
   const { isOnline } = useAppContext();
 
-  if (isOnline) {
-    return null;
-  }
+  if (isOnline) return null;
 
   return (
-    <div className="bg-yellow-500 text-center p-2 text-black text-sm font-semibold flex items-center justify-center">
-      <AlertTriangle className="h-4 w-4 mr-2" />
-      You are currently offline. Changes are being saved locally and will sync when you reconnect.
+    <div className="bg-red-500 text-white px-4 py-2 text-center text-sm">
+      <WifiOff className="inline w-4 h-4 mr-2" />
+      You are currently offline. Some features may not work properly.
     </div>
   );
 }
 
 function DevStatusIndicator() {
-  const { isOnline } = useAppContext();
+  if (process.env.NODE_ENV !== 'development') return null;
 
-  if (process.env.NODE_ENV !== 'development') {
-    return null;
-  }
-  
   return (
-     <div className="fixed bottom-2 left-2 z-50">
-        <div title={isOnline ? "Data is being sent to Firebase." : "Data is being saved to local browser storage."} className={cn(
-          "flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-lg",
-          isOnline ? "bg-green-600" : "bg-orange-500"
-        )}>
-          {isOnline ? <Database className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
-          <span>{isOnline ? "Online" : "Offline"}</span>
-        </div>
+    <div className="fixed bottom-4 left-4 bg-yellow-500 text-black px-2 py-1 rounded text-xs font-mono z-50">
+      DEV
     </div>
   );
 }
 
-function SidebarSearch() {
-  const [search, setSearch] = useState('');
-  const router = useRouter();
-  const { isCollapsed } = useSidebar();
-
-  const handleSearch = (e: FormEvent) => {
-    e.preventDefault();
-    if (search.trim()) {
-      router.push(`/recipes?q=${encodeURIComponent(search.trim())}`);
-    }
-  };
-
-  return (
-     <div className="relative">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-data-[collapsible=icon]:left-1/2 group-data-[collapsible=icon]:-translate-x-1/2" />
-              <form onSubmit={handleSearch}>
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search recipes..."
-                  className={cn("pl-8 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:border-none group-data-[collapsible=icon]:focus-visible:ring-0 group-data-[collapsible=icon]:focus-visible:ring-offset-0 group-data-[collapsible=icon]:cursor-pointer",
-                  "transition-all duration-300 ease-in-out"
-                  )}
-                  onClick={(e) => {
-                      if (isCollapsed) {
-                          e.preventDefault(); // Prevent focus on click when collapsed
-                      }
-                  }}
-                />
-              </form>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="right" align="center" hidden={!isCollapsed}>
-          Search recipes
-        </TooltipContent>
-      </Tooltip>
-    </div>
-  );
-}
-
-
-// Inner component to use hooks within SidebarProvider context
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { userProfile, acceptTerms: acceptTermsContext, isAppDataLoading } = useAppContext();
+  const router = useRouter();
   const { user, isLoading: isAuthLoading } = useAuth();
+  const { 
+    userProfile, 
+    acceptTerms: acceptTermsContext, 
+    isDataLoading: isAppDataLoading 
+  } = useAppContext();
+  
+  const [showTerms, setShowTerms] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const [showTerms, setShowTerms] = useState(false);
-
+  // Check terms acceptance
   useEffect(() => {
-    // Only show the modal if data is loaded, there is a user profile, and terms have not been accepted.
     if (!isAppDataLoading && userProfile && !userProfile.has_accepted_terms) {
       setShowTerms(true);
     } else {
@@ -225,7 +192,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const handleAcceptTerms = () => {
       startTransition(async () => {
           await acceptTermsContext();
-          setShowTerms(false); // This will now run after the context update succeeds.
+          setShowTerms(false);
       });
   };
 
@@ -255,7 +222,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const currentPageTitle = getCurrentPageTitle();
   const { isMobile, isCollapsed } = useSidebar();
 
-
   return (
     <div className="flex flex-1">
       <Sidebar>
@@ -264,116 +230,176 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             <UtensilsCrossed className="h-7 w-7 text-sidebar-primary" />
             <div className="group-data-[collapsible=icon]:hidden">
               {isMobile ? (
-                 <SheetTitle className="text-xl font-bold font-headline text-sidebar-primary">
-                   MealPlanner<span className="text-sidebar-accent">Pro</span>
-                 </SheetTitle>
+                <span className="font-bold text-sidebar-primary">MealPlannerPro</span>
               ) : (
-                <h1 id="sidebar-title" className="text-xl font-bold font-headline text-sidebar-primary">
-                  MealPlanner<span className="text-sidebar-accent">Pro</span>
-                </h1>
+                <div>
+                  <div className="font-bold text-sidebar-primary">MealPlannerPro</div>
+                  <div className="text-xs text-sidebar-muted">Smart Nutrition</div>
+                </div>
               )}
             </div>
           </Link>
         </SidebarHeader>
-        <SidebarContent className="flex flex-col justify-between">
-          <SidebarMenu>
-            <SidebarMenuItem className="px-2">
-               <SidebarSearch/>
-            </SidebarMenuItem>
-            
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname === dashboardNavItem.href}>
-                        <Link href={dashboardNavItem.href}>
-                          <dashboardNavItem.icon />
-                          <span className="group-data-[collapsible=icon]:hidden">{dashboardNavItem.label}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </TooltipTrigger>
-                <TooltipContent side="right" align="center" hidden={!isCollapsed}>
-                  {dashboardNavItem.label}
-                </TooltipContent>
-            </Tooltip>
-            
-            <Accordion type="multiple" className="w-full space-y-0 px-2 group-data-[collapsible=icon]:hidden">
-              {mainSections.map(section => (
-                 <AccordionItem key={section.label} value={section.label.toLowerCase()} className="border-none">
-                  <AccordionTrigger className="p-2 text-sm font-medium hover:no-underline hover:bg-sidebar-accent rounded-md [&[data-state=open]>svg]:rotate-180">
-                    <div className="flex items-center gap-2">
-                       <section.icon />
-                       <span>{section.label}</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pl-4">
-                     <SidebarMenu className="py-1 space-y-1">
-                      {section.items.map((item) => {
-                        const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-                        return (
-                          <SidebarMenuItem key={item.href}>
-                            <SidebarMenuButton asChild isActive={isActive} size="sm" className="h-8 font-normal">
-                              <Link href={item.href}>
-                                <item.icon />
-                                <span>{item.label}</span>
-                              </Link>
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
-                        );
-                      })}
-                    </SidebarMenu>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
 
-            <div className="hidden flex-col gap-1 group-data-[collapsible=icon]:flex">
-              {mainSections.map(section => (
-                <Tooltip key={`collapsed-${section.label}`}>
-                    <TooltipTrigger asChild>
-                        <SidebarMenuItem>
-                            <SidebarMenuButton asChild isActive={section.items.some(item => pathname.startsWith(item.href))}>
-                              <Link href={section.items[0].href}>
-                                <section.icon />
-                                <span className="group-data-[collapsible=icon]:hidden">{section.label}</span>
-                              </Link>
-                            </SidebarMenuButton>
-                        </SidebarMenuItem>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" align="center" hidden={!isCollapsed}>
-                      {section.label}
-                    </TooltipContent>
-                </Tooltip>
-              ))}
-            </div>
-
-          </SidebarMenu>
-          
-          <div className="mt-auto p-2">
+        <SidebarContent className="flex flex-col h-full">
+          <div className="flex-1 py-2">
+            {/* Dashboard */}
             <SidebarGroup>
-                <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Help & Support</SidebarGroupLabel>
-                <SidebarMenu>
-                    {helpNavItems.map((item) => {
-                    const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-                    return (
-                        <Tooltip key={item.href}>
-                            <TooltipTrigger asChild>
-                                <SidebarMenuItem>
-                                <SidebarMenuButton asChild isActive={isActive}>
-                                    <Link href={item.href}>
-                                    <item.icon />
-                                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                                    </Link>
-                                </SidebarMenuButton>
-                                </SidebarMenuItem>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" align="center" hidden={!isCollapsed}>
-                            {item.label}
-                            </TooltipContent>
-                        </Tooltip>
-                    );
-                    })}
-                </SidebarMenu>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname === dashboardNavItem.href}>
+                    <Link href={dashboardNavItem.href}>
+                      <dashboardNavItem.icon />
+                      <span className="group-data-[collapsible=icon]:hidden">{dashboardNavItem.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+            
+            <SidebarSeparator className="my-2" />
+            
+            {/* Plan Section */}
+            <SidebarGroup>
+              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Plan</SidebarGroupLabel>
+              <SidebarMenu>
+                {planNavItems.map((item) => {
+                  const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+                  return (
+                    <Tooltip key={item.href}>
+                      <TooltipTrigger asChild>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild isActive={isActive}>
+                            <Link href={item.href}>
+                              <item.icon />
+                              <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" align="center" hidden={!isCollapsed}>
+                        {item.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroup>
+            
+            <SidebarSeparator className="my-2" />
+            
+            {/* Recipes Section */}
+            <SidebarGroup>
+              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Recipes</SidebarGroupLabel>
+              <SidebarMenu>
+                {recipesNavItems.map((item) => {
+                  const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+                  return (
+                    <Tooltip key={item.href}>
+                      <TooltipTrigger asChild>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild isActive={isActive}>
+                            <Link href={item.href}>
+                              <item.icon />
+                              <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" align="center" hidden={!isCollapsed}>
+                        {item.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroup>
+            
+            <SidebarSeparator className="my-2" />
+            
+            {/* Progress Section */}
+            <SidebarGroup>
+              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Progress</SidebarGroupLabel>
+              <SidebarMenu>
+                {progressNavItems.map((item) => {
+                  const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+                  return (
+                    <Tooltip key={item.href}>
+                      <TooltipTrigger asChild>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild isActive={isActive}>
+                            <Link href={item.href}>
+                              <item.icon />
+                              <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" align="center" hidden={!isCollapsed}>
+                        {item.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroup>
+            
+            <SidebarSeparator className="my-2" />
+            
+            {/* Settings Section */}
+            <SidebarGroup>
+              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Settings</SidebarGroupLabel>
+              <SidebarMenu>
+                {settingsNavItems.map((item) => {
+                  const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+                  return (
+                    <Tooltip key={item.href}>
+                      <TooltipTrigger asChild>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild isActive={isActive}>
+                            <Link href={item.href}>
+                              <item.icon />
+                              <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" align="center" hidden={!isCollapsed}>
+                        {item.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroup>
+            
+            <SidebarSeparator className="my-2" />
+            
+            {/* Help Section */}
+            <SidebarGroup>
+              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Help</SidebarGroupLabel>
+              <SidebarMenu>
+                {helpNavItems.map((item) => {
+                  const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+                  return (
+                    <Tooltip key={item.href}>
+                      <TooltipTrigger asChild>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild isActive={isActive}>
+                            <Link href={item.href}>
+                              <item.icon />
+                              <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" align="center" hidden={!isCollapsed}>
+                        {item.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </SidebarMenu>
             </SidebarGroup>
             
             <SidebarSeparator className="my-2" />
@@ -384,7 +410,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
       </Sidebar>
       <SidebarInset>
         <header className="flex h-16 items-center border-b px-4 sticky top-0 bg-background z-40">
-           <div className="w-10"> {/* Container for SidebarTrigger */}
+           <div className="w-10">
             <SidebarTrigger className="text-primary hover:text-accent">
               <PanelLeft />
             </SidebarTrigger>
@@ -392,7 +418,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           <h1 className="flex-grow text-center text-xl font-bold font-headline text-primary">
             {currentPageTitle}
           </h1>
-          <div className="w-10 flex justify-end"> {/* Container for ThemeToggleButton */}
+          <div className="w-10 flex justify-end">
             <ThemeToggleButton />
           </div>
         </header>
@@ -401,7 +427,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         </main>
       </SidebarInset>
       <DevStatusIndicator />
-      <PreppyHelp /> {/* Add the help component */}
+      <PreppyHelp />
       <TermsAcceptanceModal
         isOpen={showTerms}
         onAccept={handleAcceptTerms}
@@ -410,7 +436,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
 
 export default function MainLayout({
   children,

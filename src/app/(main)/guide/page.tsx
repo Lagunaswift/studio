@@ -5,7 +5,7 @@ import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
-  LayoutDashboard, UtensilsCrossed, CalendarDays, Sparkles, ShoppingBag, UserCog, Settings, Archive, BookOpen, AlertTriangle
+  LayoutDashboard, UtensilsCrossed, CalendarDays, Wand2, ShoppingBag, UserCog, Settings, Archive, BookOpen, AlertTriangle
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -60,7 +60,7 @@ const sections: GuideSection[] = [
     ]
   },
   {
-    icon: Sparkles,
+    icon: Wand2,
     title: "Preppy: Plan Generator",
     content: [
       "Let me do the heavy lifting on the <strong>Plan Generator</strong> page!",

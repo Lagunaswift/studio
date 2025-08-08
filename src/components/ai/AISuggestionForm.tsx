@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Wand2, Loader2 } from 'lucide-react';
 
 
 const formSchema = z.object({
@@ -41,7 +41,7 @@ export default function AISuggestionForm({ onSubmit, isLoading }: AISuggestionFo
     <Card className="shadow-lg">
       <CardHeader>
         <CardTitle className="font-headline text-primary flex items-center">
-          <Sparkles className="w-6 h-6 mr-2 text-accent" />
+          <Wand2 className="w-6 h-6 mr-2 text-accent" />
           Get AI Meal Suggestions
         </CardTitle>
       </CardHeader>
@@ -82,7 +82,7 @@ export default function AISuggestionForm({ onSubmit, isLoading }: AISuggestionFo
               {isLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Sparkles className="mr-2 h-4 w-4" />
+                <Wand2 className="mr-2 h-4 w-4" />
               )}
               Suggest Meal Plan
             </Button>

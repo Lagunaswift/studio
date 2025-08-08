@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Bot, Info, CookingPot, BadgePercent, CheckCircle2, AlertTriangle, Search, Lock } from 'lucide-react';
+import { Loader2, Lightbulb, ChefHat, Wand2, Send, Bot, Info, CookingPot, BadgePercent, CheckCircle2, AlertTriangle, Search, Lock } from 'lucide-react';
 import { useOptimizedRecipes, useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
@@ -125,7 +125,7 @@ export default function AIRecipeFinderPage() {
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-2 mb-2">
             <ChefHat className="h-8 w-8 text-primary" />
-            <Sparkles className="h-6 w-6 text-yellow-500" />
+            <Wand2 className="h-6 w-6 text-yellow-500" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Pantry Chef</h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">

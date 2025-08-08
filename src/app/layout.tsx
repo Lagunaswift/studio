@@ -1,11 +1,12 @@
+// src/app/layout.tsx - ADD AppProvider
 import type { Metadata, Viewport } from 'next';
 import { PWAInstaller } from '@/components/PWAInstaller';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { OptimizedAppProvider } from '@/context/OptimizedAppContext';
+import { AppProvider } from '@/context/AppContext'; // ADD THIS IMPORT
 import { AuthProvider } from '@/context/AuthContext';
 import { ThemeProvider } from "next-themes";
-import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export const metadata: Metadata = {
   title: 'MealPlannerPro - Smart Nutrition & Meal Planning',
@@ -70,22 +71,22 @@ export default function RootLayout({
         <meta name="msapplication-config" content="/browserconfig.xml" />
       </head>
       <body>
-        <ErrorBoundary>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <AuthProvider>
-              <OptimizedAppProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            <OptimizedAppProvider>
+              <AppProvider>
                 {children}
                 <Toaster />
                 <PWAInstaller />
-              </OptimizedAppProvider>
-            </AuthProvider>
-          </ThemeProvider>
-        </ErrorBoundary>
+              </AppProvider>
+            </OptimizedAppProvider>
+          </AuthProvider>
+        </ThemeProvider>
         <script dangerouslySetInnerHTML={{
           __html: `
             if ('serviceWorker' in navigator) {

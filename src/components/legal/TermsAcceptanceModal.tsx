@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import Link from 'next/link';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Wand2, Loader2 } from 'lucide-react';
 
 interface TermsAcceptanceModalProps {
   isOpen: boolean;
@@ -32,7 +32,7 @@ export function TermsAcceptanceModal({ isOpen, onAccept, isPending }: TermsAccep
         <DialogHeader>
           <div className="flex flex-col items-center text-center">
             <div className="bg-accent/20 p-3 rounded-full mb-4">
-              <Sparkles className="h-10 w-10 text-accent" />
+              <Wand2 className="h-10 w-10 text-accent" />
             </div>
             <DialogTitle className="text-2xl font-headline text-primary">Hello! I'm Preppy.</DialogTitle>
             <DialogDescription className="pt-2">

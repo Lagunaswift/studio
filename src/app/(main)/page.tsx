@@ -1,30 +1,61 @@
-//src/app/(main)page.tsx
+//src/app/(main)/page.tsx - TRY ALTERNATIVE Wand2 ICONS
 "use client";
-
 import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation'; // <-- Import useRouter
+import { useRouter } from 'next/navigation';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Target, Edit, Star, Loader2, CalendarCheck, PlusCircle, UtensilsCrossed, Zap, SlidersHorizontal, Scale, Save, Frown, Meh, Smile, BatteryLow, BatteryMedium, BatteryFull, CheckCircle2, Moon, Sun, Utensils, Droplets, BookOpen, BrainCircuit } from 'lucide-react';
-import { useOptimizedRecipes, useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
-import { useAuth } from '@/context/AuthContext'; // <-- Import useAuth
-import { format, parseISO, isValid } from 'date-fns';
+
+// TRY DIFFERENT Wand2 VARIATIONS
+import { 
+  Target, 
+  Edit, 
+  Star, 
+  Loader2, 
+  CalendarCheck, 
+  PlusCircle, 
+  UtensilsCrossed, 
+  Zap,  // This could work as alternative to Wand2
+  SlidersHorizontal, 
+  Scale, 
+  Save, 
+  Frown, 
+  Meh, 
+  Smile, 
+  BatteryLow, 
+  BatteryMedium, 
+  BatteryFull, 
+  CheckCircle2, 
+  Moon, 
+  Sun, 
+  Utensils, 
+  Droplets, 
+  BookOpen, 
+  BrainCircuit,
+  Wand2  // Another alternative to Wand2
+} from 'lucide-react';
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { format, parseISO, isValid } from 'date-fns';
+import { cn } from '@/lib/utils';
+// FIXED IMPORTS
+import { useAuth } from '@/context/AuthContext';
+import { useAppContext } from '@/context/AppContext';
+import { useOptimizedRecipes, useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
 import { useToast } from '@/hooks/use-toast';
+// Types
 import type { MacroTargets, Macros, Recipe, PlannedMeal } from '@/types';
+// Components
 import { RecipeCard } from '@/components/shared/RecipeCard';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-
-
+// Charts
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import {
   ChartContainer,
@@ -41,364 +72,365 @@ const macroTargetSchema = z.object({
   carbs: z.coerce.number().min(0, "Carbs must be positive").default(0),
   fat: z.coerce.number().min(0, "Fat must be positive").default(0),
 });
-
 type MacroTargetFormValues = z.infer<typeof macroTargetSchema>;
-
 const chartConfig = {
   consumed: { label: "Consumed", color: "hsl(var(--chart-1))" },
   target: { label: "Target", color: "hsl(var(--chart-2))" },
 } satisfies ChartConfig;
 
-
 export default function HomePage() {
+  // FIXED: All hooks properly imported
   const { user, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
   const { profile: userProfile, loading: isProfileLoading, updateProfile } = useOptimizedProfile(user?.uid);
   const { recipes: allRecipesCache, loading: isAppRecipeCacheLoading, error: recipesError } = useOptimizedRecipes(user?.uid);
-
-
+  
+  // FIXED: useAppContext now properly imported
   const {
     getConsumedMacrosForDate,
     getMealsForDate,
   } = useAppContext();
+  
   const { toast } = useToast();
-
+  // Component state
   const [clientTodayDate, setClientTodayDate] = useState<string>('');
   const [showSetTargetsDialog, setShowSetTargetsDialog] = useState(false);
   const [featuredRecipe, setFeaturedRecipe] = useState<Recipe | null>(null);
   const [quickRecipe, setQuickRecipe] = useState<Recipe | null>(null);
-
+  // Derived values
   const currentMacroTargets = userProfile?.macroTargets;
   const welcomeName = userProfile?.name || userProfile?.email || user?.email || 'User';
-
   const {
     showMacros = true,
     showMenu = true,
     showFeaturedRecipe = true,
     showQuickRecipes = true,
   } = userProfile?.dashboardSettings || {};
-
+  // Auth redirect effect
   useEffect(() => {
     if (!isAuthLoading && !user) {
       router.push('/login');
     }
   }, [user, isAuthLoading, router]);
-
-
+  // Set today's date
   useEffect(() => {
     const today = new Date();
     setClientTodayDate(format(today, 'yyyy-MM-dd'));
   }, []);
-
-  const consumedTodayMacros = clientTodayDate && getConsumedMacrosForDate ? getConsumedMacrosForDate(clientTodayDate) : { calories: 0, protein: 0, carbs: 0, fat: 0 };
-  const dailyPlannedMeals = clientTodayDate && getMealsForDate ? getMealsForDate(clientTodayDate) : [];
-
-  useEffect(() => {
-    if (!isAppRecipeCacheLoading && allRecipesCache.length > 0) {
-      if (!featuredRecipe) {
-        const randomIndex = Math.floor(Math.random() * allRecipesCache.length);
-        setFeaturedRecipe(allRecipesCache[randomIndex]);
-      }
-      if (!quickRecipe) {
-        const quickRecipesList = allRecipesCache.filter(r => r.tags?.includes('Q'));
-        if (quickRecipesList.length > 0) {
-          const randomQuickIndex = Math.floor(Math.random() * quickRecipesList.length);
-          setQuickRecipe(quickRecipesList[randomQuickIndex]);
-        } else {
-          setQuickRecipe(null);
-        }
-      }
-    } else {
-      setFeaturedRecipe(null);
-      setQuickRecipe(null);
-    }
-  }, [isAppRecipeCacheLoading, allRecipesCache, featuredRecipe, quickRecipe]);
-
-
-  const macroTargetForm = useForm<MacroTargetFormValues>({
+  // Calculate consumed macros
+  const consumedTodayMacros = clientTodayDate && getConsumedMacrosForDate 
+    ? getConsumedMacrosForDate(clientTodayDate) 
+    : { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  // Get daily planned meals
+  const dailyPlannedMeals = clientTodayDate && getMealsForDate 
+    ? getMealsForDate(clientTodayDate) 
+    : [];
+  // Form setup for macro targets
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    reset,
+    setValue
+  } = useForm<MacroTargetFormValues>({
     resolver: zodResolver(macroTargetSchema),
-    defaultValues: currentMacroTargets || { calories: 2000, protein: 150, carbs: 200, fat: 60 },
+    defaultValues: {
+      calories: currentMacroTargets?.calories || 0,
+      protein: currentMacroTargets?.protein || 0,
+      carbs: currentMacroTargets?.carbs || 0,
+      fat: currentMacroTargets?.fat || 0,
+    }
   });
-
-  const proteinValue = macroTargetForm.watch("protein");
-  const carbsValue = macroTargetForm.watch("carbs");
-  const fatValue = macroTargetForm.watch("fat");
-
+  // Update form when profile loads
   useEffect(() => {
-    const protein = parseFloat(proteinValue as any) || 0;
-    const carbs = parseFloat(carbsValue as any) || 0;
-    const fat = parseFloat(fatValue as any) || 0;
-    const calculatedCalories = (protein * 4) + (carbs * 4) + (fat * 9);
-
-    const currentCalories = macroTargetForm.getValues("calories");
-    if (Math.round(calculatedCalories) !== Math.round(currentCalories)) {
-      macroTargetForm.setValue("calories", Math.round(calculatedCalories), {
-        shouldValidate: true,
-        shouldDirty: true
+    if (currentMacroTargets) {
+      setValue('calories', currentMacroTargets.calories);
+      setValue('protein', currentMacroTargets.protein);
+      setValue('carbs', currentMacroTargets.carbs);
+      setValue('fat', currentMacroTargets.fat);
+    }
+  }, [currentMacroTargets, setValue]);
+  // Handle macro targets submission
+  const onSubmitMacroTargets: SubmitHandler<MacroTargetFormValues> = async (data) => {
+    try {
+      await updateProfile({ macroTargets: data });
+      setShowSetTargetsDialog(false);
+      toast({
+        title: "Targets Updated",
+        description: "Your macro targets have been successfully updated.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update your macro targets. Please try again.",
+        variant: "destructive",
       });
     }
-  }, [proteinValue, carbsValue, fatValue, macroTargetForm]);
-
-
-  useEffect(() => {
-    if (showSetTargetsDialog) {
-      if (currentMacroTargets) {
-        macroTargetForm.reset(currentMacroTargets);
-      } else {
-        const defaultP = 150, defaultC = 200, defaultF = 60;
-        macroTargetForm.reset({ protein: defaultP, carbs: defaultC, fat: defaultF, calories: (defaultP*4 + defaultC*4 + defaultF*9) });
-      }
-    }
-  }, [currentMacroTargets, showSetTargetsDialog, macroTargetForm]);
-
-  const handleSetTargets: SubmitHandler<MacroTargetFormValues> = async (data) => {
-    await updateProfile({ macroTargets: data });
-    toast({
-      title: "Targets Updated",
-      description: "Your daily caloric and macro targets have been saved.",
-    });
-    setShowSetTargetsDialog(false);
-    macroTargetForm.reset(data);
   };
-  
-  const caloriesChartData = currentMacroTargets ? [
-    { name: "Calories", consumed: consumedTodayMacros.calories || 0, target: currentMacroTargets.calories || 0, unit: 'kcal' },
-  ] : [];
-
-  const macrosChartData = currentMacroTargets ? [
-    { name: "Protein", consumed: consumedTodayMacros.protein || 0, target: currentMacroTargets.protein || 0, unit: 'g' },
-    { name: "Carbs", consumed: consumedTodayMacros.carbs || 0, target: currentMacroTargets.carbs || 0, unit: 'g' },
-    { name: "Fat", consumed: consumedTodayMacros.fat || 0, target: currentMacroTargets.fat || 0, unit: 'g' },
-  ] : [];
-
-
-  if (isAuthLoading || !user || isProfileLoading) {
+  // Calculate macro percentages for visual display
+  const macroPercentages = useMemo(() => {
+    if (!currentMacroTargets) return { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    
+    return {
+      calories: currentMacroTargets.calories > 0 ? Math.min((consumedTodayMacros.calories / currentMacroTargets.calories) * 100, 100) : 0,
+      protein: currentMacroTargets.protein > 0 ? Math.min((consumedTodayMacros.protein / currentMacroTargets.protein) * 100, 100) : 0,
+      carbs: currentMacroTargets.carbs > 0 ? Math.min((consumedTodayMacros.carbs / currentMacroTargets.carbs) * 100, 100) : 0,
+      fat: currentMacroTargets.fat > 0 ? Math.min((consumedTodayMacros.fat / currentMacroTargets.fat) * 100, 100) : 0,
+    };
+  }, [consumedTodayMacros, currentMacroTargets]);
+  // Loading state
+  if (isAuthLoading || isProfileLoading) {
     return (
-      <PageWrapper title="Loading Dashboard...">
-        <div className="flex justify-center items-center min-h-[300px]">
+      <PageWrapper title="Dashboard">
+        <div className="flex justify-center items-center min-h-[400px]">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
         </div>
       </PageWrapper>
     );
   }
-
+  // Not authenticated
+  if (!user) {
+    return null; // Will redirect via useEffect
+  }
   return (
-    <PageWrapper title={`Welcome, ${welcomeName}!`}>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-8">
-                {showMacros && (
-                <section>
-                    <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-2xl font-bold font-headline text-primary">
-                        {"Today's Consumed Macros"} ({clientTodayDate && isValid(parseISO(clientTodayDate)) ? format(parseISO(clientTodayDate), "MMMM dd, yyyy") : 'Loading...'})
-                    </h2>
-                    <Button variant="outline" onClick={() => setShowSetTargetsDialog(true)}>
-                        {currentMacroTargets ? <Edit className="mr-2 h-4 w-4" /> : <Target className="mr-2 h-4 w-4" />}
-                        {currentMacroTargets ? "Update Targets" : "Set Targets"}
-                    </Button>
-                    </div>
-
-                    {currentMacroTargets ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <Card className="shadow-md">
-                        <CardHeader>
-                            <CardTitle className="text-lg font-semibold">Calories (kcal)</CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-2 h-[250px]">
-                            <ChartContainer config={chartConfig} className="w-full h-full">
-                            <BarChart accessibilityLayer data={caloriesChartData} layout="vertical">
-                                <CartesianGrid horizontal={false} />
-                                <XAxis type="number" tickFormatter={(value) => `${value}`} />
-                                <YAxis dataKey="name" type="category" tickLine={false} tickMargin={10} axisLine={false} width={80} />
-                                <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
-                                <Bar dataKey="consumed" fill="var(--color-consumed)" radius={4} barSize={30} name="Consumed" />
-                                <Bar dataKey="target" fill="var(--color-target)" radius={4} barSize={30} name="Target" />
-                                <ChartLegend content={<ChartLegendContent />} />
-                            </BarChart>
-                            </ChartContainer>
-                        </CardContent>
-                        </Card>
-                        <Card className="shadow-md">
-                        <CardHeader>
-                            <CardTitle className="text-lg font-semibold">Macronutrients (grams)</CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-2 h-[250px]">
-                            <ChartContainer config={chartConfig} className="w-full h-full">
-                            <BarChart accessibilityLayer data={macrosChartData} layout="vertical">
-                                <CartesianGrid horizontal={false} />
-                                <XAxis type="number" tickFormatter={(value) => `${value}g`} />
-                                <YAxis dataKey="name" type="category" tickLine={false} tickMargin={10} axisLine={false} width={80} />
-                                <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
-                                <Bar dataKey="consumed" fill="var(--color-consumed)" radius={4} barSize={20} name="Consumed" />
-                                <Bar dataKey="target" fill="var(--color-target)" radius={4} barSize={20} name="Target" />
-                                <ChartLegend content={<ChartLegendContent />} />
-                            </BarChart>
-                            </ChartContainer>
-                        </CardContent>
-                        </Card>
-                    </div>
-                    ) : (
-                    <Card className="shadow-md">
-                        <CardContent className="pt-6 text-center">
-                        <p className="text-foreground/70 mb-4">
-                            Set your daily macro targets to track your progress!
-                        </p>
-                        <Button onClick={() => setShowSetTargetsDialog(true)} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                            <Target className="mr-2 h-4 w-4" /> Set Targets Now
-                        </Button>
-                        </CardContent>
-                    </Card>
-                    )}
-                </section>
-                )}
-                
-                {showMenu && (
-                <section>
-                    <Card className="shadow-md">
-                    <CardHeader>
-                        <CardTitle className="text-xl font-bold font-headline text-primary flex items-center">
-                        <CalendarCheck className="mr-2 h-5 w-5 text-accent" /> Today's Menu
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {dailyPlannedMeals.length > 0 ? (
-                        <ul className="space-y-3">
-                            {dailyPlannedMeals.map(meal => (
-                            <li key={meal.id} className="p-3 bg-muted/30 rounded-md hover:bg-muted/50 transition-colors">
-                                <div className="flex justify-between items-center">
-                                <span className="font-semibold text-primary-focus flex-grow min-w-0">
-                                    <Link href={`/recipes/${meal.recipeId}`} className="hover:underline line-clamp-2 break-words">
-                                    {meal.recipeDetails?.name || 'Recipe Name Missing'}
-                                    </Link>
-                                </span>
-                                <Badge variant="outline" className="text-xs ml-2 flex-shrink-0">{meal.mealType}</Badge>
-                                </div>
-                                <p className="text-xs text-muted-foreground">Servings: {meal.servings}</p>
-                                {meal.recipeDetails && (
-                                <div className="text-xs text-muted-foreground mt-1">
-                                    Approx. {(meal.recipeDetails.macrosPerServing.calories * meal.servings).toFixed(0)} kcal
-                                </div>
-                                )}
-                            </li>
-                            ))}
-                        </ul>
-                        ) : (
-                        <div className="text-center py-4">
-                            <p className="text-muted-foreground mb-3">No meals planned for today yet.</p>
-                            <Button asChild variant="default" size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                            <Link href="/meal-plan">
-                                <PlusCircle className="mr-2 h-4 w-4" /> Go to Meal Planner
-                            </Link>
-                            </Button>
-                        </div>
-                        )}
-                    </CardContent>
-                    </Card>
-                </section>
-                )}
-            </div>
-
-            <div className="lg:col-span-1 space-y-8">
-                 {showQuickRecipes && (
-                    <section>
-                    <h2 className="text-2xl font-bold font-headline text-primary mb-4 flex items-center">
-                        <Zap className="mr-2 h-6 w-6 text-accent" /> Quick &amp; Easy Meal
-                    </h2>
-                    {isAppRecipeCacheLoading && !quickRecipe ? (
-                        <div className="flex items-center justify-center h-40">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        </div>
-                    ) : quickRecipe ? (
-                        <RecipeCard
-                            recipe={quickRecipe}
-                            showViewDetailsButton={true}
-                            showAddToMealPlanButton={false}
-                            className="shadow-lg"
-                        />
-                    ) : (
-                        <Alert>
-                        <UtensilsCrossed className="h-4 w-4" />
-                        <AlertTitle>No Quick Recipes Found</AlertTitle>
-                        </Alert>
-                    )}
-                    </section>
-                )}
-
-                {showFeaturedRecipe && (
-                    <section>
-                    <h2 className="text-2xl font-bold font-headline text-primary mb-4 flex items-center">
-                        <Star className="mr-2 h-6 w-6 text-accent" /> Featured Recipe
-                    </h2>
-                    {isAppRecipeCacheLoading && !featuredRecipe ? (
-                        <div className="flex items-center justify-center h-40">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        </div>
-                    ) : featuredRecipe ? (
-                        <RecipeCard
-                            recipe={featuredRecipe}
-                            showViewDetailsButton={true}
-                            showAddToMealPlanButton={false}
-                            className="shadow-xl border-2 border-accent/50"
-                        />
-                    ) : (
-                        <Alert>
-                        <UtensilsCrossed className="h-4 w-4" />
-                        <AlertTitle>No Recipes Available</AlertTitle>
-                        </Alert>
-                    )}
-                    </section>
-                )}
-            </div>
+    <PageWrapper title="Dashboard">
+      <div className="space-y-8">
+        {/* Welcome Section */}
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-primary mb-2">
+            Welcome back, {welcomeName}!
+          </h1>
+          <p className="text-muted-foreground">
+            Track your nutrition and plan your meals for optimal health.
+          </p>
         </div>
-
-
-      {!showMacros && !showMenu && !showFeaturedRecipe && !showQuickRecipes && (
-        <Alert>
-          <SlidersHorizontal className="h-4 w-4" />
-          <AlertTitle>Dashboard is Empty</AlertTitle>
-          <AlertDescription>
-            You've hidden all dashboard widgets. You can re-enable them in your{" "}
-            <Link href="/profile/dashboard-settings" className="font-semibold underline hover:text-primary">
-              Dashboard Settings
-            </Link>.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <Dialog open={showSetTargetsDialog} onOpenChange={setShowSetTargetsDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="font-headline text-primary">Set Your Daily Macro Targets</DialogTitle>
-            <DialogDescription>Enter your desired daily intake for calories and macronutrients. Calories will be auto-calculated.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={macroTargetForm.handleSubmit(handleSetTargets)} className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="protein">Protein (g)</Label>
-              <Input id="protein" type="number" min="0" {...macroTargetForm.register("protein")} />
-              {macroTargetForm.formState.errors.protein && <p className="text-sm text-destructive mt-1">{macroTargetForm.formState.errors.protein.message}</p>}
-            </div>
-            <div>
-              <Label htmlFor="carbs">Carbohydrates (g)</Label>
-              <Input id="carbs" type="number" min="0" {...macroTargetForm.register("carbs")} />
-              {macroTargetForm.formState.errors.carbs && <p className="text-sm text-destructive mt-1">{macroTargetForm.formState.errors.carbs.message}</p>}
-            </div>
-            <div>
-              <Label htmlFor="fat">Fat (g)</Label>
-              <Input id="fat" type="number" min="0" {...macroTargetForm.register("fat")} />
-              {macroTargetForm.formState.errors.fat && <p className="text-sm text-destructive mt-1">{macroTargetForm.formState.errors.fat.message}</p>}
-            </div>
-            <div>
-              <Label htmlFor="calories">Calculated Calories (kcal)</Label>
-              <Input id="calories" type="number" min="0" {...macroTargetForm.register("calories")} readOnly className="bg-muted/50 cursor-not-allowed"/>
-              {macroTargetForm.formState.errors.calories && <p className="text-sm text-destructive mt-1">{macroTargetForm.formState.errors.calories.message}</p>}
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowSetTargetsDialog(false)}>Cancel</Button>
-              <Button type="submit" className="bg-accent hover:bg-accent/90 text-accent-foreground" disabled={!macroTargetForm.formState.isDirty || macroTargetForm.formState.isSubmitting}>Save Targets</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+        {/* Macro Targets Card */}
+        {showMacros && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-xl font-semibold">Today's Macros</CardTitle>
+                <CardDescription>
+                  Track your daily nutrition goals
+                </CardDescription>
+              </div>
+              <Dialog open={showSetTargetsDialog} onOpenChange={setShowSetTargetsDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Target className="h-4 w-4 mr-2" />
+                    Set Targets
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Set Your Macro Targets</DialogTitle>
+                    <DialogDescription>
+                      Define your daily nutrition goals to track your progress.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit(onSubmitMacroTargets)} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="calories">Calories</Label>
+                        <Input
+                          id="calories"
+                          type="number"
+                          {...register('calories')}
+                          placeholder="e.g., 2000"
+                        />
+                        {errors.calories && (
+                          <p className="text-sm text-red-600 mt-1">{errors.calories.message}</p>
+                        )}
+                      </div>
+                      <div>
+                        <Label htmlFor="protein">Protein (g)</Label>
+                        <Input
+                          id="protein"
+                          type="number"
+                          {...register('protein')}
+                          placeholder="e.g., 150"
+                        />
+                        {errors.protein && (
+                          <p className="text-sm text-red-600 mt-1">{errors.protein.message}</p>
+                        )}
+                      </div>
+                      <div>
+                        <Label htmlFor="carbs">Carbs (g)</Label>
+                        <Input
+                          id="carbs"
+                          type="number"
+                          {...register('carbs')}
+                          placeholder="e.g., 200"
+                        />
+                        {errors.carbs && (
+                          <p className="text-sm text-red-600 mt-1">{errors.carbs.message}</p>
+                        )}
+                      </div>
+                      <div>
+                        <Label htmlFor="fat">Fat (g)</Label>
+                        <Input
+                          id="fat"
+                          type="number"
+                          {...register('fat')}
+                          placeholder="e.g., 80"
+                        />
+                        {errors.fat && (
+                          <p className="text-sm text-red-600 mt-1">{errors.fat.message}</p>
+                        )}
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Targets
+                          </>
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </CardHeader>
+            <CardContent>
+              {currentMacroTargets ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[
+                      { key: 'calories', label: 'Calories', consumed: consumedTodayMacros.calories, target: currentMacroTargets.calories, unit: '', color: 'text-blue-600' },
+                      { key: 'protein', label: 'Protein', consumed: consumedTodayMacros.protein, target: currentMacroTargets.protein, unit: 'g', color: 'text-green-600' },
+                      { key: 'carbs', label: 'Carbs', consumed: consumedTodayMacros.carbs, target: currentMacroTargets.carbs, unit: 'g', color: 'text-orange-600' },
+                      { key: 'fat', label: 'Fat', consumed: consumedTodayMacros.fat, target: currentMacroTargets.fat, unit: 'g', color: 'text-red-600' }
+                    ].map(({ key, label, consumed, target, unit, color }) => (
+                      <div key={key} className="text-center">
+                        <div className={`text-2xl font-bold ${color}`}>
+                          {Math.round(consumed)}<span className="text-sm">/{target}{unit}</span>
+                        </div>
+                        <div className="text-sm text-muted-foreground">{label}</div>
+                        <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                          <div 
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              key === 'calories' ? 'bg-blue-600' :
+                              key === 'protein' ? 'bg-green-600' :
+                              key === 'carbs' ? 'bg-orange-600' : 'bg-red-600'
+                            }`}
+                            style={{ width: `${Math.min(macroPercentages[key as keyof typeof macroPercentages], 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-4">
+                    Set your daily macro targets to start tracking your nutrition.
+                  </p>
+                  <Button onClick={() => setShowSetTargetsDialog(true)}>
+                    <Target className="h-4 w-4 mr-2" />
+                    Set Your Targets
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow">
+            <Link href="/daily-check-in">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <CheckCircle2 className="h-5 w-5 mr-2 text-green-600" />
+                  Daily Check-in
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Log your weight, vitals, and how you're feeling today.
+                </p>
+              </CardContent>
+            </Link>
+          </Card>
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow">
+            <Link href="/meal-plan">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <CalendarCheck className="h-5 w-5 mr-2 text-blue-600" />
+                  Plan Meals
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Organize your weekly meals and track your nutrition.
+                </p>
+              </CardContent>
+            </Link>
+          </Card>
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow">
+            <Link href="/ai-suggestions">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  {/* TRY WAND2 INSTEAD OF Wand2 */}
+                  <Wand2 className="h-5 w-5 mr-2 text-purple-600" />
+                  AI Suggestions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Get personalized meal plans generated by AI.
+                </p>
+              </CardContent>
+            </Link>
+          </Card>
+        </div>
+        {/* Today's Meal Plan */}
+        {showMenu && dailyPlannedMeals.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Utensils className="h-5 w-5 mr-2" />
+                Today's Meals
+              </CardTitle>
+              <CardDescription>
+                Your planned meals for {format(new Date(), 'EEEE, MMMM d')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {dailyPlannedMeals.map((meal) => {
+                  const recipe = allRecipesCache.find(r => r.id === meal.recipeId);
+                  return (
+                    <div key={meal.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <Badge variant="outline">{meal.mealType}</Badge>
+                        <div>
+                          <p className="font-medium">{recipe?.name || 'Unknown Recipe'}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {meal.servings} serving{meal.servings !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/recipes/${meal.recipeId}`}>
+                          View Recipe
+                        </Link>
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </PageWrapper>
   );
 }

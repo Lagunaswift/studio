@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info, Heart, Minus, Plus, Bot, Sparkles, Save, AlertTriangle, Lock } from 'lucide-react';
+import { Clock, Users, Utensils, ListChecks, Calendar as CalendarIcon, PlusCircle, ArrowLeft, Hourglass, Loader2, Info, Heart, Minus, Plus, Bot, Wand2, Save, AlertTriangle, Lock } from 'lucide-react';
 import { useOptimizedProfile, useOptimizedRecipes } from '@/hooks/useOptimizedFirestore';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -319,7 +319,7 @@ export default function RecipeDetailPage() {
             disabled={isTweaking}
             />
             <Button onClick={handleTweakRecipe} disabled={isTweaking || !tweakRequest.trim()} className="bg-primary hover:bg-primary/90">
-            {isTweaking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+            {isTweaking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
             Tweak Recipe
             </Button>
         </CardContent>
@@ -497,7 +497,7 @@ export default function RecipeDetailPage() {
          <Card className="shadow-xl mt-4 border-accent">
             <CardHeader>
                 <CardTitle className="font-headline text-primary flex items-center">
-                    <Sparkles className="w-6 h-6 mr-2 text-accent" />
+                    <Wand2 className="w-6 h-6 mr-2 text-accent" />
                     My Modified Recipe: {tweakSuggestion.newName}
                 </CardTitle>
                 <CardDescription>{tweakSuggestion.newDescription}</CardDescription>

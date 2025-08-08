@@ -16,7 +16,7 @@ import type { MacroTargets, TrainingExperienceLevel } from '@/types';
 import { useEffect, useState, useMemo } from 'react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Sparkles, Loader2, Info, Lightbulb, Droplets, AlertTriangle, HelpCircle, Calculator } from "lucide-react";
+import { Wand2, Loader2, Info, Lightbulb, Droplets, AlertTriangle, HelpCircle, Calculator } from "lucide-react";
 import Link from 'next/link';
 import { Slider } from '@/components/ui/slider';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
