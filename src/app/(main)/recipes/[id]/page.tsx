@@ -97,15 +97,18 @@ export default function RecipeDetailPage() {
   }, [recipeId, allRecipesCache]);
 
   useEffect(() => {
-    if (!recipe) return;
-
+    if (!recipe || !recipe.macrosPerServing) {
+      console.warn('Recipe or macrosPerServing is undefined:', recipe);
+      return;
+    }
+  
     const currentDisplayServings = (!isNaN(displayServings) && displayServings > 0) ? displayServings : (recipe.servings || 1);
-
+  
     const newMacros = {
-        calories: recipe.macrosPerServing.calories * currentDisplayServings,
-        protein: recipe.macrosPerServing.protein * currentDisplayServings,
-        carbs: recipe.macrosPerServing.carbs * currentDisplayServings,
-        fat: recipe.macrosPerServing.fat * currentDisplayServings,
+      calories: (recipe.macrosPerServing?.calories || 0) * currentDisplayServings,
+      protein: (recipe.macrosPerServing?.protein || 0) * currentDisplayServings,
+      carbs: (recipe.macrosPerServing?.carbs || 0) * currentDisplayServings,
+      fat: (recipe.macrosPerServing?.fat || 0) * currentDisplayServings,
     };
     setScaledMacros(newMacros);
     

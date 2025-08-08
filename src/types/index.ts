@@ -7,30 +7,29 @@ export const SEX_OPTIONS = ['male', 'female', 'notSpecified'] as const;
 export type Sex = typeof SEX_OPTIONS[number];
 
 export const ACTIVITY_LEVEL_OPTIONS = [
-  { value: 'notSpecified', label: 'Not Specified', multiplier: 1.2 },
-  { value: 'sedentary', label: 'Sedentary (little or no exercise)', multiplier: 1.2 },
-  { value: 'lightlyActive', label: 'Lightly Active (light exercise/sports 1-3 days/week)', multiplier: 1.375 }, // ✅ CORRECT
-  { value: 'moderatelyActive', label: 'Moderately Active (moderate exercise/sports 3-5 days/week)', multiplier: 1.55 },
-  { value: 'veryActive', label: 'Very Active (hard exercise/sports 6-7 days a week)', multiplier: 1.725 },
-  { value: 'extraActive', label: 'Extra Active (very hard exercise/sports & physical job)', multiplier: 1.9 }
+    { value: 'sedentary', label: 'Sedentary (little or no exercise)', multiplier: 1.2 },
+    { value: 'lightlyActive', label: 'Lightly Active (light exercise/sports 1-3 days/week)', multiplier: 1.375 },
+    { value: 'moderatelyActive', label: 'Moderately Active (moderate exercise/sports 3-5 days/week)', multiplier: 1.55 },
+    { value: 'veryActive', label: 'Very Active (hard exercise/sports 6-7 days a week)', multiplier: 1.725 },
+    { value: 'extraActive', label: 'Extra Active (very hard exercise/sports & physical job)', multiplier: 1.9 },
+    { value: 'notSpecified', label: 'Not Specified', multiplier: 1.2 }
 ] as const;
 export type ActivityLevel = typeof ACTIVITY_LEVEL_OPTIONS[number]['value'];
 
-// ✅ FIXED ATHLETE TYPE OPTIONS
 export const ATHLETE_TYPE_OPTIONS = [
-  { value: 'notSpecified', label: 'Not Specified' },
-  { value: 'endurance', label: 'Endurance Athlete' },
-  { value: 'strength', label: 'Strength/Power Athlete' }, // ✅ FIXED: was 'strengthPower'
+    { value: 'notSpecified', label: 'Not Specified' },
+    { value: 'endurance', label: 'Endurance Athlete' },
+    { value: 'strengthPower', label: 'Strength/Power Athlete' },
+    { value: 'teamSport', label: 'Team Sport Athlete' },
+    { value: 'weekendWarrior', label: 'Weekend Warrior' },
 ] as const;
 export type AthleteType = typeof ATHLETE_TYPE_OPTIONS[number]['value'];
 
-// ✅ FIXED PRIMARY GOAL OPTIONS
 export const PRIMARY_GOAL_OPTIONS = [
-  { value: 'notSpecified', label: 'Not Specified' },
-  { value: 'weightLoss', label: 'Fat Loss' }, // ✅ FIXED: was 'fatLoss'
-  { value: 'muscleGain', label: 'Muscle Gain' },
-  { value: 'maintenance', label: 'Maintenance' },
-  { value: 'performance', label: 'Performance' }, // ✅ ADDED: missing option
+    { value: 'notSpecified', label: 'Not Specified' },
+    { value: 'fatLoss', label: 'Fat Loss' },
+    { value: 'muscleGain', label: 'Muscle Gain' },
+    { value: 'maintenance', label: 'Maintenance' },
 ] as const;
 export type PrimaryGoal = typeof PRIMARY_GOAL_OPTIONS[number]['value'];
 
@@ -43,6 +42,8 @@ export const TRAINING_EXPERIENCE_OPTIONS = [
 
 export type TrainingExperienceLevel = typeof TRAINING_EXPERIENCE_OPTIONS[number]['value'];
 
+export const MENOPAUSE_STATUS_OPTIONS = ['notSpecified', 'pre', 'post'] as const;
+export type MenopauseStatus = typeof MENOPAUSE_STATUS_OPTIONS[number];
 
 
 export interface Macros {
@@ -51,6 +52,8 @@ export interface Macros {
   carbs: number;
   fat: number;
 }
+
+export type MacroTargets = Macros;
 
 export interface MealSlotConfig {
   id: string;
@@ -85,7 +88,8 @@ export const UserProfileSettingsSchema = z.object({
   heightCm: z.number().nullable(),
   weightKg: z.number().nullable(),
   age: z.number().nullable(),
-  sex: z.enum(['male', 'female', 'notSpecified']).nullable(),
+  sex: z.enum(SEX_OPTIONS),
+  menopauseStatus: z.enum(MENOPAUSE_STATUS_OPTIONS).nullable().optional(),
   activityLevel: z.enum(ACTIVITY_LEVEL_OPTIONS.map(o => o.value) as [ActivityLevel, ...ActivityLevel[]]),
   training_experience_level: z.enum(TRAINING_EXPERIENCE_OPTIONS.map(o => o.value) as [TrainingExperienceLevel, ...TrainingExperienceLevel[]]).nullable(),
   bodyFatPercentage: z.number().nullable(),
@@ -93,6 +97,7 @@ export const UserProfileSettingsSchema = z.object({
   primaryGoal: z.enum(PRIMARY_GOAL_OPTIONS.map(o => o.value) as [PrimaryGoal, ...PrimaryGoal[]]).nullable(),
   tdee: z.number().nullable(),
   leanBodyMassKg: z.number().nullable(),
+  rda: z.any().nullable(),
   subscription_status: z.string().nullable(),
   has_accepted_terms: z.boolean(),
   last_check_in_date: z.string().nullable(),
@@ -164,13 +169,18 @@ export interface Recipe {
     name: string;
     description: string;
     servings: number;
-    prepTime: number; // in minutes
-    cookTime: number; // in minutes
+    prepTime: number;
+    cookTime: number;
     ingredients: { name: string; quantity: number; unit: string; }[];
     instructions: string[];
-    macrosPerServing: Macros;
+    macrosPerServing: Macros; // This should never be optional/undefined
     imageUrl: string;
     tags: string[];
+}
+
+// Add a helper type for potentially incomplete recipes during loading
+export interface PartialRecipe extends Omit<Recipe, 'macrosPerServing'> {
+    macrosPerServing?: Macros;
 }
 
 export type RecipeFormData = Omit<Recipe, 'id' | 'user_id'>;
@@ -200,3 +210,34 @@ export interface DailyManualMacrosLog {
 }
 
 export type SubscriptionStatus = 'active' | 'inactive' | 'trialing' | 'none';
+
+export interface RDA {
+    thiamine?: number;
+    riboflavin?: number;
+    niacin?: number;
+    pantothenicAcid?: number;
+    pyridoxine?: number;
+    cobalamin?: number;
+    biotin?: number;
+    choline?: number;
+    folate?: number;
+    vitaminA?: number;
+    vitaminC?: number;
+    vitaminD?: number;
+    vitaminE?: number;
+    vitaminK?: number;
+    calcium?: number;
+    chromium?: number;
+    copper?: number;
+    fluoride?: number;
+    iodine?: number;
+    iron?: number;
+    magnesium?: number;
+    manganese?: number;
+    molybdenum?: number;
+    phosphorus?: number;
+    potassium?: number;
+    selenium?: number;
+    sodium?: number;
+    zinc?: number;
+}
