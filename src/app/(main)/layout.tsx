@@ -1,4 +1,4 @@
-//src/app/(main)/layout.tsx - COMPLETE WORKING VERSION
+//src/app/(main)/layout.tsx - RESTRUCTURED SIDEBAR VERSION
 "use client";
 
 import Link from 'next/link';
@@ -32,7 +32,7 @@ import {
 import { SheetTitle } from '@/components/ui/sheet';
 import { 
   UtensilsCrossed, 
-  Wand2, // CHANGED FROM Wand2 TO Wand2
+  Wand2,
   ShoppingBag, 
   CalendarDays, 
   LayoutDashboard, 
@@ -58,7 +58,9 @@ import {
   Database, 
   WifiOff, 
   MessageSquareWarning, 
-  Megaphone
+  Megaphone,
+  Brain,
+  Plus
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -77,32 +79,38 @@ interface NavItem {
 
 const dashboardNavItem: NavItem = { href: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true };
 
-const planNavItems: NavItem[] = [
-    { href: '/ai-suggestions', label: 'Preppy: Plan Generator', icon: Wand2 }, // CHANGED FROM Wand2
-    { href: '/meal-plan', label: 'Daily/Weekly View', icon: CalendarDays },
-    { href: '/shopping-list', label: 'Shopping List', icon: ShoppingBag },
-    { href: '/pantry', label: 'Pantry', icon: Archive },
+// RESTRUCTURED NAVIGATION GROUPS
+const mealPlanningNavItems: NavItem[] = [
+  { href: '/meal-plan', label: 'Meal Planner', icon: CalendarDays },
+  { href: '/meal-plan/weekly', label: 'Weekly View', icon: CalendarDays },
+  { href: '/shopping-list', label: 'Shopping List', icon: ShoppingBag },
+  { href: '/pantry', label: 'Pantry', icon: Archive },
 ];
 
-const recipesNavItems: NavItem[] = [
-  { href: '/ai-recipe-finder', label: 'Preppy: Pantry Chef', icon: ChefHat },
-  { href: '/recipes', label: 'Recipes', icon: UtensilsCrossed },
+// Meal Plan Generator sub-item for accordion
+const mealPlanGeneratorNavItem: NavItem = { href: '/ai-suggestions', label: 'AI Plan Generator', icon: Wand2 };
+
+// Pantry Chef sub-item for accordion  
+const pantryChefNavItem: NavItem = { href: '/ai-recipe-finder', label: 'AI Pantry Chef', icon: ChefHat };
+
+const cookbookNavItems: NavItem[] = [
+  { href: '/recipes', label: 'My Recipes', icon: UtensilsCrossed },
+  { href: '/recipes/add', label: 'Add Recipe', icon: Plus },
 ];
 
-const progressNavItems: NavItem[] = [
-    { href: '/daily-check-in', label: 'Daily Check-In', icon: ClipboardList },
-    { href: '/weekly-check-in', label: 'Preppy: Weekly Check-in', icon: CheckSquare },
+const preppyCoachNavItems: NavItem[] = [
+  { href: '/daily-check-in', label: 'Daily Check-In', icon: ClipboardList },
+  { href: '/weekly-check-in', label: 'Weekly Check-in', icon: CheckSquare },
 ];
 
-const settingsNavItems: NavItem[] = [
+const setupNavItems: NavItem[] = [
   { href: '/profile/user-info', label: 'My Profile', icon: UserCircle2 },
-  { href: '/profile/targets', label: 'My Goals & Targets', icon: Target },
-  { href: '/profile/diet-type', label: 'Diet Type', icon: Leaf },
+  { href: '/profile/targets', label: 'Goals & Targets', icon: Target },
+  { href: '/profile/diet-type', label: 'Diet & Allergens', icon: Leaf },
   { href: '/profile/meal-structure', label: 'Meal Structure', icon: SlidersHorizontal },
   { href: '/profile/dashboard-settings', label: 'Dashboard Settings', icon: Settings },
 ];
 
-// ADDED MISSING helpNavItems
 const helpNavItems: NavItem[] = [
   { href: '/guide', label: 'User Guide', icon: BookOpen },
   { href: '/updates', label: 'Updates & Feedback', icon: Megaphone },
@@ -111,12 +119,14 @@ const helpNavItems: NavItem[] = [
 ];
 
 const allNavItems: NavItem[] = [
-    dashboardNavItem,
-    ...planNavItems,
-    ...recipesNavItems,
-    ...progressNavItems,
-    ...settingsNavItems,
-    ...helpNavItems, // NOW PROPERLY DEFINED
+  dashboardNavItem,
+  ...mealPlanningNavItems,
+  mealPlanGeneratorNavItem,
+  ...cookbookNavItems,
+  pantryChefNavItem,
+  ...preppyCoachNavItems,
+  ...setupNavItems,
+  ...helpNavItems,
 ];
 
 function LogoutButton() {
@@ -179,6 +189,12 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   
   const [showTerms, setShowTerms] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [isClient, setIsClient] = useState(false);
+
+  // Fix hydration mismatch by ensuring client-side only rendering for certain elements
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Check terms acceptance
   useEffect(() => {
@@ -198,7 +214,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
   const getCurrentPageTitle = () => {
     // Specific titles for AI pages
-    if (pathname === '/ai-suggestions') return 'Preppy: Plan Generator';
+    if (pathname === '/ai-suggestions') return 'Preppy: Meal Plan Generator';
     if (pathname === '/ai-recipe-finder') return 'Preppy: Pantry Chef';
     if (pathname === '/weekly-check-in') return 'Preppy: Weekly Check-in';
     
@@ -220,6 +236,30 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   };
   
   const currentPageTitle = getCurrentPageTitle();
+
+  // Prevent hydration mismatch by not rendering sidebar-dependent content until client-side
+  if (!isClient) {
+    return (
+      <div className="flex flex-1">
+        <div className="flex-1 min-h-screen">
+          <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 bg-background border-b">
+            <div className="flex items-center gap-2 px-4">
+              <h1 className="font-semibold">{currentPageTitle}</h1>
+            </div>
+            <div className="ml-auto px-4 flex items-center gap-2">
+              <ThemeToggleButton />
+            </div>
+          </header>
+          <main className="flex-1 flex flex-col p-4 pt-0">
+            {children}
+          </main>
+          <Footer />
+        </div>
+      </div>
+    );
+  }
+
+  // Client-side rendering with sidebar
   const { isMobile, isCollapsed } = useSidebar();
 
   return (
@@ -259,11 +299,126 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             
             <SidebarSeparator className="my-2" />
             
-            {/* Plan Section */}
+            {/* Meal Planning Section */}
             <SidebarGroup>
-              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Plan</SidebarGroupLabel>
+              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Meal Planning</SidebarGroupLabel>
               <SidebarMenu>
-                {planNavItems.map((item) => {
+                {mealPlanningNavItems.map((item) => {
+                  const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+                  
+                  // Special handling for Meal Planner with accordion
+                  if (item.href === '/meal-plan') {
+                    return (
+                      <div key={item.href}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <SidebarMenuItem>
+                              <SidebarMenuButton asChild isActive={isActive}>
+                                <Link href={item.href}>
+                                  <item.icon />
+                                  <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                                </Link>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" align="center" hidden={!isCollapsed}>
+                            {item.label}
+                          </TooltipContent>
+                        </Tooltip>
+                        
+                        {/* AI Plan Generator as sub-item */}
+                        <div className="ml-4 group-data-[collapsible=icon]:hidden">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton asChild isActive={pathname === mealPlanGeneratorNavItem.href} size="sm">
+                                  <Link href={mealPlanGeneratorNavItem.href}>
+                                    <mealPlanGeneratorNavItem.icon />
+                                    <span className="text-sm">{mealPlanGeneratorNavItem.label}</span>
+                                  </Link>
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" align="center" hidden={!isCollapsed}>
+                              {mealPlanGeneratorNavItem.label}
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  // Special handling for Pantry with accordion
+                  if (item.href === '/pantry') {
+                    return (
+                      <div key={item.href}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <SidebarMenuItem>
+                              <SidebarMenuButton asChild isActive={isActive}>
+                                <Link href={item.href}>
+                                  <item.icon />
+                                  <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                                </Link>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" align="center" hidden={!isCollapsed}>
+                            {item.label}
+                          </TooltipContent>
+                        </Tooltip>
+                        
+                        {/* AI Pantry Chef as sub-item */}
+                        <div className="ml-4 group-data-[collapsible=icon]:hidden">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton asChild isActive={pathname === pantryChefNavItem.href} size="sm">
+                                  <Link href={pantryChefNavItem.href}>
+                                    <pantryChefNavItem.icon />
+                                    <span className="text-sm">{pantryChefNavItem.label}</span>
+                                  </Link>
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" align="center" hidden={!isCollapsed}>
+                              {pantryChefNavItem.label}
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  // Regular items
+                  return (
+                    <Tooltip key={item.href}>
+                      <TooltipTrigger asChild>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild isActive={isActive}>
+                            <Link href={item.href}>
+                              <item.icon />
+                              <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" align="center" hidden={!isCollapsed}>
+                        {item.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroup>
+            
+            <SidebarSeparator className="my-2" />
+            
+            {/* My Cookbook Section */}
+            <SidebarGroup>
+              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">My Cookbook</SidebarGroupLabel>
+              <SidebarMenu>
+                {cookbookNavItems.map((item) => {
                   const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
                   return (
                     <Tooltip key={item.href}>
@@ -288,11 +443,14 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             
             <SidebarSeparator className="my-2" />
             
-            {/* Recipes Section */}
+            {/* Preppy Coach Section */}
             <SidebarGroup>
-              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Recipes</SidebarGroupLabel>
+              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden flex items-center">
+                <Brain className="h-4 w-4 mr-1" />
+                Preppy Coach
+              </SidebarGroupLabel>
               <SidebarMenu>
-                {recipesNavItems.map((item) => {
+                {preppyCoachNavItems.map((item) => {
                   const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
                   return (
                     <Tooltip key={item.href}>
@@ -317,11 +475,11 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             
             <SidebarSeparator className="my-2" />
             
-            {/* Progress Section */}
+            {/* Setup Section */}
             <SidebarGroup>
-              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Progress</SidebarGroupLabel>
+              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Setup</SidebarGroupLabel>
               <SidebarMenu>
-                {progressNavItems.map((item) => {
+                {setupNavItems.map((item) => {
                   const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
                   return (
                     <Tooltip key={item.href}>
@@ -343,41 +501,15 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                 })}
               </SidebarMenu>
             </SidebarGroup>
-            
-            <SidebarSeparator className="my-2" />
-            
-            {/* Settings Section */}
-            <SidebarGroup>
-              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Settings</SidebarGroupLabel>
-              <SidebarMenu>
-                {settingsNavItems.map((item) => {
-                  const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-                  return (
-                    <Tooltip key={item.href}>
-                      <TooltipTrigger asChild>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild isActive={isActive}>
-                            <Link href={item.href}>
-                              <item.icon />
-                              <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" align="center" hidden={!isCollapsed}>
-                        {item.label}
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroup>
-            
+          </div>
+
+          {/* Footer Section */}
+          <div className="mt-auto py-2">
             <SidebarSeparator className="my-2" />
             
             {/* Help Section */}
             <SidebarGroup>
-              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Help</SidebarGroupLabel>
+              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Help & Legal</SidebarGroupLabel>
               <SidebarMenu>
                 {helpNavItems.map((item) => {
                   const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
@@ -401,56 +533,64 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                 })}
               </SidebarMenu>
             </SidebarGroup>
-            
+
             <SidebarSeparator className="my-2" />
             
-            {!isAuthLoading && user && <LogoutButton />}
+            {/* Logout */}
+            <SidebarGroup>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <LogoutButton />
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
           </div>
         </SidebarContent>
       </Sidebar>
-      <SidebarInset>
-        <header className="flex h-16 items-center border-b px-4 sticky top-0 bg-background z-40">
-           <div className="w-10">
-            <SidebarTrigger className="text-primary hover:text-accent">
-              <PanelLeft />
-            </SidebarTrigger>
+
+      <SidebarInset className="flex flex-col flex-1">
+        <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-sidebar-border">
+          <div className="flex items-center gap-2 px-4">
+            <SidebarTrigger className="-ml-1" />
+            <div className="h-4 w-px bg-sidebar-border" />
+            <h1 className="font-semibold">{currentPageTitle}</h1>
           </div>
-          <h1 className="flex-grow text-center text-xl font-bold font-headline text-primary">
-            {currentPageTitle}
-          </h1>
-          <div className="w-10 flex justify-end">
+          <div className="ml-auto px-4 flex items-center gap-2">
             <ThemeToggleButton />
+            <PreppyHelp />
           </div>
         </header>
-        <main className="flex-grow">
+        
+        <ServiceStatusBanner />
+        
+        <main className="flex-1 flex flex-col p-4 pt-0">
           {children}
         </main>
+        
+        <Footer />
       </SidebarInset>
-      <DevStatusIndicator />
-      <PreppyHelp />
-      <TermsAcceptanceModal
-        isOpen={showTerms}
-        onAccept={handleAcceptTerms}
-        isPending={isPending}
+
+      <TermsAcceptanceModal 
+        isOpen={showTerms} 
+        onAccept={handleAcceptTerms} 
+        isLoading={isPending}
       />
+      
+      <DevStatusIndicator />
     </div>
   );
 }
 
-export default function MainLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider defaultOpen={true} collapsible="icon">
-       <TooltipProvider>
-          <div className="flex flex-col min-h-screen">
-            <ServiceStatusBanner />
-            <LayoutContent>{children}</LayoutContent>
-            <Footer />
-          </div>
-      </TooltipProvider>
-    </SidebarProvider>
+    <TooltipProvider>
+      <SidebarProvider>
+        <LayoutContent>{children}</LayoutContent>
+      </SidebarProvider>
+    </TooltipProvider>
   );
 }
