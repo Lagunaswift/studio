@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo, useTransition } from 'react';
@@ -6,7 +5,7 @@ import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Scale, Save, Loader2, BrainCircuit, CheckCircle2, TrendingUp, Edit, CalculatorIcon, Lock } from 'lucide-react';
-import { useAppContext } from '@/context/AppContext';
+import { useOptimizedProfile, useOptimizedRecipes } from '@/hooks/useOptimizedFirestore';
 import { useAuth } from '@/context/AuthContext';
 import { format, parseISO } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
@@ -34,9 +33,6 @@ import {
   type ChartConfig
 } from "@/components/ui/chart";
 
-import { addOrUpdateWeightLog, addOrUpdateVitalsLog, addOrUpdateManualMacrosLog } from '../profile/actions';
-
-
 const weightLogSchema = z.object({
   weightKg: z.coerce.number().positive("Weight must be a positive number.").min(20, "Weight must be at least 20kg").max(500, "Weight must be at most 500kg"),
 });
@@ -61,15 +57,15 @@ const vitalsSchema = z.object({
 type VitalsFormValues = z.infer<typeof vitalsSchema>;
 
 function DailyVitalsCheckin() {
-  const { userProfile } = useAppContext();
   const { user } = useAuth();
+  const { profile: userProfile, updateProfile } = useOptimizedProfile(user?.uid);
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const clientTodayDate = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   
   const todayLog = useMemo(() => 
-    userProfile?.dailyVitalsLog?.find(log => log.date === clientTodayDate),
+    (userProfile?.dailyVitalsLog as DailyVitalsLog[])?.find(log => log.date === clientTodayDate),
     [userProfile?.dailyVitalsLog, clientTodayDate]
   );
   
@@ -96,12 +92,12 @@ function DailyVitalsCheckin() {
         toast({ title: "Authentication Error", description: "You must be logged in to log vitals.", variant: "destructive"});
         return;
     }
-    const vitalsData = { date: clientTodayDate, user_id: user.uid, ...data };
+    const vitalsData = { date: clientTodayDate, ...data };
     
     startTransition(async () => {
-        const result = await addOrUpdateVitalsLog(vitalsData as any);
+        const result = await updateProfile({ dailyVitalsLog: [...(userProfile?.dailyVitalsLog || []), vitalsData] as any });
 
-        if (result.error) {
+        if (!result.success) {
             toast({ title: "Error Saving Vitals", description: result.error, variant: "destructive" });
         } else {
             toast({
@@ -343,8 +339,8 @@ function DailyVitalsCheckin() {
 }
 
 function DailyWeightLog() {
-    const { userProfile } = useAppContext();
     const { user } = useAuth();
+    const { profile: userProfile, updateProfile } = useOptimizedProfile(user?.uid);
     const { toast } = useToast();
     const [clientTodayDate, setClientTodayDate] = useState<string>('');
     const [isPending, startTransition] = useTransition();
@@ -374,9 +370,9 @@ function DailyWeightLog() {
         }
 
         startTransition(async () => {
-            const result = await addOrUpdateWeightLog(user.uid, clientTodayDate, data.weightKg);
+            const result = await updateProfile({ dailyWeightLog: [...(userProfile?.dailyWeightLog || []), { date: clientTodayDate, weightKg: data.weightKg }] as any });
 
-            if (result.error) {
+            if (!result.success) {
                 toast({ title: "Error Saving Weight", description: result.error, variant: "destructive" });
             } else {
                 toast({
@@ -388,7 +384,7 @@ function DailyWeightLog() {
     };
     
     const recentWeightEntries = useMemo(() => {
-      return userProfile?.dailyWeightLog?.slice(0, 7) || [];
+      return (userProfile?.dailyWeightLog as DailyWeightLog[])?.slice(0, 7) || [];
     }, [userProfile?.dailyWeightLog]);
 
     return (
@@ -442,14 +438,14 @@ function DailyWeightLog() {
 }
 
 function ManualMacroLog() {
-    const { userProfile } = useAppContext();
     const { user } = useAuth();
+    const { profile: userProfile, updateProfile } = useOptimizedProfile(user?.uid);
     const { toast } = useToast();
     const [isPending, startTransition] = useTransition();
     const clientTodayDate = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
 
     const todayLog = useMemo(() => 
-        userProfile?.dailyManualMacrosLog?.find(log => log.date === clientTodayDate)?.macros,
+        (userProfile?.dailyManualMacrosLog as DailyManualMacrosLog[])?.find(log => log.date === clientTodayDate)?.macros,
         [userProfile?.dailyManualMacrosLog, clientTodayDate]
     );
 
@@ -483,11 +479,11 @@ function ManualMacroLog() {
             toast({ title: "Authentication Error", description: "You must be logged in to log macros.", variant: "destructive"});
             return;
         }
-        const macroData = { date: clientTodayDate, macros: data, user_id: user.uid };
+        const macroData = { date: clientTodayDate, macros: data };
 
         startTransition(async () => {
-            const result = await addOrUpdateManualMacrosLog(macroData as any);
-            if (result.error) {
+            const result = await updateProfile({ dailyManualMacrosLog: [...(userProfile?.dailyManualMacrosLog || []), macroData] as any });
+            if (!result.success) {
                 toast({ title: "Error Saving Macros", description: result.error, variant: "destructive" });
             } else {
                 toast({
@@ -557,14 +553,15 @@ function ManualMacroLog() {
 }
 
 function VitalsHistoryCharts() {
-  const { userProfile, isSubscribed } = useAppContext();
+  const { user } = useAuth();
+  const { profile: userProfile } = useOptimizedProfile(user?.uid);
   
   const vitalsData = useMemo(() => {
-    if (!userProfile?.dailyVitalsLog || userProfile.dailyVitalsLog.length === 0) {
+    if (!userProfile?.dailyVitalsLog || (userProfile.dailyVitalsLog as DailyVitalsLog[]).length === 0) {
       return [];
     }
     
-    const last14Days = userProfile.dailyVitalsLog.slice(0, 14).reverse(); 
+    const last14Days = (userProfile.dailyVitalsLog as DailyVitalsLog[]).slice(0, 14).reverse(); 
 
     const energyMap: Record<EnergyLevelV2, number> = { low: 1, moderate: 2, high: 3, vibrant: 4 };
     const sorenessMap: Record<SorenessLevel, number> = { none: 1, mild: 2, moderate: 3, severe: 4 };
@@ -580,7 +577,7 @@ function VitalsHistoryCharts() {
     return formattedData;
   }, [userProfile?.dailyVitalsLog]);
   
-  if (!isSubscribed) {
+  if (!userProfile?.subscription_status || userProfile.subscription_status !== 'active') {
     return (
         <div className="md:col-span-2">
             <ProFeature featureName="Detailed Vitals History" description="Unlock historical charts to visualize your trends in sleep quality, energy levels, recovery, and more. Spot patterns and optimize your performance over time." />
@@ -660,7 +657,7 @@ function VitalsHistoryCharts() {
 
 export default function DailyLogPage() {
     return (
-        <PageWrapper title="Daily Log">
+        <PageWrapper title="Daily Check-In">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <DailyWeightLog />
                 <DailyVitalsCheckin />

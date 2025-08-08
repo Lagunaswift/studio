@@ -7,14 +7,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAppContext } from '@/context/AppContext';
+import { useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { MealSlotConfig, MealType } from '@/types';
 import { MEAL_TYPES } from '@/lib/data'; // Ensure MEAL_TYPES is exported from data.ts
 import { PlusCircle, Trash2, Save } from 'lucide-react';
 
 export default function MealStructurePage() {
-  const { userProfile, setMealStructure: setContextMealStructure } = useAppContext();
+  const { user } = useAuth();
+  const { profile: userProfile, updateProfile } = useOptimizedProfile(user?.uid);
   const { toast } = useToast();
 
   const [editableMealStructure, setEditableMealStructure] = useState<MealSlotConfig[]>([]);
@@ -65,7 +67,7 @@ export default function MealStructurePage() {
       });
       return;
     }
-    setContextMealStructure(editableMealStructure);
+    updateProfile({ mealStructure: editableMealStructure });
     toast({
       title: "Meal Structure Saved",
       description: "Your meal structure has been updated.",

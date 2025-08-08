@@ -7,7 +7,8 @@ import { Switch } from '@/components/ui/switch';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useAppContext } from '@/context/AppContext';
+import { useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect } from 'react';
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
@@ -24,7 +25,8 @@ const dashboardSettingsSchema = z.object({
 type DashboardSettingsFormValues = z.infer<typeof dashboardSettingsSchema>;
 
 export default function DashboardSettingsPage() {
-  const { userProfile, setDashboardSettings } = useAppContext();
+  const { user } = useAuth();
+  const { profile: userProfile, updateProfile } = useOptimizedProfile(user?.uid);
   const { toast } = useToast();
 
   const form = useForm<DashboardSettingsFormValues>({
@@ -44,7 +46,7 @@ export default function DashboardSettingsPage() {
   }, [userProfile?.dashboardSettings, form]);
 
   const onSubmit: SubmitHandler<DashboardSettingsFormValues> = (data) => {
-    setDashboardSettings(data as DashboardSettings);
+    updateProfile({ dashboardSettings: data });
     toast({
       title: "Dashboard Settings Saved",
       description: "Your dashboard preferences have been updated.",

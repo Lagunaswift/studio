@@ -3,16 +3,37 @@ import type {NextConfig} from 'next';
 const nextConfig: NextConfig = {
   async headers() {
     return [
+      // Static assets - 1 year cache
       {
-        source: "/api/:path*",
+        source: '/_next/static/(.*)',
         headers: [
-          { key: "Access-Control-Allow-Credentials", value: "true" },
-          { key: "Access-Control-Allow-Origin", value: "*" },
-          { key: "Access-Control-Allow-Methods", value: "GET,DELETE,PATCH,POST,PUT" },
-          { key: "Access-Control-Allow-Headers", value: "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version" },
-        ]
-      }
-    ]
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
+      // Images - 1 month cache
+      {
+        source: '/images/(.*)',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=2592000' },
+        ],
+      },
+      // API routes - no cache
+      {
+        source: '/api/(.*)',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          { key: 'Pragma', value: 'no-cache' },
+          { key: 'Expires', value: '0' },
+        ],
+      },
+      // HTML pages - short cache with revalidation
+      {
+        source: '/((?!api|_next/static|images).*)',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=3600, must-revalidate' },
+        ],
+      },
+    ];
   },
   async redirects() {
     return [];

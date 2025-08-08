@@ -3,7 +3,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { useAppContext } from '@/context/AppContext';
+import { useOptimizedRecipes, useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
+import { useAuth } from '@/context/AuthContext';
 import type { PlannedMeal, MealType, Recipe, Macros, MealSlotConfig } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,18 +49,9 @@ const chartConfig = {
 
 
 export default function MealPlanPage() {
-  const {
-    userProfile,
-    getPlannedMacrosForDate,
-    removeMealFromPlan,
-    updatePlannedMealServings,
-    clearMealPlanForDate,
-    getMealsForDate,
-    addMealToPlan,
-    allRecipesCache,
-    isRecipeCacheLoading: isAppRecipeCacheLoading,
-    updateMealStatus,
-  } = useAppContext();
+  const { user } = useAuth();
+  const { profile: userProfile, updateProfile } = useOptimizedProfile(user?.uid);
+  const { recipes: allRecipesCache, loading: isAppRecipeCacheLoading } = useOptimizedRecipes(user?.uid);
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [editingMeal, setEditingMeal] = useState<PlannedMeal | null>(null);
@@ -78,10 +70,21 @@ export default function MealPlanPage() {
   const mealStructureToUse = userProfile?.mealStructure || MEAL_SLOT_CONFIG.map((s, i) => ({...s, id: `default-${i}`}));
 
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-  const dailyMacros = getPlannedMacrosForDate(formattedDate);
-  const currentMacroTargets = userProfile?.macroTargets;
-  const dailyMeals = getMealsForDate(formattedDate);
+  // @ts-ignore
+  const dailyMeals = userProfile?.mealPlan?.filter(meal => meal.date === formattedDate) || [];
+  // @ts-ignore
+  const dailyMacros = dailyMeals.reduce((acc, meal) => {
+    const recipe = allRecipesCache.find(r => r.id === meal.recipeId);
+    if (recipe) {
+      acc.calories += recipe.macrosPerServing.calories * meal.servings;
+      acc.protein += recipe.macrosPerServing.protein * meal.servings;
+      acc.carbs += recipe.macrosPerServing.carbs * meal.servings;
+      acc.fat += recipe.macrosPerServing.fat * meal.servings;
+    }
+    return acc;
+  }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
 
+  const currentMacroTargets = userProfile?.macroTargets;
 
   const caloriesChartData = currentMacroTargets ? [
     { name: "Calories", consumed: dailyMacros.calories || 0, target: currentMacroTargets.calories || 0, unit: 'kcal' },
@@ -90,7 +93,7 @@ export default function MealPlanPage() {
   const macrosChartData = currentMacroTargets ? [
     { name: "Protein", consumed: dailyMacros.protein || 0, target: currentMacroTargets.protein || 0, unit: 'g' },
     { name: "Carbs", consumed: dailyMacros.carbs || 0, target: currentMacroTargets.carbs || 0, unit: 'g' },
-    { name: "Fat", consumed: dailyMacros.fat || 0, target: 0, unit: 'g' },
+    { name: "Fat", consumed: dailyMacros.fat || 0, target: currentMacroTargets.fat || 0, unit: 'g' },
   ] : [
     { name: "Protein", consumed: dailyMacros.protein || 0, target: 0, unit: 'g' },
     { name: "Carbs", consumed: dailyMacros.carbs || 0, target: 0, unit: 'g' },
@@ -111,7 +114,9 @@ export default function MealPlanPage() {
 
   const handleSaveServings = () => {
     if (editingMeal && newServings > 0) {
-      updatePlannedMealServings(editingMeal.id, newServings);
+      // @ts-ignore
+      const updatedMealPlan = userProfile.mealPlan.map(meal => meal.id === editingMeal.id ? { ...meal, servings: newServings } : meal);
+      updateProfile({ mealPlan: updatedMealPlan });
       toast({ title: "Servings Updated", description: `${editingMeal.recipeDetails?.name} servings updated to ${newServings}.` });
       setEditingMeal(null);
     } else {
@@ -138,22 +143,41 @@ export default function MealPlanPage() {
     const recipeIndex = recipePickerIndices[slotKey] || 0;
     const recipeToAdd = availableRecipesForPicker[recipeIndex];
     if (recipeToAdd) {
-      try {
-        await addMealToPlan(recipeToAdd, formattedDate, mealType, recipeToAdd.servings);
-        toast({
-          title: "Meal Added",
-          description: `${recipeToAdd.name} added as ${mealType} for ${format(selectedDate, 'PPP')}.`,
-        });
-      } catch (e: any) {
-        console.error("Error adding meal from picker:", e);
-        toast({
-          title: "Failed to Add Meal",
-          description: e.message || "An error occurred while saving the meal.",
-          variant: "destructive"
-        });
-      }
+      const newMeal = {
+        id: `${Date.now()}`,
+        recipeId: recipeToAdd.id,
+        date: formattedDate,
+        mealType,
+        servings: recipeToAdd.servings,
+        status: 'planned'
+      };
+      // @ts-ignore
+      const updatedMealPlan = [...(userProfile.mealPlan || []), newMeal];
+      await updateProfile({ mealPlan: updatedMealPlan });
+      toast({
+        title: "Meal Added",
+        description: `${recipeToAdd.name} added as ${mealType} for ${format(selectedDate, 'PPP')}.`,
+      });
     }
   };
+
+  const removeMealFromPlan = async (mealId: string) => {
+    // @ts-ignore
+    const updatedMealPlan = userProfile.mealPlan.filter(meal => meal.id !== mealId);
+    await updateProfile({ mealPlan: updatedMealPlan });
+  }
+
+  const updateMealStatus = async (mealId: string, status: 'planned' | 'eaten') => {
+    // @ts-ignore
+    const updatedMealPlan = userProfile.mealPlan.map(meal => meal.id === mealId ? { ...meal, status } : meal);
+    await updateProfile({ mealPlan: updatedMealPlan });
+  }
+
+  const clearMealPlanForDate = async (date: string) => {
+    // @ts-ignore
+    const updatedMealPlan = userProfile.mealPlan.filter(meal => meal.date !== date);
+    await updateProfile({ mealPlan: updatedMealPlan });
+  }
 
   const getPlannedMealForSlot = (slotType: MealType, slotIndexWithinType: number): PlannedMeal | undefined => {
     const mealsOfThisType = dailyMeals.filter(dm => dm.mealType === slotType);

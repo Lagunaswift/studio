@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useAppContext } from '@/context/AppContext';
+import { useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { UserProfileSettings, Sex, ActivityLevel, AthleteType, PrimaryGoal, TrainingExperienceLevel } from '@/types';
 import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS, TRAINING_EXPERIENCE_OPTIONS } from '@/types';
@@ -173,12 +174,11 @@ function UserInfoPageSkeleton() {
     )
 }
 
-function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserProfileSettings, setUserInformation: (updates: Partial<UserProfileSettings>) => Promise<void> }) {
+function UserInfoForm({ userProfile, updateProfile }: { userProfile: UserProfileSettings, updateProfile: (updates: Partial<UserProfileSettings>) => Promise<{success: boolean, error?: string}> }) {
   const { toast } = useToast();
   const [calculationMessage, setCalculationMessage] = useState<string | null>(null);
   const [calculationError, setCalculationError] = useState<boolean>(false);
 
-  // Create a stable default value object by merging defaults with the actual profile
   const defaultValues = useMemo(() => ({
     ...getDefaultUserProfile(''),
     ...userProfile,
@@ -189,7 +189,6 @@ function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserPr
     defaultValues: defaultValues,
   });
   
-  // This effect synchronizes the form state if the userProfile from context changes.
   useEffect(() => {
     form.reset(defaultValues);
   }, [defaultValues, form.reset]);
@@ -206,7 +205,7 @@ function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserPr
   
   const onSubmit: SubmitHandler<UserInfoFormValues> = async (data) => {
     try {
-        await setUserInformation(data as Partial<UserProfileSettings>); 
+        await updateProfile(data as Partial<UserProfileSettings>); 
         toast({
           title: "User Information Saved",
           description: "Your profile details have been updated.",
@@ -561,21 +560,20 @@ function UserInfoForm({ userProfile, setUserInformation }: { userProfile: UserPr
 }
 
 export default function UserInfoPage() {
-  const { userProfile, setUserInformation, isAppDataLoading } = useAppContext();
+  const { user } = useAuth();
+  const { profile: userProfile, updateProfile, loading: isAppDataLoading } = useOptimizedProfile(user?.uid);
   
-  // Create a merged profile that includes defaults for any missing values.
-  // This ensures the form component always receives a complete profile object.
   const formProfile = useMemo(() => ({
-    ...getDefaultUserProfile(),
+    ...getDefaultUserProfile(user?.uid || ''),
     ...userProfile,
-  }), [userProfile]);
+  }), [userProfile, user?.uid]);
 
   return (
     <PageWrapper title="User Information">
       {isAppDataLoading ? (
         <UserInfoPageSkeleton />
       ) : (
-        <UserInfoForm userProfile={formProfile} setUserInformation={setUserInformation} />
+        <UserInfoForm userProfile={formProfile} updateProfile={updateProfile} />
       )}
     </PageWrapper>
   );

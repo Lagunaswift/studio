@@ -3,7 +3,8 @@
 
 import { useState, useMemo } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { useAppContext } from '@/context/AppContext';
+import { useOptimizedProfile, useOptimizedRecipes } from '@/hooks/useOptimizedFirestore';
+import { useAuth } from '@/context/AuthContext';
 import { ShoppingListItemComponent } from '@/components/shopping/ShoppingListItemComponent';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,7 +22,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { ShoppingListItem } from '@/types';
+import type { ShoppingListItem, PlannedMeal } from '@/types';
 import { parseIngredientString } from '@/lib/data';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -46,17 +47,27 @@ interface RecipeShoppingGroup {
 }
 
 export default function ShoppingListPage() {
-  const { shoppingList, toggleShoppingListItem, clearEntireMealPlan, mealPlan, allRecipesCache } = useAppContext();
+  const { user } = useAuth();
+  const { profile: userProfile, updateProfile } = useOptimizedProfile(user?.uid);
+  const { recipes: allRecipesCache } = useOptimizedRecipes(user?.uid);
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"aisle" | "recipe">("aisle");
 
+  const shoppingList = (userProfile?.shoppingList as ShoppingListItem[]) || [];
+  const mealPlan = (userProfile?.mealPlan as PlannedMeal[]) || [];
+
   const handleClearList = () => {
-    clearEntireMealPlan(); 
+    updateProfile({ mealPlan: [] }); 
     toast({
       title: "Meal Plan Cleared",
       description: "Your meal plan and shopping list have been cleared.",
     });
   };
+
+  const toggleShoppingListItem = (itemId: string) => {
+    const updatedShoppingList = shoppingList.map(item => item.id === itemId ? { ...item, purchased: !item.purchased } : item);
+    updateProfile({ shoppingList: updatedShoppingList as any });
+  }
 
   const groupedListByAisle: { [category: string]: ShoppingListItem[] } = useMemo(() => {
     if (activeTab !== 'aisle') return {};
@@ -72,11 +83,12 @@ export default function ShoppingListPage() {
     if (activeTab !== 'recipe') return [];
 
     return mealPlan.map(pm => {
-      const recipeDetails = pm.recipeDetails || allRecipesCache.find(r => r.id === pm.recipeId);
+      const recipeDetails = allRecipesCache.find(r => r.id === pm.recipeId);
       const ingredientsForRecipeView: IngredientForRecipeView[] = [];
 
       if (recipeDetails) {
-        recipeDetails.ingredients.forEach((ingStr, index) => {
+        recipeDetails.ingredients.forEach((ing, index) => {
+          const ingStr = typeof ing === 'string' ? ing : `${ing.quantity} ${ing.unit} ${ing.name}`;
           const parsedOriginal = parseIngredientString(ingStr);
           if (!parsedOriginal || parsedOriginal.name === 'non-item') return;
           const quantityForThisMeal = (parsedOriginal.quantity / recipeDetails.servings) * pm.servings;

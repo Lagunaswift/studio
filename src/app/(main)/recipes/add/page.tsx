@@ -5,33 +5,34 @@ import { PageWrapper } from '@/components/layout/PageWrapper';
 import { RecipeForm } from '@/components/recipes/RecipeForm';
 import type { RecipeFormData } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { useAppContext } from '@/context/AppContext';
+import { useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
+import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function AddRecipePage() {
-  const { addCustomRecipe } = useAppContext();
+  const { user } = useAuth();
+  const { updateProfile } = useOptimizedProfile(user?.uid);
   const { toast } = useToast();
   const router = useRouter();
 
   const handleSubmit = async (data: RecipeFormData) => {
     try {
-        const result = await addCustomRecipe(data);
+        const newRecipe = {
+          id: Date.now(),
+          ...data,
+          user_id: user?.uid,
+        };
 
-        if (result?.error) {
-            toast({
-                title: "Error",
-                description: result.error,
-                variant: "destructive",
-            });
-        } else {
-            toast({
-                title: "Recipe Added!",
-                description: `${data.name} has been added to your recipes.`,
-            });
-            router.push('/recipes');
-        }
+        // @ts-ignore
+        await updateProfile({ recipes: [newRecipe] });
+
+        toast({
+            title: "Recipe Added!",
+            description: `${data.name} has been added to your recipes.`,
+        });
+        router.push('/recipes');
     } catch(e: any) {
         toast({
             title: "Error",

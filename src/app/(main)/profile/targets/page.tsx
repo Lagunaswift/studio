@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useAppContext } from '@/context/AppContext';
+import { useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { MacroTargets, TrainingExperienceLevel } from '@/types';
 import { useEffect, useState, useMemo } from 'react';
@@ -31,7 +32,6 @@ const macroTargetSchema = z.object({
 
 type MacroTargetFormValues = z.infer<typeof macroTargetSchema>;
 
-// Local types for protein and fat suggestions
 interface ProteinSuggestion {
   minProteinGramsPerDay: number;
   maxProteinGramsPerDay: number;
@@ -46,7 +46,6 @@ interface FatSuggestion {
   justification: string;
 }
 
-// Local calculation functions (replacing AI calls)
 const calculateProteinIntake = (
   leanBodyMassKg: number,
   recommendationType: 'average' | 'safe' | 'flexible',
@@ -54,7 +53,6 @@ const calculateProteinIntake = (
   primaryGoal: string | null,
   unitPreference: 'g/kgLBM' | 'g/lbLBM' = 'g/kgLBM'
 ): ProteinSuggestion => {
-  // Lookup table from your AI prompt
   let factorGPerKg: number;
   
   switch (recommendationType) {
@@ -71,14 +69,10 @@ const calculateProteinIntake = (
       factorGPerKg = 2.35;
   }
   
-  // Calculate daily protein
   const dailyProteinGrams = Math.round(factorGPerKg * leanBodyMassKg);
-  
-  // Convert factor for display
-  const factorGPerLb = factorGPerKg * 0.453592; // Convert kg to lb
+  const factorGPerLb = factorGPerKg * 0.453592;
   const displayFactor = unitPreference === 'g/kgLBM' ? factorGPerKg : factorGPerLb;
   
-  // Generate justification (same templates as AI)
   let justification: string;
   const goalText = primaryGoal || 'your fitness goals';
   
@@ -153,7 +147,8 @@ const getMonthlyGainKg = (sex: 'male' | 'female' | null | 'notSpecified', level:
 };
 
 export default function DietaryTargetsPage() {
-  const { userProfile, setMacroTargets, setUserInformation } = useAppContext();
+  const { user } = useAuth();
+  const { profile: userProfile, updateProfile } = useOptimizedProfile(user?.uid);
   const { toast } = useToast();
   const [proteinSuggestion, setProteinSuggestion] = useState<ProteinSuggestion | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -227,7 +222,7 @@ export default function DietaryTargetsPage() {
         newTargetRateKg = (dailyDeficitOrSurplus * 7) / 7700;
     }
     
-    setUserInformation({
+    updateProfile({
       macroTargets: data,
       target_weight_change_rate_kg: newTargetRateKg
     });
@@ -254,14 +249,12 @@ export default function DietaryTargetsPage() {
       return;
     }
 
-    // Clear previous states
     setProteinSuggestion(null);
     setAiError(null);
     setFatSuggestion(null); 
     setFatSuggestionError(null);
 
     try {
-      // Use local calculation instead of AI API
       const suggestion = calculateProteinIntake(
         userProfile.leanBodyMassKg,
         recommendationType,

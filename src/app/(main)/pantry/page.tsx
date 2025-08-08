@@ -4,7 +4,8 @@
 
 import { useState, useEffect } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { useAppContext } from '@/context/AppContext';
+import { useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
+import { useAuth } from '@/context/AuthContext';
 import type { PantryItem, UKSupermarketCategory } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,7 +40,8 @@ const pantryItemSchema = z.object({
 type PantryItemFormValues = z.infer<typeof pantryItemSchema>;
 
 export default function PantryPage() {
-  const { pantryItems, addPantryItem, removePantryItem, updatePantryItemQuantity, assignIngredientCategory, isAppDataLoading } = useAppContext();
+  const { user } = useAuth();
+  const { profile: userProfile, updateProfile, loading: isAppDataLoading } = useOptimizedProfile(user?.uid);
   const { toast } = useToast();
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingQuantity, setEditingQuantity] = useState<number>(0);
@@ -47,6 +49,8 @@ export default function PantryPage() {
 
   const [expiredItems, setExpiredItems] = useState<PantryItem[]>([]);
   const [expiringSoonItems, setExpiringSoonItems] = useState<PantryItem[]>([]);
+
+  const pantryItems = (userProfile?.pantryItems as PantryItem[]) || [];
 
   const form = useForm<PantryItemFormValues>({
     resolver: zodResolver(pantryItemSchema),
@@ -88,8 +92,13 @@ export default function PantryPage() {
 
   const onSubmit: SubmitHandler<PantryItemFormValues> = (data) => {
     try {
-      const category = data.category || assignIngredientCategory(data.name);
-      addPantryItem(data.name, data.quantity, data.unit, category, data.expiryDate);
+      const category = data.category || 'Food Cupboard';
+      const newItem = {
+        id: `${Date.now()}`,
+        ...data,
+        category,
+      }
+      updateProfile({ pantryItems: [...pantryItems, newItem] as any });
       toast({
         title: "Item Added",
         description: `${data.quantity} ${data.unit} of ${data.name} added to your pantry.`,
@@ -125,6 +134,16 @@ export default function PantryPage() {
     }
   };
 
+  const updatePantryItemQuantity = (itemId: string, newQuantity: number) => {
+    const updatedPantry = pantryItems.map(item => item.id === itemId ? { ...item, quantity: newQuantity } : item);
+    updateProfile({ pantryItems: updatedPantry as any });
+  }
+
+  const removePantryItem = (itemId: string) => {
+    const updatedPantry = pantryItems.filter(item => item.id !== itemId);
+    updateProfile({ pantryItems: updatedPantry as any });
+  }
+
   const handleDirectQuantityUpdate = (itemId: string, newQuantityStr: string) => {
     const newQuantity = parseFloat(newQuantityStr);
     if (!isNaN(newQuantity)) {
@@ -153,9 +172,7 @@ export default function PantryPage() {
 
 
   const groupedPantryItems: { [category: string]: PantryItem[] } = pantryItems.reduce((acc, item) => {
-    if (item.syncStatus !== 'deleted') { // Do not show deleted items
-      (acc[item.category] = acc[item.category] || []).push(item);
-    }
+    (acc[item.category] = acc[item.category] || []).push(item);
     return acc;
   }, {} as { [category: string]: PantryItem[] });
 
@@ -328,7 +345,7 @@ export default function PantryPage() {
                               mode="single"
                               selected={selectedExpiryDate}
                               onSelect={(date) => {
-                                setSelectedExpiryDate(date);
+                                setSelectedExpiryDate(date as Date);
                                 field.onChange(date ? format(date, "yyyy-MM-dd") : undefined);
                               }}
                               disabled={(date) => date < startOfDay(new Date()) }
@@ -384,7 +401,6 @@ export default function PantryPage() {
                             <div className="flex-grow">
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">{item.name}</span>
-                                {item.syncStatus === 'pending' && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" title="Sync pending"/>}
                               </div>
                               {editingItemId === item.id ? (
                                 <div className="flex items-center gap-2 mt-1">

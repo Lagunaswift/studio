@@ -8,7 +8,7 @@ import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Target, Edit, Star, Loader2, CalendarCheck, PlusCircle, UtensilsCrossed, Zap, SlidersHorizontal, Scale, Save, Frown, Meh, Smile, BatteryLow, BatteryMedium, BatteryFull, CheckCircle2, Moon, Sun, Utensils, Droplets, BookOpen, BrainCircuit } from 'lucide-react';
-import { useAppContext } from '@/context/AppContext';
+import { useOptimizedRecipes, useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
 import { useAuth } from '@/context/AuthContext'; // <-- Import useAuth
 import { format, parseISO, isValid } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
@@ -53,13 +53,12 @@ const chartConfig = {
 export default function HomePage() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
+  const { profile: userProfile, loading: isProfileLoading, updateProfile } = useOptimizedProfile(user?.uid);
+  const { recipes: allRecipesCache, loading: isAppRecipeCacheLoading, error: recipesError } = useOptimizedRecipes(user?.uid);
+
 
   const {
     getConsumedMacrosForDate,
-    setMacroTargets,
-    allRecipesCache,
-    isRecipeCacheLoading: isAppRecipeCacheLoading,
-    userProfile: appContextUserProfile,
     getMealsForDate,
   } = useAppContext();
   const { toast } = useToast();
@@ -69,21 +68,18 @@ export default function HomePage() {
   const [featuredRecipe, setFeaturedRecipe] = useState<Recipe | null>(null);
   const [quickRecipe, setQuickRecipe] = useState<Recipe | null>(null);
 
-  const currentMacroTargets = appContextUserProfile?.macroTargets;
-  const welcomeName = appContextUserProfile?.name || appContextUserProfile?.email || user?.email || 'User';
+  const currentMacroTargets = userProfile?.macroTargets;
+  const welcomeName = userProfile?.name || userProfile?.email || user?.email || 'User';
 
   const {
     showMacros = true,
     showMenu = true,
     showFeaturedRecipe = true,
     showQuickRecipes = true,
-  } = appContextUserProfile?.dashboardSettings || {};
+  } = userProfile?.dashboardSettings || {};
 
   useEffect(() => {
-    // --- ADDED REDIRECT LOGIC ---
-    // Wait until the authentication check is complete
     if (!isAuthLoading && !user) {
-      // If the check is done and there is no user, redirect to login
       router.push('/login');
     }
   }, [user, isAuthLoading, router]);
@@ -156,7 +152,7 @@ export default function HomePage() {
   }, [currentMacroTargets, showSetTargetsDialog, macroTargetForm]);
 
   const handleSetTargets: SubmitHandler<MacroTargetFormValues> = async (data) => {
-    await setMacroTargets(data);
+    await updateProfile({ macroTargets: data });
     toast({
       title: "Targets Updated",
       description: "Your daily caloric and macro targets have been saved.",
@@ -176,9 +172,7 @@ export default function HomePage() {
   ] : [];
 
 
-  // --- ADDED LOADING STATE ---
-  // If still loading or no user, show a loading state to prevent flashing content
-  if (isAuthLoading || !user) {
+  if (isAuthLoading || !user || isProfileLoading) {
     return (
       <PageWrapper title="Loading Dashboard...">
         <div className="flex justify-center items-center min-h-[300px]">

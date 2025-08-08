@@ -5,7 +5,8 @@ import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Bot, Info, CookingPot, BadgePercent, CheckCircle2, AlertTriangle, Search, Lock } from 'lucide-react';
-import { useAppContext } from '@/context/AppContext';
+import { useOptimizedRecipes, useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
+import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -13,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { ProFeature } from '@/components/shared/ProFeature';
+import { optimizedAIService } from '@/lib/ai/OptimizedAIService';
 
 // ✅ Use type imports only - no direct flow imports
 type SuggestRecipesByIngredientsInput = {
@@ -44,7 +46,9 @@ type AIRecipeSuggestionResult = {
 };
 
 export default function AIRecipeFinderPage() {
-  const { allRecipesCache, isRecipeCacheLoading, userProfile, isSubscribed } = useAppContext();
+  const { user } = useAuth();
+  const { profile, loading: profileLoading } = useOptimizedProfile(user?.uid);
+  const { recipes: allRecipesCache, loading: isRecipeCacheLoading, error: recipesError } = useOptimizedRecipes(user?.uid);
   const { toast } = useToast();
 
   const [ingredients, setIngredients] = useState('');
@@ -66,47 +70,30 @@ export default function AIRecipeFinderPage() {
     setError(null);
     setSuggestion(null);
 
-    const recipesForAI: RecipeWithIngredients[] = allRecipesCache.map(r => ({
-      id: r.id,
-      name: r.name,
-      ingredients: r.ingredients.map(i => i.name),
-      tags: r.tags,
-      macrosPerServing: r.macrosPerServing,
-    }));
-    
     const userIngredients = ingredients.split(',').map(s => s.trim()).filter(Boolean);
 
-    const input: SuggestRecipesByIngredientsInput = {
-      userIngredients: userIngredients,
-      availableRecipes: recipesForAI,
-      dietaryPreferences: userProfile?.dietaryPreferences || [],
-      allergens: userProfile?.allergens || [],
-      maxResults: 5,
-    };
-
     try {
-      // ✅ CALL API ROUTE instead of AI flow directly
-      const response = await fetch('/api/ai/suggest-recipes', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(input),
-      });
+      const result = await optimizedAIService.generateRecipeSuggestions(
+        userIngredients,
+        {
+            dietType: profile?.dietaryPreferences?.join(', '),
+            allergens: profile?.allergens
+        }
+      );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result: AIRecipeSuggestionResult = await response.json();
-      setSuggestion(result);
-      
-      if (result.suggestedRecipes.length === 0) {
-        toast({
-            title: "No Matching Recipes Found",
-            description: "I couldn't find any recipes that closely match your ingredients and profile settings."
-        })
+      if (result.success) {
+        setSuggestion(result.data as any);
+        if (result.data?.recipes.length === 0) {
+            toast({
+                title: "No Matching Recipes Found",
+                description: "I couldn't find any recipes that closely match your ingredients and profile settings."
+            })
+        }
+      } else {
+          setError(result.error || 'Failed to get suggestions');
+          if(result.fallback) {
+            setSuggestion({ suggestedRecipes: result.fallback.recipes as any, aiGeneralNotes: "Could not connect to the AI, here is a fallback suggestion."});
+          }
       }
     } catch (err: any) {
       console.error("AI Recipe Suggestion Error:", err);
@@ -120,7 +107,7 @@ export default function AIRecipeFinderPage() {
     }
   };
 
-  if (!isSubscribed) {
+  if (!profile?.subscription_status || profile.subscription_status !== 'active') {
     return (
       <PageWrapper title="Preppy: Pantry Chef">
         <ProFeature 

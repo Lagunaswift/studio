@@ -28,7 +28,8 @@ import {
   ChevronRight,
   AlertTriangle 
 } from 'lucide-react';
-import { useAppContext } from '@/context/AppContext';
+import { useOptimizedRecipes, useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -62,7 +63,10 @@ const containsAllergenKeyword = (text: string, keywords: string[]): boolean => {
 };
 
 function RecipesPageComponent() {
-  const { userProfile, addMealToPlan, allRecipesCache, isRecipeCacheLoading, isRecipeFavorite, pantryItems } = useAppContext();
+  const { user } = useAuth();
+  const { profile: userProfile, updateProfile } = useOptimizedProfile(user?.uid);
+  const { recipes: allRecipesCache, loading: isRecipeCacheLoading } = useOptimizedRecipes(user?.uid);
+
   const { toast } = useToast();
   
   const router = useRouter();
@@ -102,6 +106,10 @@ function RecipesPageComponent() {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
+  const isRecipeFavorite = (recipeId: number) => {
+    return userProfile?.favorite_recipe_ids?.includes(recipeId) || false;
+  }
+
   const filteredRecipes = useMemo(() => {
     if (isRecipeCacheLoading) return [];
     
@@ -131,7 +139,6 @@ function RecipesPageComponent() {
           const keywords = ALLERGEN_KEYWORD_MAP[allergen.toLowerCase()];
           if (!keywords) return false;
           if (containsAllergenKeyword(recipe.name, keywords)) return true;
-          // ✅ FIXED: Handle ingredients properly - they are objects with name property
           if (recipe.ingredients && recipe.ingredients.some(ingredient => 
             containsAllergenKeyword(ingredient.name, keywords)
           )) return true;
@@ -153,7 +160,7 @@ function RecipesPageComponent() {
       recipes = recipes.filter(recipe => isRecipeFavorite(recipe.id));
     }
     return recipes;
-  }, [allRecipesCache, searchTerm, activeDietaryFilters, activeAllergenFilters, showFavoritesOnly, isRecipeFavorite, isRecipeCacheLoading]);
+  }, [allRecipesCache, searchTerm, activeDietaryFilters, activeAllergenFilters, showFavoritesOnly, isRecipeCacheLoading]);
   
   const finalRecipesForDisplay = useMemo(() => {
     const startIndex = (currentPage - 1) * recipesPerPage;
@@ -165,7 +172,6 @@ function RecipesPageComponent() {
     return Math.ceil(filteredRecipes.length / recipesPerPage);
   }, [filteredRecipes, recipesPerPage]);
   
-  // ✅ FIXED: Handle pantry match calculation properly for object ingredients
   const calculatePantryMatch = useCallback((recipe: Recipe, pantryItems: PantryItem[]) => {
       if (!pantryItems || pantryItems.length === 0 || !recipe.ingredients) {
         return { matched: 0, total: recipe.ingredients?.length || 0 };
@@ -175,7 +181,6 @@ function RecipesPageComponent() {
       let matchedCount = 0;
 
       recipe.ingredients.forEach(ingredientObj => {
-          // Ingredients are objects with name, quantity, unit properties
           if (!ingredientObj || !ingredientObj.name) return;
           const ingredientNameLower = ingredientObj.name.toLowerCase().trim();
           
@@ -200,7 +205,18 @@ function RecipesPageComponent() {
 
   const handleAddToMealPlan = () => {
     if (selectedRecipe && planDate && planMealType && planServings > 0) {
-      addMealToPlan(selectedRecipe, format(planDate, 'yyyy-MM-dd'), planMealType, planServings);
+      const newMeal = {
+        id: `${Date.now()}`,
+        recipeId: selectedRecipe.id,
+        date: format(planDate, 'yyyy-MM-dd'),
+        mealType: planMealType,
+        servings: planServings,
+        status: 'planned'
+      };
+      // @ts-ignore
+      const updatedMealPlan = [...(userProfile.mealPlan || []), newMeal];
+      updateProfile({ mealPlan: updatedMealPlan });
+
       toast({
         title: "Meal Added",
         description: `${selectedRecipe.name} added to your meal plan for ${format(planDate, 'PPP')} (${planMealType}).`,
@@ -213,7 +229,6 @@ function RecipesPageComponent() {
   };
 
   return (
-    // ✅ FIXED: Removed description prop that doesn't exist on PageWrapper
     <PageWrapper title="Recipes">
       <div className="mb-6 text-muted-foreground">
         Browse, search, and manage your recipe collection.
@@ -299,7 +314,7 @@ function RecipesPageComponent() {
         <>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {finalRecipesForDisplay.map((recipe) => {
-              const { matched, total } = calculatePantryMatch(recipe, pantryItems);
+              const { matched, total } = calculatePantryMatch(recipe, (userProfile?.pantryItems as PantryItem[]) || []);
               const matchPercentage = total > 0 ? (matched / total) * 100 : 0;
               let pantryMatchStatus: 'make' | 'almost' | null = null;
               if (matchPercentage >= 80) {
@@ -460,7 +475,6 @@ function RecipesPageComponent() {
 export default function RecipesPage() {
   return (
     <Suspense fallback={
-      // ✅ FIXED: Removed description prop here too
       <PageWrapper title="Recipes">
         <div className="flex justify-center items-center min-h-[200px]">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />

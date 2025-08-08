@@ -8,7 +8,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useAppContext } from '@/context/AppContext';
+import { useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState } from 'react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -33,7 +34,8 @@ const dietAndAllergensSchema = z.object({
 type DietAndAllergensFormValues = z.infer<typeof dietAndAllergensSchema>;
 
 export default function DietAndAllergensPage() {
-  const { userProfile, setUserInformation } = useAppContext();
+  const { user } = useAuth();
+  const { profile: userProfile, updateProfile } = useOptimizedProfile(user?.uid);
   const { toast } = useToast();
   
   const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -59,7 +61,7 @@ export default function DietAndAllergensPage() {
   const handleConfirmSubmit = async () => {
     if (formData) {
       try {
-        await setUserInformation({ 
+        await updateProfile({ 
             dietaryPreferences: formData.dietaryPreferences, 
             allergens: formData.allergens 
         });
@@ -94,7 +96,7 @@ export default function DietAndAllergensPage() {
     } else {
         // If no new allergens are added, or if allergens are only removed, save directly.
         try {
-            await setUserInformation({ 
+            await updateProfile({ 
                 dietaryPreferences: data.dietaryPreferences, 
                 allergens: data.allergens 
             });
