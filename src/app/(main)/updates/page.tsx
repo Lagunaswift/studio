@@ -1,56 +1,52 @@
 
 "use client";
 
-import { useState } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { reportBug } from '@/app/(main)/profile/actions';
-import { useAppContext } from '@/context/AppContext';
-import { Megaphone, Bug, CheckCircle, Lightbulb, Loader2, Send } from 'lucide-react';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
-
-export default function UpdatesAndFeedbackPage() {
-  const { userProfile } = useAppContext();
+export default function UpdatesPage() {
+  const [isBugReportOpen, setIsBugReportOpen] = useState(false);
   const [bugDescription, setBugDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionResult, setSubmissionResult] = useState<{ success: boolean; message: string } | null>(null);
+  const { user } = useAuth();
   const { toast } = useToast();
 
-  const handleBugSubmit = async () => {
-    if (!userProfile?.id) {
-       toast({
-        title: "Authentication Error",
-        description: "You must be logged in to report a bug.",
-        variant: "destructive",
-      });
-      return;
-    }
+  const handleBugReportSubmit = async () => {
     if (!bugDescription.trim()) {
       toast({
-        title: "Description Required",
-        description: "Please describe the bug before submitting.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Please provide a description of the bug.',
+        variant: 'destructive',
       });
       return;
     }
-
     setIsSubmitting(true);
-    setSubmissionResult(null);
-
     try {
-      const result = await reportBug(bugDescription, userProfile.id);
-      if (result.error) {
-        throw new Error(result.error);
+      const result = await reportBug(bugDescription, user?.uid || 'anonymous');
+      if (result.success) {
+        toast({
+          title: 'Bug Report Submitted',
+          description: 'Thank you for your feedback!',
+        });
+        setBugDescription('');
+        setIsBugReportOpen(false);
+      } else {
+        throw new Error(result.error || 'Failed to submit bug report.');
       }
-      setSubmissionResult({ success: true, message: "Thank you! Your bug report has been submitted and categorized by our AI." });
-      setBugDescription('');
     } catch (error: any) {
-      setSubmissionResult({ success: false, message: error.message || "An unexpected error occurred." });
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -58,88 +54,56 @@ export default function UpdatesAndFeedbackPage() {
 
   return (
     <PageWrapper title="Updates & Feedback">
-      <div className="grid md:grid-cols-2 gap-8">
-        {/* What's New Section */}
-        <Card className="shadow-lg">
+      <div className="space-y-8">
+        <Card>
           <CardHeader>
-            <CardTitle className="font-headline text-primary flex items-center">
-              <Megaphone className="w-6 h-6 mr-2 text-accent" />
-              What's New & Upcoming
-            </CardTitle>
-            <CardDescription>
-              Check out the latest updates and our roadmap for future features.
-            </CardDescription>
+            <CardTitle>What's New</CardTitle>
+            <CardDescription>Latest updates and features added to MealPlannerPro.</CardDescription>
           </CardHeader>
           <CardContent>
-             <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
-                <AccordionItem value="item-1">
-                  <AccordionTrigger>Version 1.0 - Initial Launch!</AccordionTrigger>
-                  <AccordionContent>
-                    <ul className="list-disc pl-5 space-y-2 text-sm">
-                        <li><span className="font-semibold text-primary">Core Functionality:</span> Recipe management, meal planning, and macro tracking are live.</li>
-                        <li><span className="font-semibold text-primary">AI Features:</span> Preppy can generate meal plans, suggest recipes from your pantry, and tweak existing recipes.</li>
-                        <li><span className="font-semibold text-primary">Pantry & Shopping List:</span> Keep track of your ingredients and automatically generate a shopping list.</li>
-                    </ul>
-                  </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="item-2">
-                  <AccordionTrigger>Coming Soon...</AccordionTrigger>
-                  <AccordionContent>
-                     <ul className="list-disc pl-5 space-y-2 text-sm">
-                        
-                        <li><span className="font-semibold text-accent">Advanced Analytics:</span> Deeper insights into your nutritional trends and progress over time.</li>
-                        <li><span className="font-semibold text-accent">Wearable Integrations:</span> Sync your activity data from popular fitness trackers.</li>
-                    </ul>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
+            {/* You can map over a list of updates here */}
+            <p>Stay tuned for exciting new features!</p>
           </CardContent>
         </Card>
 
-        {/* Bug Reporting Section */}
-        <Card className="shadow-lg">
+        <Card>
           <CardHeader>
-            <CardTitle className="font-headline text-primary flex items-center">
-              <Bug className="w-6 h-6 mr-2 text-destructive" />
-              Report a Bug
-            </CardTitle>
+            <CardTitle>Feedback & Bug Reports</CardTitle>
             <CardDescription>
-              Found something that's not working right? Let us know! Our AI will analyze and categorize your report to help us fix it faster.
+              Have a suggestion or encountered a bug? Let us know!
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Textarea
-              placeholder="Please describe the bug in detail. What were you doing? What did you expect to happen? What actually happened?"
-              rows={6}
-              value={bugDescription}
-              onChange={(e) => setBugDescription(e.target.value)}
-              disabled={isSubmitting}
-            />
-            {submissionResult && (
-              <Alert variant={submissionResult.success ? 'default' : 'destructive'} className={submissionResult.success ? 'border-green-500' : ''}>
-                {submissionResult.success ? <CheckCircle className="h-4 w-4" /> : <Lightbulb className="h-4 w-4" />}
-                <AlertTitle>{submissionResult.success ? 'Submission Successful' : 'Submission Failed'}</AlertTitle>
-                <AlertDescription>{submissionResult.message}</AlertDescription>
-              </Alert>
-            )}
+          <CardContent>
+            <Button onClick={() => setIsBugReportOpen(true)}>Report a Bug</Button>
           </CardContent>
-          <CardFooter>
-            <Button onClick={handleBugSubmit} disabled={isSubmitting || !bugDescription.trim()}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <Send className="mr-2 h-4 w-4" />
-                  Submit Report
-                </>
-              )}
-            </Button>
-          </CardFooter>
         </Card>
       </div>
+
+      <Dialog open={isBugReportOpen} onOpenChange={setIsBugReportOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Report a Bug</DialogTitle>
+            <DialogDescription>
+              Please describe the issue you're facing in as much detail as possible.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              value={bugDescription}
+              onChange={(e) => setBugDescription(e.target.value)}
+              placeholder="E.g., When I click the 'Save Recipe' button, the page crashes."
+              rows={5}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBugReportOpen(false)}>Cancel</Button>
+            <Button onClick={handleBugReportSubmit} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Submit Report
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageWrapper>
   );
 }
