@@ -298,7 +298,7 @@ export default function AISuggestionsPage() {
   const [dailyUsageCount, setDailyUsageCount] = useState(0);
 
   // Free tier limits
-  const FREE_DAILY_GENERATIONS = 3;
+  const FREE_DAILY_GENERATIONS = 1;
 
   const userSettingsToUse = userProfile;
 
