@@ -16,10 +16,10 @@ export interface SubscriptionLimits {
 
 export const SUBSCRIPTION_LIMITS: Record<SubscriptionTier, SubscriptionLimits> = {
   free: {
-    aiRequestsPerDay: 10,
-    aiRequestsPerMonth: 100,
-    maxRecipes: 25,
-    mealPlanDaysPerMonth: 30, // 1 month of basic meal planning
+    aiRequestsPerDay: 3,        // Reduced from 10
+    aiRequestsPerMonth: 25,     // Reduced from 100
+    maxRecipes: 10,             // Reduced from 25
+    mealPlanDaysPerMonth: 15,   // Reduced from 30
     features: {
       advancedAI: false,
       exportData: false,
@@ -28,10 +28,10 @@ export const SUBSCRIPTION_LIMITS: Record<SubscriptionTier, SubscriptionLimits> =
     },
   },
   premium: {
-    aiRequestsPerDay: 150,
-    aiRequestsPerMonth: 2000,
-    maxRecipes: -1, // Unlimited
-    mealPlanDaysPerMonth: -1, // Unlimited
+    aiRequestsPerDay: 5,        // Reduced from 150
+    aiRequestsPerMonth: 100,    // Reduced from 2000  
+    maxRecipes: -1,             // Unlimited
+    mealPlanDaysPerMonth: -1,   // Unlimited
     features: {
       advancedAI: true,
       exportData: true,
