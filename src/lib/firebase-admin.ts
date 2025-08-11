@@ -11,20 +11,28 @@ if (!getApps().length) {
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
+  // Only throw error in runtime, not during build
   if (!projectId || !clientEmail || !privateKey) {
-    throw new Error('Missing Firebase configuration: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are required');
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Missing Firebase configuration: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are required');
+    } else {
+      console.warn('Firebase admin configuration incomplete, using default project ID for build');
+      adminApp = initializeApp({ 
+        projectId: projectId || 'build-placeholder'
+      });
+    }
+  } else {
+    const serviceAccount = {
+      projectId,
+      clientEmail,
+      privateKey: privateKey.replace(/\\n/g, '\n'), // Handle newlines properly
+    };
+
+    adminApp = initializeApp({
+      credential: cert(serviceAccount),
+      projectId,
+    });
   }
-
-  const serviceAccount = {
-    projectId,
-    clientEmail,
-    privateKey: privateKey.replace(/\\n/g, '\n'), // Handle newlines properly
-  };
-
-  adminApp = initializeApp({
-    credential: cert(serviceAccount),
-    projectId,
-  });
 } else {
   adminApp = getApps()[0];
 }

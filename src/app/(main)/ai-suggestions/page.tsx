@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { ProFeature } from '@/components/shared/ProFeature';
 import { checkSubscriptionLimit, trackUsage } from '@/lib/subscriptionVerification';
 import { MiniUpgradeButton } from '@/components/subscription/CheckoutButton';
+import { safeLocalStorage } from '@/lib/safe-storage';
 
 // Your actual recipe data structure (macros as individual properties)
 interface RecipeWithDirectMacros {
@@ -307,7 +308,7 @@ export default function AISuggestionsPage() {
     
     const today = format(new Date(), 'yyyy-MM-dd');
     const storageKey = `ai_usage_${user.uid}_${today}`;
-    const storedCount = localStorage.getItem(storageKey);
+    const storedCount = safeLocalStorage.getItem(storageKey);
     setDailyUsageCount(storedCount ? parseInt(storedCount, 10) : 0);
   }, [user]);
 
@@ -337,7 +338,7 @@ export default function AISuggestionsPage() {
     const storageKey = `ai_usage_${user.uid}_${today}`;
     const newCount = dailyUsageCount + 1;
     
-    localStorage.setItem(storageKey, newCount.toString());
+    safeLocalStorage.setItem(storageKey, newCount.toString());
     setDailyUsageCount(newCount);
   };
 

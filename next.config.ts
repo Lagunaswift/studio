@@ -84,6 +84,10 @@ const nextConfig: NextConfig = {
         '@google-cloud/logging': 'commonjs @google-cloud/logging',
         '@google-cloud/opentelemetry-cloud-trace-exporter': 'commonjs @google-cloud/opentelemetry-cloud-trace-exporter',
         '@grpc/grpc-js': 'commonjs @grpc/grpc-js',
+        // OpenTelemetry modules (server-only)
+        '@opentelemetry/auto-instrumentations-node': 'commonjs @opentelemetry/auto-instrumentations-node',
+        '@opentelemetry/sdk-node': 'commonjs @opentelemetry/sdk-node',
+        '@opentelemetry/api': 'commonjs @opentelemetry/api',
         // Firebase Admin (server-only)
         'firebase-admin': 'commonjs firebase-admin',
         // Genkit server modules

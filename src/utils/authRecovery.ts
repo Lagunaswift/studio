@@ -1,4 +1,5 @@
 import { getAuth, signOut } from 'firebase/auth';
+import { safeLocalStorage, safeSessionStorage } from '@/lib/safe-storage';
 
 interface FirebaseError extends Error {
   code?: string;
@@ -73,11 +74,11 @@ export class AuthRecoveryManager {
         
         // Update stored token if using localStorage/sessionStorage
         if (typeof window !== 'undefined') {
-          const storageKey = localStorage.getItem('authToken') ? 'authToken' : 
-                           sessionStorage.getItem('authToken') ? 'authToken' : null;
+          const storageKey = safeLocalStorage.getItem('authToken') ? 'authToken' : 
+                           safeSessionStorage.getItem('authToken') ? 'authToken' : null;
           
           if (storageKey) {
-            const storage = localStorage.getItem('authToken') ? localStorage : sessionStorage;
+            const storage = safeLocalStorage.getItem('authToken') ? safeLocalStorage : safeSessionStorage;
             storage.setItem(storageKey, newToken);
           }
         }
@@ -97,8 +98,8 @@ export class AuthRecoveryManager {
     
     // Clear invalid token
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('authToken');
-      sessionStorage.removeItem('authToken');
+      safeLocalStorage.removeItem('authToken');
+      safeSessionStorage.removeItem('authToken');
       
       // Clear cookie
       document.cookie = 'authToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
@@ -163,8 +164,8 @@ export class AuthRecoveryManager {
     
     // Clear all auth-related storage
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('authToken');
-      sessionStorage.removeItem('authToken');
+      safeLocalStorage.removeItem('authToken');
+      safeSessionStorage.removeItem('authToken');
       document.cookie = 'authToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
       
       // Redirect to login

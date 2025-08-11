@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { X, Download, Smartphone, Monitor, Share, Apple } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { safeLocalStorage } from '@/lib/safe-storage';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -28,7 +29,7 @@ export function EnhancedPWAInstaller() {
     setIsInstalled(standalone);
 
     // Check dismissal history
-    const dismissed = localStorage.getItem('pwa-install-dismissed');
+    const dismissed = safeLocalStorage.getItem('pwa-install-dismissed');
     const lastDismissed = dismissed ? parseInt(dismissed) : 0;
     const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
     
@@ -99,7 +100,7 @@ export function EnhancedPWAInstaller() {
 
   const handleDismiss = () => {
     setShowInstallBanner(false);
-    localStorage.setItem('pwa-install-dismissed', Date.now().toString());
+    safeLocalStorage.setItem('pwa-install-dismissed', Date.now().toString());
     
     if (typeof window.gtag !== 'undefined') {
       window.gtag('event', 'pwa_install_dismissed');

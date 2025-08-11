@@ -1,3 +1,5 @@
+import { safeLocalStorage } from './safe-storage';
+
 class BackgroundSyncManager {
   private offlineActions: Array<{
     id: string;
@@ -110,7 +112,7 @@ class BackgroundSyncManager {
 
   private loadOfflineActions(): void {
     try {
-      const stored = localStorage.getItem('offline-actions');
+      const stored = safeLocalStorage.getItem('offline-actions');
       if (stored) {
         this.offlineActions = JSON.parse(stored);
       }
@@ -122,7 +124,7 @@ class BackgroundSyncManager {
 
   private saveOfflineActions(): void {
     try {
-      localStorage.setItem('offline-actions', JSON.stringify(this.offlineActions));
+      safeLocalStorage.setItem('offline-actions', JSON.stringify(this.offlineActions));
     } catch (error) {
       console.error('Failed to save offline actions:', error);
     }

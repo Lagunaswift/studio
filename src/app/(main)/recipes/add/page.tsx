@@ -2,7 +2,7 @@
 "use client";
 
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { RecipeForm } from '@/components/recipes/RecipeForm';
+import RecipeForm from '@/components/recipes/RecipeForm';
 import type { RecipeFormData } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useOptimizedProfile } from '@/hooks/useOptimizedFirestore';

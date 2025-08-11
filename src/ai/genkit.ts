@@ -3,8 +3,14 @@ import { googleAI } from '@genkit-ai/googleai';
 import { enableFirebaseTelemetry } from '@genkit-ai/firebase';
 import { genkit } from 'genkit';
 
-//enable Firebase telemetry
-enableFirebaseTelemetry();
+//enable Firebase telemetry only in production with proper Firebase config
+if (process.env.NODE_ENV === 'production' && process.env.FIREBASE_PROJECT_ID) {
+  try {
+    enableFirebaseTelemetry();
+  } catch (error) {
+    console.warn('Firebase telemetry could not be enabled:', error);
+  }
+}
 
 // Configure the Genkit instance - THIS is what you need to export
 export const ai = genkit({

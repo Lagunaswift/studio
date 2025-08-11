@@ -7,14 +7,23 @@ import {
   getCurrentMonthString,
   SubscriptionTier
 } from '@/config/subscriptionLimits';
+import { safeLocalStorage } from '@/lib/safe-storage';
 
 const USAGE_STORAGE_KEY = 'meal_planner_usage';
 
 export class UsageTracker {
   private storage: Storage;
   
-  constructor(storage: Storage = localStorage) {
-    this.storage = storage;
+  constructor(storage?: Storage) {
+    // Use safeLocalStorage by default, fallback to provided storage
+    this.storage = storage || {
+      getItem: (key: string) => safeLocalStorage.getItem(key),
+      setItem: (key: string, value: string) => safeLocalStorage.setItem(key, value),
+      removeItem: (key: string) => safeLocalStorage.removeItem(key),
+      clear: () => safeLocalStorage.clear(),
+      length: 0,
+      key: () => null
+    };
   }
   
   // Get current usage for user
@@ -227,7 +236,7 @@ export async function loadUsageFromFirebase(userId: string): Promise<void> {
       
       // Merge with local usage (keep the most recent)
       if (firebaseUsage.syncedAt && firebaseUsage.syncedAt > localUsage.lastUpdated) {
-        localStorage.setItem(`${USAGE_STORAGE_KEY}_${userId}`, JSON.stringify(firebaseUsage));
+        safeLocalStorage.setItem(`${USAGE_STORAGE_KEY}_${userId}`, JSON.stringify(firebaseUsage));
         console.log('✅ Usage loaded from Firebase');
       }
     }

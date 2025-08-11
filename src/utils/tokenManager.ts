@@ -1,6 +1,7 @@
 
 // src/utils/tokenManager.ts
 import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
+import { safeLocalStorage } from '@/lib/safe-storage';
 
 export class TokenManager {
   private currentToken: string | null = null;
@@ -69,7 +70,7 @@ export class TokenManager {
 
       this.currentToken = token;
       this.tokenExpiry = payload.exp * 1000;
-      localStorage.setItem('authToken', token); // Ensure token is stored
+      safeLocalStorage.setItem('authToken', token); // Ensure token is stored
 
       console.log('Token refreshed successfully');
       console.log('Token expires at:', new Date(this.tokenExpiry));
@@ -155,7 +156,7 @@ export class TokenManager {
   private clearToken(): void {
     this.currentToken = null;
     this.tokenExpiry = null;
-    localStorage.removeItem('authToken');
+    safeLocalStorage.removeItem('authToken');
     if (this.refreshTimer) {
       clearTimeout(this.refreshTimer);
       this.refreshTimer = null;
