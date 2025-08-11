@@ -26,6 +26,7 @@ yarn-error.log*
 next-env.d.ts
 
 # local env files
+.env
 .env.local
 .env.development.local
 .env.test.local
@@ -37,6 +38,11 @@ next-env.d.ts
 # Firebase
 serviceaccount.json
 firebase-debug.log
-.next/
-.next/
-.next/
+ui-debug.log
+firebase-debug.*.log
+
+# Genkit
+.genkit/
+
+# AI generated content
+prompts/*.json

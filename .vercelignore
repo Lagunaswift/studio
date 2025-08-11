@@ -1,0 +1,41 @@
+# Development files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Documentation
+*.md
+!README.md
+
+# Development tools
+.vscode/
+.idea/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Firebase emulator
+.firebase/
+firebase-debug.log
+ui-debug.log
+firebase-debug.*.log
+
+# Genkit development
+.genkit/
+
+# Test files
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# Source maps in production
+**/*.map
+
+# Scripts
+scripts/
+seed-*.ts
