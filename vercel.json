@@ -1,20 +1,4 @@
 {
-  "functions": {
-    "src/app/api/ai/**": {
-      "runtime": "nodejs18.x",
-      "maxDuration": 300,
-      "memory": 1024
-    },
-    "src/app/api/genkit/**": {
-      "runtime": "nodejs18.x",
-      "maxDuration": 300,
-      "memory": 1024
-    },
-    "src/app/api/**": {
-      "runtime": "nodejs18.x",
-      "maxDuration": 60
-    }
-  },
   "headers": [
     {
       "source": "/_next/static/(.*)",

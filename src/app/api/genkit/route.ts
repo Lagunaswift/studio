@@ -2,6 +2,9 @@ import { proCoachFlow } from '@/ai/flows/pro-coach-flow';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
+export const runtime = 'nodejs';
+export const maxDuration = 300;
+
 // Define input validation schema to match the ProCoachInputSchema in schemas.ts
 const ProCoachInputSchema = z.object({
   primaryGoal: z.enum(['fatLoss', 'muscleGain', 'maintenance', 'notSpecified']),

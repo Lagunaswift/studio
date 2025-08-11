@@ -2,6 +2,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { suggestMealPlanFlow, type SuggestMealPlanInput, type SuggestMealPlanOutput } from '@/ai/flows/suggest-meal-plan';
 
+export const runtime = 'nodejs';
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest) {
   try {
     const body: SuggestMealPlanInput = await request.json();
