@@ -1,6 +1,6 @@
 import { MetadataRoute } from 'next';
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mealplannerpro.com';
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mealpreppypro.com';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticRoutes = [

@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'MealPlannerPro',
+    title: 'MealPreppyPro',
     startupImage: [
       '/icons/apple-splash-2048-2732.png',
       '/icons/apple-splash-1668-2224.png',

@@ -1,11 +1,11 @@
 //src/ai/flows/app-guide-context.ts
 
 export const APP_GUIDE_CONTEXT = `
-# MealPlannerPro
+# MealPreppyPro
 
 ## 🚀 Your Intelligent Adaptive Nutrition Coach
 
-MealPlannerPro is a comprehensive, AI-powered meal planning application designed to help you achieve your health and fitness goals. Whether you want to lose fat, build muscle, or simply maintain a healthy lifestyle, our adaptive coaching system, "Preppy," analyzes your progress and adjusts your targets to keep you on track.
+MealPreppyPro is a comprehensive, AI-powered meal planning application designed to help you achieve your health and fitness goals. Whether you want to lose fat, build muscle, or simply maintain a healthy lifestyle, our adaptive coaching system, "Preppy," analyzes your progress and adjusts your targets to keep you on track.
 
 ---
 
@@ -43,7 +43,7 @@ Smart inventory management that saves you time and money.
 Leverage the power of generative AI for a truly personalized experience with your coach, Preppy.
 - **Preppy: Plan Generator**: Let Preppy create a complete, one-day meal plan for you based on your macro targets, meal structure, dietary preferences, and available recipes.
 - **Preppy: Pantry Chef**: Don't know what to make? Enter the ingredients you have, and Preppy will suggest the best recipes from your collection that you can make right now, scoring them based on how well they use your ingredients.
-- **Preppy: Weekly Check-in**: This is the core of MealPlannerPro's intelligence. After 14 days of data, the weekly check-in analyzes your weight trend and actual calorie intake to calculate your true energy expenditure (TDEE). Preppy then provides a coaching summary and recommends new, optimized macro targets to ensure you stay on track with your goals.
+- **Preppy: Weekly Check-in**: This is the core of MealPreppyPro's intelligence. After 14 days of data, the weekly check-in analyzes your weight trend and actual calorie intake to calculate your true energy expenditure (TDEE). Preppy then provides a coaching summary and recommends new, optimized macro targets to ensure you stay on track with your goals.
 - **Preppy: App Help**: Have a question about how the app works or a general nutrition query? Click the floating robot icon to ask Preppy anything!
 
 ### ⚙️ Comprehensive Profile & Goal Setting

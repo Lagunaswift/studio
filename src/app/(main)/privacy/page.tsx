@@ -12,7 +12,7 @@ export default function PrivacyPolicyPage() {
           </CardHeader>
           <CardContent>
             <p>
-              This Privacy Policy explains how MealPlannerPro Ltd. ("we," "us," or "our") collects, uses, and discloses your information when you use our MealPlannerPro application (the "Service"). This policy is designed to comply with UK GDPR.
+              This Privacy Policy explains how MealPreppyPro Ltd. ("we," "us," or "our") collects, uses, and discloses your information when you use our MealPreppyPro application (the "Service"). This policy is designed to comply with UK GDPR.
             </p>
           </CardContent>
         </Card>

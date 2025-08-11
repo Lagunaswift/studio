@@ -272,7 +272,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         }
       }
     }
-    return bestMatch ? bestMatch.label : "MealPlannerPro";
+    return bestMatch ? bestMatch.label : "MealPreppyPro";
   };
   
   const currentPageTitle = getCurrentPageTitle();
@@ -286,11 +286,11 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             <div className="group-data-[collapsible=icon]:hidden">
               {isMobile ? (
                  <SheetTitle className="text-xl font-bold font-headline text-sidebar-primary">
-                   MealPlanner<span className="text-sidebar-accent">Pro</span>
+                   MealPreppy<span className="text-sidebar-accent">Pro</span>
                  </SheetTitle>
               ) : (
                 <h1 id="sidebar-title" className="text-xl font-bold font-headline text-sidebar-primary">
-                  MealPlanner<span className="text-sidebar-accent">Pro</span>
+                  MealPreppy<span className="text-sidebar-accent">Pro</span>
                 </h1>
               )}
             </div>

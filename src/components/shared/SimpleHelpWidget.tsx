@@ -122,7 +122,7 @@ export function SimpleHelpWidget() {
               Preppy Assistant
             </DialogTitle>
             <DialogDescription>
-              Quick actions and help for MealPlannerPro
+              Quick actions and help for MealPreppyPro
             </DialogDescription>
           </DialogHeader>
           
@@ -181,7 +181,7 @@ export function SimpleHelpWidget() {
                   <BookOpen className="w-5 h-5 mr-3 text-blue-600" />
                   <div className="text-left">
                     <p className="font-medium text-sm">App Guide</p>
-                    <p className="text-xs text-gray-600">Learn how to use MealPlannerPro</p>
+                    <p className="text-xs text-gray-600">Learn how to use MealPreppyPro</p>
                   </div>
                 </Button>
                 

@@ -121,7 +121,7 @@ export function EnhancedPWAInstaller() {
                 <div className="flex-1 mr-3">
                   <div className="flex items-center mb-2">
                     <Smartphone className="h-5 w-5 mr-2" />
-                    <span className="font-semibold">Install MealPlannerPro</span>
+                    <span className="font-semibold">Install MealPreppyPro</span>
                   </div>
                   <p className="text-sm text-blue-100 mb-3">
                     ✨ Get offline access, push notifications, and faster loading!
@@ -168,7 +168,7 @@ export function EnhancedPWAInstaller() {
                 <Apple className="h-12 w-12 mx-auto mb-3 text-gray-600" />
                 <h3 className="text-lg font-semibold mb-2">Install on iOS</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Add MealPlannerPro to your home screen for the best experience
+                  Add MealPreppyPro to your home screen for the best experience
                 </p>
               </div>
               

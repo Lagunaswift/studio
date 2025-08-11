@@ -14,11 +14,11 @@ interface SEOConfig {
 }
 
 const baseConfig = {
-  siteName: 'MealPlannerPro',
-  siteUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://mealplannerpro.com',
+  siteName: 'MealPreppyPro',
+  siteUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://mealpreppypro.com',
   defaultImage: '/icons/og-image.png',
-  twitterHandle: '@MealPlannerPro',
-  author: 'MealPlannerPro Team',
+  twitterHandle: '@MealPreppyPro',
+  author: 'MealPreppyPro Team',
 };
 
 export function generateMetadata(config: SEOConfig): Metadata {
@@ -108,7 +108,7 @@ export function generateMetadata(config: SEOConfig): Metadata {
 }
 
 export const defaultMetadata = generateMetadata({
-  title: 'MealPlannerPro - AI-Powered Smart Nutrition & Meal Planning',
+  title: 'MealPreppyPro - AI-Powered Smart Nutrition & Meal Planning',
   description: 'Transform your nutrition with AI-powered meal planning. Get personalized meal plans, track macros, manage recipes, and create smart shopping lists. Start your healthy eating journey today!',
   keywords: [
     'meal planning',
@@ -155,9 +155,9 @@ export function generateWebsiteJsonLd() {
       'query-input': 'required name=search_term_string',
     },
     sameAs: [
-      'https://twitter.com/MealPlannerPro',
-      'https://facebook.com/MealPlannerPro',
-      'https://instagram.com/MealPlannerPro',
+      'https://twitter.com/MealPreppyPro',
+      'https://facebook.com/MealPreppyPro',
+      'https://instagram.com/MealPreppyPro',
     ],
   };
 }
@@ -177,9 +177,9 @@ export function generateOrganizationJsonLd() {
       availableLanguage: 'English',
     },
     sameAs: [
-      'https://twitter.com/MealPlannerPro',
-      'https://facebook.com/MealPlannerPro',
-      'https://instagram.com/MealPlannerPro',
+      'https://twitter.com/MealPreppyPro',
+      'https://facebook.com/MealPreppyPro',
+      'https://instagram.com/MealPreppyPro',
     ],
   };
 }

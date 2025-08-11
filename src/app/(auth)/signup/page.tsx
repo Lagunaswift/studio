@@ -69,7 +69,7 @@ export default function SignupPage() {
         <CardHeader>
           <CardTitle className="text-2xl">Create an Account</CardTitle>
           <CardDescription>
-            Join MealPlannerPro to start your personalized nutrition journey.
+            Join MealPreppyPro to start your personalized nutrition journey.
           </CardDescription>
         </CardHeader>
         <CardContent>

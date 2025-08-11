@@ -58,7 +58,7 @@ export default function UpdatesPage() {
         <Card>
           <CardHeader>
             <CardTitle>What's New</CardTitle>
-            <CardDescription>Latest updates and features added to MealPlannerPro.</CardDescription>
+            <CardDescription>Latest updates and features added to MealPreppyPro.</CardDescription>
           </CardHeader>
           <CardContent>
             {/* You can map over a list of updates here */}

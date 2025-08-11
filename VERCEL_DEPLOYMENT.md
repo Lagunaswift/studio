@@ -1,6 +1,6 @@
-# Vercel Deployment Guide for MealPlannerPro
+# Vercel Deployment Guide for MealPreppyPro
 
-This guide walks through deploying the Next.js 15 MealPlannerPro application to Vercel.
+This guide walks through deploying the Next.js 15 MealPreppyPro application to Vercel.
 
 ## Prerequisites
 

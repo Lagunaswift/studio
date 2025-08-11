@@ -94,7 +94,7 @@ const sections: GuideSection[] = [
     icon: UserCog,
     title: "Profile Settings Deep Dive",
     content: [
-      "Keeping your <strong>Profile Settings</strong> up-to-date is key to personalizing your MealPlannerPro experience.",
+      "Keeping your <strong>Profile Settings</strong> up-to-date is key to personalizing your MealPreppyPro experience.",
       "<strong>User Info:</strong> Basic details like name, email, height, weight, age, sex, and activity level. This data helps calculate your TDEE (Total Daily Energy Expenditure) and LBM (Lean Body Mass), which can guide your macro targets. You can also input body measurements to estimate Body Fat % using the Navy method.",
       "<strong>Targets:</strong> Set your daily caloric and macronutrient (protein, carbs, fat) goals here. I can help suggest protein and fat intake based on your LBM, TDEE and goals.",
       "<strong>Diet Type:</strong> Specify preferences like Vegetarian, Vegan, etc. This influences recipe filtering and my suggestions.",
@@ -106,9 +106,9 @@ const sections: GuideSection[] = [
 
 export default function GuidePage() {
   return (
-    <PageWrapper title="Welcome to MealPlannerPro! Your App Guide">
+    <PageWrapper title="Welcome to MealPreppyPro! Your App Guide">
       <p className="mb-6 text-lg text-muted-foreground">
-        This guide will walk you through the main features of MealPlannerPro to help you get the most out of your meal planning experience.
+        This guide will walk you through the main features of MealPreppyPro to help you get the most out of your meal planning experience.
       </p>
       <Accordion type="single" collapsible className="w-full space-y-4">
         {sections.map((section, index) => (
@@ -141,7 +141,7 @@ export default function GuidePage() {
         </CardHeader>
         <CardContent>
           <p className="text-foreground/90 text-base">
-            The more accurately you set up your <a href="/profile/user-info" className="text-accent font-semibold underline hover:text-accent/80">User Info</a>, <a href="/profile/targets" className="text-accent font-semibold underline hover:text-accent/80">Targets</a>, <a href="/profile/diet-type" className="text-accent font-semibold underline hover:text-accent/80">Diet Type</a>, <a href="/profile/allergens" className="text-accent font-semibold underline hover:text-accent/80">Allergens</a>, and <a href="/profile/meal-structure" className="text-accent font-semibold underline hover:text-accent/80">Meal Structure</a>, the better MealPlannerPro can assist you, especially with AI-powered suggestions and recipe filtering. Also, keeping your <a href="/pantry" className="text-accent font-semibold underline hover:text-accent/80">Pantry</a> updated ensures your shopping lists are accurate!
+            The more accurately you set up your <a href="/profile/user-info" className="text-accent font-semibold underline hover:text-accent/80">User Info</a>, <a href="/profile/targets" className="text-accent font-semibold underline hover:text-accent/80">Targets</a>, <a href="/profile/diet-type" className="text-accent font-semibold underline hover:text-accent/80">Diet Type</a>, <a href="/profile/allergens" className="text-accent font-semibold underline hover:text-accent/80">Allergens</a>, and <a href="/profile/meal-structure" className="text-accent font-semibold underline hover:text-accent/80">Meal Structure</a>, the better MealPreppyPro can assist you, especially with AI-powered suggestions and recipe filtering. Also, keeping your <a href="/pantry" className="text-accent font-semibold underline hover:text-accent/80">Pantry</a> updated ensures your shopping lists are accurate!
           </p>
         </CardContent>
       </Card>
