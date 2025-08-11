@@ -1,21 +1,20 @@
 {
-  "framework": "nextjs",
-  "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
-  "installCommand": "npm install",
-  "regions": ["iad1"],
   "functions": {
-    "src/app/api/**/*.ts": {
-      "runtime": "nodejs20.x",
+    "src/app/api/ai/**": {
+      "runtime": "nodejs18.x",
+      "maxDuration": 300,
+      "memory": 1024
+    },
+    "src/app/api/genkit/**": {
+      "runtime": "nodejs18.x",
+      "maxDuration": 300,
+      "memory": 1024
+    },
+    "src/app/api/**": {
+      "runtime": "nodejs18.x",
       "maxDuration": 60
     }
   },
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    }
-  ],
   "headers": [
     {
       "source": "/_next/static/(.*)",
@@ -52,13 +51,5 @@
         }
       ]
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  },
-  "build": {
-    "env": {
-      "NODE_OPTIONS": "--max-old-space-size=4096"
-    }
-  }
+  ]
 }

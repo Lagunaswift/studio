@@ -7,10 +7,10 @@ import { OptimizedAppProvider } from '@/context/OptimizedAppContext';
 import { AppProvider } from '@/context/AppContext'; // ADD THIS IMPORT
 import { AuthProvider } from '@/context/AuthContext';
 import { ThemeProvider } from "next-themes";
+import { defaultMetadata, generateWebsiteJsonLd, generateOrganizationJsonLd } from '@/lib/seo';
 
 export const metadata: Metadata = {
-  title: 'MealPlannerPro - Smart Nutrition & Meal Planning',
-  description: 'AI-powered meal planning with nutrition tracking, recipe management, and smart shopping lists',
+  ...defaultMetadata,
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
@@ -29,22 +29,20 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false
   },
-  openGraph: {
-    type: 'website',
-    siteName: 'MealPlannerPro',
-    title: 'MealPlannerPro - Smart Nutrition & Meal Planning',
-    description: 'AI-powered meal planning with nutrition tracking',
-    images: ['/og-image.png']
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'MealPlannerPro - Smart Nutrition & Meal Planning',
-    description: 'AI-powered meal planning with nutrition tracking',
-    images: ['/twitter-image.png']
-  },
   icons: {
-    icon: '/icons/icon-192x192.png',
-    apple: '/icons/apple-icon-180x180.png'
+    icon: [
+      { url: '/icons/icon-48x48.png', sizes: '48x48' },
+      { url: '/icons/icon-72x72.png', sizes: '72x72' },
+      { url: '/icons/icon-96x96.png', sizes: '96x96' },
+      { url: '/icons/icon-128x128.png', sizes: '128x128' },
+      { url: '/icons/icon-144x144.png', sizes: '144x144' },
+      { url: '/icons/icon-152x152.png', sizes: '152x152' },
+      { url: '/icons/icon-192x192.png', sizes: '192x192' },
+      { url: '/icons/icon-384x384.png', sizes: '384x384' },
+      { url: '/icons/icon-512x512.png', sizes: '512x512' },
+    ],
+    apple: '/icons/apple-icon-180x180.png',
+    shortcut: '/favicon.ico'
   }
 };
 
@@ -61,6 +59,9 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const websiteJsonLd = generateWebsiteJsonLd();
+  const organizationJsonLd = generateOrganizationJsonLd();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -69,6 +70,16 @@ export default function RootLayout({
         <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#2563eb" />
         <meta name="msapplication-TileColor" content="#2563eb" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
+        
+        {/* Structured Data */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
       </head>
       <body>
         <ThemeProvider

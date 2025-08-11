@@ -69,12 +69,12 @@ SENTRY_AUTH_TOKEN=your_sentry_auth_token
 
 ### 3. Build Configuration
 
-The project includes optimized build settings:
+The project includes optimized function settings:
 
-- **Memory**: Increased to 4GB for Genkit compilation
-- **Node.js**: Uses Node.js 20.x runtime
-- **Timeout**: Set to 60 seconds for AI operations
-- **Region**: Defaults to `iad1` (US East)
+- **Runtime**: Node.js 18.x (Vercel supported version)
+- **AI Functions**: 5 minutes timeout with 1GB memory for Genkit AI operations (`/api/ai/**`, `/api/genkit/**`)
+- **Standard Functions**: 60 seconds timeout for regular API routes
+- **Memory**: Increased allocation for AI-intensive operations
 
 ### 4. Deploy
 
@@ -103,15 +103,22 @@ Update `NEXT_PUBLIC_APP_URL` to your production domain.
 
 ## Troubleshooting
 
+### Function Runtime Errors
+- **"Function Runtimes must have a valid version"**: Ensure `vercel.json` uses `nodejs18.x` (not `nodejs20.x`)
+- **AI Function Timeouts**: AI routes have 5-minute timeout - check Genkit flow performance
+- **Memory Issues**: AI functions allocated 1GB - increase if needed for complex operations
+
 ### Build Fails
 - Check Node.js memory allocation in build logs
 - Verify all required environment variables are set
 - Check for TypeScript errors (ignored but may cause issues)
+- Ensure Genkit dependencies are properly bundled
 
 ### AI Features Not Working
 - Verify `GEMINI_API_KEY` is correctly set
 - Check API quota and billing in Google AI Studio
 - Ensure Genkit server modules are properly excluded from client bundle
+- Check function logs in Vercel dashboard for AI route errors
 
 ### Firebase Auth Issues
 - Verify all Firebase config variables are set
