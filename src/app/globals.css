@@ -158,3 +158,40 @@ body {
     }
   }
 }
+/* Extra small breakpoint utilities (below 475px) */
+  .xs\:hidden {
+    @media (min-width: 475px) {
+      display: none;
+    }
+  }
+  
+  .xs\:block {
+    @media (min-width: 475px) {
+      display: block;
+    }
+  }
+  
+  .xs\:inline {
+    @media (min-width: 475px) {
+      display: inline;
+    }
+  }
+  
+  .xs\:flex {
+    @media (min-width: 475px) {
+      display: flex;
+    }
+  }
+  
+  /* Hide on extra small screens */
+  .hidden-xs {
+    @media (max-width: 474px) {
+      display: none !important;
+    }
+  }
+  
+  /* Mobile-specific text truncation utilities */
+  .truncate-mobile {
+    @media (max-width: 640px) {
+      overflow: hidden;
+      text-overflow:
