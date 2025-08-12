@@ -85,19 +85,24 @@ export default function MealPlanPage() {
   const MealPlanRecipeCard: React.FC<MealPlanRecipeCardProps> = ({ recipe, onAdd }) => {
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [imageError, setImageError] = useState(false);
+    const imagePath = `/images/${recipe.id}.jpg`; 
     
-    return (
-      <div className="border rounded-lg p-3 bg-card">
-        {/* Compact Header */}
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-12 h-12 rounded overflow-hidden bg-muted flex-shrink-0">
-            <img 
-              src={imageError ? '/placeholder-recipe.jpg' : recipe.image}
-              alt={recipe.name}
-              className="w-full h-full object-cover"
-              onError={() => setImageError(true)}
-            />
-          </div>
+return (
+    <div className="border rounded-lg p-3 bg-card">
+      {/* Compact Header */}
+      <div className="flex items-center gap-3 mb-3">
+        {/* FIXED: Larger image size and proper path */}
+        <div className="w-20 h-20 rounded overflow-hidden bg-muted flex-shrink-0">
+          <Image 
+            src={imageError ? '/placeholder-recipe.jpg' : imagePath}
+            alt={recipe.name}
+            width={80}
+            height={80}
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
+            priority={false}
+          />
+        </div>
           
           <div className="flex-1 min-w-0">
             <h4 className="font-medium text-sm line-clamp-1 text-primary">
