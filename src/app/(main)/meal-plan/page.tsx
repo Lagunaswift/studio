@@ -84,25 +84,42 @@ export default function MealPlanPage() {
   }
 
   const MealPlanRecipeCard: React.FC<MealPlanRecipeCardProps> = ({ recipe, onAdd }) => {
-    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-    const [imageError, setImageError] = useState(false);
-    const imagePath = `/images/${recipe.id}.jpg`;
-    
-    return (
-      <div className="border rounded-lg p-3 bg-card overflow-hidden">
-        {/* Mobile-optimized Compact Header */}
-        <div className="flex items-start gap-3 mb-3">
-          {/* Recipe Image - responsive sizing */}
-          <div className="w-32 h-32 sm:w-20 sm:h-20 rounded overflow-hidden bg-muted flex-shrink-0">
-            <Image 
-              src={imageError ? '/placeholder-recipe.jpg' : imagePath}
-              alt={recipe.name}
-              width={80}
-              height={80}
-              className="w-full h-full object-cover"
-              onError={() => setImageError(true)}
-            />
-          </div>
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  
+  // **CONSISTENT IMAGE LOADING PATTERN** - matches RecipeCard.tsx
+  const getImageSrc = () => {
+    if (imageError) {
+      return '/placeholder-recipe.jpg';
+    }
+    // Always use public/images/{id}.jpg pattern for consistency
+    return `/images/${recipe.id}.jpg`;
+  };
+  
+  const handleImageError = () => {
+    console.log(`Image not found for recipe ${recipe.id} in meal planner, falling back to placeholder`);
+    setImageError(true);
+  };
+  
+  return (
+    <div className="border rounded-lg p-3 bg-card overflow-hidden">
+      {/* Mobile-optimized Compact Header */}
+      <div className="flex items-start gap-3 mb-3">
+        {/* Recipe Image - responsive sizing with consistent loading */}
+        <div className="w-32 h-32 sm:w-20 sm:h-20 rounded overflow-hidden bg-muted flex-shrink-0">
+          <Image 
+            src={getImageSrc()}
+            alt={recipe.name}
+            width={128}
+            height={128}
+            className="w-full h-full object-cover"
+            onError={handleImageError}
+            sizes="(max-width: 640px) 128px, 80px"
+            priority={false}
+            placeholder="blur"
+            blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx4f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
+          />
+        </div>
           
           {/* Recipe Info with proper truncation */}
           <div className="flex-1 min-w-0 space-y-2">
