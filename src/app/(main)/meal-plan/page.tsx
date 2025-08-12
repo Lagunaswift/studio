@@ -93,7 +93,7 @@ export default function MealPlanPage() {
         {/* Mobile-optimized Compact Header */}
         <div className="flex items-start gap-3 mb-3">
           {/* Recipe Image - responsive sizing */}
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded overflow-hidden bg-muted flex-shrink-0">
+          <div className="w-32 h-32 sm:w-20 sm:h-20 rounded overflow-hidden bg-muted flex-shrink-0">
             <Image 
               src={imageError ? '/placeholder-recipe.jpg' : imagePath}
               alt={recipe.name}
