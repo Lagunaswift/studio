@@ -28,6 +28,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronUp, ChevronDown, Flame, Beef, Wheat, Droplets, Plus, Minus, Edit, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info, CalendarDays as CalendarDaysIcon, CheckCircle2, Clock, Users } from 'lucide-react';
 
 import {
   ChartContainer,
@@ -121,138 +122,137 @@ export default function MealPlanPage() {
           />
         </div>
           
-          {/* Recipe Info with proper truncation */}
-          <div className="flex-1 min-w-0 space-y-2">
-            <div>
-              <h4 
-                className="font-medium text-sm sm:text-base leading-tight text-primary mb-1 break-words"
-                style={{
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                  wordBreak: 'break-word',
-                  hyphens: 'auto'
-                }}
-                title={recipe.name}
-              >
-                {recipe.name}
-              </h4>
-              
-              {/* Mobile-friendly quick stats */}
-              <div className="flex items-center gap-2 sm:gap-3 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <Info className="w-3 h-3 shrink-0" />
-                  <span className="truncate">{recipe.prepTime}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Info className="w-3 h-3 shrink-0" />
-                  <span className="truncate">{recipe.servings}</span>
-                </div>
+        {/* Recipe Info with proper truncation */}
+        <div className="flex-1 min-w-0 space-y-2">
+          <div>
+            <h4 
+              className="font-medium text-sm sm:text-base leading-tight text-primary mb-1 break-words"
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                wordBreak: 'break-word',
+                hyphens: 'auto'
+              }}
+              title={recipe.name}
+            >
+              {recipe.name}
+            </h4>
+            
+            {/* Mobile-friendly quick stats - FIXED ICONS */}
+            <div className="flex items-center gap-2 sm:gap-3 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <Clock className="w-3 h-3 shrink-0" />
+                <span className="truncate">{recipe.prepTime}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Users className="w-3 h-3 shrink-0" />
+                <span className="truncate">{recipe.servings}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Flame className="w-3 h-3 shrink-0" />
+                <span className="truncate">{recipe.macrosPerServing?.calories?.toFixed(0) || 0} cal</span>
               </div>
             </div>
-            
-            {/* Add button - touch-friendly */}
-            <Button 
-              onClick={onAdd} 
-              className="w-full h-8 text-xs sm:text-sm bg-accent hover:bg-accent/90"
-            >
-              <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-              Add
-            </Button>
+          </div>
+          
+          {/* Add button - touch-friendly */}
+          <Button 
+            onClick={onAdd} 
+            className="w-full h-8 text-xs sm:text-sm bg-accent hover:bg-accent/90"
+          >
+            <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+            Add
+          </Button>
+        </div>
+      </div>
+
+      {/* FIXED Mobile-friendly macros display - PROPER MACRO ACCESS */}
+      {recipe.macrosPerServing && (
+        <div className="grid grid-cols-4 gap-1 sm:gap-2 text-center text-xs mb-3 overflow-hidden">
+          <div className="min-w-0">
+            <Flame className="w-3 h-3 mx-auto text-orange-500 mb-1" />
+            <div className="font-medium truncate">
+              {recipe.macrosPerServing.calories?.toFixed(0) || 0}
+            </div>
+            <div className="text-muted-foreground truncate">kcal</div>
+          </div>
+          <div className="min-w-0">
+            <Beef className="w-3 h-3 mx-auto text-red-500 mb-1" />
+            <div className="font-medium truncate">
+              {recipe.macrosPerServing.protein?.toFixed(0) || 0}g
+            </div>
+            <div className="text-muted-foreground truncate">protein</div>
+          </div>
+          <div className="min-w-0">
+            <Wheat className="w-3 h-3 mx-auto text-amber-500 mb-1" />
+            <div className="font-medium truncate">
+              {recipe.macrosPerServing.carbs?.toFixed(0) || 0}g
+            </div>
+            <div className="text-muted-foreground truncate">carbs</div>
+          </div>
+          <div className="min-w-0">
+            <Droplets className="w-3 h-3 mx-auto text-blue-500 mb-1" />
+            <div className="font-medium truncate">
+              {recipe.macrosPerServing.fat?.toFixed(0) || 0}g
+            </div>
+            <div className="text-muted-foreground truncate">fat</div>
           </div>
         </div>
-
-        {/* Mobile-friendly macros display */}
-        {recipe.macrosPerServing && (
-          <div className="grid grid-cols-4 gap-1 sm:gap-2 text-center text-xs mb-3 overflow-hidden">
-            <div className="min-w-0">
-              <Flame className="w-3 h-3 mx-auto text-primary" />
-              <div className="font-medium truncate">
-                {recipe.macrosPerServing ? 
-                  recipe.macrosPerServing.calories.toFixed(0) : 
-                  recipe.calories?.toFixed(0) || 0
-                }
-              </div>
-              <div className="text-muted-foreground truncate">kcal</div>
+      )}
+      
+      {/* Mobile-optimized collapsible details */}
+      <Collapsible open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button 
+            variant="ghost" 
+            className="w-full justify-between p-2 h-8 text-xs font-medium hover:bg-muted/50"
+          >
+            <span>Details</span>
+            {isDetailsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </Button>
+        </CollapsibleTrigger>
+        
+        <CollapsibleContent className="space-y-2 pt-2 border-t">
+          {/* Timing & Servings - mobile layout */}
+          <div className="text-xs space-y-1">
+            <div className="flex justify-between">
+              <span className="truncate">Prep:</span>
+              <span className="shrink-0 ml-2">{recipe.prepTime}</span>
             </div>
-            <div className="min-w-0">
-              <Beef className="w-3 h-3 mx-auto text-chart-1" />
-              <div className="font-medium truncate">
-                {recipe.macrosPerServing ? 
-                  recipe.macrosPerServing.protein.toFixed(0) : 
-                  recipe.protein?.toFixed(0) || 0
-                }g
-              </div>
-              <div className="text-muted-foreground truncate">protein</div>
+            <div className="flex justify-between">
+              <span className="truncate">Cook:</span>
+              <span className="shrink-0 ml-2">{recipe.cookTime}</span>
             </div>
-            <div className="min-w-0">
-              <Wheat className="w-3 h-3 mx-auto text-chart-2" />
-              <div className="font-medium truncate">
-                {recipe.macrosPerServing ? 
-                  recipe.macrosPerServing.carbs.toFixed(0) : 
-                  recipe.carbs?.toFixed(0) || 0
-                }g
-              </div>
-              <div className="text-muted-foreground truncate">carbs</div>
-            </div>
-            <div className="min-w-0">
-              <Droplets className="w-3 h-3 mx-auto text-accent" />
-              <div className="font-medium truncate">
-                {recipe.macrosPerServing ? 
-                  recipe.macrosPerServing.fat.toFixed(0) : 
-                  recipe.fat?.toFixed(0) || 0
-                }g
-              </div>
-              <div className="text-muted-foreground truncate">fat</div>
+            <div className="flex justify-between">
+              <span className="truncate">Servings:</span>
+              <span className="shrink-0 ml-2">{recipe.servings}</span>
             </div>
           </div>
-        )}
-        
-        {/* Mobile-optimized collapsible details */}
-        <Collapsible open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-          <CollapsibleTrigger asChild>
-            <Button 
-              variant="ghost" 
-              className="w-full justify-between p-2 h-8 text-xs font-medium hover:bg-muted/50"
-            >
-              <span>Details</span>
-              {isDetailsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            </Button>
-          </CollapsibleTrigger>
           
-          <CollapsibleContent className="space-y-2 pt-2 border-t">
-            {/* Timing & Servings - mobile layout */}
-            <div className="text-xs space-y-1">
-              <div className="flex justify-between">
-                <span className="truncate">Prep:</span>
-                <span className="shrink-0 ml-2">{recipe.prepTime}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="truncate">Cook:</span>
-                <span className="shrink-0 ml-2">{recipe.cookTime}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="truncate">Servings:</span>
-                <span className="shrink-0 ml-2">{recipe.servings}</span>
-              </div>
+          {/* Description */}
+          {recipe.description && (
+            <p className="text-xs text-muted-foreground line-clamp-2">
+              {recipe.description}
+            </p>
+          )}
+          
+          {/* Tags - responsive display */}
+          {recipe.tags && recipe.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {recipe.tags.map(tag => (
+                <Badge key={tag} variant="outline" className="text-xs px-1 py-0 truncate max-w-full">
+                  <span className="truncate">{tag}</span>
+                </Badge>
+              ))}
             </div>
-            
-            {/* Tags - responsive display */}
-            {recipe.tags && (
-              <div className="flex flex-wrap gap-1">
-                {recipe.tags.map(tag => (
-                  <Badge key={tag} variant="outline" className="text-xs px-1 py-0 truncate max-w-full">
-                    <span className="truncate">{tag}</span>
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </CollapsibleContent>
-        </Collapsible>
-      </div>
-    );
-  };
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  );
+};
   
   // Component functions
   const handleDateChange = (date: Date | undefined) => {
