@@ -125,6 +125,16 @@ export function RecipeCard({
           </div>
         </div>
 
+        {/* Macro Summary Row */}
+        {recipe.macrosPerServing && (
+          <div className="flex justify-between items-center text-xs text-muted-foreground mt-2 pt-2 border-t border-muted/30">
+            <span className="font-medium">Per serving:</span>
+            <span>
+              {recipe.macrosPerServing.protein.toFixed(0)}P • {recipe.macrosPerServing.carbs.toFixed(0)}C • {recipe.macrosPerServing.fat.toFixed(0)}F
+            </span>
+          </div>
+        )}
+
         {/* Tags Preview */}
         {recipe.tags && recipe.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
@@ -159,31 +169,43 @@ export function RecipeCard({
         
         <CollapsibleContent className="px-4 pb-4">
           <CardContent className="p-0 space-y-4">
-            {/* Macros */}
+            {/* Detailed Macros */}
             {recipe.macrosPerServing && (
-              <div className="grid grid-cols-4 gap-2 text-center">
-                <div className="flex flex-col items-center p-2 bg-muted/50 rounded">
-                  <Flame className="w-4 h-4 text-orange-500 mb-1" />
-                  <span className="text-xs font-medium">{recipe.macrosPerServing.calories}</span>
-                  <span className="text-xs text-muted-foreground">cal</span>
-                </div>
-                <div className="flex flex-col items-center p-2 bg-muted/50 rounded">
-                  <Beef className="w-4 h-4 text-red-500 mb-1" />
-                  <span className="text-xs font-medium">{recipe.macrosPerServing.protein}g</span>
-                  <span className="text-xs text-muted-foreground">protein</span>
-                </div>
-                <div className="flex flex-col items-center p-2 bg-muted/50 rounded">
-                  <Wheat className="w-4 h-4 text-amber-500 mb-1" />
-                  <span className="text-xs font-medium">{recipe.macrosPerServing.carbs}g</span>
-                  <span className="text-xs text-muted-foreground">carbs</span>
-                </div>
-                <div className="flex flex-col items-center p-2 bg-muted/50 rounded">
-                  <Droplets className="w-4 h-4 text-blue-500 mb-1" />
-                  <span className="text-xs font-medium">{recipe.macrosPerServing.fat}g</span>
-                  <span className="text-xs text-muted-foreground">fat</span>
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm text-primary">Nutrition per serving:</h4>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Flame className="w-4 h-4 text-orange-500" />
+                      <span>Calories</span>
+                    </div>
+                    <span className="font-medium">{recipe.macrosPerServing.calories.toFixed(0)} kcal</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Beef className="w-4 h-4 text-red-500" />
+                      <span>Protein</span>
+                    </div>
+                    <span className="font-medium">{recipe.macrosPerServing.protein.toFixed(0)}g</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Wheat className="w-4 h-4 text-amber-500" />
+                      <span>Carbs</span>
+                    </div>
+                    <span className="font-medium">{recipe.macrosPerServing.carbs.toFixed(0)}g</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Droplets className="w-4 h-4 text-blue-500" />
+                      <span>Fat</span>
+                    </div>
+                    <span className="font-medium">{recipe.macrosPerServing.fat.toFixed(0)}g</span>
+                  </div>
                 </div>
               </div>
             )}
+            
             
             {/* Timing Details */}
             <div className="space-y-2">
