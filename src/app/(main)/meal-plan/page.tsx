@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { format, addDays, subDays, isValid } from 'date-fns';
-import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info, CalendarDays as CalendarDaysIcon, CheckCircle2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
