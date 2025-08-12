@@ -86,7 +86,7 @@ export default function MealPlanPage() {
   const MealPlanRecipeCard: React.FC<MealPlanRecipeCardProps> = ({ recipe, onAdd }) => {
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [imageError, setImageError] = useState(false);
-    const imagePath = `/images/${recipe.id}.jpg`; 
+    const imagePath = `/images/${recipe.id}.jpg`;
     
     return (
       <div className="border rounded-lg p-3 bg-card overflow-hidden">
