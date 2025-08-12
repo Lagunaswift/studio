@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
 import { useAuth } from '@/context/AuthContext';
@@ -47,8 +47,6 @@ export default function PantryPage() {
   const [editingQuantity, setEditingQuantity] = useState<number>(0);
   const [selectedExpiryDate, setSelectedExpiryDate] = useState<Date | undefined>(undefined);
 
-  const [expiredItems, setExpiredItems] = useState<PantryItem[]>([]);
-  const [expiringSoonItems, setExpiringSoonItems] = useState<PantryItem[]>([]);
 
   const pantryItems = (userProfile?.pantryItems as PantryItem[]) || [];
 
@@ -63,7 +61,8 @@ export default function PantryPage() {
     },
   });
 
-  useEffect(() => {
+  // Memoized expiry calculations to prevent infinite loops
+  const { expiredItems, expiringSoonItems } = useMemo(() => {
     const today = startOfDay(new Date());
     const sevenDaysFromNow = addDays(today, 7);
 
@@ -86,8 +85,11 @@ export default function PantryPage() {
         }
       }
     });
-    setExpiredItems(expired.sort((a,b) => new Date(a.expiryDate!).getTime() - new Date(b.expiryDate!).getTime()));
-    setExpiringSoonItems(expiringSoon.sort((a,b) => new Date(a.expiryDate!).getTime() - new Date(b.expiryDate!).getTime()));
+    
+    return {
+      expiredItems: expired.sort((a,b) => new Date(a.expiryDate!).getTime() - new Date(b.expiryDate!).getTime()),
+      expiringSoonItems: expiringSoon.sort((a,b) => new Date(a.expiryDate!).getTime() - new Date(b.expiryDate!).getTime())
+    };
   }, [pantryItems]);
 
   const onSubmit: SubmitHandler<PantryItemFormValues> = (data) => {
@@ -121,7 +123,23 @@ export default function PantryPage() {
     }
   };
 
-  const handleQuantityChange = (itemId: string, delta: number) => {
+  const updatePantryItemQuantity = useCallback((itemId: string, newQuantity: number) => {
+    updateProfile((prevProfile: any) => ({
+      ...prevProfile,
+      pantryItems: prevProfile?.pantryItems?.map((item: any) => 
+        item.id === itemId ? { ...item, quantity: newQuantity } : item
+      ) || []
+    }));
+  }, [updateProfile]);
+
+  const removePantryItem = useCallback((itemId: string) => {
+    updateProfile((prevProfile: any) => ({
+      ...prevProfile,
+      pantryItems: prevProfile?.pantryItems?.filter((item: any) => item.id !== itemId) || []
+    }));
+  }, [updateProfile]);
+
+  const handleQuantityChange = useCallback((itemId: string, delta: number) => {
     const item = pantryItems.find(p => p.id === itemId);
     if (item) {
       const newQuantity = Math.max(0, item.quantity + delta);
@@ -132,26 +150,16 @@ export default function PantryPage() {
         updatePantryItemQuantity(itemId, newQuantity);
       }
     }
-  };
+  }, [removePantryItem, updatePantryItemQuantity, toast]);
 
-  const updatePantryItemQuantity = (itemId: string, newQuantity: number) => {
-    const updatedPantry = pantryItems.map(item => item.id === itemId ? { ...item, quantity: newQuantity } : item);
-    updateProfile({ pantryItems: updatedPantry as any });
-  }
-
-  const removePantryItem = (itemId: string) => {
-    const updatedPantry = pantryItems.filter(item => item.id !== itemId);
-    updateProfile({ pantryItems: updatedPantry as any });
-  }
-
-  const handleDirectQuantityUpdate = (itemId: string, newQuantityStr: string) => {
+  const handleDirectQuantityUpdate = useCallback((itemId: string, newQuantityStr: string) => {
     const newQuantity = parseFloat(newQuantityStr);
     if (!isNaN(newQuantity)) {
       setEditingQuantity(newQuantity); // Keep local state for input field
     }
-  };
+  }, []);
 
-  const saveEditedQuantity = (itemId: string) => {
+  const saveEditedQuantity = useCallback((itemId: string) => {
     const item = pantryItems.find(p => p.id === itemId);
     if (item) {
       if (editingQuantity <= 0) {
@@ -163,20 +171,27 @@ export default function PantryPage() {
       }
     }
     setEditingItemId(null);
-  };
+  }, [editingQuantity, removePantryItem, updatePantryItemQuantity, toast]);
 
-  const startEditing = (item: PantryItem) => {
+  const startEditing = useCallback((item: PantryItem) => {
     setEditingItemId(item.id);
     setEditingQuantity(item.quantity);
-  };
+  }, []);
 
 
-  const groupedPantryItems: { [category: string]: PantryItem[] } = pantryItems.reduce((acc, item) => {
-    (acc[item.category] = acc[item.category] || []).push(item);
-    return acc;
-  }, {} as { [category: string]: PantryItem[] });
+  const { groupedPantryItems, sortedCategories } = useMemo(() => {
+    const grouped: { [category: string]: PantryItem[] } = pantryItems.reduce((acc, item) => {
+      (acc[item.category] = acc[item.category] || []).push(item);
+      return acc;
+    }, {} as { [category: string]: PantryItem[] });
 
-  const sortedCategories = Object.keys(groupedPantryItems).sort();
+    const sorted = Object.keys(grouped).sort();
+    
+    return {
+      groupedPantryItems: grouped,
+      sortedCategories: sorted
+    };
+  }, [pantryItems]);
 
   if (isAppDataLoading) {
     return (
@@ -276,7 +291,7 @@ export default function PantryPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Unit</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select unit" />
@@ -299,7 +314,7 @@ export default function PantryPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Category</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select a category" />

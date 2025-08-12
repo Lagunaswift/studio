@@ -51,6 +51,7 @@ import type { MacroTargets, Macros, Recipe, PlannedMeal } from '@/types';
 
 // Components
 import { RecipeCard } from '@/components/shared/RecipeCard';
+import { ProgressSummary } from '@/components/shared/ProgressSummary';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from '@/components/ui/badge';
 import { UsageDashboard } from '@/components/subscription/UsageDashboard';
@@ -264,37 +265,11 @@ export default function HomePage() {
                   </div>
                   
                   {/* Progress Summary */}
-                  <div className="mt-4 p-3 bg-muted/30 rounded-lg">
-                    <h4 className="font-semibold text-sm mb-2">Progress Summary</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                      {[
-                        { key: 'calories', label: 'Calories', consumed: consumedTodayMacros.calories, target: currentMacroTargets.calories, unit: '', color: 'text-red-500' },
-                        { key: 'protein', label: 'Protein', consumed: consumedTodayMacros.protein, target: currentMacroTargets.protein, unit: 'g', color: 'text-blue-500' },
-                        { key: 'carbs', label: 'Carbs', consumed: consumedTodayMacros.carbs, target: currentMacroTargets.carbs, unit: 'g', color: 'text-green-500' },
-                        { key: 'fat', label: 'Fat', consumed: consumedTodayMacros.fat, target: currentMacroTargets.fat, unit: 'g', color: 'text-yellow-500' }
-                      ].map(({ key, label, consumed, target, unit, color }) => {
-                        const percentage = target > 0 ? Math.round((consumed / target) * 100) : 0;
-                        return (
-                          <div key={key} className="text-center">
-                            <div className={`font-semibold ${color}`}>
-                              {percentage}%
-                            </div>
-                            <div className="text-muted-foreground">{label}</div>
-                            <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
-                              <div 
-                                className={`h-1.5 rounded-full transition-all duration-300 ${
-                                  key === 'calories' ? 'bg-red-500' :
-                                  key === 'protein' ? 'bg-blue-500' :
-                                  key === 'carbs' ? 'bg-green-500' : 'bg-yellow-500'
-                                }`}
-                                style={{ width: `${Math.min(percentage, 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <ProgressSummary 
+                    consumedMacros={consumedTodayMacros}
+                    targetMacros={currentMacroTargets}
+                    className="mt-4"
+                  />
                 </div>
               ) : (
                 <div className="text-center py-8">

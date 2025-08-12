@@ -272,7 +272,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         }
       }
     }
-    return bestMatch ? bestMatch.label : "MealPreppyPro";
+    return bestMatch ? bestMatch.label : "MealPreppy";
   };
   
   const currentPageTitle = getCurrentPageTitle();
