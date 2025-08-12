@@ -2,47 +2,43 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { useAuth } from '@/lib/auth';
-import { useOptimizedProfile } from '@/hooks/useOptimizedProfile';
-import { useOptimizedRecipes } from '@/hooks/useOptimizedRecipes';
-import type { PlannedMeal, Recipe } from '@/types';
+import { useOptimizedRecipes, useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
+import { useAuth } from '@/context/AuthContext';
+import type { PlannedMeal, MealType, Recipe, Macros, MealSlotConfig } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from 'recharts';
-import { format, addDays, subDays } from 'date-fns';
-import { 
-  CalendarDays as CalendarDaysIcon, 
-  ChevronLeft, 
-  ChevronRight, 
-  Plus, 
-  Minus, 
-  Edit, 
-  Trash2, 
-  Clock, 
-  Users, 
-  Flame, 
-  Beef, 
-  Wheat, 
-  Droplets,
-  ChevronUp,
-  ChevronDown,
-  Target
-} from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { format, addDays, subDays, isValid } from 'date-fns';
+import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info, CalendarDays as CalendarDaysIcon, CheckCircle2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import type { ChartConfig } from '@/components/ui/chart';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter as EditDialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
+import { RecipeCard } from '@/components/shared/RecipeCard';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { MacroDisplay } from '@/components/shared/MacroDisplay';
+import { Checkbox } from '@/components/ui/checkbox';
+import { cn } from '@/lib/utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronUp, ChevronDown, Flame, Beef, Wheat, Droplets, Plus, Minus, Edit, Target } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 
-// Default meal structure if user hasn't customized theirs
-const MEAL_SLOT_CONFIG = [
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig
+} from "@/components/ui/chart";
+
+const MEAL_SLOT_CONFIG: Array<{ type: MealType; displayName: string }> = [
   { type: "Breakfast", displayName: "Breakfast" },
   { type: "Lunch", displayName: "Lunch" },
   { type: "Dinner", displayName: "Dinner" },
@@ -129,11 +125,11 @@ export default function MealPlanPage() {
               {/* Mobile-friendly quick stats */}
               <div className="flex items-center gap-2 sm:gap-3 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
-                  <Clock className="w-3 h-3 shrink-0" />
+                  <Info className="w-3 h-3 shrink-0" />
                   <span className="truncate">{recipe.prepTime}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Users className="w-3 h-3 shrink-0" />
+                  <Info className="w-3 h-3 shrink-0" />
                   <span className="truncate">{recipe.servings}</span>
                 </div>
               </div>
@@ -155,22 +151,42 @@ export default function MealPlanPage() {
           <div className="grid grid-cols-4 gap-1 sm:gap-2 text-center text-xs mb-3 overflow-hidden">
             <div className="min-w-0">
               <Flame className="w-3 h-3 mx-auto text-primary" />
-              <div className="font-medium truncate">{recipe.macrosPerServing.calories.toFixed(0)}</div>
+              <div className="font-medium truncate">
+                {recipe.macrosPerServing ? 
+                  recipe.macrosPerServing.calories.toFixed(0) : 
+                  recipe.calories?.toFixed(0) || 0
+                }
+              </div>
               <div className="text-muted-foreground truncate">kcal</div>
             </div>
             <div className="min-w-0">
               <Beef className="w-3 h-3 mx-auto text-chart-1" />
-              <div className="font-medium truncate">{recipe.macrosPerServing.protein.toFixed(0)}g</div>
+              <div className="font-medium truncate">
+                {recipe.macrosPerServing ? 
+                  recipe.macrosPerServing.protein.toFixed(0) : 
+                  recipe.protein?.toFixed(0) || 0
+                }g
+              </div>
               <div className="text-muted-foreground truncate">protein</div>
             </div>
             <div className="min-w-0">
               <Wheat className="w-3 h-3 mx-auto text-chart-2" />
-              <div className="font-medium truncate">{recipe.macrosPerServing.carbs.toFixed(0)}g</div>
+              <div className="font-medium truncate">
+                {recipe.macrosPerServing ? 
+                  recipe.macrosPerServing.carbs.toFixed(0) : 
+                  recipe.carbs?.toFixed(0) || 0
+                }g
+              </div>
               <div className="text-muted-foreground truncate">carbs</div>
             </div>
             <div className="min-w-0">
               <Droplets className="w-3 h-3 mx-auto text-accent" />
-              <div className="font-medium truncate">{recipe.macrosPerServing.fat.toFixed(0)}g</div>
+              <div className="font-medium truncate">
+                {recipe.macrosPerServing ? 
+                  recipe.macrosPerServing.fat.toFixed(0) : 
+                  recipe.fat?.toFixed(0) || 0
+                }g
+              </div>
               <div className="text-muted-foreground truncate">fat</div>
             </div>
           </div>
@@ -221,7 +237,7 @@ export default function MealPlanPage() {
     );
   };
   
-  // Rest of component logic...
+  // Component functions
   const handleDateChange = (date: Date | undefined) => {
     if (date) {
       setSelectedDate(date);
@@ -233,7 +249,7 @@ export default function MealPlanPage() {
 
     const newMeal: PlannedMeal = {
       id: Date.now().toString(),
-      recipeId,
+      recipeId: parseInt(recipeId),
       date: formattedDate,
       mealType,
       servings: 1,
@@ -283,7 +299,7 @@ export default function MealPlanPage() {
     });
   };
 
-  // Calculate daily macros
+  // Calculate daily macros with safety checks
   const dailyMacros = dailyMeals.reduce((acc, meal) => {
     if (!meal || typeof meal.recipeId === 'undefined' || typeof meal.servings !== 'number') {
       return acc;
@@ -334,19 +350,6 @@ export default function MealPlanPage() {
       target: currentMacroTargets.fat,
     },
   ] : [];
-
-  const markMealAsEaten = (meal: PlannedMeal) => {
-    if (!userProfile) return;
-
-    const updatedMealPlan = userProfile.mealPlan?.map(m => 
-      m.id === meal.id ? { ...m, status: 'eaten' } : m
-    );
-    updateProfile({ mealPlan: updatedMealPlan });
-    toast({
-      title: "Meal Marked as Eaten",
-      description: `${meal.recipeDetails?.name} marked as eaten.`,
-    });
-  };
 
   return (
     <PageWrapper title="Meal Plan" maxWidth="max-w-7xl">
@@ -593,7 +596,7 @@ export default function MealPlanPage() {
                             <MealPlanRecipeCard
                               recipe={recipesForThisSlot[currentPickerIndex]}
                               onAdd={() => handleAddMeal(
-                                recipesForThisSlot[currentPickerIndex].id,
+                                recipesForThisSlot[currentPickerIndex].id.toString(),
                                 mealSlot.type,
                                 mealSlotId
                               )}
@@ -677,7 +680,7 @@ export default function MealPlanPage() {
             </Button>
           </div>
           
-          <DialogFooter className="gap-2 sm:gap-0">
+          <EditDialogFooter className="gap-2 sm:gap-0">
             <Button 
               variant="outline" 
               onClick={() => setEditingMeal(null)}
@@ -691,7 +694,7 @@ export default function MealPlanPage() {
             >
               Save Changes
             </Button>
-          </DialogFooter>
+          </EditDialogFooter>
         </DialogContent>
       </Dialog>
     </PageWrapper>
