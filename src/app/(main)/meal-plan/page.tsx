@@ -23,8 +23,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
-
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronUp, ChevronDown, Flame, Beef, Wheat, Droplets } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+
 import {
   ChartContainer,
   ChartTooltip,
@@ -72,6 +75,146 @@ export default function MealPlanPage() {
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
   // @ts-ignore
   const dailyMeals = userProfile?.mealPlan?.filter(meal => meal.date === formattedDate) || [];
+
+  // MealPlanRecipeCard Component
+  interface MealPlanRecipeCardProps {
+    recipe: Recipe;
+    onAdd: () => void;
+  }
+
+  const MealPlanRecipeCard: React.FC<MealPlanRecipeCardProps> = ({ recipe, onAdd }) => {
+    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+    const [imageError, setImageError] = useState(false);
+    
+    return (
+      <div className="border rounded-lg p-3 bg-card">
+        {/* Compact Header */}
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-12 h-12 rounded overflow-hidden bg-muted flex-shrink-0">
+            <img 
+              src={imageError ? '/placeholder-recipe.jpg' : recipe.image}
+              alt={recipe.name}
+              className="w-full h-full object-cover"
+              onError={() => setImageError(true)}
+            />
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <h4 className="font-medium text-sm line-clamp-1 text-primary">
+              {recipe.name}
+            </h4>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              {recipe.macrosPerServing && (
+                <span>{recipe.macrosPerServing.calories.toFixed(0)}kcal</span>
+              )}
+              {recipe.calories && !recipe.macrosPerServing && (
+                <span>{recipe.calories.toFixed(0)}kcal</span>
+              )}
+              <span>{recipe.prepTime}</span>
+            </div>
+          </div>
+          
+          <Button
+            size="sm"
+            onClick={onAdd}
+            className="bg-accent hover:bg-accent/90"
+          >
+            <PlusCircle className="h-3 w-3 mr-1" />
+            Add
+          </Button>
+        </div>
+        
+        {/* Collapsible Details */}
+        <Collapsible open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+          <CollapsibleTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="w-full justify-between text-xs"
+            >
+              Show Details
+              {isDetailsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            </Button>
+          </CollapsibleTrigger>
+          
+          <CollapsibleContent className="space-y-2 pt-2 border-t mt-2">
+            {/* Macro Grid */}
+            {(recipe.macrosPerServing || recipe.calories) && (
+              <div className="grid grid-cols-4 gap-1 text-xs">
+                <div className="text-center">
+                  <Flame className="w-3 h-3 mx-auto text-primary" />
+                  <div className="font-medium">
+                    {recipe.macrosPerServing ? 
+                      recipe.macrosPerServing.calories.toFixed(0) : 
+                      recipe.calories?.toFixed(0) || 0
+                    }
+                  </div>
+                  <div className="text-muted-foreground">kcal</div>
+                </div>
+                <div className="text-center">
+                  <Beef className="w-3 h-3 mx-auto text-chart-1" />
+                  <div className="font-medium">
+                    {recipe.macrosPerServing ? 
+                      recipe.macrosPerServing.protein.toFixed(0) : 
+                      recipe.protein?.toFixed(0) || 0
+                    }g
+                  </div>
+                  <div className="text-muted-foreground">protein</div>
+                </div>
+                <div className="text-center">
+                  <Wheat className="w-3 h-3 mx-auto text-chart-2" />
+                  <div className="font-medium">
+                    {recipe.macrosPerServing ? 
+                      recipe.macrosPerServing.carbs.toFixed(0) : 
+                      recipe.carbs?.toFixed(0) || 0
+                    }g
+                  </div>
+                  <div className="text-muted-foreground">carbs</div>
+                </div>
+                <div className="text-center">
+                  <Droplets className="w-3 h-3 mx-auto text-accent" />
+                  <div className="font-medium">
+                    {recipe.macrosPerServing ? 
+                      recipe.macrosPerServing.fat.toFixed(0) : 
+                      recipe.fat?.toFixed(0) || 0
+                    }g
+                  </div>
+                  <div className="text-muted-foreground">fat</div>
+                </div>
+              </div>
+            )}
+            
+            {/* Timing & Servings */}
+            <div className="text-xs space-y-1">
+              <div className="flex justify-between">
+                <span>Prep:</span>
+                <span>{recipe.prepTime}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Cook:</span>
+                <span>{recipe.cookTime}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Servings:</span>
+                <span>{recipe.servings}</span>
+              </div>
+            </div>
+            
+            {/* Tags */}
+            {recipe.tags && (
+              <div className="flex flex-wrap gap-1">
+                {recipe.tags.map(tag => (
+                  <Badge key={tag} variant="outline" className="text-xs px-1 py-0">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+    );
+  };
   
   // FIXED: Handle both old and new recipe data formats with complete safety
   // @ts-ignore
@@ -451,18 +594,21 @@ export default function MealPlanPage() {
                       >
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
+                      
+                      {/* REPLACED: Rich Recipe Card instead of basic text */}
                       {availableRecipesForPicker.length > 0 && (
-                        <div className="flex-1 min-w-0">
-                          <div className="p-3 border rounded-md bg-background">
-                            <h5 className="font-medium truncate">
-                              {availableRecipesForPicker[recipePickerIndices[slotKey] || 0]?.name || 'Recipe'}
-                            </h5>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {availableRecipesForPicker[recipePickerIndices[slotKey] || 0]?.tags?.slice(0, 3).join(', ') || 'No tags'}
-                            </p>
-                          </div>
+                        <div className="flex-1">
+                          <MealPlanRecipeCard
+                            recipe={availableRecipesForPicker[recipePickerIndices[slotKey] || 0]}
+                            onAdd={() => handleAddRecipeToSlot(
+                              availableRecipesForPicker[recipePickerIndices[slotKey] || 0],
+                              slotConfig,
+                              NthInstanceOfType
+                            )}
+                          />
                         </div>
                       )}
+                      
                       <Button
                         size="sm"
                         variant="outline"
@@ -470,19 +616,6 @@ export default function MealPlanPage() {
                         disabled={!availableRecipesForPicker.length || (recipePickerIndices[slotKey] || 0) >= availableRecipesForPicker.length - 1}
                       >
                         <ChevronRight className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => handleAddRecipeToSlot(
-                          availableRecipesForPicker[recipePickerIndices[slotKey] || 0],
-                          slotConfig,
-                          NthInstanceOfType
-                        )}
-                        disabled={!availableRecipesForPicker.length}
-                        className="bg-accent hover:bg-accent/90"
-                      >
-                        <PlusCircle className="h-4 w-4 mr-1" />
-                        Add
                       </Button>
                     </div>
                   </div>
