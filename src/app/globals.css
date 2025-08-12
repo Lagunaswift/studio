@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -136,7 +135,7 @@ body {
   background: hsl(var(--primary));
 }
 
-/* Tailwind plugin for custom scrollbars */
+/* Tailwind plugin for custom scrollbars and mobile utilities */
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
@@ -147,7 +146,7 @@ body {
       background-color: hsl(var(--primary));
     }
   }
-    .scrollbar-thumb-primary\/50 {
+  .scrollbar-thumb-primary\/50 {
     &::-webkit-scrollbar-thumb {
       background-color: hsl(var(--primary) / 0.5);
     }
@@ -157,8 +156,8 @@ body {
       background-color: hsl(var(--muted));
     }
   }
-}
- /* Extra small breakpoint utilities (below 475px) */
+
+  /* Extra small breakpoint utilities (below 475px) */
   .xs\:hidden {
     @media (min-width: 475px) {
       display: none;
