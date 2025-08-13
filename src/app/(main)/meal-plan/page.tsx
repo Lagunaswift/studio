@@ -27,8 +27,30 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronUp, ChevronDown, Flame, Beef, Wheat, Droplets, Plus, Minus, Edit, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
-import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info, CalendarDays as CalendarDaysIcon, CheckCircle2, Clock, Users, Flame, Beef, Wheat, Droplets } from 'lucide-react';
-
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  Trash2, 
+  Edit3, 
+  PlusCircle, 
+  Loader2, 
+  Info, 
+  CalendarDays as CalendarDaysIcon, 
+  CheckCircle2,
+  ChevronUp,
+  ChevronDown,
+  Plus,
+  Minus,
+  Edit,
+  Target,
+  // Icons for MealPlanRecipeCard
+  Clock,
+  Users,
+  Flame,
+  Beef,
+  Wheat,
+  Droplets
+} from 'lucide-react';
 import {
   ChartContainer,
   ChartTooltip,
