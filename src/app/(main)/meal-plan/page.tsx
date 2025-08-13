@@ -108,12 +108,23 @@ export default function MealPlanPage() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [imageError, setImageError] = useState(false);
   
-  // **CONSISTENT IMAGE LOADING PATTERN** - matches RecipeCard.tsx
+  // **FIXED: Helper function to get macros from individual properties**
+  const getMacros = () => {
+    return {
+      calories: recipe.calories || 0,
+      protein: recipe.protein || 0,
+      carbs: recipe.carbs || 0,
+      fat: recipe.fat || 0
+    };
+  };
+  
+  const macros = getMacros();
+  
+  // **CONSISTENT IMAGE LOADING PATTERN**
   const getImageSrc = () => {
     if (imageError) {
       return '/placeholder-recipe.jpg';
     }
-    // Always use public/images/{id}.jpg pattern for consistency
     return `/images/${recipe.id}.jpg`;
   };
   
@@ -160,7 +171,7 @@ export default function MealPlanPage() {
               {recipe.name}
             </h4>
             
-            {/* FIXED: Mobile-friendly quick stats with proper icons */}
+            {/* FIXED: Mobile-friendly quick stats with individual macro properties */}
             <div className="flex items-center gap-2 sm:gap-3 text-xs text-muted-foreground">
               <div className="flex items-center gap-1">
                 <Clock className="w-3 h-3 shrink-0" />
@@ -172,7 +183,7 @@ export default function MealPlanPage() {
               </div>
               <div className="flex items-center gap-1">
                 <Flame className="w-3 h-3 shrink-0" />
-                <span className="truncate">{recipe.macrosPerServing?.calories?.toFixed(0) || 0} cal</span>
+                <span className="truncate">{macros.calories} cal</span>
               </div>
             </div>
           </div>
@@ -188,34 +199,34 @@ export default function MealPlanPage() {
         </div>
       </div>
 
-      {/* FIXED: Mobile-friendly macros display - NOW SHOWS PROPERLY */}
-      {recipe.macrosPerServing && (
+      {/* FIXED: Mobile-friendly macros display using individual properties */}
+      {(macros.calories > 0 || macros.protein > 0 || macros.carbs > 0 || macros.fat > 0) && (
         <div className="grid grid-cols-4 gap-1 sm:gap-2 text-center text-xs mb-3 overflow-hidden">
           <div className="min-w-0">
             <Flame className="w-3 h-3 mx-auto text-orange-500 mb-1" />
             <div className="font-medium truncate">
-              {recipe.macrosPerServing.calories?.toFixed(0) || 0}
+              {macros.calories.toFixed(0)}
             </div>
             <div className="text-muted-foreground truncate">kcal</div>
           </div>
           <div className="min-w-0">
             <Beef className="w-3 h-3 mx-auto text-red-500 mb-1" />
             <div className="font-medium truncate">
-              {recipe.macrosPerServing.protein?.toFixed(0) || 0}g
+              {macros.protein.toFixed(0)}g
             </div>
             <div className="text-muted-foreground truncate">protein</div>
           </div>
           <div className="min-w-0">
             <Wheat className="w-3 h-3 mx-auto text-amber-500 mb-1" />
             <div className="font-medium truncate">
-              {recipe.macrosPerServing.carbs?.toFixed(0) || 0}g
+              {macros.carbs.toFixed(0)}g
             </div>
             <div className="text-muted-foreground truncate">carbs</div>
           </div>
           <div className="min-w-0">
             <Droplets className="w-3 h-3 mx-auto text-blue-500 mb-1" />
             <div className="font-medium truncate">
-              {recipe.macrosPerServing.fat?.toFixed(0) || 0}g
+              {macros.fat.toFixed(0)}g
             </div>
             <div className="text-muted-foreground truncate">fat</div>
           </div>
@@ -235,6 +246,43 @@ export default function MealPlanPage() {
         </CollapsibleTrigger>
         
         <CollapsibleContent className="space-y-2 pt-2 border-t">
+          {/* FIXED: Detailed macro breakdown using individual properties */}
+          {(macros.calories > 0 || macros.protein > 0 || macros.carbs > 0 || macros.fat > 0) && (
+            <div className="space-y-2">
+              <h4 className="font-medium text-xs text-primary">Nutrition per serving:</h4>
+              <div className="grid grid-cols-4 gap-1 text-center">
+                <div className="text-xs">
+                  <div className="flex items-center justify-center mb-1">
+                    <Flame className="w-3 h-3 text-orange-500" />
+                  </div>
+                  <div className="font-medium">{macros.calories.toFixed(0)}</div>
+                  <div className="text-muted-foreground">cal</div>
+                </div>
+                <div className="text-xs">
+                  <div className="flex items-center justify-center mb-1">
+                    <Beef className="w-3 h-3 text-red-500" />
+                  </div>
+                  <div className="font-medium">{macros.protein.toFixed(0)}g</div>
+                  <div className="text-muted-foreground">protein</div>
+                </div>
+                <div className="text-xs">
+                  <div className="flex items-center justify-center mb-1">
+                    <Wheat className="w-3 h-3 text-amber-500" />
+                  </div>
+                  <div className="font-medium">{macros.carbs.toFixed(0)}g</div>
+                  <div className="text-muted-foreground">carbs</div>
+                </div>
+                <div className="text-xs">
+                  <div className="flex items-center justify-center mb-1">
+                    <Droplets className="w-3 h-3 text-blue-500" />
+                  </div>
+                  <div className="font-medium">{macros.fat.toFixed(0)}g</div>
+                  <div className="text-muted-foreground">fat</div>
+                </div>
+              </div>
+            </div>
+          )}
+          
           {/* Timing & Servings - mobile layout */}
           <div className="text-xs space-y-1">
             <div className="flex justify-between">
