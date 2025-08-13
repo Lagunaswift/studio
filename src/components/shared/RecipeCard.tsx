@@ -1,4 +1,5 @@
 // src/components/shared/RecipeCard.tsx
+// FIXED VERSION for your actual data structure
 
 "use client";
 
@@ -42,14 +43,24 @@ export function RecipeCard({
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [imageError, setImageError] = useState(false);
   
+  // **FIXED: Helper function to get macros from your actual data structure**
+  const getMacros = () => {
+    // Your data has individual properties: calories, protein, carbs, fat
+    return {
+      calories: recipe.calories || 0,
+      protein: recipe.protein || 0,
+      carbs: recipe.carbs || 0,
+      fat: recipe.fat || 0
+    };
+  };
+  
+  const macros = getMacros();
+  
   // **STANDARDIZED IMAGE LOADING PATTERN**
-  // Priority: 1. public/images/{recipe.id}.jpg 2. recipe.imageUrl (legacy) 3. placeholder
   const getImageSrc = () => {
     if (imageError) {
       return '/placeholder-recipe.jpg';
     }
-    
-    // Always try public/images/{id}.jpg first for consistency
     return `/images/${recipe.id}.jpg`;
   };
   
@@ -109,7 +120,7 @@ export function RecipeCard({
           {recipe.name}
         </CardTitle>
         
-        {/* Quick Info Row */}
+        {/* Quick Info Row - FIXED to use individual macro properties */}
         <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
           <div className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
@@ -121,16 +132,16 @@ export function RecipeCard({
           </div>
           <div className="flex items-center gap-1">
             <Flame className="w-3 h-3" />
-            <span>{recipe.macrosPerServing?.calories || 0} cal</span>
+            <span>{macros.calories} cal</span>
           </div>
         </div>
 
-        {/* Macro Summary Row */}
-        {recipe.macrosPerServing && (
+        {/* Macro Summary Row - FIXED to use individual macro properties */}
+        {(macros.calories > 0 || macros.protein > 0 || macros.carbs > 0 || macros.fat > 0) && (
           <div className="flex justify-between items-center text-xs text-muted-foreground mt-2 pt-2 border-t border-muted/30">
             <span className="font-medium">Per serving:</span>
             <span>
-              {recipe.macrosPerServing.protein.toFixed(0)}P • {recipe.macrosPerServing.carbs.toFixed(0)}C • {recipe.macrosPerServing.fat.toFixed(0)}F
+              {macros.protein.toFixed(0)}P • {macros.carbs.toFixed(0)}C • {macros.fat.toFixed(0)}F
             </span>
           </div>
         )}
@@ -169,8 +180,8 @@ export function RecipeCard({
         
         <CollapsibleContent className="px-4 pb-4">
           <CardContent className="p-0 space-y-4">
-            {/* Detailed Macros */}
-            {recipe.macrosPerServing && (
+            {/* Detailed Macros - FIXED to use individual macro properties */}
+            {(macros.calories > 0 || macros.protein > 0 || macros.carbs > 0 || macros.fat > 0) && (
               <div className="space-y-2">
                 <h4 className="font-medium text-sm text-primary">Nutrition per serving:</h4>
                 <div className="space-y-1 text-sm">
@@ -179,28 +190,28 @@ export function RecipeCard({
                       <Flame className="w-4 h-4 text-orange-500" />
                       <span>Calories</span>
                     </div>
-                    <span className="font-medium">{recipe.macrosPerServing.calories.toFixed(0)} kcal</span>
+                    <span className="font-medium">{macros.calories.toFixed(0)} kcal</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
                       <Beef className="w-4 h-4 text-red-500" />
                       <span>Protein</span>
                     </div>
-                    <span className="font-medium">{recipe.macrosPerServing.protein.toFixed(0)}g</span>
+                    <span className="font-medium">{macros.protein.toFixed(0)}g</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
                       <Wheat className="w-4 h-4 text-amber-500" />
                       <span>Carbs</span>
                     </div>
-                    <span className="font-medium">{recipe.macrosPerServing.carbs.toFixed(0)}g</span>
+                    <span className="font-medium">{macros.carbs.toFixed(0)}g</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
                       <Droplets className="w-4 h-4 text-blue-500" />
                       <span>Fat</span>
                     </div>
-                    <span className="font-medium">{recipe.macrosPerServing.fat.toFixed(0)}g</span>
+                    <span className="font-medium">{macros.fat.toFixed(0)}g</span>
                   </div>
                 </div>
               </div>
