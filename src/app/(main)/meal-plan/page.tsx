@@ -24,7 +24,6 @@ import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronUp, ChevronDown, Flame, Beef, Wheat, Droplets, Plus, Minus, Edit, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { 
