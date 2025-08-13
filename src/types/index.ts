@@ -169,13 +169,19 @@ export interface Recipe {
     name: string;
     description: string;
     servings: number;
-    prepTime: number;
-    cookTime: number;
-    ingredients: { name: string; quantity: number; unit: string; }[];
+    prepTime: string;  // ✅ Changed to string to match your data ("10 mins")
+    cookTime: string;  // ✅ Changed to string to match your data ("15 mins")
+    chillTime?: string; // ✅ Added optional chill time
+    ingredients: string[]; // ✅ Changed to string array to match your data
     instructions: string[];
-    macrosPerServing: Macros; // This should never be optional/undefined
-    imageUrl: string;
+    // ✅ CHANGED: Individual macro properties instead of nested object
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    imageUrl?: string; // ✅ Made optional
     tags: string[];
+    isCustom?: boolean; // ✅ Added to match your data
 }
 
 // Add a helper type for potentially incomplete recipes during loading
