@@ -228,248 +228,287 @@ function RecipesPageComponent() {
   };
 
   return (
-    <PageWrapper title="Recipes">
-      <div className="mb-6 text-muted-foreground">
-        Browse, search, and manage your recipe collection.
-      </div>
+  <PageWrapper title="Recipes">
+    <div className="mb-6 text-muted-foreground">
+      Browse, search, and manage your recipe collection.
+    </div>
 
-      {/* Search and Filter Section */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4 items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              type="text"
-              placeholder="Search recipes by name, description, or tags..."
-              value={searchTerm}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Heart className="h-4 w-4 text-red-500" />
-            <Label htmlFor="favorites-only" className="text-sm font-medium">
-              Favorites only
-            </Label>
-            <Switch
-              id="favorites-only"
-              checked={showFavoritesOnly}
-              onCheckedChange={setShowFavoritesOnly}
-            />
-          </div>
+    {/* Search and Filter Section */}
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-4 items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
+            type="text"
+            placeholder="Search recipes by name, description, or tags..."
+            value={searchTerm}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="pl-10"
+          />
         </div>
-
-        {/* Active Filters Display */}
-        {(activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0) && (
-          <div className="flex flex-wrap gap-2">
-            <span className="text-sm text-muted-foreground">Active filters:</span>
-            {activeDietaryFilters.map((filter) => (
-              <Badge key={filter} variant="secondary" className="text-xs">
-                {filter}
-              </Badge>
-            ))}
-            {activeAllergenFilters.map((filter) => (
-              <Badge key={filter} variant="destructive" className="text-xs">
-                No {filter}
-              </Badge>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Add New Recipe Button */}
-      <div className="flex justify-end">
-        <Button asChild>
-          <Link href="/recipes/add">
-            <PlusCircle className="h-4 w-4 mr-2" />
-            Add New Recipe
-          </Link>
-        </Button>
-      </div>
-
-      {/* Results Summary */}
-      <div className="text-sm text-muted-foreground">
-        {!isRecipeCacheLoading && (
-          <>
-            {filteredRecipes.length === allRecipesCache.length 
-              ? `Showing all ${allRecipesCache.length} recipes`
-              : `Found ${filteredRecipes.length} of ${allRecipesCache.length} recipes`
-            }
-            {filteredRecipes.length > recipesPerPage && (
-              <span> (Page {currentPage} of {totalPages})</span>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Recipe Display */}
-      {isRecipeCacheLoading ? (
-        <div className="flex justify-center items-center min-h-[200px]">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="ml-2 text-muted-foreground">Loading recipes...</p>
+        
+        <div className="flex items-center space-x-2">
+          <Heart className="h-4 w-4 text-red-500" />
+          <Label htmlFor="favorites-only" className="text-sm font-medium">
+            Favorites only
+          </Label>
+          <Switch
+            id="favorites-only"
+            checked={showFavoritesOnly}
+            onCheckedChange={setShowFavoritesOnly}
+          />
         </div>
-      ) : finalRecipesForDisplay.length > 0 ? (
+      </div>
+
+      {/* Active Filters Display */}
+      {(activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0) && (
+        <div className="flex flex-wrap gap-2">
+          <span className="text-sm text-muted-foreground">Active filters:</span>
+          {activeDietaryFilters.map((filter) => (
+            <Badge key={filter} variant="secondary" className="text-xs">
+              {filter}
+            </Badge>
+          ))}
+          {activeAllergenFilters.map((filter) => (
+            <Badge key={filter} variant="destructive" className="text-xs">
+              No {filter}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
+
+    {/* Add New Recipe Button */}
+    <div className="flex justify-end">
+      <Button asChild>
+        <Link href="/recipes/add">
+          <PlusCircle className="h-4 w-4 mr-2" />
+          Add New Recipe
+        </Link>
+      </Button>
+    </div>
+
+    {/* Results Summary */}
+    <div className="text-sm text-muted-foreground">
+      {!isRecipeCacheLoading && (
         <>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {finalRecipesForDisplay.map((recipe) => {
-              const { matched, total } = calculatePantryMatch(recipe, (userProfile?.pantryItems as PantryItem[]) || []);
-              const matchPercentage = total > 0 ? (matched / total) * 100 : 0;
-              let pantryMatchStatus: 'make' | 'almost' | null = null;
-              if (matchPercentage >= 80) {
-                pantryMatchStatus = 'make';
-              } else if (matchPercentage >= 50) {
-                pantryMatchStatus = 'almost';
-              }
-              return (
-                <RecipeCard
-                  key={recipe.id}
-                  recipe={recipe}
-                  onAddToMealPlan={handleOpenAddToPlanDialog}
-                  showAddToMealPlanButton={true}
-                  showViewDetailsButton={true}
-                  pantryMatchStatus={pantryMatchStatus}
-                />
-              )
-            })}
-          </div>
-          {totalPages > 1 && (
-            <div className="mt-8 flex items-center justify-between">
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <span>Recipes per page:</span>
-                <Select
-                  value={String(recipesPerPage)}
-                  onValueChange={(value) => setRecipesPerPage(Number(value))}
-                >
-                  <SelectTrigger className="w-[70px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+          {filteredRecipes.length === allRecipesCache.length 
+            ? `Showing all ${allRecipesCache.length} recipes`
+            : `Found ${filteredRecipes.length} of ${allRecipesCache.length} recipes`
+          }
+          {filteredRecipes.length > recipesPerPage && (
+            <span> (Page {currentPage} of {totalPages})</span>
           )}
         </>
-      ) : (
-         <Card className="text-center py-10 shadow-none border-dashed">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold text-muted-foreground flex justify-center items-center">
-              <Info className="h-8 w-8 text-primary/50 mr-4" /> No Recipes Found
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">
-              {searchTerm || activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0 || showFavoritesOnly 
-                ? "No recipes match your current search criteria or filters. Try adjusting your search or removing some filters."
-                : "You haven't added any recipes yet. Start building your recipe collection!"
-              }
-            </p>
-            <Button asChild>
-              <Link href="/recipes/add">
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Add Your First Recipe
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
       )}
+    </div>
 
-      {/* Add to Meal Plan Dialog */}
-      <Dialog open={showAddToPlanDialog} onOpenChange={setShowAddToPlanDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Add to Meal Plan</DialogTitle>
-            <DialogDescription>
-              Add {selectedRecipe?.name} to your meal plan.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="plan-date">Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
+    {/* Recipe Display */}
+    {isRecipeCacheLoading ? (
+      <div className="flex justify-center items-center min-h-[200px]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-2 text-muted-foreground">Loading recipes...</p>
+      </div>
+    ) : finalRecipesForDisplay.length > 0 ? (
+      <>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {finalRecipesForDisplay.map((recipe) => {
+            const { matched, total } = calculatePantryMatch(recipe, (userProfile?.pantryItems as PantryItem[]) || []);
+            const matchPercentage = total > 0 ? (matched / total) * 100 : 0;
+            let pantryMatchStatus: 'make' | 'almost' | null = null;
+            if (matchPercentage >= 80) {
+              pantryMatchStatus = 'make';
+            } else if (matchPercentage >= 50) {
+              pantryMatchStatus = 'almost';
+            }
+            
+            return (
+              <div key={recipe.id} className="relative">
+                <RecipeCard
+                  recipe={recipe}
+                  pantryMatchStatus={pantryMatchStatus}
+                  onFavoriteToggle={() => {
+                    const currentFavorites = userProfile?.favorite_recipe_ids || [];
+                    const isFavorited = currentFavorites.includes(recipe.id);
+                    const updatedFavorites = isFavorited 
+                      ? currentFavorites.filter(id => id !== recipe.id)
+                      : [...currentFavorites, recipe.id];
+                    updateProfile({ favorite_recipe_ids: updatedFavorites });
+                    
+                    toast({
+                      title: isFavorited ? "Removed from favorites" : "Added to favorites",
+                      description: `${recipe.name} ${isFavorited ? 'removed from' : 'added to'} your favorites.`,
+                    });
+                  }}
+                  isFavorited={isRecipeFavorite(recipe.id)}
+                />
+                
+                {/* Add to Meal Plan Button - Positioned over the card */}
+                <div className="absolute bottom-4 right-4 z-10">
+                  <Button 
+                    size="sm"
+                    onClick={() => handleOpenAddToPlanDialog(recipe)}
+                    className="bg-accent hover:bg-accent/90 text-white shadow-lg"
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {planDate ? format(planDate, 'PPP') : 'Pick a date'}
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add to Plan
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={planDate}
-                    onSelect={setPlanDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="plan-meal-type">Meal Type</Label>
+                </div>
+                
+                {/* View Details Button - Positioned over the card */}
+                <div className="absolute bottom-4 left-4 z-10">
+                  <Button 
+                    size="sm"
+                    variant="outline"
+                    asChild
+                    className="bg-background/90 hover:bg-background shadow-lg"
+                  >
+                    <Link href={`/recipes/${recipe.id}`}>
+                      <Info className="h-4 w-4 mr-1" />
+                      Details
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {totalPages > 1 && (
+          <div className="mt-8 flex items-center justify-between">
+            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+              <span>Recipes per page:</span>
               <Select
-                value={planMealType}
-                onValueChange={(value) => setPlanMealType(value as MealType)}
+                value={String(recipesPerPage)}
+                onValueChange={(value) => setRecipesPerPage(Number(value))}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select meal type" />
+                <SelectTrigger className="w-[70px]">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {MEAL_TYPES.map((mealType) => (
-                    <SelectItem key={mealType} value={mealType}>
-                      {mealType}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="plan-servings">Servings</Label>
-              <Input
-                id="plan-servings"
-                type="number"
-                min="1"
-                value={planServings}
-                onChange={(e) => setPlanServings(parseInt(e.target.value, 10) || 1)}
-              />
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-          <DialogFooter>
-            <Button type="submit" onClick={handleAddToMealPlan}>
-              Add to Meal Plan
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </PageWrapper>
-  );
-}
+        )}
+      </>
+    ) : (
+       <Card className="text-center py-10 shadow-none border-dashed">
+        <CardHeader>
+          <CardTitle className="text-xl font-semibold text-muted-foreground flex justify-center items-center">
+            <Info className="h-8 w-8 text-primary/50 mr-4" /> No Recipes Found
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground mb-4">
+            {searchTerm || activeDietaryFilters.length > 0 || activeAllergenFilters.length > 0 || showFavoritesOnly 
+              ? "No recipes match your current search criteria or filters. Try adjusting your search or removing some filters."
+              : "You haven't added any recipes yet. Start building your recipe collection!"
+            }
+          </p>
+          <Button asChild>
+            <Link href="/recipes/add">
+              <PlusCircle className="h-4 w-4 mr-2" />
+              Add Your First Recipe
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    )}
+
+    {/* Add to Meal Plan Dialog */}
+    <Dialog open={showAddToPlanDialog} onOpenChange={setShowAddToPlanDialog}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Add to Meal Plan</DialogTitle>
+          <DialogDescription>
+            Add {selectedRecipe?.name} to your meal plan.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="plan-date">Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-left font-normal"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {planDate ? format(planDate, 'PPP') : 'Pick a date'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={planDate}
+                  onSelect={setPlanDate}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="plan-meal-type">Meal Type</Label>
+            <Select
+              value={planMealType}
+              onValueChange={(value) => setPlanMealType(value as MealType)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select meal type" />
+              </SelectTrigger>
+              <SelectContent>
+                {MEAL_TYPES.map((mealType) => (
+                  <SelectItem key={mealType} value={mealType}>
+                    {mealType}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="plan-servings">Servings</Label>
+            <Input
+              id="plan-servings"
+              type="number"
+              min="1"
+              value={planServings}
+              onChange={(e) => setPlanServings(parseInt(e.target.value, 10) || 1)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button type="submit" onClick={handleAddToMealPlan}>
+            Add to Meal Plan
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </PageWrapper>
+);
 
 export default function RecipesPage() {
   return (
