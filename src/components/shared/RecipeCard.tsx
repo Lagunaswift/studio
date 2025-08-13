@@ -58,207 +58,208 @@ export function RecipeCard({
     setImageError(true);
   };
   
- return (
-  <Card className={cn(
-    "group hover:shadow-lg transition-all duration-200 overflow-hidden w-full max-w-full", 
-    className
-  )}>
-    {/* Recipe Image & Basic Info */}
-    <div className="relative w-full">
-      <Image 
-        src={getImageSrc()}
-        alt={recipe.name}
-        width={400}
-        height={200}
-        className="w-full h-40 sm:h-48 object-cover group-hover:scale-105 transition-transform duration-200"
-        onError={handleImageError}
-        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-        priority={false}
-      />
-      
-      {/* Favorite Button */}
-      {onFavoriteToggle && (
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="absolute top-2 right-2 bg-background/70 hover:bg-background/90 text-primary hover:text-accent p-2 rounded-full shadow-md z-10 h-8 w-8 sm:h-10 sm:w-10"
-          onClick={onFavoriteToggle}
-          aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
-        >
-          <Heart className={cn("w-4 h-4 sm:w-5 sm:h-5", isFavorited ? "fill-accent text-accent" : "text-muted-foreground")} />
-        </Button>
-      )}
-      
-      {/* Pantry Match Badge */}
-      {pantryMatchStatus && (
-        <Badge 
-          variant="secondary" 
-          className={cn(
-            "absolute top-2 left-2 z-10 text-xs px-2 py-1",
-            pantryMatchStatus === 'make' && "bg-green-100 text-green-800 border-green-300",
-            pantryMatchStatus === 'almost' && "bg-yellow-100 text-yellow-800 border-yellow-300"
-          )}
-        >
-          {pantryMatchStatus === 'make' ? 'Can Make!' : 'Almost'}
-        </Badge>
-      )}
-    </div>
-
-    <CardHeader className="p-4">
-      <CardTitle className="text-lg font-semibold text-primary line-clamp-2">
-        {recipe.name}
-      </CardTitle>
-      
-      {/* Quick Info Row */}
-      <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-        <div className="flex items-center gap-1">
-          <Clock className="w-3 h-3" />
-          <span>{recipe.prepTime}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <Users className="w-3 h-3" />
-          <span>{recipe.servings}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <Flame className="w-3 h-3" />
-          <span>{recipe.macrosPerServing?.calories || 0} cal</span>
-        </div>
+  return (
+    <Card className={cn(
+      "group hover:shadow-lg transition-all duration-200 overflow-hidden w-full max-w-full", 
+      className
+    )}>
+      {/* Recipe Image & Basic Info */}
+      <div className="relative w-full">
+        <Image 
+          src={getImageSrc()}
+          alt={recipe.name}
+          width={400}
+          height={200}
+          className="w-full h-40 sm:h-48 object-cover group-hover:scale-105 transition-transform duration-200"
+          onError={handleImageError}
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          priority={false}
+        />
+        
+        {/* Favorite Button */}
+        {onFavoriteToggle && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="absolute top-2 right-2 bg-background/70 hover:bg-background/90 text-primary hover:text-accent p-2 rounded-full shadow-md z-10 h-8 w-8 sm:h-10 sm:w-10"
+            onClick={onFavoriteToggle}
+            aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
+          >
+            <Heart className={cn("w-4 h-4 sm:w-5 sm:h-5", isFavorited ? "fill-accent text-accent" : "text-muted-foreground")} />
+          </Button>
+        )}
+        
+        {/* Pantry Match Badge */}
+        {pantryMatchStatus && (
+          <Badge 
+            variant="secondary" 
+            className={cn(
+              "absolute top-2 left-2 z-10 text-xs px-2 py-1",
+              pantryMatchStatus === 'make' && "bg-green-100 text-green-800 border-green-300",
+              pantryMatchStatus === 'almost' && "bg-yellow-100 text-yellow-800 border-yellow-300"
+            )}
+          >
+            {pantryMatchStatus === 'make' ? 'Can Make!' : 'Almost'}
+          </Badge>
+        )}
       </div>
 
-      {/* Macro Summary Row */}
-      {recipe.macrosPerServing && (
-        <div className="flex justify-between items-center text-xs text-muted-foreground mt-2 pt-2 border-t border-muted/30">
-          <span className="font-medium">Per serving:</span>
-          <span>
-            {recipe.macrosPerServing.protein.toFixed(0)}P • {recipe.macrosPerServing.carbs.toFixed(0)}C • {recipe.macrosPerServing.fat.toFixed(0)}F
-          </span>
+      <CardHeader className="p-4">
+        <CardTitle className="text-lg font-semibold text-primary line-clamp-2">
+          {recipe.name}
+        </CardTitle>
+        
+        {/* Quick Info Row */}
+        <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            <span>{recipe.prepTime}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Users className="w-3 h-3" />
+            <span>{recipe.servings}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Flame className="w-3 h-3" />
+            <span>{recipe.macrosPerServing?.calories || 0} cal</span>
+          </div>
         </div>
-      )}
 
-      {/* Tags Preview */}
-      {recipe.tags && recipe.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-2">
-          {recipe.tags.slice(0, 3).map(tag => (
-            <Badge key={tag} variant="outline" className="text-xs">
-              {tag}
-            </Badge>
-          ))}
-          {recipe.tags.length > 3 && (
-            <Badge variant="outline" className="text-xs text-muted-foreground">
-              +{recipe.tags.length - 3}
-            </Badge>
-          )}
-        </div>
-      )}
-    </CardHeader>
+        {/* Macro Summary Row */}
+        {recipe.macrosPerServing && (
+          <div className="flex justify-between items-center text-xs text-muted-foreground mt-2 pt-2 border-t border-muted/30">
+            <span className="font-medium">Per serving:</span>
+            <span>
+              {recipe.macrosPerServing.protein.toFixed(0)}P • {recipe.macrosPerServing.carbs.toFixed(0)}C • {recipe.macrosPerServing.fat.toFixed(0)}F
+            </span>
+          </div>
+        )}
 
-    {/* Expandable Details */}
-    <Collapsible open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-      <CollapsibleTrigger asChild>
-        <Button variant="ghost" className="w-full justify-between p-4 pt-0">
-          <span className="text-sm font-medium">
-            {isDetailsOpen ? 'Hide Details' : 'Show Details'}
-          </span>
-          {isDetailsOpen ? (
-            <ChevronUp className="w-4 h-4" />
-          ) : (
-            <ChevronDown className="w-4 h-4" />
-          )}
-        </Button>
-      </CollapsibleTrigger>
-      
-      <CollapsibleContent className="px-4 pb-4">
-        <CardContent className="p-0 space-y-4">
-          {/* Detailed Macros */}
-          {recipe.macrosPerServing && (
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm text-primary">Nutrition per serving:</h4>
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <Flame className="w-4 h-4 text-orange-500" />
-                    <span>Calories</span>
-                  </div>
-                  <span className="font-medium">{recipe.macrosPerServing.calories.toFixed(0)} kcal</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <Beef className="w-4 h-4 text-red-500" />
-                    <span>Protein</span>
-                  </div>
-                  <span className="font-medium">{recipe.macrosPerServing.protein.toFixed(0)}g</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <Wheat className="w-4 h-4 text-amber-500" />
-                    <span>Carbs</span>
-                  </div>
-                  <span className="font-medium">{recipe.macrosPerServing.carbs.toFixed(0)}g</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <Droplets className="w-4 h-4 text-blue-500" />
-                    <span>Fat</span>
-                  </div>
-                  <span className="font-medium">{recipe.macrosPerServing.fat.toFixed(0)}g</span>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Timing Details */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Prep time:</span>
-              <span className="font-medium">{recipe.prepTime}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Cook time:</span>
-              <span className="font-medium">{recipe.cookTime}</span>
-            </div>
-            {recipe.chillTime && (
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Chill time:</span>
-                <span className="font-medium">{recipe.chillTime}</span>
-              </div>
+        {/* Tags Preview */}
+        {recipe.tags && recipe.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {recipe.tags.slice(0, 3).map(tag => (
+              <Badge key={tag} variant="outline" className="text-xs">
+                {tag}
+              </Badge>
+            ))}
+            {recipe.tags.length > 3 && (
+              <Badge variant="outline" className="text-xs text-muted-foreground">
+                +{recipe.tags.length - 3}
+              </Badge>
             )}
           </div>
-          
-          {/* Description */}
-          {recipe.description && (
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm text-primary">Description:</h4>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {recipe.description}
-              </p>
-            </div>
-          )}
-          
-          {/* All Tags */}
-          {recipe.tags && recipe.tags.length > 3 && (
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm text-primary">All tags:</h4>
-              <div className="flex flex-wrap gap-1">
-                {recipe.tags.map(tag => (
-                  <Badge key={tag} variant="outline" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
+        )}
+      </CardHeader>
+
+      {/* Expandable Details */}
+      <Collapsible open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" className="w-full justify-between p-4 pt-0">
+            <span className="text-sm font-medium">
+              {isDetailsOpen ? 'Hide Details' : 'Show Details'}
+            </span>
+            {isDetailsOpen ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
+          </Button>
+        </CollapsibleTrigger>
+        
+        <CollapsibleContent className="px-4 pb-4">
+          <CardContent className="p-0 space-y-4">
+            {/* Detailed Macros */}
+            {recipe.macrosPerServing && (
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm text-primary">Nutrition per serving:</h4>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Flame className="w-4 h-4 text-orange-500" />
+                      <span>Calories</span>
+                    </div>
+                    <span className="font-medium">{recipe.macrosPerServing.calories.toFixed(0)} kcal</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Beef className="w-4 h-4 text-red-500" />
+                      <span>Protein</span>
+                    </div>
+                    <span className="font-medium">{recipe.macrosPerServing.protein.toFixed(0)}g</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Wheat className="w-4 h-4 text-amber-500" />
+                      <span>Carbs</span>
+                    </div>
+                    <span className="font-medium">{recipe.macrosPerServing.carbs.toFixed(0)}g</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Droplets className="w-4 h-4 text-blue-500" />
+                      <span>Fat</span>
+                    </div>
+                    <span className="font-medium">{recipe.macrosPerServing.fat.toFixed(0)}g</span>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
-          
-          {/* Ingredient Count Preview */}
-          {recipe.ingredients && (
+            )}
+            
+            {/* Timing Details */}
             <div className="space-y-2">
-              <h4 className="font-medium text-sm text-primary">Ingredients:</h4>
-              <p className="text-sm text-muted-foreground">
-                {recipe.ingredients.length} ingredients required
-              </p>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Prep time:</span>
+                <span className="font-medium">{recipe.prepTime}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Cook time:</span>
+                <span className="font-medium">{recipe.cookTime}</span>
+              </div>
+              {recipe.chillTime && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Chill time:</span>
+                  <span className="font-medium">{recipe.chillTime}</span>
+                </div>
+              )}
             </div>
-          )}
-        </CardContent>
-      </CollapsibleContent>
-    </Collapsible>
-  </Card>
-);
+            
+            {/* Description */}
+            {recipe.description && (
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm text-primary">Description:</h4>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {recipe.description}
+                </p>
+              </div>
+            )}
+            
+            {/* All Tags */}
+            {recipe.tags && recipe.tags.length > 3 && (
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm text-primary">All tags:</h4>
+                <div className="flex flex-wrap gap-1">
+                  {recipe.tags.map(tag => (
+                    <Badge key={tag} variant="outline" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Ingredient Count Preview */}
+            {recipe.ingredients && (
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm text-primary">Ingredients:</h4>
+                <p className="text-sm text-muted-foreground">
+                  {recipe.ingredients.length} ingredients required
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  );
+}
