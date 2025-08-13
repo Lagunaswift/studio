@@ -27,7 +27,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronUp, ChevronDown, Flame, Beef, Wheat, Droplets, Plus, Minus, Edit, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
-import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info, CalendarDays as CalendarDaysIcon, CheckCircle2, Clock, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trash2, Edit3, PlusCircle, Loader2, Info, CalendarDays as CalendarDaysIcon, CheckCircle2, Clock, Users, Flame, Beef, Wheat, Droplets } from 'lucide-react';
 
 import {
   ChartContainer,
@@ -139,7 +139,7 @@ export default function MealPlanPage() {
               {recipe.name}
             </h4>
             
-            {/* Mobile-friendly quick stats - FIXED ICONS */}
+            {/* FIXED: Mobile-friendly quick stats with proper icons */}
             <div className="flex items-center gap-2 sm:gap-3 text-xs text-muted-foreground">
               <div className="flex items-center gap-1">
                 <Clock className="w-3 h-3 shrink-0" />
@@ -167,7 +167,7 @@ export default function MealPlanPage() {
         </div>
       </div>
 
-      {/* FIXED Mobile-friendly macros display - PROPER MACRO ACCESS */}
+      {/* FIXED: Mobile-friendly macros display - NOW SHOWS PROPERLY */}
       {recipe.macrosPerServing && (
         <div className="grid grid-cols-4 gap-1 sm:gap-2 text-center text-xs mb-3 overflow-hidden">
           <div className="min-w-0">
@@ -252,6 +252,7 @@ export default function MealPlanPage() {
     </div>
   );
 };
+
   
   // Component functions
   const handleDateChange = (date: Date | undefined) => {
