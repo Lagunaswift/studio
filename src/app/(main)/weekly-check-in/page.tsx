@@ -17,10 +17,13 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { ProFeature } from '@/components/shared/ProFeature';
+import { WeeklyCheckinChat } from '@/components/ai-coach/WeeklyCheckinChat';
+import { useWeeklyAnalysisChat } from '@/hooks/useWeeklyAnalysisChat';
 
 export default function WeeklyCheckinPage() {
   const { user } = useAuth();
   const { profile: userProfile, updateProfile, loading: isAppDataLoading } = useOptimizedProfile(user?.uid);
+  const { state: chatState, startConversation, endConversation } = useWeeklyAnalysisChat();
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,16 +35,32 @@ export default function WeeklyCheckinPage() {
     setRecommendation(null);
 
     try {
-      // This logic should be moved to a server action or API route
-      // For now, we will simulate the check-in
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Enhanced simulation for demo with realistic analysis
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Simulate successful weekly analysis
+      const mockAnalysis: PreppyOutput = {
+        newMacroTargets: {
+          calories: 1820,
+          protein: 140,
+          carbs: 180,
+          fat: 65,
+        },
+        coachingSummary: "Excellent week! You maintained consistent logging and your energy levels have been strong. Your actual TDEE is tracking higher than estimated, which means your metabolism is responding well to the current approach. I'm making a small adjustment to optimize your progress rate while keeping you energized."
+      };
+
+      setRecommendation(mockAnalysis);
+      // Start conversational mode
+      startConversation(mockAnalysis);
+
+      // For production, this would be:
       // const result = await runWeeklyCheckin();
       // if (result.success && result.recommendation) {
       //   setRecommendation(result.recommendation);
+      //   startConversation(result.recommendation);
       // } else {
       //   setError(result.message || "An unknown error occurred during the check-in.");
       // }
-      setError("Weekly check-in functionality is being refactored.");
     } catch (e: any) {
       console.error("Weekly Check-in Error:", e);
       setError(e.message || "A critical error occurred. Please check the console.");
@@ -55,6 +74,12 @@ export default function WeeklyCheckinPage() {
     await updateProfile({ macroTargets: recommendation.newMacroTargets });
     setError("New targets have been applied! You're all set for the week ahead.");
     setRecommendation(null); // Clear the recommendation to prevent re-applying
+    endConversation(); // End conversation mode
+  };
+
+  const handleEndConversation = () => {
+    endConversation();
+    setRecommendation(null);
   };
   // @ts-ignore
   const isCheckinDisabled = !userProfile?.dailyWeightLog || userProfile.dailyWeightLog.length < 14;
@@ -130,7 +155,17 @@ export default function WeeklyCheckinPage() {
           </Alert>
         )}
 
-        {recommendation && !isLoading && (
+        {/* Conversational Mode - Whoop-style AI Coach */}
+        {chatState.isConversationMode && recommendation && !isLoading && (
+          <WeeklyCheckinChat
+            analysisResult={recommendation}
+            onAcceptTargets={handleApplyTargets}
+            onClose={handleEndConversation}
+          />
+        )}
+
+        {/* Legacy Static Mode - fallback if conversation fails */}
+        {recommendation && !isLoading && !chatState.isConversationMode && (
           <Card className="shadow-xl">
             <CardHeader>
               <CardTitle className="font-headline text-primary">Your Weekly Check-in Results</CardTitle>

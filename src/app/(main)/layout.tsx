@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { Footer } from '@/components/layout/Footer';
 import { ThemeToggleButton } from '@/components/layout/ThemeToggleButton';
 import { TermsAcceptanceModal } from '@/components/legal/TermsAcceptanceModal';
-import { PreppyHelp } from '@/components/shared/SimpleHelpWidget';
+import { PreppyHelp } from '@/components/ai-coach/ProgressiveAIWidget';
 import {
   Accordion,
   AccordionContent,
