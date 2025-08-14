@@ -947,3 +947,125 @@ export async function addOrUpdateManualMacrosLog(idToken: string, macrosData: an
     return { success: false, error: `Could not save manual macros log: ${error.message}` };
   }
 }
+
+// Migration function to move legacy meal plan data to new daily structure
+export async function migrateLegacyMealPlanData(idToken: string) {
+  try {
+    const decodedToken = await serverFirestore.verifyToken(idToken);
+    const userId = decodedToken.uid;
+    
+    console.log(`🚀 Starting meal plan migration for user ${userId}`);
+    
+    // Get legacy meal plan data
+    const legacyMealPlanRef = adminDb.collection('profiles').doc(userId).collection('mealPlan');
+    const legacySnapshot = await legacyMealPlanRef.get();
+    
+    if (legacySnapshot.empty) {
+      console.log(`ℹ️ No legacy meal plan data found for user ${userId}`);
+      return { success: true, message: 'No legacy data to migrate' };
+    }
+    
+    console.log(`📋 Found ${legacySnapshot.docs.length} legacy meal plan entries`);
+    
+    // Group meals by date
+    const mealsByDate: { [date: string]: any[] } = {};
+    
+    legacySnapshot.docs.forEach(doc => {
+      const meal = { id: doc.id, ...doc.data() };
+      const date = meal.date;
+      
+      if (date) {
+        if (!mealsByDate[date]) {
+          mealsByDate[date] = [];
+        }
+        mealsByDate[date].push({
+          ...meal,
+          source: 'legacy',
+          migratedAt: FieldValue.serverTimestamp()
+        });
+      }
+    });
+    
+    const dates = Object.keys(mealsByDate);
+    console.log(`📅 Migrating meals for ${dates.length} dates:`, dates);
+    
+    // Migrate each date to new structure
+    const batch = adminDb.batch();
+    let migratedCount = 0;
+    
+    for (const date of dates) {
+      const meals = mealsByDate[date];
+      const dailyMealPlanRef = adminDb.collection('profiles').doc(userId).collection('dailyMealPlans').doc(date);
+      
+      // Check if this date already exists in new structure
+      const existingDoc = await dailyMealPlanRef.get();
+      if (existingDoc.exists() && existingDoc.data()?.meals?.length > 0) {
+        console.log(`⏭️ Skipping ${date} - already exists in new structure with ${existingDoc.data()?.meals?.length} meals`);
+        continue;
+      }
+      
+      batch.set(dailyMealPlanRef, {
+        date,
+        meals,
+        migrated: true,
+        migratedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      });
+      
+      migratedCount += meals.length;
+      console.log(`✅ Prepared migration for ${date}: ${meals.length} meals`);
+    }
+    
+    if (dates.length > 0) {
+      await batch.commit();
+      console.log(`🎉 Migration completed: ${migratedCount} meals across ${dates.length} dates`);
+    }
+    
+    revalidatePath('/meal-plan');
+    revalidatePath('/');
+    
+    return { 
+      success: true, 
+      message: `Successfully migrated ${migratedCount} meals across ${dates.length} dates`,
+      migratedDates: dates,
+      migratedMealsCount: migratedCount
+    };
+    
+  } catch (error: any) {
+    console.error('Migration error:', {
+      code: error.code,
+      message: error.message,
+      stack: error.stack,
+    });
+    return { success: false, error: `Migration failed: ${error.message}` };
+  }
+}
+
+// Helper function to check if migration is needed
+export async function checkMigrationStatus(idToken: string) {
+  try {
+    const decodedToken = await serverFirestore.verifyToken(idToken);
+    const userId = decodedToken.uid;
+    
+    // Check if there's any legacy data
+    const legacyMealPlanRef = adminDb.collection('profiles').doc(userId).collection('mealPlan');
+    const legacySnapshot = await legacyMealPlanRef.limit(1).get();
+    const hasLegacyData = !legacySnapshot.empty;
+    
+    // Check if there's any new structure data
+    const newMealPlanRef = adminDb.collection('profiles').doc(userId).collection('dailyMealPlans');
+    const newSnapshot = await newMealPlanRef.limit(1).get();
+    const hasNewData = !newSnapshot.empty;
+    
+    return {
+      success: true,
+      hasLegacyData,
+      hasNewData,
+      needsMigration: hasLegacyData && !hasNewData
+    };
+    
+  } catch (error: any) {
+    console.error('Migration status check error:', error);
+    return { success: false, error: error.message };
+  }
+}

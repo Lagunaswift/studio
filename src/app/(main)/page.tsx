@@ -42,7 +42,7 @@ import { cn } from '@/lib/utils';
 // FIXED IMPORTS
 import { useAuth } from '@/context/AuthContext';
 import { useAppContext } from '@/context/AppContext';
-import { useOptimizedRecipes, useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
+import { useOptimizedRecipes, useOptimizedProfile, useOptimizedDailyMealPlan } from '@/hooks/useOptimizedFirestore';
 import { useToast } from '@/hooks/use-toast';
 
 // Types
@@ -69,6 +69,55 @@ const chartConfig = {
   consumed: { label: "Consumed", color: "hsl(var(--chart-1))" },
   target: { label: "Target", color: "hsl(var(--chart-2))" },
 } satisfies ChartConfig;
+
+// Enhanced Meal Item Component with Image
+const TodaysMenuMealItem: React.FC<{ meal: any; index: number }> = ({ meal, index }) => {
+  const [imageError, setImageError] = useState(false);
+  
+  const getImageSrc = () => {
+    if (!meal.recipeDetails || imageError) {
+      return '/placeholder-recipe.jpg';
+    }
+    return `/images/${meal.recipeDetails.id}.jpg`;
+  };
+  
+  return (
+    <div key={meal.id || index} className="flex items-center gap-4 p-3 bg-muted/30 rounded-lg">
+      {/* Recipe Image */}
+      <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+        <img
+          src={getImageSrc()}
+          alt={meal.recipeDetails?.name || 'Recipe'}
+          className="w-full h-full object-cover"
+          onError={() => setImageError(true)}
+          loading="lazy"
+        />
+      </div>
+      
+      {/* Meal Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <h4 className="font-medium text-sm">{meal.mealType}</h4>
+          <Badge variant={meal.status === 'eaten' ? 'default' : 'secondary'} className="text-xs">
+            {meal.status === 'eaten' ? 'Completed' : 'Planned'}
+          </Badge>
+        </div>
+        <p className="text-sm text-muted-foreground truncate">
+          {meal.recipeDetails?.name || (
+            <span className="text-destructive">Recipe not found (ID: {meal.recipeId})</span>
+          )}
+          {meal.servings && meal.servings > 1 && ` • ${meal.servings} servings`}
+        </p>
+        {meal.recipeDetails && (
+          <p className="text-xs text-muted-foreground mt-1">
+            {meal.recipeDetails.calories && `${Math.round(meal.recipeDetails.calories * (meal.servings || 1))} cal`}
+            {meal.recipeDetails.prepTime && ` • ${meal.recipeDetails.prepTime}`}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export default function HomePage() {
   // FIXED: All hooks properly imported
@@ -124,10 +173,50 @@ export default function HomePage() {
     ? getConsumedMacrosForDate(clientTodayDate) 
     : { calories: 0, protein: 0, carbs: 0, fat: 0 };
 
-  // Get daily planned meals
-  const dailyPlannedMeals = clientTodayDate && getMealsForDate 
-    ? getMealsForDate(clientTodayDate) 
-    : [];
+  // Get daily planned meals using the optimized hook with fallback
+  const { meals: dailyPlannedMeals, loading: isDailyMealsLoading, error: dailyMealsError, hasMigratedData } = useOptimizedDailyMealPlan(
+    user?.uid,
+    clientTodayDate
+  );
+  
+  // Enhanced meals with recipe details
+  const enhancedDailyMeals = dailyPlannedMeals.map(meal => ({
+    ...meal,
+    recipeDetails: allRecipesCache.find(recipe => recipe.id === meal.recipeId)
+  }));
+  
+  // Auto-migration effect
+  useEffect(() => {
+    const triggerMigrationIfNeeded = async () => {
+      if (!user || !clientTodayDate || hasMigratedData || isDailyMealsLoading) return;
+      
+      // Only trigger migration if we have no meals but legacy data might exist
+      if (dailyPlannedMeals.length === 0) {
+        try {
+          const idToken = await user.getIdToken();
+          console.log('🔄 Checking if migration is needed...');
+          
+          // Import the migration functions dynamically to avoid bundle issues
+          const { migrateLegacyMealPlanData } = await import('@/app/(main)/profile/actions');
+          const result = await migrateLegacyMealPlanData(idToken);
+          
+          if (result.success && result.migratedMealsCount && result.migratedMealsCount > 0) {
+            console.log(`✅ Migration successful: ${result.message}`);
+            toast({
+              title: "Meal Plan Updated",
+              description: `We've updated your meal plan structure. ${result.migratedMealsCount} meals have been migrated.`,
+            });
+          }
+        } catch (error) {
+          console.warn('Migration check failed:', error);
+        }
+      }
+    };
+    
+    // Delay migration check to avoid race conditions
+    const timeoutId = setTimeout(triggerMigrationIfNeeded, 2000);
+    return () => clearTimeout(timeoutId);
+  }, [user, clientTodayDate, hasMigratedData, isDailyMealsLoading, dailyPlannedMeals.length, toast]);
 
 
   // Prepare chart data (same as weekly planner)
@@ -163,7 +252,7 @@ export default function HomePage() {
   }, [allRecipesCache]);
 
   // Loading state
-  if (isAuthLoading || isProfileLoading) {
+  if (isAuthLoading || isProfileLoading || isAppRecipeCacheLoading) {
     return (
       <PageWrapper title="Dashboard">
         <div className="flex justify-center items-center min-h-[400px]">
@@ -273,27 +362,36 @@ export default function HomePage() {
         {showMenu && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl font-semibold">Today's Menu</CardTitle>
-              <CardDescription>
-                Your planned meals for {isClient ? format(new Date(), 'MMMM dd, yyyy') : 'today'}
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl font-semibold">Today's Menu</CardTitle>
+                  <CardDescription>
+                    Your planned meals for {isClient ? format(new Date(), 'MMMM dd, yyyy') : 'today'}
+                    {!hasMigratedData && dailyPlannedMeals.length > 0 && (
+                      <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                        Legacy data - will be migrated automatically
+                      </span>
+                    )}
+                  </CardDescription>
+                </div>
+                {isDailyMealsLoading && (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
             </CardHeader>
             <CardContent>
-              {dailyPlannedMeals && dailyPlannedMeals.length > 0 ? (
+              {dailyMealsError && (
+                <Alert className="mb-4">
+                  <AlertTitle>Error Loading Meals</AlertTitle>
+                  <AlertDescription>
+                    {dailyMealsError} - Try refreshing the page.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {enhancedDailyMeals && enhancedDailyMeals.length > 0 ? (
                 <div className="space-y-4">
-                  {dailyPlannedMeals.map((meal, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                      <div>
-                        <h4 className="font-medium">{meal.mealType}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {meal.recipeDetails?.name || 'Unknown Recipe'} 
-                          {meal.servings > 1 && ` (${meal.servings} servings)`}
-                        </p>
-                      </div>
-                      <Badge variant={meal.status === 'eaten' ? 'default' : 'secondary'}>
-                        {meal.status === 'eaten' ? 'Completed' : 'Planned'}
-                      </Badge>
-                    </div>
+                  {enhancedDailyMeals.map((meal, index) => (
+                    <TodaysMenuMealItem key={meal.id || index} meal={meal} index={index} />
                   ))}
                   <div className="text-center pt-2">
                     <Link href="/meal-plan">
@@ -308,14 +406,16 @@ export default function HomePage() {
                 <div className="text-center py-8">
                   <UtensilsCrossed className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <p className="text-muted-foreground mb-4">
-                    No meals planned for today yet.
+                    {isDailyMealsLoading ? 'Loading your meals...' : 'No meals planned for today yet.'}
                   </p>
-                  <Link href="/meal-plan">
-                    <Button>
-                      <PlusCircle className="h-4 w-4 mr-2" />
-                      Plan Your Meals
-                    </Button>
-                  </Link>
+                  {!isDailyMealsLoading && (
+                    <Link href="/meal-plan">
+                      <Button>
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Plan Your Meals
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               )}
             </CardContent>

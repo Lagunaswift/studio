@@ -86,7 +86,26 @@ export default function MealPlanPage() {
   const { toast } = useToast();
 
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-  const { meals: dailyMeals, loading: isMealPlanLoading } = useOptimizedDailyMealPlan(user?.uid, formattedDate);
+  const { meals: dailyMeals, loading: isMealPlanLoading, error: mealPlanError, hasMigratedData } = useOptimizedDailyMealPlan(user?.uid, formattedDate);
+  
+  // Log meal plan data for debugging deployment issues
+  useEffect(() => {
+    console.log(`📋 Meal Plan Debug (${formattedDate}):`, {
+      userId: user?.uid,
+      selectedDate: formattedDate,
+      mealsCount: dailyMeals.length,
+      loading: isMealPlanLoading,
+      error: mealPlanError,
+      hasMigratedData,
+      meals: dailyMeals.map(meal => ({
+        id: meal.id,
+        recipeId: meal.recipeId,
+        mealType: meal.mealType,
+        servings: meal.servings,
+        hasRecipeDetails: !!allRecipesCache.find(r => r.id === meal.recipeId)
+      }))
+    });
+  }, [formattedDate, user?.uid, dailyMeals.length, isMealPlanLoading, mealPlanError, hasMigratedData, dailyMeals, allRecipesCache]);
 
   const [recipePickerIndices, setRecipePickerIndices] = useState<{[key: string]: number}>(
     (userProfile?.mealStructure || MEAL_SLOT_CONFIG).reduce((acc, slot, index) => {
@@ -333,9 +352,14 @@ export default function MealPlanPage() {
   };
 
   const handleAddMeal = async (recipeId: string, mealType: string, mealSlotId?: string) => {
-    if (!user) return;
+    if (!user) {
+      console.error('❌ No user authenticated for add meal');
+      return;
+    }
 
     try {
+      console.log(`➕ Adding meal:`, { recipeId, mealType, mealSlotId, date: formattedDate });
+      
       const idToken = await user.getIdToken();
       const mealData = {
         recipeId: parseInt(recipeId),
@@ -348,12 +372,15 @@ export default function MealPlanPage() {
 
       const result = await addMealToDay(idToken, formattedDate, mealData);
       
+      console.log(`📝 Add meal result:`, result);
+      
       if (result.success) {
         toast({
           title: "Meal Added",
           description: `Recipe added to ${mealType} for ${format(selectedDate, 'MMM do, yyyy')}.`,
         });
       } else {
+        console.error('❌ Add meal failed:', result.error);
         toast({
           title: "Error",
           description: result.error || "Failed to add meal",
@@ -361,21 +388,34 @@ export default function MealPlanPage() {
         });
       }
     } catch (error: any) {
-      console.error('Add meal error:', error);
+      console.error('❌ Add meal error:', {
+        error: error.message,
+        stack: error.stack,
+        recipeId,
+        mealType,
+        date: formattedDate
+      });
       toast({
         title: "Error",
-        description: "Failed to add meal",
+        description: `Failed to add meal: ${error.message}`,
         variant: "destructive",
       });
     }
   };
 
   const handleRemoveMeal = async (mealId: string) => {
-    if (!user) return;
+    if (!user) {
+      console.error('❌ No user authenticated for remove meal');
+      return;
+    }
 
     try {
+      console.log(`➖ Removing meal:`, { mealId, date: formattedDate });
+      
       const idToken = await user.getIdToken();
       const result = await removeMealFromDay(idToken, formattedDate, mealId);
+      
+      console.log(`📝 Remove meal result:`, result);
       
       if (result.success) {
         toast({
@@ -383,6 +423,7 @@ export default function MealPlanPage() {
           description: "Meal removed from your plan.",
         });
       } else {
+        console.error('❌ Remove meal failed:', result.error);
         toast({
           title: "Error",
           description: result.error || "Failed to remove meal",
@@ -390,10 +431,15 @@ export default function MealPlanPage() {
         });
       }
     } catch (error: any) {
-      console.error('Remove meal error:', error);
+      console.error('❌ Remove meal error:', {
+        error: error.message,
+        stack: error.stack,
+        mealId,
+        date: formattedDate
+      });
       toast({
         title: "Error",
-        description: "Failed to remove meal",
+        description: `Failed to remove meal: ${error.message}`,
         variant: "destructive",
       });
     }
@@ -405,9 +451,14 @@ export default function MealPlanPage() {
   };
 
   const saveServings = async () => {
-    if (!user || !editingMeal) return;
+    if (!user || !editingMeal) {
+      console.error('❌ No user or editing meal for update servings');
+      return;
+    }
 
     try {
+      console.log(`✏️ Updating servings:`, { mealId: editingMeal.id, newServings, date: formattedDate });
+      
       const idToken = await user.getIdToken();
       
       if (!editingMeal?.id) {
@@ -418,6 +469,8 @@ export default function MealPlanPage() {
         servings: newServings
       });
       
+      console.log(`📝 Update servings result:`, result);
+      
       if (result.success) {
         setEditingMeal(null);
         toast({
@@ -425,6 +478,7 @@ export default function MealPlanPage() {
           description: `Servings updated to ${newServings}.`,
         });
       } else {
+        console.error('❌ Update servings failed:', result.error);
         toast({
           title: "Error",
           description: result.error || "Failed to update servings",
@@ -432,10 +486,16 @@ export default function MealPlanPage() {
         });
       }
     } catch (error: any) {
-      console.error('Update servings error:', error);
+      console.error('❌ Update servings error:', {
+        error: error.message,
+        stack: error.stack,
+        mealId: editingMeal?.id,
+        newServings,
+        date: formattedDate
+      });
       toast({
         title: "Error",
-        description: "Failed to update servings",
+        description: `Failed to update servings: ${error.message}`,
         variant: "destructive",
       });
     }
@@ -446,11 +506,18 @@ export default function MealPlanPage() {
   };
 
   const confirmClearDay = async () => {
-    if (!user) return;
+    if (!user) {
+      console.error('❌ No user authenticated for clear day');
+      return;
+    }
 
     try {
+      console.log(`🗑️ Clearing day:`, { date: formattedDate, mealsCount: dailyMeals.length });
+      
       const idToken = await user.getIdToken();
       const result = await clearDailyMealPlan(idToken, formattedDate);
+      
+      console.log(`📝 Clear day result:`, result);
       
       if (result.success) {
         toast({
@@ -458,6 +525,7 @@ export default function MealPlanPage() {
           description: `Cleared all meals from ${format(selectedDate, 'PPP')}.`,
         });
       } else {
+        console.error('❌ Clear day failed:', result.error);
         toast({
           title: "Error",
           description: result.error || "Failed to clear day",
@@ -465,10 +533,14 @@ export default function MealPlanPage() {
         });
       }
     } catch (error: any) {
-      console.error('Clear day error:', error);
+      console.error('❌ Clear day error:', {
+        error: error.message,
+        stack: error.stack,
+        date: formattedDate
+      });
       toast({
         title: "Error",
-        description: "Failed to clear day",
+        description: `Failed to clear day: ${error.message}`,
         variant: "destructive",
       });
     } finally {
@@ -534,7 +606,7 @@ export default function MealPlanPage() {
     { name: "Fat", planned: Math.round(dailyMacros.fat) || 0, target: 0, unit: 'g' },
   ];
 
-  // Debug logging for chart issues
+  // Enhanced debug logging for deployment issues
   console.log('📊 Chart Debug Data:', {
     dailyMealsCount: dailyMeals.length,
     dailyMacros,
@@ -542,7 +614,14 @@ export default function MealPlanPage() {
     caloriesChartData,
     macrosChartData,
     hasTargets: !!currentMacroTargets,
-    selectedDate: formattedDate
+    selectedDate: formattedDate,
+    recipesLoaded: allRecipesCache.length,
+    error: mealPlanError,
+    hasMigratedData,
+    environment: {
+      NODE_ENV: process.env.NODE_ENV,
+      isClient: typeof window !== 'undefined'
+    }
   });
 
   return (
@@ -596,6 +675,21 @@ export default function MealPlanPage() {
             />
           </CardContent>
         </Card>
+
+        {/* Error Alert */}
+        {mealPlanError && (
+          <Alert className="border-destructive">
+            <AlertTitle className="text-destructive">Meal Plan Loading Error</AlertTitle>
+            <AlertDescription>
+              {mealPlanError}
+              <br />
+              <span className="text-xs text-muted-foreground mt-2 block">
+                Debug info: Date={formattedDate}, User={user?.uid?.substr(0, 8)}..., 
+                HasMigratedData={hasMigratedData ? 'Yes' : 'No'}
+              </span>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Mobile-optimized Daily Macros Summary */}
         <Card className="shadow-lg">

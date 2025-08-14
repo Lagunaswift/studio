@@ -279,11 +279,78 @@ export function useOptimizedShoppingList(userId: string | undefined) {
   return { shoppingList, loading, error };
 }
 
-// Daily Meal Plan Hook (New Structure: One Document Per Day)
+// Daily Meal Plan Hook (New Structure with Legacy Fallback)
 export function useOptimizedDailyMealPlan(userId: string | undefined, date?: string) {
   const [dailyMealPlan, setDailyMealPlan] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasMigratedData, setHasMigratedData] = useState(false);
+
+  const loadWithFallback = useCallback(async (targetDate: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log(`🍽️ Loading meal plan for ${userId} on ${targetDate}`);
+      
+      // First try new structure
+      const newStructurePath = `profiles/${userId}/dailyMealPlans/${targetDate}`;
+      const newData = await optimizedFirestore.getDocument<any>(
+        newStructurePath,
+        30 * 1000 // 30 second cache
+      );
+      
+      if (newData && newData.meals && newData.meals.length > 0) {
+        console.log(`✅ Found meals in new structure:`, newData.meals.length);
+        setDailyMealPlan(newData);
+        setHasMigratedData(true);
+        return;
+      }
+      
+      console.log(`🔍 No meals in new structure, checking legacy structure...`);
+      
+      // Fallback to legacy structure
+      const legacyResult = await optimizedFirestore.getCollection<any>(
+        `profiles/${userId}/mealPlan`,
+        [],
+        {
+          ttl: 5 * 60 * 1000,
+          enablePagination: false,
+          cacheKey: `legacy_meal_plan:${userId}:${targetDate}`
+        }
+      );
+      
+      // Filter legacy meals for the target date
+      const legacyMeals = legacyResult.data.filter((meal: any) => meal.date === targetDate);
+      
+      if (legacyMeals.length > 0) {
+        console.log(`✅ Found ${legacyMeals.length} meals in legacy structure, creating migration data`);
+        const migratedData = {
+          date: targetDate,
+          meals: legacyMeals.map((meal: any) => ({
+            ...meal,
+            id: meal.id || `migrated-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            source: 'legacy' // Mark as migrated from legacy
+          })),
+          migrated: true,
+          migratedAt: new Date().toISOString()
+        };
+        
+        setDailyMealPlan(migratedData);
+        setHasMigratedData(false); // Not yet saved to new structure
+      } else {
+        console.log(`ℹ️ No meals found in either structure for ${targetDate}`);
+        setDailyMealPlan({ date: targetDate, meals: [] });
+      }
+      
+    } catch (err: any) {
+      console.error(`❌ Error loading meal plan for ${targetDate}:`, err);
+      setError(err.message);
+      setDailyMealPlan({ date: targetDate, meals: [] });
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) {
@@ -292,28 +359,43 @@ export function useOptimizedDailyMealPlan(userId: string | undefined, date?: str
       return;
     }
 
-    // If no date specified, use today
     const targetDate = date || format(new Date(), 'yyyy-MM-dd');
-    const documentPath = `profiles/${userId}/dailyMealPlans/${targetDate}`;
+    loadWithFallback(targetDate);
     
+    // Set up real-time subscription to new structure
+    const documentPath = `profiles/${userId}/dailyMealPlans/${targetDate}`;
     const unsubscribe = optimizedFirestore.subscribeToDocument<any>(
       documentPath,
       (data) => {
-        setDailyMealPlan(data);
+        if (data && data.meals) {
+          console.log(`🔄 Real-time update: ${data.meals.length} meals`);
+          setDailyMealPlan(data);
+          setHasMigratedData(true);
+        }
         setLoading(false);
         setError(null);
       },
       {
         debounceMs: 300,
-        ttl: 30 * 1000 // 30 second cache for real-time updates
+        ttl: 30 * 1000
       }
     );
 
     return unsubscribe;
-  }, [userId, date]);
+  }, [userId, date, loadWithFallback]);
 
   // Helper to get meals array
   const meals = dailyMealPlan?.meals || [];
 
-  return { dailyMealPlan, meals, loading, error };
+  return { 
+    dailyMealPlan, 
+    meals, 
+    loading, 
+    error,
+    hasMigratedData,
+    refetch: () => {
+      const targetDate = date || format(new Date(), 'yyyy-MM-dd');
+      loadWithFallback(targetDate);
+    }
+  };
 }
