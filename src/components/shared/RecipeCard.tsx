@@ -14,10 +14,7 @@ import {
   ChefHat, 
   ChevronDown, 
   ChevronUp, 
-  Flame, 
-  Beef, 
-  Wheat, 
-  Droplets,
+  Flame,
   Heart,
   Info
 } from 'lucide-react';
@@ -185,29 +182,28 @@ export function RecipeCard({
           </div>
         </div>
 
-        {/* Macro Summary Row - FIXED to use individual macro properties */}
+        {/* Detailed Macro Display - Main focus on macros */}
         {(macros.calories > 0 || macros.protein > 0 || macros.carbs > 0 || macros.fat > 0) && (
-          <div className="flex justify-between items-center text-xs text-muted-foreground mt-2 pt-2 border-t border-muted/30">
-            <span className="font-medium">Per serving:</span>
-            <span>
-              {macros.protein.toFixed(0)}P • {macros.carbs.toFixed(0)}C • {macros.fat.toFixed(0)}F
-            </span>
-          </div>
-        )}
-
-        {/* Tags Preview */}
-        {recipe.tags && recipe.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {recipe.tags.slice(0, 3).map(tag => (
-              <Badge key={tag} variant="outline" className="text-xs">
-                {tag}
-              </Badge>
-            ))}
-            {recipe.tags.length > 3 && (
-              <Badge variant="outline" className="text-xs text-muted-foreground">
-                +{recipe.tags.length - 3}
-              </Badge>
-            )}
+          <div className="mt-3 p-3 bg-muted/20 rounded-lg border border-muted/30">
+            <div className="text-xs text-muted-foreground mb-2 text-center">Nutrition per serving</div>
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <div>
+                <div className="text-lg font-semibold text-accent">{macros.calories}</div>
+                <div className="text-xs text-muted-foreground">cal</div>
+              </div>
+              <div>
+                <div className="text-lg font-semibold text-accent">{macros.protein.toFixed(0)}</div>
+                <div className="text-xs text-muted-foreground">protein</div>
+              </div>
+              <div>
+                <div className="text-lg font-semibold text-accent">{macros.carbs.toFixed(0)}</div>
+                <div className="text-xs text-muted-foreground">carbs</div>
+              </div>
+              <div>
+                <div className="text-lg font-semibold text-accent">{macros.fat.toFixed(0)}</div>
+                <div className="text-xs text-muted-foreground">fat</div>
+              </div>
+            </div>
           </div>
         )}
       </CardHeader>
@@ -229,42 +225,6 @@ export function RecipeCard({
         
         <CollapsibleContent className="px-4 pb-4">
           <CardContent className="p-0 space-y-4">
-            {/* Detailed Macros - FIXED to use individual macro properties */}
-            {(macros.calories > 0 || macros.protein > 0 || macros.carbs > 0 || macros.fat > 0) && (
-              <div className="space-y-2">
-                <h4 className="font-medium text-sm text-primary">Nutrition per serving:</h4>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <Flame className="w-4 h-4 text-orange-500" />
-                      <span>Calories</span>
-                    </div>
-                    <span className="font-medium">{macros.calories.toFixed(0)} kcal</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <Beef className="w-4 h-4 text-red-500" />
-                      <span>Protein</span>
-                    </div>
-                    <span className="font-medium">{macros.protein.toFixed(0)}g</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <Wheat className="w-4 h-4 text-amber-500" />
-                      <span>Carbs</span>
-                    </div>
-                    <span className="font-medium">{macros.carbs.toFixed(0)}g</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <Droplets className="w-4 h-4 text-blue-500" />
-                      <span>Fat</span>
-                    </div>
-                    <span className="font-medium">{macros.fat.toFixed(0)}g</span>
-                  </div>
-                </div>
-              </div>
-            )}
             
             {/* Timing Details */}
             <div className="space-y-2">
@@ -295,9 +255,9 @@ export function RecipeCard({
             )}
             
             {/* All Tags */}
-            {recipe.tags && recipe.tags.length > 3 && (
+            {recipe.tags && recipe.tags.length > 0 && (
               <div className="space-y-2">
-                <h4 className="font-medium text-sm text-primary">All tags:</h4>
+                <h4 className="font-medium text-sm text-primary">Tags:</h4>
                 <div className="flex flex-wrap gap-1">
                   {recipe.tags.map(tag => (
                     <Badge key={tag} variant="outline" className="text-xs">

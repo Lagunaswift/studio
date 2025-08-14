@@ -142,7 +142,6 @@ export default function HomePage() {
   const [featuredRecipe, setFeaturedRecipe] = useState<Recipe | null>(null);
   const [quickRecipe, setQuickRecipe] = useState<Recipe | null>(null);
   const [isClient, setIsClient] = useState(false);
-  const [isMigrating, setIsMigrating] = useState(false);
 
   // Fix hydration issues by ensuring client-side only rendering for dates
   useEffect(() => {
@@ -233,43 +232,6 @@ export default function HomePage() {
     return () => clearTimeout(timeoutId);
   }, [user, clientTodayDate, hasMigratedData, isDailyMealsLoading, toast]);
   
-  // Manual migration function for testing
-  const handleManualMigration = async () => {
-    if (!user || isMigrating) return;
-    
-    setIsMigrating(true);
-    try {
-      const idToken = await user.getIdToken();
-      console.log('🔄 Manual migration triggered');
-      
-      const { migrateLegacyMealPlanData } = await import('@/app/(main)/profile/actions');
-      const result = await migrateLegacyMealPlanData(idToken);
-      
-      if (result.success) {
-        toast({
-          title: "Migration Complete",
-          description: result.message,
-        });
-        console.log('✅ Manual migration result:', result);
-      } else {
-        toast({
-          title: "Migration Failed",
-          description: result.error || 'Unknown error',
-          variant: "destructive",
-        });
-      }
-    } catch (error: any) {
-      console.error('❌ Manual migration error:', error);
-      toast({
-        title: "Migration Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsMigrating(false);
-    }
-  };
-
 
   // Prepare chart data (same as weekly planner)
   const caloriesChartData = useMemo(() => {
@@ -427,21 +389,6 @@ export default function HomePage() {
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                  {process.env.NODE_ENV === 'development' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleManualMigration}
-                      disabled={isMigrating}
-                      className="text-xs"
-                    >
-                      {isMigrating ? (
-                        <><Loader2 className="h-3 w-3 animate-spin mr-1" />Migrating...</>
-                      ) : (
-                        'Migrate Legacy Data'
-                      )}
-                    </Button>
-                  )}
                   {isDailyMealsLoading && (
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   )}

@@ -267,42 +267,6 @@ export default function MealPlanPage() {
         </CollapsibleTrigger>
         
         <CollapsibleContent className="space-y-2 pt-2 border-t">
-          {/* FIXED: Detailed macro breakdown using individual properties */}
-          {(macros.calories > 0 || macros.protein > 0 || macros.carbs > 0 || macros.fat > 0) && (
-            <div className="space-y-2">
-              <h4 className="font-medium text-xs text-primary">Nutrition per serving:</h4>
-              <div className="grid grid-cols-4 gap-1 text-center">
-                <div className="text-xs">
-                  <div className="flex items-center justify-center mb-1">
-                    <Flame className="w-3 h-3 text-orange-500" />
-                  </div>
-                  <div className="font-medium">{macros.calories.toFixed(0)}</div>
-                  <div className="text-muted-foreground">cal</div>
-                </div>
-                <div className="text-xs">
-                  <div className="flex items-center justify-center mb-1">
-                    <Beef className="w-3 h-3 text-red-500" />
-                  </div>
-                  <div className="font-medium">{macros.protein.toFixed(0)}g</div>
-                  <div className="text-muted-foreground">protein</div>
-                </div>
-                <div className="text-xs">
-                  <div className="flex items-center justify-center mb-1">
-                    <Wheat className="w-3 h-3 text-amber-500" />
-                  </div>
-                  <div className="font-medium">{macros.carbs.toFixed(0)}g</div>
-                  <div className="text-muted-foreground">carbs</div>
-                </div>
-                <div className="text-xs">
-                  <div className="flex items-center justify-center mb-1">
-                    <Droplets className="w-3 h-3 text-blue-500" />
-                  </div>
-                  <div className="font-medium">{macros.fat.toFixed(0)}g</div>
-                  <div className="text-muted-foreground">fat</div>
-                </div>
-              </div>
-            </div>
-          )}
           
           {/* Timing & Servings - mobile layout */}
           <div className="text-xs space-y-1">

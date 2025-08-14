@@ -6,6 +6,7 @@ import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Lightbulb, ChefHat, Sparkles, Send, Info, PlusCircle } from 'lucide-react';
+import { MealPlanLoading } from '@/components/ui/enhanced-preppy-loading';
 import { useAppContext } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import type { Macros } from '@/types';
@@ -707,11 +708,20 @@ export default function AISuggestionsPage() {
         </Card>
 
         {isGeneratingPlan && (
-          <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
-            <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
-            <p className="text-lg">Generating your personalized meal plan...</p>
-            <p className="text-sm">Creating balanced nutrition...</p>
-          </div>
+          <MealPlanLoading 
+            duration={8000}
+            userContext={{
+              hasAllergies: (userSettingsToUse?.allergens?.length || 0) > 0,
+              isVegetarian: userSettingsToUse?.dietaryPreferences?.includes('vegetarian'),
+              currentGoal: userSettingsToUse?.primaryGoal as any,
+              timeOfDay: new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening',
+              isNewUser: !userSettingsToUse?.macroTargets,
+              hasCookingTime: true,
+              preferredCuisines: userSettingsToUse?.dietaryPreferences
+            }}
+            showProgress
+            className="h-60"
+          />
         )}
 
         {error && (

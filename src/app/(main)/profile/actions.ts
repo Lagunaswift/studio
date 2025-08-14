@@ -236,7 +236,7 @@ export async function addMealToDay(idToken: string, date: string, meal: any) {
     const doc = await dailyMealPlanRef.get();
     
     let currentMeals = [];
-    if (doc.exists()) {
+    if (doc.exists) {
       currentMeals = doc.data()?.meals || [];
     }
     
@@ -272,7 +272,7 @@ export async function updateMealInDay(idToken: string, date: string, mealId: str
     const dailyMealPlanRef = adminDb.collection('profiles').doc(userId).collection('dailyMealPlans').doc(date);
     const doc = await dailyMealPlanRef.get();
     
-    if (!doc.exists()) {
+    if (!doc.exists) {
       return { success: false, error: 'No meals found for this date' };
     }
     
@@ -306,7 +306,7 @@ export async function removeMealFromDay(idToken: string, date: string, mealId: s
     const dailyMealPlanRef = adminDb.collection('profiles').doc(userId).collection('dailyMealPlans').doc(date);
     const doc = await dailyMealPlanRef.get();
     
-    if (!doc.exists()) {
+    if (!doc.exists) {
       return { success: false, error: 'No meals found for this date' };
     }
     
@@ -386,7 +386,7 @@ export async function addOrUpdateMealPlan(idToken: string, mealData: any) {
         const dailyRef = adminDb.collection('profiles').doc(userId).collection('dailyMealPlans').doc(date);
         const doc = await dailyRef.get();
         
-        if (doc.exists()) {
+        if (doc.exists) {
           const meals = doc.data()?.meals || [];
           const mealIndex = meals.findIndex((m: any) => m.id === mealData.id);
           
@@ -710,7 +710,7 @@ export async function generateShoppingListFromMealPlan(idToken: string) {
     
     return { 
       success: true, 
-      itemsGenerated: Object.keys(requiredIngredients).length,
+      itemsGenerated: Object.keys(consolidatedIngredients).length,
       mealsProcessed: mealPlan.length 
     };
   } catch (error: any) {
@@ -950,7 +950,7 @@ export async function migrateLegacyMealPlanData(idToken: string) {
       
       // Check if this date already exists in new structure
       const existingDoc = await dailyMealPlanRef.get();
-      if (existingDoc.exists() && existingDoc.data()?.meals?.length > 0) {
+      if (existingDoc.exists && existingDoc.data()?.meals?.length > 0) {
         console.log(`⏭️ Skipping ${date} - already exists in new structure with ${existingDoc.data()?.meals?.length} meals`);
         continue;
       }

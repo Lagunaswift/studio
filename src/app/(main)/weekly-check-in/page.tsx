@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Wand2, CheckSquare, Info, AlertTriangle, TrendingUp, TrendingDown, Lock } from 'lucide-react';
+import { WeeklyAnalysisLoading } from '@/components/ui/enhanced-preppy-loading';
 import type { PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Separator } from '@/components/ui/separator';
@@ -107,11 +108,18 @@ export default function WeeklyCheckinPage() {
           </CardContent>
         </Card>
         {isLoading && (
-          <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
-            <Loader2 className="h-16 w-16 animate-spin text-accent mb-6" />
-            <p className="text-lg">Analyzing your progress...</p>
-            <p className="text-sm">This might take a moment.</p>
-          </div>
+          <WeeklyAnalysisLoading 
+            duration={12000}
+            userContext={{
+              currentGoal: userProfile?.primaryGoal as any,
+              hasLowEnergy: false,
+              timeOfDay: new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening',
+              moodToday: 'motivated',
+              fitnessLevel: 'intermediate'
+            }}
+            showProgress
+            className="h-60"
+          />
         )}
 
         {error && !recommendation && (
