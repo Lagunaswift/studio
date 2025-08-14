@@ -48,13 +48,14 @@ ${promptInput.availableRecipes.map(recipe => `- ID: ${recipe.id}, Name: "${recip
 
 Your Task:
 1. For EACH slot in the 'mealStructure', select ONE recipe from the 'availableRecipes'.
-2. Determine an appropriate number of servings for EACH selected recipe. Servings can be fractional (e.g., 1.5, 0.75, 0.5) but must be at least 0.25. Adjust servings to help meet overall daily macro targets. Ensure the servings output is a positive number.
-3. CRITICAL: Ensure your recipe choices and tags align with the user's 'dietaryPreferences' (e.g., if "Vegetarian", only select recipes tagged 'vegetarian' or those that are inherently vegetarian).
-4. CRITICAL: Ensure your recipe choices strictly AVOID any ingredients implied by the user's 'allergens' (e.g., if "Nuts", avoid recipes that might contain nuts based on their name or typical ingredients, even if not explicitly tagged). Use common sense for allergens.
-5. For each planned meal, calculate the 'calculatedMacros' based on the recipe's 'macrosPerServing' multiplied by your chosen 'servings'.
-6. Calculate 'totalAchievedMacros' by summing the 'calculatedMacros' for all planned meals.
-7. Provide a concise 'aiJustification' (2-3 sentences) explaining your key recipe choices and serving adjustments, particularly how they relate to the user's profile.
-8. Provide a 'fitnessAssessment' (2-3 sentences) on how well the generated plan meets the daily 'macroTargets'. If no targets, comment on overall balance.
+2. CRITICAL MEAL TYPE MATCHING: For slots with "Snack" as the Expected Meal Type, ONLY select recipes that are tagged with 'S', 'snack', or contain 'snack' in their tags. For non-snack meal types (Breakfast, Lunch, Dinner), avoid recipes that are exclusively snack recipes (recipes that ONLY have snack-related tags).
+3. Determine an appropriate number of servings for EACH selected recipe. Servings can be fractional (e.g., 1.5, 0.75, 0.5) but must be at least 0.25. Adjust servings to help meet overall daily macro targets. Ensure the servings output is a positive number.
+4. CRITICAL: Ensure your recipe choices and tags align with the user's 'dietaryPreferences' (e.g., if "Vegetarian", only select recipes tagged 'vegetarian' or those that are inherently vegetarian).
+5. CRITICAL: Ensure your recipe choices strictly AVOID any ingredients implied by the user's 'allergens' (e.g., if "Nuts", avoid recipes that might contain nuts based on their name or typical ingredients, even if not explicitly tagged). Use common sense for allergens.
+6. For each planned meal, calculate the 'calculatedMacros' based on the recipe's 'macrosPerServing' multiplied by your chosen 'servings'.
+7. Calculate 'totalAchievedMacros' by summing the 'calculatedMacros' for all planned meals.
+8. Provide a concise 'aiJustification' (2-3 sentences) explaining your key recipe choices and serving adjustments, particularly how they relate to the user's profile.
+9. Provide a 'fitnessAssessment' (2-3 sentences) on how well the generated plan meets the daily 'macroTargets'. If no targets, comment on overall balance.
 
 Output the entire response as a single, valid JSON object that conforms EXACTLY to the expected schema. Do NOT include any text or formatting outside of this JSON object.
 

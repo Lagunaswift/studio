@@ -116,6 +116,34 @@ export default function MealPlanPage() {
     }, {} as {[key: string]: number})
   );
   
+  // Filter recipes based on meal slot type
+  const getRecipesForSlot = (slotType: MealType, allRecipes: Recipe[]) => {
+    if (slotType === 'Snack') {
+      // For snack slots, only show recipes with 'S' or 'snack' tags
+      return allRecipes.filter(recipe => 
+        recipe.tags?.some(tag => 
+          tag.toLowerCase() === 's' || 
+          tag.toLowerCase() === 'snack' ||
+          tag.toLowerCase().includes('snack')
+        )
+      );
+    }
+    
+    // For non-snack slots, show all recipes except those exclusively tagged as snacks
+    return allRecipes.filter(recipe => {
+      if (!recipe.tags || recipe.tags.length === 0) return true;
+      
+      // Exclude recipes that are ONLY snack recipes
+      const hasOnlySnackTags = recipe.tags.every(tag => 
+        tag.toLowerCase() === 's' || 
+        tag.toLowerCase() === 'snack' ||
+        tag.toLowerCase().includes('snack')
+      );
+      
+      return !hasOnlySnackTags;
+    });
+  };
+
   const availableRecipesForPicker = allRecipesCache;
   const mealStructureToUse = userProfile?.mealStructure || MEAL_SLOT_CONFIG.map((s, i) => ({...s, id: `default-${i}`}));
 
@@ -761,7 +789,7 @@ export default function MealPlanPage() {
             } : null;
 
             const currentPickerIndex = recipePickerIndices[mealSlotKey] || 0;
-            const recipesForThisSlot = availableRecipesForPicker || [];
+            const recipesForThisSlot = getRecipesForSlot(mealSlot.type, availableRecipesForPicker || []);
 
             return (
               <Card key={mealSlotKey} className="overflow-hidden">
