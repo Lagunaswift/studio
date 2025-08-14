@@ -215,16 +215,15 @@ export function PreppyLoading({
           {texts[currentTextIndex]}
         </p>
         
-        {/* Animated dots */}
+        {/* Static dots */}
         <div className="flex justify-center space-x-1 mb-4">
           {[...Array(3)].map((_, i) => (
             <div
               key={i}
               className={cn(
-                "bg-primary rounded-full animate-bounce",
+                "bg-primary rounded-full",
                 config.dot
               )}
-              style={{ animationDelay: `${i * 0.1}s` }}
             />
           ))}
         </div>
