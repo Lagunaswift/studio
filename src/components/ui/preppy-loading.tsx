@@ -148,9 +148,9 @@ export function PreppyLoading({
 
   const texts = getContextualTexts();
   
-  // Text rotation effect - slower cycling (minimum 3 seconds per text)
+  // Text rotation effect - slower cycling (every 2.5 seconds)
   useEffect(() => {
-    const changeInterval = Math.max(duration / texts.length, 3000); // Increased from 800ms to 3000ms
+    const changeInterval = Math.max(duration / texts.length, 2500); // Set to 2.5 seconds per text
     
     const interval = setInterval(() => {
       setCurrentTextIndex((prev) => (prev + 1) % texts.length);
