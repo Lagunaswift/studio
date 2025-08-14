@@ -153,14 +153,14 @@ export function EnhancedPreppyLoading({
             
             {/* Main content */}
             <div className="relative z-10">
-              <PreppyLoading {...props} className="preppy-breathing" />
+              <PreppyLoading {...props} />
             </div>
           </div>
         );
         
       case 'glow':
         return (
-          <div className={cn("preppy-glow", className)}>
+          <div className={className}>
             <PreppyLoading {...props} />
           </div>
         );
@@ -235,7 +235,7 @@ export function EnhancedPreppyLoading({
             <Sparkles className={cn("w-4 h-4", colors.text)} />
             <span className={cn("text-sm font-medium", colors.text)}>Did you know?</span>
           </div>
-          <p className="text-sm text-gray-600 animate-pulse">
+          <p className="text-sm text-gray-600">
             {currentInsight}
           </p>
         </div>

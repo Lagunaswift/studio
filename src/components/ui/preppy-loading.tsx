@@ -175,21 +175,18 @@ export function PreppyLoading({
     sm: {
       avatar: 'w-16 h-16', // Same as md
       bot: 'w-7 h-7', // Slightly larger icon
-      spinner: 'w-4 h-4',
       text: 'text-sm',
       dot: 'w-1.5 h-1.5'
     },
     md: {
       avatar: 'w-16 h-16', // Keep same avatar size
       bot: 'w-9 h-9', // Larger icon
-      spinner: 'w-6 h-6',
       text: 'text-base',
       dot: 'w-2 h-2'
     },
     lg: {
       avatar: 'w-16 h-16', // Keep same avatar size
       bot: 'w-11 h-11', // Larger icon
-      spinner: 'w-8 h-8',
       text: 'text-lg',
       dot: 'w-3 h-3'
     }
@@ -199,24 +196,20 @@ export function PreppyLoading({
 
   return (
     <div className={cn("flex flex-col items-center justify-center p-8", className)}>
-      {/* Preppy Avatar with breathing animation */}
+      {/* Preppy Avatar - clean and simple */}
       <div className="relative mb-6">
         <div className={cn(
-          "bg-gradient-to-br from-muted to-muted/50 rounded-full flex items-center justify-center animate-pulse border border-muted",
+          "bg-gradient-to-br from-muted to-muted/50 rounded-full flex items-center justify-center border border-muted",
           config.avatar
         )}>
           <Bot className={cn("text-primary", config.bot)} />
         </div>
-        <Loader2 className={cn(
-          "text-accent animate-spin absolute -bottom-1 -right-1",
-          config.spinner
-        )} />
       </div>
       
       {/* Loading text */}
       <div className="text-center max-w-md">
         <p className={cn(
-          "font-medium text-gray-700 animate-pulse mb-4",
+          "font-medium text-gray-700 mb-4",
           config.text
         )}>
           {texts[currentTextIndex]}
