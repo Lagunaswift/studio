@@ -208,37 +208,13 @@ const generateFallbackMealPlan = (
   };
 };
 
-// Enhanced simple meal plan generation with real recipe data
-const generateSimpleMealPlan = async (
+// Demo meal plan generation for extreme fallback cases
+const generateDemoMealPlan = (
   userProfile: any, 
-  mealStructure: MealSlotForAI[],
-  availableRecipes: any[] // Using any[] to avoid type conflicts
-): Promise<SuggestMealPlanOutput> => {
-  console.log('🚀 Generating simple meal plan...');
-  
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  mealStructure: MealSlotForAI[]
+): SuggestMealPlanOutput => {
+  console.log('⚠️ Generating demo meal plan (no recipes available)...');
 
-  // Try to use real recipes if available, otherwise fall back to demo data
-  if (availableRecipes && availableRecipes.length > 0) {
-    try {
-      // Cast the meal structure to our local type
-      const mealStructureLocal: MealSlotConfigLocal[] = mealStructure.map(ms => ({
-        id: ms.id,
-        name: ms.name,
-        type: ms.type,
-      }));
-      
-      return generateFallbackMealPlan(
-        availableRecipes as RecipeWithDirectMacros[], 
-        mealStructureLocal, 
-        userProfile?.macroTargets
-      );
-    } catch (error) {
-      console.warn('Failed to use real recipes, falling back to demo data:', error);
-    }
-  }
-
-  // Demo meal plan generation (original logic)
   const plannedMeals: PlannedRecipeItem[] = [];
   const targetCalories = userProfile?.macroTargets?.calories || 2000;
   const caloriesPerMeal = targetCalories / mealStructure.length;
@@ -273,8 +249,8 @@ const generateSimpleMealPlan = async (
   return {
     plannedMeals,
     totalAchievedMacros: totalMacros,
-    aiJustification: `I've created a balanced meal plan targeting ${targetCalories} calories across your ${mealStructure.length} meal slots. Each meal is designed to provide the right balance of macronutrients to support your goals.`,
-    fitnessAssessment: `This plan provides ${totalMacros.calories} calories with a good balance of protein (${totalMacros.protein}g), carbs (${totalMacros.carbs}g), and fat (${totalMacros.fat}g) to support your fitness goals.`
+    aiJustification: `Demo meal plan created targeting ${targetCalories} calories across your ${mealStructure.length} meal slots. Please add real recipes to your collection for Preppy's personalized suggestions.`,
+    fitnessAssessment: `This demo plan provides ${totalMacros.calories} calories with a balanced macro distribution. Add recipes to get personalized suggestions from Preppy.`
   };
 };
 
@@ -342,9 +318,9 @@ export default function AISuggestionsPage() {
     setDailyUsageCount(newCount);
   };
 
-  // FIXED: handleGeneratePlan with proper error handling
+  // FIXED: handleGeneratePlan to use real AI API
   const handleGeneratePlan = async () => {
-    console.log('🎬 Starting handleGeneratePlan...');
+    console.log('🎬 Starting handleGeneratePlan with real AI...');
 
     // Check subscription limits before proceeding
     if (!checkLimitsBeforeGeneration()) {
@@ -361,38 +337,97 @@ export default function AISuggestionsPage() {
       return;
     }
 
-    // Add validation to prevent the error at its source
-    if (allRecipesCache && allRecipesCache.length > 0) {
-      const validRecipeCount = allRecipesCache.filter((recipe: any) => 
-        recipe && 
-        typeof recipe.calories === 'number' &&
-        typeof recipe.protein === 'number' &&
-        typeof recipe.carbs === 'number' &&
-        typeof recipe.fat === 'number'
-      ).length;
+    if (!allRecipesCache || allRecipesCache.length === 0) {
+      setError("No recipes available. Please add some recipes to your collection first.");
+      return;
+    }
 
-      if (validRecipeCount === 0) {
-        setError('No recipes with valid macro data found. Using demo meal plan instead.');
-        // Continue with demo plan rather than failing
-      }
+    // Filter and validate recipes for AI
+    const validRecipes = allRecipesCache.filter((recipe: any) => 
+      recipe && 
+      recipe.id &&
+      recipe.name &&
+      typeof recipe.calories === 'number' &&
+      typeof recipe.protein === 'number' &&
+      typeof recipe.carbs === 'number' &&
+      typeof recipe.fat === 'number'
+    );
+
+    if (validRecipes.length === 0) {
+      setError('No recipes with valid macro data found. Please check your recipe database.');
+      return;
     }
 
     setIsGeneratingPlan(true);
     setError(null);
     setSuggestion(null);
 
-    const mealStructureForAI: MealSlotForAI[] = userSettingsToUse.mealStructure.map((ms: any) => ({
-      id: ms.id,
-      name: ms.name,
-      type: ms.type,
-    }));
+    // Prepare data for AI API in the format expected by the schema
+    const requestBody = {
+      macroTargets: userSettingsToUse.macroTargets ? {
+        calories: userSettingsToUse.macroTargets.calories || 0,
+        protein: userSettingsToUse.macroTargets.protein || 0,
+        carbs: userSettingsToUse.macroTargets.carbs || 0,
+        fat: userSettingsToUse.macroTargets.fat || 0
+      } : null,
+      dietaryPreferences: userSettingsToUse.dietaryPreferences || [],
+      allergens: userSettingsToUse.allergens || [],
+      mealStructure: userSettingsToUse.mealStructure.map((ms: any) => ({
+        id: ms.id,
+        name: ms.name,
+        type: ms.type,
+      })),
+      availableRecipes: validRecipes.map((recipe: any) => ({
+        id: recipe.id,
+        name: recipe.name,
+        macrosPerServing: {
+          calories: recipe.calories,
+          protein: recipe.protein,
+          carbs: recipe.carbs,
+          fat: recipe.fat
+        },
+        tags: recipe.tags || []
+      })),
+      currentDate: format(new Date(), 'yyyy-MM-dd')
+    };
 
     try {
-      const result = await generateSimpleMealPlan(
-        userSettingsToUse, 
-        mealStructureForAI,
-        allRecipesCache || []
-      );
+      console.log('🚀 Calling Preppy API with:', { 
+        recipeCount: validRecipes.length, 
+        mealSlots: userSettingsToUse.mealStructure.length,
+        hasTargets: !!userSettingsToUse.macroTargets
+      });
+
+      console.log('📡 Request body:', JSON.stringify(requestBody, null, 2));
+
+      const response = await fetch('/api/ai/suggest-meal-plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log('📥 Response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}: Failed to generate meal plan`;
+        try {
+          const responseText = await response.text();
+          try {
+            const errorData = JSON.parse(responseText);
+            errorMessage = errorData.error || errorData.details || errorMessage;
+          } catch (jsonParseError) {
+            // If it's not JSON, use the raw text
+            errorMessage = responseText || errorMessage;
+          }
+        } catch (textError) {
+          console.error('Could not read error response:', textError);
+        }
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
       setSuggestion(result);
       
       // Track usage after successful generation
@@ -402,16 +437,17 @@ export default function AISuggestionsPage() {
       
       toast({
         title: "Meal Plan Generated!",
-        description: "Your personalized meal plan is ready",
+        description: "Preppy has created your personalized meal plan",
         variant: "default",
       });
 
     } catch (err: any) {
-      console.error("Meal plan error:", err);
+      console.error("AI meal plan error:", err);
       
-      // Try fallback meal plan generation
+      // Try fallback meal plan generation only as last resort
       try {
-        // Cast the meal structure and recipes to avoid type conflicts
+        console.log('⚠️ AI failed, trying fallback...');
+        
         const mealStructureLocal: MealSlotConfigLocal[] = userSettingsToUse.mealStructure.map((ms: any) => ({
           id: ms.id,
           name: ms.name,
@@ -419,7 +455,7 @@ export default function AISuggestionsPage() {
         }));
         
         const fallbackResult = generateFallbackMealPlan(
-          (allRecipesCache || []) as unknown as RecipeWithDirectMacros[],
+          validRecipes as unknown as RecipeWithDirectMacros[],
           mealStructureLocal,
           userSettingsToUse.macroTargets || undefined
         );
@@ -430,7 +466,7 @@ export default function AISuggestionsPage() {
           trackUsage(user.uid, 'aiRequest');
         }
         
-        setError('AI suggestion temporarily unavailable. Showing a simple fallback plan.');
+        setError(`Preppy temporarily unavailable: ${err.message}. Showing a simple fallback plan instead.`);
       } catch (fallbackError: any) {
         console.error('Even fallback failed:', fallbackError);
         setError(`Failed to generate meal plan: ${err.message}`);
@@ -559,8 +595,8 @@ export default function AISuggestionsPage() {
               <br />
               <small className="text-muted-foreground mt-1 block">
                 {allRecipesCache && allRecipesCache.length > 0 
-                  ? `🍽️ Using your ${allRecipesCache.length} recipes` 
-                  : '🧪 Demo version with sample meal plans'
+                  ? `🤖 Preppy will use your ${allRecipesCache.length} recipes` 
+                  : '🧪 Demo version - add recipes for Preppy suggestions'
                 }
               </small>
               {!isSubscribed && (

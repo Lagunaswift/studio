@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { ShoppingListItemComponent } from '@/components/shopping/ShoppingListItemComponent';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, ShoppingCart, Trash2, ListChecks, Utensils } from 'lucide-react';
+import { AlertCircle, ShoppingCart, Trash2, ListChecks, Utensils, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -67,6 +67,15 @@ export default function ShoppingListPage() {
   const toggleShoppingListItem = (itemId: string) => {
     const updatedShoppingList = shoppingList.map(item => item.id === itemId ? { ...item, purchased: !item.purchased } : item);
     updateProfile({ shoppingList: updatedShoppingList as any });
+  }
+
+  const removeMealFromPlan = (plannedMealId: string) => {
+    const updatedMealPlan = mealPlan.filter(pm => pm.id !== plannedMealId);
+    updateProfile({ mealPlan: updatedMealPlan as any });
+    toast({
+      title: "Meal Removed",
+      description: "The meal has been removed from your plan.",
+    });
   }
 
   const groupedListByAisle: { [category: string]: ShoppingListItem[] } = useMemo(() => {
@@ -234,9 +243,19 @@ export default function ShoppingListPage() {
                 <div className="space-y-6">
                   {recipeShoppingGroups.map((group) => (
                     <div key={group.plannedMealId}>
-                      <h3 className="text-lg font-semibold text-primary mb-2 capitalize border-b border-border pb-1">
-                        {group.recipeName}
-                      </h3>
+                      <div className="flex items-center justify-between mb-2 pb-1 border-b border-border">
+                        <h3 className="text-lg font-semibold text-primary capitalize">
+                          {group.recipeName}
+                        </h3>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => removeMealFromPlan(group.plannedMealId)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                       <div className="space-y-2 pl-4">
                         {group.ingredients.map((ing) => (
                           <div key={ing.id} className="flex items-center space-x-3 py-1">

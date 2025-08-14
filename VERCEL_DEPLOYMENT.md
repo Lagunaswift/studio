@@ -1,6 +1,6 @@
-# Vercel Deployment Guide for MealPreppyPro
+# Vercel Deployment Guide for MealPlannerPro
 
-This guide walks through deploying the Next.js 15 MealPreppyPro application to Vercel.
+This guide walks through deploying the Next.js 15 MealPlannerPro application to Vercel.
 
 ## Prerequisites
 
@@ -69,18 +69,19 @@ SENTRY_AUTH_TOKEN=your_sentry_auth_token
 
 ### 3. Build Configuration
 
-The project uses Next.js native function configuration:
+The project includes optimized function settings:
 
-- **Runtime**: Automatic Node.js runtime detection by Next.js
-- **AI Functions**: 5 minutes timeout configured at route level for Genkit operations
-- **Function Config**: Defined in individual route files using `export const maxDuration = 300`
-- **Headers**: Optimized cache control for static assets and API routes
+- **Runtime**: Node.js 18.x (Vercel supported version)
+- **AI Functions**: 5 minutes timeout with 1GB memory for Genkit AI operations (`/api/ai/**`, `/api/genkit/**`)
+- **Standard Functions**: 60 seconds timeout for regular API routes
+- **Memory**: Increased allocation for AI-intensive operations
 
 ### 4. Deploy
 
 1. Click "Deploy" in Vercel dashboard
 2. Wait for build to complete
-3. Verify deployment at your assigned URL
+3. Verify 
+deployment at your assigned URL
 
 ## Post-Deployment Setup
 
@@ -104,9 +105,9 @@ Update `NEXT_PUBLIC_APP_URL` to your production domain.
 ## Troubleshooting
 
 ### Function Runtime Errors
-- **"Function Runtimes must have a valid version"**: Remove `functions` config from `vercel.json` for Next.js apps
-- **AI Function Timeouts**: AI routes configured with `maxDuration: 300` at route level
-- **Runtime Issues**: Use Next.js native runtime configuration instead of Vercel function overrides
+- **"Function Runtimes must have a valid version"**: Ensure `vercel.json` uses `nodejs18.x` (not `nodejs20.x`)
+- **AI Function Timeouts**: AI routes have 5-minute timeout - check Genkit flow performance
+- **Memory Issues**: AI functions allocated 1GB - increase if needed for complex operations
 
 ### Build Fails
 - Check Node.js memory allocation in build logs

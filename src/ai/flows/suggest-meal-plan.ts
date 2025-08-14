@@ -28,19 +28,28 @@ export const suggestMealPlanFlow = ai.defineFlow(
             currentDate: input.currentDate || new Date().toISOString().split('T')[0],
         };
 
+        // Correctly retrieve the prompt object first
         const suggestMealPlanPrompt = ai.prompt('suggestMealPlan');
-        const response = await suggestMealPlanPrompt.run({ data: promptInput });
-        const output = response.output;
+        
+        // Invoke the executable prompt with the input
+        const response = await suggestMealPlanPrompt(promptInput);
+
+        const output = response.output; // Access output as a property
 
         if (!output) {
             throw new Error("AI failed to generate a meal plan output.");
         }
 
-        if (output.plannedMeals.length !== input.mealStructure.length) {
-            console.warn("AI did not plan for all meal slots. Input slots:", input.mealStructure.length, "Planned meals:", output.plannedMeals.length);
+        const parsedOutput = SuggestMealPlanOutputSchema.safeParse(output);
+        if (!parsedOutput.success) {
+            throw new Error('Invalid output format from AI: ' + JSON.stringify(parsedOutput.error.flatten()));
         }
 
-        output.plannedMeals = output.plannedMeals.map((meal: PlannedRecipeItem) => {
+        if (parsedOutput.data.plannedMeals.length !== input.mealStructure.length) {
+            console.warn("AI did not plan for all meal slots. Input slots:", input.mealStructure.length, "Planned meals:", parsedOutput.data.plannedMeals.length);
+        }
+
+        parsedOutput.data.plannedMeals = parsedOutput.data.plannedMeals.map((meal: PlannedRecipeItem) => {
             if (meal.servings <= 0) {
                 console.warn(`AI generated non-positive servings (${meal.servings}) for ${meal.recipeName}. Setting to 0.25.`);
                 const originalRecipe = input.availableRecipes.find((r: RecipeForAI) => r.id === meal.recipeId);
@@ -57,7 +66,7 @@ export const suggestMealPlanFlow = ai.defineFlow(
             return meal;
         });
 
-        return output;
+        return parsedOutput.data;
     }
 );
 

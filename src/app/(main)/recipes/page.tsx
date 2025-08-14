@@ -328,6 +328,7 @@ function RecipesPageComponent() {
                   <RecipeCard
                     recipe={recipe}
                     pantryMatchStatus={pantryMatchStatus}
+                    pantryItems={(userProfile?.pantryItems as PantryItem[]) || []}
                     onFavoriteToggle={() => {
                       const currentFavorites = userProfile?.favorite_recipe_ids || [];
                       const isFavorited = currentFavorites.includes(recipe.id);
@@ -353,21 +354,6 @@ function RecipesPageComponent() {
                     >
                       <Plus className="h-4 w-4 mr-1" />
                       Add to Plan
-                    </Button>
-                  </div>
-                  
-                  {/* View Details Button - Positioned over the card */}
-                  <div className="absolute bottom-4 left-4 z-10">
-                    <Button 
-                      size="sm"
-                      variant="outline"
-                      asChild
-                      className="bg-background/90 hover:bg-background shadow-lg"
-                    >
-                      <Link href={`/recipes/${recipe.id}`}>
-                        <Info className="h-4 w-4 mr-1" />
-                        Details
-                      </Link>
                     </Button>
                   </div>
                 </div>

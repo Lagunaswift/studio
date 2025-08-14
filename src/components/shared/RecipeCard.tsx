@@ -23,13 +23,14 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
-import type { Recipe } from '@/types';
+import type { Recipe, PantryItem } from '@/types';
 
 interface RecipeCardProps {
   recipe: Recipe;
   onFavoriteToggle?: () => void;
   isFavorited?: boolean;
   pantryMatchStatus?: 'make' | 'almost' | 'missing';
+  pantryItems?: PantryItem[];
   className?: string;
 }
 
@@ -38,6 +39,7 @@ export function RecipeCard({
   onFavoriteToggle, 
   isFavorited = false, 
   pantryMatchStatus,
+  pantryItems = [],
   className 
 }: RecipeCardProps) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -55,6 +57,53 @@ export function RecipeCard({
   };
   
   const macros = getMacros();
+  
+  // Calculate ingredients that need to be bought
+  const calculateIngredientsToBuy = () => {
+    if (!recipe.ingredients || recipe.ingredients.length === 0) {
+      return 0;
+    }
+    
+    if (!pantryItems.length) {
+      return recipe.ingredients.length;
+    }
+    
+    const pantryIngredientNames = pantryItems.map(p => p.name.toLowerCase().trim());
+    let ingredientsToBuy = 0;
+
+    recipe.ingredients.forEach(ingredient => {
+      if (!ingredient) {
+        return;
+      }
+      
+      // Handle both string ingredients and parsed ingredient objects
+      let ingredientName: string;
+      if (typeof ingredient === 'string') {
+        ingredientName = ingredient;
+      } else if (typeof ingredient === 'object' && 'name' in ingredient) {
+        ingredientName = (ingredient as any).name;
+      } else {
+        return; // Skip invalid ingredients
+      }
+      
+      const ingredientNameLower = ingredientName.toLowerCase().trim();
+      
+      // More precise matching: only match if pantry item name is contained in ingredient name
+      // or if they are exactly the same (but not the reverse)
+      const isInPantry = pantryIngredientNames.some(pName => 
+        ingredientNameLower === pName || 
+        ingredientNameLower.includes(pName)
+      );
+      
+      if (!isInPantry) {
+        ingredientsToBuy++;
+      }
+    });
+
+    return ingredientsToBuy;
+  };
+  
+  const ingredientsToBuy = calculateIngredientsToBuy();
   
   // **STANDARDIZED IMAGE LOADING PATTERN**
   const getImageSrc = () => {
@@ -264,7 +313,10 @@ export function RecipeCard({
               <div className="space-y-2">
                 <h4 className="font-medium text-sm text-primary">Ingredients:</h4>
                 <p className="text-sm text-muted-foreground">
-                  {recipe.ingredients.length} ingredients required
+                  {ingredientsToBuy === 0 
+                    ? "All ingredients in pantry!" 
+                    : `Need to buy ${ingredientsToBuy} ingredient${ingredientsToBuy !== 1 ? 's' : ''}`
+                  }
                 </p>
               </div>
             )}

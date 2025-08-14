@@ -31,8 +31,7 @@ import {
   Utensils, 
   Droplets, 
   BookOpen, 
-  BrainCircuit,
-  Wand2
+  BrainCircuit
 } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
@@ -374,43 +373,6 @@ export default function HomePage() {
           }}
         />
 
-        {/* Quick Actions Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold">Quick Actions</CardTitle>
-            <CardDescription>
-              Jump to the most common tasks
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Link href="/recipes/add">
-                <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center">
-                  <PlusCircle className="h-6 w-6 mb-2" />
-                  <span className="text-xs">Add Recipe</span>
-                </Button>
-              </Link>
-              <Link href="/ai-suggestions">
-                <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center">
-                  <Wand2 className="h-6 w-6 mb-2" />
-                  <span className="text-xs">AI Meal Plan</span>
-                </Button>
-              </Link>
-              <Link href="/shopping-list">
-                <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center">
-                  <CheckCircle2 className="h-6 w-6 mb-2" />
-                  <span className="text-xs">Shopping List</span>
-                </Button>
-              </Link>
-              <Link href="/daily-check-in">
-                <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center">
-                  <Scale className="h-6 w-6 mb-2" />
-                  <span className="text-xs">Daily Check-in</span>
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </PageWrapper>
   );

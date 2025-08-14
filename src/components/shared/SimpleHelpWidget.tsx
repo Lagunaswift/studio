@@ -38,16 +38,16 @@ export function SimpleHelpWidget() {
       description: 'Save a new recipe to your collection',
       icon: PlusCircle,
       href: '/recipes/add',
-      color: 'text-green-600',
-      bgColor: 'bg-green-50 hover:bg-green-100'
+      color: 'text-teal-600',
+      bgColor: 'bg-teal-50 hover:bg-teal-100'
     },
     {
       title: 'AI Meal Plan',
       description: 'Let Preppy create a personalized meal plan',
       icon: Wand2,
       href: '/ai-suggestions',
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50 hover:bg-purple-100',
+      color: 'text-yellow-600',
+      bgColor: 'bg-yellow-50 hover:bg-yellow-100',
       popular: true
     },
     {
@@ -55,16 +55,16 @@ export function SimpleHelpWidget() {
       description: 'View and manage your shopping list',
       icon: CheckCircle2,
       href: '/shopping-list',
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50 hover:bg-blue-100'
+      color: 'text-teal-600',
+      bgColor: 'bg-teal-50 hover:bg-teal-100'
     },
     {
       title: 'Daily Check-in',
       description: 'Log your weight and daily progress',
       icon: Scale,
       href: '/daily-check-in',
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50 hover:bg-orange-100'
+      color: 'text-amber-600',
+      bgColor: 'bg-amber-50 hover:bg-amber-100'
     }
   ];
 
@@ -118,7 +118,7 @@ export function SimpleHelpWidget() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Bot className="w-5 h-5 text-blue-600" />
+              <Bot className="w-5 h-5 text-teal-600" />
               Preppy Assistant
             </DialogTitle>
             <DialogDescription>
@@ -178,7 +178,7 @@ export function SimpleHelpWidget() {
                   className="w-full justify-start h-auto p-3 hover:bg-gray-50"
                   onClick={() => handleQuickAction('/guide')}
                 >
-                  <BookOpen className="w-5 h-5 mr-3 text-blue-600" />
+                  <BookOpen className="w-5 h-5 mr-3 text-teal-600" />
                   <div className="text-left">
                     <p className="font-medium text-sm">App Guide</p>
                     <p className="text-xs text-gray-600">Learn how to use MealPreppyPro</p>
@@ -190,7 +190,7 @@ export function SimpleHelpWidget() {
                   className="w-full justify-start h-auto p-3 hover:bg-gray-50"
                   onClick={() => { setIsOpen(false); setIsBugReportOpen(true); }}
                 >
-                  <Bug className="w-5 h-5 mr-3 text-red-600" />
+                  <Bug className="w-5 h-5 mr-3 text-amber-600" />
                   <div className="text-left">
                     <p className="font-medium text-sm">Report a Bug</p>
                     <p className="text-xs text-gray-600">Let us know if something isn't working</p>
@@ -202,7 +202,7 @@ export function SimpleHelpWidget() {
                   className="w-full justify-start h-auto p-3 hover:bg-gray-50"
                   onClick={() => handleQuickAction('/updates')}
                 >
-                  <Sparkles className="w-5 h-5 mr-3 text-purple-600" />
+                  <Sparkles className="w-5 h-5 mr-3 text-yellow-600" />
                   <div className="text-left">
                     <p className="font-medium text-sm">Updates & Feedback</p>
                     <p className="text-xs text-gray-600">See what's new and share your thoughts</p>
