@@ -650,14 +650,14 @@ export default function AISuggestionsPage() {
           <CardHeader>
             <CardTitle className="font-headline text-primary flex items-center">
               <Sparkles className="w-6 h-6 mr-2 text-accent" />
-              Let Me Plan Your Day
+              Ready for today's meal plan?
             </CardTitle>
             <CardDescription>
-              Just say the word, and I'll craft a personalized meal plan for you based on your profile settings.
+              Just give me the go-ahead, and I'll create a personalized day of meals tailored to your goals, preferences, and dietary needs.
               <br />
               <small className="text-muted-foreground mt-1 block">
                 {allRecipesCache && allRecipesCache.length > 0 
-                  ? `🤖 Preppy will use your ${allRecipesCache.length} recipes` 
+                  ? '' 
                   : '🧪 Demo version - add recipes for Preppy suggestions'
                 }
               </small>
