@@ -28,31 +28,56 @@ export const suggestMealPlanFlow = ai.defineFlow(
             currentDate: input.currentDate || new Date().toISOString().split('T')[0],
         };
 
-        // Correctly retrieve the prompt object first with error handling
-        let suggestMealPlanPrompt;
-        try {
-            console.log('🔍 Attempting to retrieve suggestMealPlan prompt...');
-            suggestMealPlanPrompt = ai.prompt('suggestMealPlan');
-            
-            if (!suggestMealPlanPrompt) {
-                throw new Error('Prompt returned undefined');
-            }
-            
-            console.log('✅ suggestMealPlan prompt retrieved successfully');
-        } catch (promptError: any) {
-            console.error('❌ Failed to retrieve suggestMealPlan prompt:', {
-                error: promptError.message,
-                type: promptError.constructor.name,
-                availablePrompts: 'Cannot list - prompt enumeration not available'
-            });
-            
-            throw new Error(`Prompt retrieval failed: ${promptError.message}. This usually indicates the prompt file is not properly loaded in the deployment environment.`);
-        }
+        // Use direct model generation instead of prompt system
+        console.log('🚀 Generating meal plan using direct model call...');
         
-        // Invoke the executable prompt with the input
-        console.log('🚀 Invoking suggestMealPlan prompt with input...');
-        const response = await suggestMealPlanPrompt(promptInput);
-        console.log('✅ Prompt execution completed');
+        const promptText = `You are an expert Meal Planning AI. Your task is to create a one-day meal plan by selecting appropriate recipes from the 'availableRecipes' list to fit the user's 'mealStructure'.
+
+Context:
+- Today's Date (for context, if relevant for seasonal suggestions, otherwise ignore): ${promptInput.currentDate}
+
+User Profile & Constraints:
+- Macro Targets for the Day: ${promptInput.macroTargets ? `Calories: ${promptInput.macroTargets.calories}kcal, Protein: ${promptInput.macroTargets.protein}g, Carbs: ${promptInput.macroTargets.carbs}g, Fat: ${promptInput.macroTargets.fat}g` : 'No specific macro targets set. Prioritize a balanced and varied diet.'}
+- Dietary Preferences (Strictly Adhere): ${promptInput.dietaryPreferences?.length ? promptInput.dietaryPreferences.join(', ') : 'None specified.'}
+- Allergens to AVOID (Strictly Exclude): ${promptInput.allergens?.length ? promptInput.allergens.join(', ') : 'None specified.'}
+- Meal Structure for the Day (Plan ONE recipe per slot):
+${promptInput.mealStructure.map(slot => `  - Slot ID: ${slot.id}, Slot Name: "${slot.name}", Expected Meal Type: ${slot.type}`).join('\n')}
+
+Available Recipes Database (Recipe ID, Name, Macros per SINGLE serving, Tags):
+${promptInput.availableRecipes.map(recipe => `- ID: ${recipe.id}, Name: "${recipe.name}", MacrosPerServing: (Calories: ${recipe.macrosPerServing.calories}, Protein: ${recipe.macrosPerServing.protein}, Carbs: ${recipe.macrosPerServing.carbs}, Fat: ${recipe.macrosPerServing.fat}), Tags: [${recipe.tags?.length ? recipe.tags.map(tag => `"${tag}"`).join(', ') : 'No tags'}]`).join('\n')}
+
+Your Task:
+1. For EACH slot in the 'mealStructure', select ONE recipe from the 'availableRecipes'.
+2. Determine an appropriate number of servings for EACH selected recipe. Servings can be fractional (e.g., 1.5, 0.75, 0.5) but must be at least 0.25. Adjust servings to help meet overall daily macro targets. Ensure the servings output is a positive number.
+3. CRITICAL: Ensure your recipe choices and tags align with the user's 'dietaryPreferences' (e.g., if "Vegetarian", only select recipes tagged 'vegetarian' or those that are inherently vegetarian).
+4. CRITICAL: Ensure your recipe choices strictly AVOID any ingredients implied by the user's 'allergens' (e.g., if "Nuts", avoid recipes that might contain nuts based on their name or typical ingredients, even if not explicitly tagged). Use common sense for allergens.
+5. For each planned meal, calculate the 'calculatedMacros' based on the recipe's 'macrosPerServing' multiplied by your chosen 'servings'.
+6. Calculate 'totalAchievedMacros' by summing the 'calculatedMacros' for all planned meals.
+7. Provide a concise 'aiJustification' (2-3 sentences) explaining your key recipe choices and serving adjustments, particularly how they relate to the user's profile.
+8. Provide a 'fitnessAssessment' (2-3 sentences) on how well the generated plan meets the daily 'macroTargets'. If no targets, comment on overall balance.
+
+Output the entire response as a single, valid JSON object that conforms EXACTLY to the expected schema. Do NOT include any text or formatting outside of this JSON object.
+
+JSON Output Structure:
+{
+  "plannedMeals": [
+    { "mealSlotId": "...", "mealSlotName": "...", "recipeId": ..., "recipeName": "...", "servings": ..., "calculatedMacros": { "calories": ..., "protein": ..., "carbs": ..., "fat": ... }},
+    // ... more planned meal objects
+  ],
+  "totalAchievedMacros": { "calories": ..., "protein": ..., "carbs": ..., "fat": ... },
+  "aiJustification": "...",
+  "fitnessAssessment": "..."
+}`;
+
+        const response = await ai.generate({
+            model: 'googleai/gemini-1.5-flash',
+            prompt: promptText,
+            output: {
+                schema: SuggestMealPlanOutputSchema,
+            },
+        });
+        
+        console.log('✅ Direct model generation completed');
 
         const output = response.output; // Access output as a property
 
