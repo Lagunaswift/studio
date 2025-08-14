@@ -297,35 +297,72 @@ export async function clearDailyMealPlan(idToken: string, date: string) {
 }
 
 // LEGACY MEAL PLAN FUNCTIONS (Old Structure: Individual Meals)
+// DEPRECATED: Legacy function redirected to new structure
 export async function addOrUpdateMealPlan(idToken: string, mealData: any) {
+  console.warn('⚠️ DEPRECATED: addOrUpdateMealPlan called, redirecting to new structure');
+  
   try {
     const decodedToken = await serverFirestore.verifyToken(idToken);
     const userId = decodedToken.uid;
     
-    const mealPlanRef = adminDb.collection('profiles').doc(userId).collection('mealPlan');
+    // Redirect to new daily meal plan structure
+    if (!mealData.date) {
+      throw new Error('Date is required for meal plan operations');
+    }
     
     if (mealData.id) {
-      // Update existing meal
-      await mealPlanRef.doc(mealData.id).update({
-        ...mealData,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
+      // For updates, try to find and update in the new structure
+      console.log(`🔄 Attempting to update meal ${mealData.id} in new structure`);
+      
+      // Try to find the meal in the new structure across recent dates
+      const dates = [mealData.date, format(new Date(), 'yyyy-MM-dd')];
+      let found = false;
+      
+      for (const date of dates) {
+        const dailyRef = adminDb.collection('profiles').doc(userId).collection('dailyMealPlans').doc(date);
+        const doc = await dailyRef.get();
+        
+        if (doc.exists()) {
+          const meals = doc.data()?.meals || [];
+          const mealIndex = meals.findIndex((m: any) => m.id === mealData.id);
+          
+          if (mealIndex >= 0) {
+            meals[mealIndex] = { ...meals[mealIndex], ...mealData, updatedAt: FieldValue.serverTimestamp() };
+            await dailyRef.set({ date, meals, updatedAt: FieldValue.serverTimestamp() });
+            found = true;
+            console.log(`✅ Updated meal in new structure for date ${date}`);
+            break;
+          }
+        }
+      }
+      
+      if (!found) {
+        // If not found in new structure, fall back to legacy update but also add to new structure
+        console.log(`🔄 Meal not found in new structure, updating legacy and adding to new`);
+        const mealPlanRef = adminDb.collection('profiles').doc(userId).collection('mealPlan');
+        await mealPlanRef.doc(mealData.id).update({
+          ...mealData,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        
+        // Also add to new structure
+        return await addMealToDay(idToken, mealData.date, mealData);
+      }
     } else {
-      // Add new meal
-      await mealPlanRef.add({
-        ...mealData,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
+      // For new meals, always use the new structure
+      console.log(`➡️ Redirecting new meal to addMealToDay`);
+      return await addMealToDay(idToken, mealData.date, mealData);
     }
     
     revalidatePath('/meal-plan');
+    revalidatePath('/');
     return { success: true };
   } catch (error: any) {
-    console.error('addOrUpdateMealPlan error:', {
+    console.error('addOrUpdateMealPlan (deprecated) error:', {
       code: error.code,
       message: error.message,
       stack: error.stack,
+      mealData
     });
     return { success: false, error: `Could not save meal plan: ${error.message}` };
   }

@@ -139,6 +139,7 @@ export default function HomePage() {
   const [featuredRecipe, setFeaturedRecipe] = useState<Recipe | null>(null);
   const [quickRecipe, setQuickRecipe] = useState<Recipe | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
 
   // Fix hydration issues by ensuring client-side only rendering for dates
   useEffect(() => {
@@ -188,35 +189,83 @@ export default function HomePage() {
   // Auto-migration effect
   useEffect(() => {
     const triggerMigrationIfNeeded = async () => {
-      if (!user || !clientTodayDate || hasMigratedData || isDailyMealsLoading) return;
+      if (!user || !clientTodayDate || isDailyMealsLoading) return;
       
-      // Only trigger migration if we have no meals but legacy data might exist
-      if (dailyPlannedMeals.length === 0) {
-        try {
-          const idToken = await user.getIdToken();
-          console.log('🔄 Checking if migration is needed...');
+      try {
+        const idToken = await user.getIdToken();
+        console.log('🔄 Checking migration status...');
+        
+        // Import the migration functions dynamically
+        const { checkMigrationStatus, migrateLegacyMealPlanData } = await import('@/app/(main)/profile/actions');
+        const status = await checkMigrationStatus(idToken);
+        
+        if (status.success) {
+          console.log('📊 Migration status:', status);
           
-          // Import the migration functions dynamically to avoid bundle issues
-          const { migrateLegacyMealPlanData } = await import('@/app/(main)/profile/actions');
-          const result = await migrateLegacyMealPlanData(idToken);
-          
-          if (result.success && result.migratedMealsCount && result.migratedMealsCount > 0) {
-            console.log(`✅ Migration successful: ${result.message}`);
-            toast({
-              title: "Meal Plan Updated",
-              description: `We've updated your meal plan structure. ${result.migratedMealsCount} meals have been migrated.`,
-            });
+          // If we have legacy data and need migration
+          if (status.needsMigration || (status.hasLegacyData && !hasMigratedData)) {
+            console.log('🚀 Starting automatic migration...');
+            const result = await migrateLegacyMealPlanData(idToken);
+            
+            if (result.success && result.migratedMealsCount && result.migratedMealsCount > 0) {
+              console.log(`✅ Migration successful: ${result.message}`);
+              toast({
+                title: "Meal Plan Updated",
+                description: `We've updated your meal plan structure. ${result.migratedMealsCount} meals have been migrated.`,
+              });
+            } else {
+              console.log('ℹ️ Migration completed but no meals found to migrate');
+            }
+          } else {
+            console.log('✅ No migration needed');
           }
-        } catch (error) {
-          console.warn('Migration check failed:', error);
         }
+      } catch (error) {
+        console.warn('⚠️ Migration check failed:', error);
       }
     };
     
     // Delay migration check to avoid race conditions
-    const timeoutId = setTimeout(triggerMigrationIfNeeded, 2000);
+    const timeoutId = setTimeout(triggerMigrationIfNeeded, 1500);
     return () => clearTimeout(timeoutId);
-  }, [user, clientTodayDate, hasMigratedData, isDailyMealsLoading, dailyPlannedMeals.length, toast]);
+  }, [user, clientTodayDate, hasMigratedData, isDailyMealsLoading, toast]);
+  
+  // Manual migration function for testing
+  const handleManualMigration = async () => {
+    if (!user || isMigrating) return;
+    
+    setIsMigrating(true);
+    try {
+      const idToken = await user.getIdToken();
+      console.log('🔄 Manual migration triggered');
+      
+      const { migrateLegacyMealPlanData } = await import('@/app/(main)/profile/actions');
+      const result = await migrateLegacyMealPlanData(idToken);
+      
+      if (result.success) {
+        toast({
+          title: "Migration Complete",
+          description: result.message,
+        });
+        console.log('✅ Manual migration result:', result);
+      } else {
+        toast({
+          title: "Migration Failed",
+          description: result.error || 'Unknown error',
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('❌ Manual migration error:', error);
+      toast({
+        title: "Migration Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsMigrating(false);
+    }
+  };
 
 
   // Prepare chart data (same as weekly planner)
@@ -374,9 +423,26 @@ export default function HomePage() {
                     )}
                   </CardDescription>
                 </div>
-                {isDailyMealsLoading && (
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                )}
+                <div className="flex items-center gap-2">
+                  {process.env.NODE_ENV === 'development' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleManualMigration}
+                      disabled={isMigrating}
+                      className="text-xs"
+                    >
+                      {isMigrating ? (
+                        <><Loader2 className="h-3 w-3 animate-spin mr-1" />Migrating...</>
+                      ) : (
+                        'Migrate Legacy Data'
+                      )}
+                    </Button>
+                  )}
+                  {isDailyMealsLoading && (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
