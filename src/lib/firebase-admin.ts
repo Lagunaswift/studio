@@ -2,6 +2,7 @@
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { fixVercelPrivateKey } from './vercel-env-fix';
 
 let adminApp: App;
 
@@ -44,27 +45,32 @@ function initializeFirebaseAdmin() {
   }
 
   try {
-    // More robust private key formatting
-    let formattedPrivateKey = privateKey;
+    // Apply Vercel-specific fixes first (includes all necessary transformations)
+    const formattedPrivateKey = fixVercelPrivateKey(privateKey);
     
-    // Handle different possible formats of the private key
-    if (typeof privateKey === 'string') {
-      // Replace literal \n with actual newlines
-      formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
-      
-      // Ensure proper BEGIN/END format
-      if (!formattedPrivateKey.includes('-----BEGIN PRIVATE KEY-----')) {
-        console.error('❌ Private key does not contain BEGIN PRIVATE KEY marker');
-        console.error('First 100 chars:', formattedPrivateKey.substring(0, 100));
-        throw new Error('Invalid private key format - missing BEGIN marker');
-      }
-      
-      if (!formattedPrivateKey.includes('-----END PRIVATE KEY-----')) {
-        console.error('❌ Private key does not contain END PRIVATE KEY marker');
-        console.error('Last 100 chars:', formattedPrivateKey.substring(-100));
-        throw new Error('Invalid private key format - missing END marker');
-      }
+    // Validate the formatted key
+    if (!formattedPrivateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+      console.error('❌ Private key missing BEGIN marker after formatting');
+      console.error('Formatted key start:', formattedPrivateKey.substring(0, 100));
+      console.error('Original key start:', privateKey.substring(0, 100));
+      throw new Error('Invalid private key format - missing BEGIN PRIVATE KEY marker');
     }
+    
+    if (!formattedPrivateKey.includes('-----END PRIVATE KEY-----')) {
+      console.error('❌ Private key missing END marker after formatting');
+      console.error('Formatted key end:', formattedPrivateKey.slice(-100));
+      console.error('Original key end:', privateKey.slice(-100));
+      throw new Error('Invalid private key format - missing END PRIVATE KEY marker');
+    }
+    
+    console.log('✅ Private key format validation passed');
+    console.log('Final key length:', formattedPrivateKey.length);
+    console.log('Final key structure check:', {
+      hasBegin: formattedPrivateKey.includes('-----BEGIN PRIVATE KEY-----'),
+      hasEnd: formattedPrivateKey.includes('-----END PRIVATE KEY-----'),
+      hasNewlines: formattedPrivateKey.includes('\n'),
+      lineCount: formattedPrivateKey.split('\n').length
+    });
 
     console.log('🚀 Initializing Firebase Admin with credentials...');
     

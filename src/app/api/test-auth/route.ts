@@ -2,21 +2,33 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET() {
   try {
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+    
     // Test Firebase Admin environment variables
     const testResult = {
       timestamp: new Date().toISOString(),
+      platform: 'Vercel', // Since you mentioned it's on Vercel
       environment: {
         NODE_ENV: process.env.NODE_ENV,
         hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
         hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
-        hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+        hasPrivateKey: !!privateKey,
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKeyStart: process.env.FIREBASE_PRIVATE_KEY?.substring(0, 50),
-        privateKeyEnd: process.env.FIREBASE_PRIVATE_KEY?.substring(-50),
-        privateKeyLength: process.env.FIREBASE_PRIVATE_KEY?.length,
-        privateKeyHasBegin: process.env.FIREBASE_PRIVATE_KEY?.includes('-----BEGIN PRIVATE KEY-----'),
-        privateKeyHasEnd: process.env.FIREBASE_PRIVATE_KEY?.includes('-----END PRIVATE KEY-----'),
+        privateKeyLength: privateKey?.length,
+        privateKeyHasBegin: privateKey?.includes('-----BEGIN PRIVATE KEY-----'),
+        privateKeyHasEnd: privateKey?.includes('-----END PRIVATE KEY-----'),
+        privateKeyHasNewlines: privateKey?.includes('\n'),
+        privateKeyHasLiteralNewlines: privateKey?.includes('\\n'),
+        privateKeyStart: privateKey?.substring(0, 50),
+        privateKeyEnd: privateKey?.slice(-50),
+        // Test different formatting scenarios
+        formatting: {
+          original: privateKey?.substring(0, 100),
+          afterReplace: privateKey?.replace(/\\n/g, '\n').substring(0, 100),
+          afterTrim: privateKey?.replace(/\\n/g, '\n').trim().substring(0, 100),
+          withoutQuotes: privateKey?.replace(/^["']|["']$/g, '').replace(/\\n/g, '\n').substring(0, 100),
+        }
       }
     };
 

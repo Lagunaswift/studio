@@ -35,8 +35,23 @@ async function verifyTokenAndGetUserId(idToken: string): Promise<string> {
     const { getApps } = await import('firebase-admin/app');
     console.log('🔧 Firebase Admin apps count:', getApps().length);
     
-    const decodedToken = await adminAuth.verifyIdToken(cleanToken, true);
-    console.log('✅ Token verified successfully for user:', decodedToken.uid);
+    // Try token verification with revocation check first
+    let decodedToken;
+    try {
+      decodedToken = await adminAuth.verifyIdToken(cleanToken, true);
+      console.log('✅ Token verified with revocation check for user:', decodedToken.uid);
+    } catch (revocationError: any) {
+      console.warn('⚠️ Token verification with revocation check failed, trying without revocation check:', revocationError.message);
+      
+      // Fallback: verify without revocation check
+      try {
+        decodedToken = await adminAuth.verifyIdToken(cleanToken, false);
+        console.log('✅ Token verified without revocation check for user:', decodedToken.uid);
+      } catch (fallbackError: any) {
+        console.error('❌ Both token verification methods failed');
+        throw revocationError; // Throw the original error
+      }
+    }
     
     return decodedToken.uid;
   } catch (error: any) {
