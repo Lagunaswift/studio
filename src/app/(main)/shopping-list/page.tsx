@@ -9,7 +9,7 @@ import { ShoppingListItemComponent } from '@/components/shopping/ShoppingListIte
 import { updateShoppingListItemStatus, clearShoppingList, generateShoppingListFromMealPlan } from '@/app/(main)/profile/actions';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, ShoppingCart, Trash2, ListChecks, Utensils, X, RefreshCw } from 'lucide-react';
+import { AlertCircle, ShoppingCart, Trash2, ListChecks, Utensils, X, RefreshCw, CheckCircle, TrendingUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -27,6 +27,7 @@ import type { ShoppingListItem, PlannedMeal } from '@/types';
 import { parseIngredientString } from '@/lib/data';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 
 interface IngredientForRecipeView {
   id: string; 
@@ -162,6 +163,7 @@ export default function ShoppingListPage() {
 
   const purchasedCount = shoppingList.filter(item => item.purchased).length;
   const totalCount = shoppingList.length;
+  const completionPercentage = totalCount > 0 ? Math.round((purchasedCount / totalCount) * 100) : 0;
 
   if (isLoading) {
     return (
@@ -182,14 +184,37 @@ export default function ShoppingListPage() {
     <PageWrapper title="Your Shopping List">
       <Card className="shadow-xl">
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-          <div>
+          <div className="flex-1 min-w-0">
             <CardTitle className="font-headline text-primary flex items-center">
               <ShoppingCart className="w-6 h-6 mr-2 text-accent" />
               Grocery Items
+              {totalCount > 0 && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  ({purchasedCount}/{totalCount})
+                </span>
+              )}
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="mb-3">
               {totalCount > 0 ? `You have ${totalCount - purchasedCount} item(s) left to buy.` : "Your shopping list is currently empty. Click 'Generate from Meal Plan' to create a list from your planned meals."}
             </CardDescription>
+            {totalCount > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Shopping Progress</span>
+                  <span className="font-medium text-primary">{completionPercentage}% Complete</span>
+                </div>
+                <Progress 
+                  value={completionPercentage} 
+                  className="h-2 bg-secondary"
+                />
+                {completionPercentage === 100 && (
+                  <div className="flex items-center gap-2 text-sm text-green-600">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Shopping complete! 🎉</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 mt-4 sm:mt-0">
             <Button 

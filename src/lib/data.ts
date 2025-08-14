@@ -4,6 +4,135 @@ import { parse as dateParse, differenceInDays } from 'date-fns';
 
 export const MEAL_TYPES: MealType[] = ["Breakfast", "Lunch", "Dinner", "Snack"];
 
+// Unit standardization mapping
+const UNIT_NORMALIZER: { [key: string]: string } = {
+  // Tablespoons
+  'tbsp.': 'tablespoon', 'tbsp': 'tablespoon', 'tablespoons': 'tablespoon',
+  // Teaspoons  
+  'tsp.': 'teaspoon', 'tsp': 'teaspoon', 'teaspoons': 'teaspoon',
+  // Items/Units
+  'unit': 'item', 'units': 'items', 'pcs': 'items', 'piece': 'item', 'pieces': 'items',
+  // Weights
+  'g': 'grams', 'kg': 'kilograms', 'oz': 'ounces', 'lb': 'pounds', 'lbs': 'pounds',
+  // Volumes
+  'ml': 'milliliters', 'l': 'liters', 'fl oz': 'fluid ounces', 'cups': 'cup', 'pints': 'pint',
+  // Other common units
+  'pinches': 'pinch', 'Pinch': 'pinch', 'cloves': 'clove', 'leaves': 'leaf',
+  // Remove periods from abbreviated units
+  'cup.': 'cup', 'pint.': 'pint', 'qt.': 'quart'
+};
+
+// Ingredient name cleaning and normalization
+export const normalizeIngredientName = (name: string): string => {
+  if (!name) return '';
+  
+  let cleaned = name.toLowerCase().trim();
+  
+  // Handle specific problematic ingredient names
+  const nameMapping: { [key: string]: string } = {
+    'leaves': 'lettuce leaves',
+    'whites': 'egg whites', 
+    'cloves': 'garlic cloves',
+    'fillets': 'salmon fillets',
+    'zest': 'lemon zest',
+    's': 'eggs' // Common parsing artifact
+  };
+  
+  if (nameMapping[cleaned]) {
+    return nameMapping[cleaned];
+  }
+  
+  // Remove descriptor prefixes
+  cleaned = cleaned.replace(/^(from\s+\d+\s+|of\s+|½\s*|¼\s*|¾\s*|\d+\/\d+\s*|\/\d+\s*)/g, '');
+  
+  // Remove cooking instructions and descriptors
+  cleaned = cleaned.replace(/\s*,\s*(peeled|chopped|diced|sliced|minced|halved|quartered|finely|thinly|roughly).*$/g, '');
+  
+  // Remove size descriptors but keep important ones
+  cleaned = cleaned.replace(/\b(fresh|organic|free-range)\b/g, '').trim();
+  
+  // Clean up specific patterns
+  cleaned = cleaned
+    .replace(/\s+fillets?\s+\d+g\s+each.*$/, ' fillets')
+    .replace(/\s+\(\d+g\).*$/, '') // Remove weight specifications
+    .replace(/^[\s.]+|[\s.]+$/g, '') // Remove leading/trailing dots and spaces
+    .replace(/\s+/g, ' ') // Multiple spaces to single space
+    .trim();
+    
+  return cleaned || name.toLowerCase().trim(); // Fallback to original if cleaning resulted in empty string
+};
+
+// Smart quantity rounding for shopping
+export const roundQuantityForShopping = (quantity: number, unit: string): number => {
+  if (!quantity || quantity <= 0) return 0;
+  
+  const normalizedUnit = UNIT_NORMALIZER[unit.toLowerCase()] || unit.toLowerCase();
+  
+  // Whole items - always round up
+  if (['item', 'items', 'whole', 'head', 'bulb', 'package', 'bottle', 'can', 'jar'].includes(normalizedUnit)) {
+    return Math.ceil(quantity);
+  }
+  
+  // Very small quantities - use more precision
+  if (quantity < 1) {
+    return Math.round(quantity * 100) / 100;
+  }
+  
+  // Medium quantities - round to quarters for measurements
+  if (quantity < 10) {
+    return Math.round(quantity * 4) / 4;
+  }
+  
+  // Large quantities - round to nearest whole number
+  return Math.round(quantity);
+};
+
+// Normalize units for consistency
+export const normalizeUnit = (unit: string): string => {
+  if (!unit) return 'item';
+  
+  const normalized = unit.toLowerCase().trim();
+  return UNIT_NORMALIZER[normalized] || normalized;
+};
+
+// Enhanced ingredient consolidation key generator
+export const generateConsolidationKey = (name: string, unit: string): string => {
+  const normalizedName = normalizeIngredientName(name);
+  const normalizedUnit = normalizeUnit(unit);
+  
+  // Special consolidation rules for similar ingredients
+  let consolidatedName = normalizedName;
+  
+  // Consolidate all egg variants
+  if (normalizedName.includes('egg') && !normalizedName.includes('plant')) {
+    consolidatedName = 'eggs';
+  }
+  
+  // Consolidate onion variants
+  if (normalizedName.includes('onion')) {
+    if (normalizedName.includes('red')) {
+      consolidatedName = 'red onions';
+    } else if (normalizedName.includes('green') || normalizedName.includes('spring')) {
+      consolidatedName = 'green onions';
+    } else {
+      consolidatedName = 'onions';
+    }
+  }
+  
+  // Consolidate tomato variants
+  if (normalizedName.includes('tomato')) {
+    if (normalizedName.includes('cherry')) {
+      consolidatedName = 'cherry tomatoes';
+    } else if (normalizedName.includes('paste') || normalizedName.includes('puree')) {
+      consolidatedName = 'tomato paste';
+    } else {
+      consolidatedName = 'tomatoes';
+    }
+  }
+  
+  return `${consolidatedName}|${normalizedUnit}`;
+};
+
 export function parseIngredientString(ingredient: string): { name: string; quantity: number; unit: string } {
   // Enhanced regex to capture quantities, units, and names more robustly
   const regex = /^((\d*\.?\d+)\s*([a-zA-Z]+)?)\s+(.*)$/;
@@ -23,23 +152,86 @@ export function parseIngredientString(ingredient: string): { name: string; quant
 export const assignCategory = (ingredientName: string): UKSupermarketCategory => {
   const lowerCaseName = ingredientName.toLowerCase();
   
-  // More specific keywords for better categorization
+  // Enhanced keywords for better categorization with more comprehensive coverage
   const categoryKeywords: { [key in UKSupermarketCategory]: string[] } = {
-    'Fresh Fruit & Vegetables': ['apple', 'banana', 'carrot', 'broccoli', 'spinach', 'onion', 'garlic', 'potato', 'tomato', 'lettuce', 'pepper'],
-    'Meat & Poultry': ['chicken', 'beef', 'pork', 'lamb', 'turkey', 'mince', 'sausage', 'bacon'],
-    'Fish & Seafood': ['salmon', 'tuna', 'cod', 'haddock', 'prawns', 'shrimp'],
-    'Dairy, Butter & Eggs': ['milk', 'cheese', 'yogurt', 'butter', 'egg', 'cream'],
-    'Bakery': ['bread', 'baguette', 'croissant', 'wrap', 'roll'],
-    'Food Cupboard': ['pasta', 'rice', 'flour', 'sugar', 'oil', 'vinegar', 'soy sauce', 'ketchup', 'mayonnaise', 'canned tomatoes', 'beans', 'lentils', 'spice', 'herb', 'stock', 'bouillon'],
-    'Frozen': ['frozen peas', 'frozen corn', 'ice cream', 'frozen pizza'],
-    'Drinks': ['water', 'juice', 'soda', 'coffee', 'tea'],
+    'Fresh Fruit & Vegetables': [
+      // Fruits
+      'apple', 'banana', 'orange', 'lemon', 'lime', 'grape', 'strawberry', 'blueberry', 'raspberry',
+      'avocado', 'mango', 'pineapple', 'kiwi', 'pear', 'peach', 'plum', 'cherry', 'melon', 'dates',
+      // Vegetables
+      'carrot', 'broccoli', 'spinach', 'onion', 'garlic', 'potato', 'tomato', 'lettuce', 'pepper', 
+      'bell pepper', 'sweet potato', 'asparagus', 'cucumber', 'celery', 'mushroom', 'zucchini',
+      'cauliflower', 'cabbage', 'kale', 'brussels sprouts', 'green beans', 'peas', 'corn',
+      // Herbs and aromatics
+      'basil', 'parsley', 'cilantro', 'mint', 'dill', 'rosemary', 'thyme', 'oregano', 'sage',
+      'ginger', 'leek', 'shallot', 'scallion', 'green onion', 'spring onion'
+    ],
+    'Meat & Poultry': [
+      'chicken', 'beef', 'pork', 'lamb', 'turkey', 'duck', 'mince', 'ground beef', 'ground turkey',
+      'sausage', 'bacon', 'ham', 'steak', 'chop', 'fillet', 'breast', 'thigh', 'wing', 'ribs'
+    ],
+    'Fish & Seafood': [
+      'salmon', 'tuna', 'cod', 'haddock', 'prawns', 'shrimp', 'crab', 'lobster', 'mussels', 
+      'clams', 'scallops', 'mackerel', 'sardines', 'trout', 'sea bass', 'halibut'
+    ],
+    'Dairy, Butter & Eggs': [
+      'milk', 'cheese', 'yogurt', 'butter', 'egg', 'cream', 'sour cream', 'cottage cheese',
+      'cheddar', 'mozzarella', 'parmesan', 'swiss', 'goat cheese', 'feta', 'ricotta',
+      'almond milk', 'oat milk', 'soy milk', 'coconut milk'
+    ],
+    'Bakery': [
+      'bread', 'baguette', 'croissant', 'wrap', 'roll', 'bagel', 'muffin', 'pita', 'naan',
+      'tortilla', 'flatbread', 'sourdough', 'whole wheat', 'rye'
+    ],
+    'Food Cupboard': [
+      // Grains and starches
+      'pasta', 'rice', 'flour', 'oat flour', 'coconut flour', 'quinoa', 'couscous', 'bulgur',
+      'oats', 'barley', 'farro', 'polenta',
+      // Sweeteners and basic ingredients
+      'sugar', 'honey', 'maple syrup', 'agave', 'brown sugar', 'vanilla', 'vanilla extract',
+      // Oils and fats
+      'oil', 'olive oil', 'coconut oil', 'canola oil', 'vegetable oil', 'sesame oil',
+      // Vinegars and acids
+      'vinegar', 'apple cider vinegar', 'balsamic vinegar', 'white vinegar', 'lemon juice',
+      // Condiments and sauces
+      'soy sauce', 'worcestershire', 'hot sauce', 'sriracha', 'ketchup', 'mayonnaise', 'mustard',
+      'tomato paste', 'tomato puree', 'tomato sauce',
+      // Canned and preserved
+      'canned tomatoes', 'beans', 'lentils', 'chickpeas', 'black beans', 'kidney beans',
+      'coconut', 'desiccated coconut',
+      // Spices and seasonings
+      'salt', 'pepper', 'paprika', 'cumin', 'coriander', 'turmeric', 'cinnamon', 'nutmeg',
+      'cardamom', 'cloves', 'allspice', 'cayenne', 'chili powder', 'garlic powder', 'onion powder',
+      'dried herbs', 'bay leaves', 'red pepper flakes',
+      // Baking essentials
+      'baking powder', 'baking soda', 'yeast', 'cornstarch', 'gelatin',
+      // Nuts and seeds
+      'almonds', 'ground almonds', 'walnuts', 'pecans', 'cashews', 'peanuts', 'pine nuts',
+      'chia seeds', 'flax seeds', 'sesame seeds', 'sunflower seeds', 'pumpkin seeds',
+      // Nut butters
+      'peanut butter', 'almond butter', 'tahini', 'sunbutter',
+      // Stock and broth
+      'stock', 'broth', 'bouillon', 'vegetable stock', 'chicken stock', 'beef stock',
+      // Chocolate and baking
+      'chocolate', 'dark chocolate', 'chocolate chips', 'cocoa powder', 'baking chocolate'
+    ],
+    'Frozen': [
+      'frozen peas', 'frozen corn', 'frozen spinach', 'frozen berries', 'frozen fruit',
+      'ice cream', 'frozen pizza', 'frozen vegetables', 'frozen meat', 'frozen fish'
+    ],
+    'Drinks': [
+      'water', 'sparkling water', 'juice', 'orange juice', 'apple juice', 'cranberry juice',
+      'soda', 'cola', 'lemonade', 'coffee', 'tea', 'green tea', 'herbal tea',
+      'wine', 'beer', 'spirits', 'kombucha'
+    ],
     'Health & Beauty': [],
     'Household': [],
     'Other': []
   };
 
   for (const category of UK_SUPERMARKET_CATEGORIES) {
-    if (categoryKeywords[category as UKSupermarketCategory]?.some(keyword => lowerCaseName.includes(keyword))) {
+    const keywords = categoryKeywords[category as UKSupermarketCategory];
+    if (keywords && keywords.some(keyword => lowerCaseName.includes(keyword))) {
       return category as UKSupermarketCategory;
     }
   }

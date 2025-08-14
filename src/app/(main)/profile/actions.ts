@@ -11,187 +11,9 @@ import { adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { mergeWithDefaults } from '@/utils/profileDefaults';
 import { migrateEnumValues, validateAndFallbackEnums } from '@/utils/enumMigration';
-import { parseIngredientString } from '@/lib/data';
+import { parseIngredientString, normalizeIngredientName, normalizeUnit, roundQuantityForShopping, generateConsolidationKey, assignCategory } from '@/lib/data';
 
-// --- Ingredient Processing Helpers ---
-const cleanIngredientName = (name: string): string => {
-  if (!name) return '';
-  
-  let cleaned = name
-    .toLowerCase()
-    .trim()
-    // Remove common prefixes that shouldn't be in ingredient names
-    .replace(/^(from\s+\d+\s+|of\s+|½\s*|¼\s*|¾\s*|\d+\/\d+\s*|\/\d+\s*)/g, '')
-    // Remove trailing descriptors in parentheses or after commas for most cases
-    .replace(/\s*,\s*(peeled|chopped|diced|sliced|minced|halved|quartered).*$/g, '')
-    // Clean up common parsing artifacts
-    .replace(/\s+fillets?\s+\d+g\s+each.*$/, ' salmon fillets')
-    .replace(/\s+whites?$/, ' egg whites')
-    .replace(/\s+leaves?$/, ' lettuce')
-    .replace(/\s+cloves?,?\s+minced.*$/, ' garlic')
-    // Remove leading dots and spaces
-    .replace(/^[\s.]+/, '')
-    // Remove trailing dots and spaces
-    .replace(/[\s.]+$/, '')
-    // Convert multiple spaces to single space
-    .replace(/\s+/g, ' ')
-    .trim();
-    
-  return cleaned;
-};
-
-// Convert recipe quantities to shopping-friendly quantities
-const convertToShoppingQuantity = (quantity: number, unit: string, ingredientName: string): { quantity: number; unit: string; name: string } => {
-  const name = ingredientName.toLowerCase();
-  
-  // Lettuce: Convert leaves to heads
-  if (name.includes('lettuce') && (unit === 'items' || unit.includes('leaves'))) {
-    const heads = Math.ceil(quantity / 8); // ~8 leaves per head
-    return { quantity: heads, unit: 'head', name: 'lettuce' };
-  }
-  
-  // Garlic: Convert cloves to bulbs
-  if (name.includes('garlic') && (unit === 'items' || unit.includes('cloves'))) {
-    const bulbs = Math.ceil(quantity / 6); // ~6 cloves per bulb
-    return { quantity: bulbs, unit: 'bulb', name: 'garlic' };
-  }
-  
-  // Eggs: Always round up to whole eggs, combine different types
-  if (name.includes('egg') && !name.includes('plant')) {
-    const totalEggs = Math.ceil(quantity);
-    return { quantity: totalEggs, unit: 'large', name: 'eggs' };
-  }
-  
-  // Onions: Convert fractional onions to whole onions
-  if (name.includes('onion') && quantity < 1) {
-    return { quantity: 1, unit: 'medium', name: name.includes('red') ? 'red onions' : 'onions' };
-  }
-  
-  // Potatoes: Convert grams to approximate count
-  if (name.includes('potato') && unit === 'grams') {
-    const count = Math.ceil(quantity / 150); // ~150g per medium potato
-    return { quantity: count, unit: 'medium', name: name.includes('sweet') ? 'sweet potatoes' : 'potatoes' };
-  }
-  
-  // Tomatoes: Cherry tomatoes by container
-  if (name.includes('tomato') && name.includes('cherry')) {
-    const containers = Math.ceil(quantity / 20); // ~20 cherry tomatoes per container
-    return { quantity: containers, unit: 'container', name: 'cherry tomatoes' };
-  }
-  
-  // Lemons/Limes: Always whole fruits
-  if (name.includes('lemon') || name.includes('lime')) {
-    const count = Math.ceil(quantity);
-    return { quantity: count, unit: 'whole', name: name.includes('lemon') ? 'lemons' : 'limes' };
-  }
-  
-  // Milk alternatives: Convert small amounts to standard carton
-  if (name.includes('almond milk') || name.includes('oat milk') || name.includes('soy milk')) {
-    const liters = Math.max(1, Math.ceil(quantity * 0.25)); // Min 1L carton
-    return { quantity: liters, unit: 'liter', name: name };
-  }
-  
-  // Oils: Convert small amounts to standard bottle
-  if (name.includes('olive oil') || name.includes('coconut oil')) {
-    const bottles = Math.max(0.5, Math.ceil(quantity / 500)); // 500ml standard bottle
-    return { quantity: bottles, unit: 'bottle', name: name };
-  }
-  
-  // Spices and small quantities: Always minimum package
-  if (unit.includes('tsp') || unit.includes('tbsp') || unit.includes('pinch')) {
-    return { quantity: 1, unit: 'package', name: name };
-  }
-  
-  // Small gram quantities: Convert to reasonable package sizes
-  if (unit === 'grams' && quantity < 50) {
-    return { quantity: 1, unit: 'package', name: name };
-  }
-  
-  // Large gram quantities: Convert to kg or standard packages
-  if (unit === 'grams' && quantity > 500) {
-    const kg = Math.ceil(quantity / 1000);
-    return { quantity: kg, unit: 'kg', name: name };
-  }
-  
-  // Default: return as-is but with cleaned values
-  return { 
-    quantity: Math.max(0.1, Math.round(quantity * 10) / 10), // Round to 1 decimal
-    unit: unit, 
-    name: ingredientName 
-  };
-};
-
-const normalizeUnit = (unit: string): string => {
-  if (!unit) return 'items';
-  
-  const unitMap: { [key: string]: string } = {
-    'tbsp': 'tablespoon',
-    'tsp': 'teaspoon',
-    'g': 'grams',
-    'kg': 'kilograms',
-    'ml': 'milliliters',
-    'l': 'liters',
-    'oz': 'ounces',
-    'lb': 'pounds',
-    'cups': 'cup',
-    'pinch': 'pinch',
-    'pinches': 'pinch'
-  };
-  
-  const normalized = unit.toLowerCase().trim();
-  return unitMap[normalized] || normalized || 'items';
-};
-
-const categorizeIngredient = (ingredientName: string): string => {
-  const name = ingredientName.toLowerCase();
-  
-  // Produce & Fresh
-  if (name.match(/\b(potato|tomato|onion|garlic|lettuce|spinach|carrot|bell pepper|avocado|lemon|apple|banana|asparagus|sweet potato|cherry|broccoli|cucumber|celery|zucchini|lime|orange|grapefruit|grapes|strawberries|blueberries|mushroom|corn|peas|green beans)\b/)) {
-    return 'Produce';
-  }
-  
-  // Proteins & Meat  
-  if (name.match(/\b(chicken|beef|pork|salmon|tuna|turkey|fish|meat|fillet|ground beef|ground turkey|bacon|ham|sausage|shrimp|crab|lobster)\b/)) {
-    return 'Meat & Seafood';
-  }
-  
-  // Eggs (separate from other dairy for shopping convenience)
-  if (name.match(/\b(eggs|egg whites|egg white|large eggs)\b/)) {
-    return 'Dairy & Eggs';
-  }
-  
-  // Dairy
-  if (name.match(/\b(milk|cheese|butter|yogurt|cream|sour cream|cottage cheese|cheddar|mozzarella|parmesan|almond milk|oat milk|soy milk)\b/)) {
-    return 'Dairy & Eggs';
-  }
-  
-  // Pantry & Dry Goods
-  if (name.match(/\b(flour|sugar|salt|pepper|oil|vinegar|baking|spice|seasoning|powder|seeds|nuts|oats|rice|pasta|beans|lentils|quinoa|coconut|chia|flax|vanilla|cinnamon|paprika|cumin|oregano|basil|thyme|rosemary)\b/)) {
-    return 'Pantry';
-  }
-  
-  // Condiments & Sauces
-  if (name.match(/\b(sauce|dressing|mustard|ketchup|mayo|honey|syrup|puree|paste|jam|jelly|peanut butter|almond butter|tahini)\b/)) {
-    return 'Condiments';
-  }
-  
-  // Frozen
-  if (name.match(/\b(frozen)\b/)) {
-    return 'Frozen';
-  }
-  
-  // Bakery
-  if (name.match(/\b(bread|roll|bagel|muffin|croissant|bun|tortilla|pita|naan)\b/)) {
-    return 'Bakery';
-  }
-  
-  // Beverages
-  if (name.match(/\b(juice|water|soda|tea|coffee|wine|beer)\b/)) {
-    return 'Beverages';
-  }
-  
-  return 'Other';
-};
+// Old helper functions removed - now using optimized functions from data.ts
 
 // --- Calculation Helpers ---
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
@@ -809,8 +631,14 @@ export async function generateShoppingListFromMealPlan(idToken: string) {
       batch.delete(doc.ref);
     });
     
-    // Generate new shopping list from meal plan
-    const requiredIngredients: { [key: string]: { name: string; quantity: number; unit: string; recipes: any[] } } = {};
+    // STEP 1: Parse and consolidate ingredients with smart grouping
+    const consolidatedIngredients: { [key: string]: { 
+      name: string; 
+      quantity: number; 
+      unit: string; 
+      recipes: any[];
+      originalIngredients: string[];
+    } } = {};
     
     mealPlan.forEach(meal => {
       const recipe = allRecipes.find(r => r.id == meal.recipeId);
@@ -818,80 +646,104 @@ export async function generateShoppingListFromMealPlan(idToken: string) {
         recipe.ingredients.forEach(ing => {
           const ingStr = typeof ing === 'string' ? ing : `${ing.quantity} ${ing.unit} ${ing.name}`;
           
-          // Enhanced ingredient parsing
+          // Parse ingredient
           const parsedIngredient = parseIngredientString(ingStr);
           console.log('🥕 Parsing ingredient:', { original: ingStr, parsed: parsedIngredient });
           
           if (parsedIngredient && parsedIngredient.name && parsedIngredient.name !== 'non-item') {
-            // Clean up the ingredient name
-            let cleanName = cleanIngredientName(parsedIngredient.name);
-            let cleanUnit = normalizeUnit(parsedIngredient.unit);
+            // Normalize ingredient name and unit using new functions
+            const normalizedName = normalizeIngredientName(parsedIngredient.name);
+            const normalizedUnit = normalizeUnit(parsedIngredient.unit);
             
-            // Skip if name is too short or invalid
-            if (cleanName.length < 2) {
-              console.log('⚠️ Skipping invalid ingredient name:', cleanName);
+            // Skip invalid ingredients
+            if (!normalizedName || normalizedName.length < 2) {
+              console.log('⚠️ Skipping invalid ingredient:', normalizedName);
               return;
             }
             
-            // Calculate scaled quantity first
+            // Calculate scaled quantity
             const scaledQuantity = (parsedIngredient.quantity / (recipe.servings || 1)) * (meal.servings || 1);
             
-            // Convert to shopping-friendly quantities
-            const shoppingQuantity = convertToShoppingQuantity(scaledQuantity, cleanUnit, cleanName);
-            console.log('🛒 Shopping conversion:', { 
-              original: { name: cleanName, quantity: scaledQuantity, unit: cleanUnit },
-              shopping: shoppingQuantity 
+            // Generate consolidation key for smart grouping (handles eggs, onions, tomatoes, etc.)
+            const consolidationKey = generateConsolidationKey(normalizedName, normalizedUnit);
+            console.log('🔗 Consolidation key:', { 
+              original: normalizedName,
+              unit: normalizedUnit,
+              key: consolidationKey 
             });
             
-            const key = `${shoppingQuantity.name}-${shoppingQuantity.unit}`;
-            
-            if (!requiredIngredients[key]) {
-              requiredIngredients[key] = {
-                name: shoppingQuantity.name,
+            if (!consolidatedIngredients[consolidationKey]) {
+              const [consolidatedName, consolidatedUnit] = consolidationKey.split('|');
+              consolidatedIngredients[consolidationKey] = {
+                name: consolidatedName,
                 quantity: 0,
-                unit: shoppingQuantity.unit,
-                recipes: []
+                unit: consolidatedUnit,
+                recipes: [],
+                originalIngredients: []
               };
             }
             
-            // For items that should be whole units, take the max rather than adding
-            if (shoppingQuantity.unit === 'head' || shoppingQuantity.unit === 'bulb' || shoppingQuantity.unit === 'bottle' || shoppingQuantity.unit === 'package') {
-              requiredIngredients[key].quantity = Math.max(requiredIngredients[key].quantity, shoppingQuantity.quantity);
-            } else {
-              requiredIngredients[key].quantity += shoppingQuantity.quantity;
-            }
-            
-            requiredIngredients[key].recipes.push({
+            // Add to consolidated ingredient
+            consolidatedIngredients[consolidationKey].quantity += scaledQuantity;
+            consolidatedIngredients[consolidationKey].recipes.push({
               recipeId: meal.recipeId,
               recipeName: recipe.name,
-              plannedMealId: meal.id
+              plannedMealId: meal.id,
+              originalIngredient: ingStr
             });
+            consolidatedIngredients[consolidationKey].originalIngredients.push(ingStr);
           }
         });
       }
     });
     
-    // Create shopping list items, considering pantry
-    for (const [key, ingredient] of Object.entries(requiredIngredients)) {
+    // STEP 2: Apply shopping-friendly rounding and create final shopping list
+    for (const [key, ingredient] of Object.entries(consolidatedIngredients)) {
+      console.log('🛒 Processing consolidated ingredient:', { 
+        key, 
+        name: ingredient.name,
+        quantity: ingredient.quantity,
+        unit: ingredient.unit,
+        recipeCount: ingredient.recipes.length
+      });
+      
+      // Apply shopping-friendly quantity rounding
+      const shoppingQuantity = roundQuantityForShopping(ingredient.quantity, ingredient.unit);
+      
+      // Check pantry for existing stock (with normalized matching)
       const pantryItem = pantryItems.find(p => 
-        p.name?.toLowerCase().trim() === ingredient.name && 
-        p.unit === ingredient.unit
+        normalizeIngredientName(p.name || '').toLowerCase() === ingredient.name.toLowerCase() && 
+        normalizeUnit(p.unit || '') === ingredient.unit
       );
       
-      const neededQuantity = ingredient.quantity - (pantryItem?.quantity || 0);
+      const neededQuantity = Math.max(0, shoppingQuantity - (pantryItem?.quantity || 0));
       
       if (neededQuantity > 0) {
+        // Apply enhanced categorization
+        const category = assignCategory(ingredient.name);
+        
         const newItemRef = shoppingListRef.doc();
         batch.set(newItemRef, {
           name: ingredient.name,
-          quantity: parseFloat(neededQuantity.toFixed(2)),
+          quantity: neededQuantity,
           unit: ingredient.unit,
-          category: categorizeIngredient(ingredient.name),
+          category: category,
           purchased: false,
           recipes: ingredient.recipes,
+          originalIngredients: ingredient.originalIngredients,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
         });
+        
+        console.log('✅ Added to shopping list:', {
+          name: ingredient.name,
+          quantity: neededQuantity,
+          unit: ingredient.unit,
+          category: category,
+          recipeCount: ingredient.recipes.length
+        });
+      } else {
+        console.log('⏭️ Skipping (sufficient in pantry):', ingredient.name);
       }
     }
     
