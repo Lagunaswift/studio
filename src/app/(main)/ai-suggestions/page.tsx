@@ -21,6 +21,7 @@ import { checkSubscriptionLimit, trackUsage } from '@/lib/subscriptionVerificati
 import { MiniUpgradeButton } from '@/components/subscription/CheckoutButton';
 import { safeLocalStorage } from '@/lib/safe-storage';
 import { addMealToDay } from '@/app/(main)/profile/actions';
+import { useOptimizedRecipes, useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
 
 // Your actual recipe data structure (macros as individual properties)
 interface RecipeWithDirectMacros {
@@ -256,17 +257,15 @@ const generateDemoMealPlan = (
 };
 
 export default function AISuggestionsPage() {
-  const {
-    addMealToPlan,
-    allRecipesCache,
-    isRecipeCacheLoading: isAppRecipeCacheLoading,
-    userProfile,
-    isSubscribed,
-    setUserInformation,
-    mealPlan
-  } = useAppContext();
-
   const { user, isLoading: isAuthLoading } = useAuth();
+  
+  // Use optimized hooks instead of AppContext
+  const { recipes: allRecipesCache, loading: isAppRecipeCacheLoading } = useOptimizedRecipes(user?.uid);
+  const { profile: userProfile, updateProfile } = useOptimizedProfile(user?.uid);
+  
+  // Simplified subscription check
+  const isSubscribed = userProfile?.subscription_status === 'active';
+  const setUserInformation = updateProfile;
   const { toast } = useToast();
   
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);

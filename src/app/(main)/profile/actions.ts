@@ -368,136 +368,9 @@ export async function addOrUpdateMealPlan(idToken: string, mealData: any) {
   }
 }
 
-export async function deleteMealFromPlan(idToken: string, mealId: string) {
-  try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
-    await adminDb.collection('profiles').doc(userId).collection('mealPlan').doc(mealId).delete();
-    revalidatePath('/meal-plan');
-    return { success: true };
-  } catch (error: any) {
-    console.error('deleteMealFromPlan error:', {
-      code: error.code,
-      message: error.message,
-      stack: error.stack,
-    });
-    return { success: false, error: `Could not delete meal: ${error.message}` };
-  }
-}
 
-export async function clearDayMealPlan(idToken: string, date: string) {
-  try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
-    
-    // Get all meals for the specific date
-    const mealPlanRef = adminDb.collection('profiles').doc(userId).collection('mealPlan');
-    const snapshot = await mealPlanRef.where('date', '==', date).get();
-    
-    // Delete all meals for this date
-    const batch = adminDb.batch();
-    snapshot.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-    
-    await batch.commit();
-    revalidatePath('/meal-plan');
-    return { success: true, deletedCount: snapshot.docs.length };
-  } catch (error: any) {
-    console.error('clearDayMealPlan error:', {
-      code: error.code,
-      message: error.message,
-      stack: error.stack,
-    });
-    return { success: false, error: `Could not clear meal plan: ${error.message}` };
-  }
-}
 
-export async function clearAllMealPlan(idToken: string) {
-  try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
-    
-    // Get ALL meals in the meal plan
-    const mealPlanRef = adminDb.collection('profiles').doc(userId).collection('mealPlan');
-    const snapshot = await mealPlanRef.get();
-    
-    console.log(`Found ${snapshot.docs.length} meals to delete for user ${userId}`);
-    
-    // Delete all meals
-    const batch = adminDb.batch();
-    snapshot.docs.forEach(doc => {
-      console.log(`Deleting meal: ${doc.id}`, doc.data());
-      batch.delete(doc.ref);
-    });
-    
-    await batch.commit();
-    revalidatePath('/meal-plan');
-    revalidatePath('/shopping-list');
-    
-    return { success: true, deletedCount: snapshot.docs.length };
-  } catch (error: any) {
-    console.error('clearAllMealPlan error:', {
-      code: error.code,
-      message: error.message,
-      stack: error.stack,
-    });
-    return { success: false, error: `Could not clear all meal plan: ${error.message}` };
-  }
-}
 
-export async function debugMealPlan(idToken: string) {
-  try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
-    
-    // Get ALL meals in the meal plan
-    const mealPlanRef = adminDb.collection('profiles').doc(userId).collection('mealPlan');
-    const snapshot = await mealPlanRef.get();
-    
-    const meals = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    
-    // Group by date for easier analysis
-    const mealsByDate = meals.reduce((acc, meal) => {
-      const date = meal.date || 'no-date';
-      if (!acc[date]) acc[date] = [];
-      acc[date].push(meal);
-      return acc;
-    }, {} as any);
-    
-    console.log('Meal Plan Debug:', {
-      totalMeals: meals.length,
-      mealsByDate: Object.keys(mealsByDate).map(date => ({
-        date,
-        count: mealsByDate[date].length,
-        meals: mealsByDate[date].map((m: any) => ({
-          id: m.id,
-          recipeId: m.recipeId,
-          mealType: m.mealType,
-          servings: m.servings,
-          status: m.status
-        }))
-      }))
-    });
-    
-    return { 
-      success: true, 
-      totalMeals: meals.length,
-      mealsByDate: Object.keys(mealsByDate).length,
-      meals 
-    };
-  } catch (error: any) {
-    console.error('debugMealPlan error:', {
-      code: error.code,
-      message: error.message,
-      stack: error.stack,
-    });
-    return { success: false, error: `Could not debug meal plan: ${error.message}` };
-  }
-}
 
 // SHOPPING LIST FUNCTIONS
 export async function addOrUpdateShoppingListItem(idToken: string, itemData: any) {
@@ -634,17 +507,6 @@ export async function generateShoppingListFromMealPlan(idToken: string) {
     });
     
     console.log(`🥘 Total aggregated meals from daily plans: ${mealPlan.length}`, mealPlan);
-    
-    // FALLBACK: If no meals found in new structure, try old structure for backwards compatibility
-    if (mealPlan.length === 0) {
-      console.log('🔄 No meals found in new daily structure, checking old meal plan structure...');
-      const oldMealPlanRef = adminDb.collection('profiles').doc(userId).collection('mealPlan');
-      const oldMealPlanSnapshot = await oldMealPlanRef.get();
-      const oldMeals = oldMealPlanSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      console.log(`📋 Found ${oldMeals.length} meals in old structure`);
-      mealPlan.push(...oldMeals);
-    }
     
     console.log(`🥘 Final total meals for shopping list: ${mealPlan.length}`);
     

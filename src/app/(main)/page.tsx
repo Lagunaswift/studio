@@ -41,7 +41,6 @@ import { cn } from '@/lib/utils';
 
 // FIXED IMPORTS
 import { useAuth } from '@/context/AuthContext';
-import { useAppContext } from '@/context/AppContext';
 import { useOptimizedRecipes, useOptimizedProfile, useOptimizedDailyMealPlan } from '@/hooks/useOptimizedFirestore';
 import { useToast } from '@/hooks/use-toast';
 
@@ -126,11 +125,15 @@ export default function HomePage() {
   const { profile: userProfile, loading: isProfileLoading, updateProfile } = useOptimizedProfile(user?.uid);
   const { recipes: allRecipesCache, loading: isAppRecipeCacheLoading, error: recipesError } = useOptimizedRecipes(user?.uid);
   
-  // FIXED: useAppContext now properly imported
-  const {
-    getConsumedMacrosForDate,
-    getMealsForDate,
-  } = useAppContext();
+  // Get consumed macros directly from user profile manual entries
+  const getConsumedMacrosForDate = (date: string): Macros => {
+    if (!userProfile?.dailyManualMacrosLog) {
+      return { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    }
+    
+    const dayEntry = userProfile.dailyManualMacrosLog.find(entry => entry.date === date);
+    return dayEntry?.macros || { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  };
   
   const { toast } = useToast();
 
@@ -170,7 +173,7 @@ export default function HomePage() {
   }, []);
 
   // Calculate consumed macros
-  const consumedTodayMacros = clientTodayDate && getConsumedMacrosForDate 
+  const consumedTodayMacros = clientTodayDate 
     ? getConsumedMacrosForDate(clientTodayDate) 
     : { calories: 0, protein: 0, carbs: 0, fat: 0 };
 

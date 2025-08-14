@@ -25,7 +25,7 @@ import {
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
 import { format, subDays, differenceInDays } from 'date-fns';
-import { addOrUpdateMealPlan, deleteMealFromPlan, addOrUpdatePantryItem, deletePantryItem, addRecipe as addRecipeAction, updateUserProfile, addOrUpdateVitalsLog, addOrUpdateWeightLog, addOrUpdateManualMacrosLog } from '@/app/(main)/profile/actions';
+import { addOrUpdateMealPlan, addOrUpdatePantryItem, deletePantryItem, addRecipe as addRecipeAction, updateUserProfile, addOrUpdateVitalsLog, addOrUpdateWeightLog, addOrUpdateManualMacrosLog } from '@/app/(main)/profile/actions';
 import { z } from 'zod';
 import { migrateEnumValues, validateAndFallbackEnums } from '@/utils/enumMigration';
 import { useOptimizedRecipes, useOptimizedProfile } from '@/hooks/useOptimizedFirestore';

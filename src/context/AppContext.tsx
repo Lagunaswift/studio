@@ -25,7 +25,7 @@ import {
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
 import { calculateTotalMacros as calculateTotalMacrosUtil, generateShoppingList as generateShoppingListUtil, assignCategory as assignCategoryUtil, calculateTrendWeight } from '@/lib/data';
 import { format, subDays, differenceInDays } from 'date-fns';
-import { addOrUpdateMealPlan, deleteMealFromPlan, addOrUpdatePantryItem, deletePantryItem, addRecipe as addRecipeAction, updateUserProfile, addOrUpdateVitalsLog, addOrUpdateWeightLog, addOrUpdateManualMacrosLog } from '@/app/(main)/profile/actions';
+import { addOrUpdateMealPlan, addOrUpdatePantryItem, deletePantryItem, addRecipe as addRecipeAction, updateUserProfile, addOrUpdateVitalsLog, addOrUpdateWeightLog, addOrUpdateManualMacrosLog } from '@/app/(main)/profile/actions';
 import { z } from 'zod';
 import { migrateEnumValues, validateAndFallbackEnums } from '@/utils/enumMigration';
 import { useOptimizedRecipes, useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
@@ -275,7 +275,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
   
   const removeMealFromPlan = useCallback(async (plannedMealId: string) => {
-    await callServerActionWithAuth(deleteMealFromPlan, plannedMealId);
+    console.warn('⚠️ DEPRECATED: removeMealFromPlan called - AppContext is being phased out');
+    // Legacy function removed - use dailyMealPlans structure instead
+    throw new Error('Legacy meal plan function removed. Use new dailyMealPlans structure.');
   }, []);
 
   const updateMealServingsOrStatus = useCallback(async (plannedMealId: string, updates: Partial<Pick<PlannedMeal, 'servings' | 'status'>>) => {
@@ -332,10 +334,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updatePlannedMealServings: (id, servings) => updateMealServingsOrStatus(id, { servings }),
     updateMealStatus: (id, status) => updateMealServingsOrStatus(id, { status }),
     clearMealPlanForDate: async (date: string) => {
-      await Promise.all(mealPlan.filter(pm => pm.date === date).map(meal => callServerActionWithAuth(deleteMealFromPlan, meal.id)));
+      console.warn('⚠️ DEPRECATED: clearMealPlanForDate called - AppContext is being phased out');
+      throw new Error('Legacy meal plan function removed. Use new dailyMealPlans structure.');
     },
     clearEntireMealPlan: async () => {
-      await Promise.all(mealPlan.map(meal => callServerActionWithAuth(deleteMealFromPlan, meal.id)));
+      console.warn('⚠️ DEPRECATED: clearEntireMealPlan called - AppContext is being phased out');
+      throw new Error('Legacy meal plan function removed. Use new dailyMealPlans structure.');
     },
     toggleFavoriteRecipe: async (recipeId: number) => {
         if (!userProfile) return;

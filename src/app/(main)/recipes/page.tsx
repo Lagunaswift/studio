@@ -203,28 +203,49 @@ function RecipesPageComponent() {
     setShowAddToPlanDialog(true);
   };
 
-  const handleAddToMealPlan = () => {
-    if (selectedRecipe && planDate && planMealType && planServings > 0) {
-      const newMeal = {
-        id: `${Date.now()}`,
+  const handleAddToMealPlan = async () => {
+    if (!selectedRecipe || !planDate || !planMealType || planServings <= 0 || !user) {
+      toast({ title: "Error", description: "Please fill all fields." });
+      return;
+    }
+
+    try {
+      const idToken = await user.getIdToken();
+      const dateStr = format(planDate, 'yyyy-MM-dd');
+      
+      const mealData = {
         recipeId: selectedRecipe.id,
-        date: format(planDate, 'yyyy-MM-dd'),
+        date: dateStr,
         mealType: planMealType,
         servings: planServings,
         status: 'planned'
       };
-      // @ts-ignore
-      const updatedMealPlan = [...(userProfile.mealPlan || []), newMeal];
-      updateProfile({ mealPlan: updatedMealPlan });
 
-      toast({
-        title: "Meal Added",
-        description: `${selectedRecipe.name} added to your meal plan for ${format(planDate, 'PPP')} (${planMealType}).`,
+      // Import addMealToDay dynamically to avoid circular imports
+      const { addMealToDay } = await import('@/app/(main)/profile/actions');
+      const result = await addMealToDay(idToken, dateStr, mealData);
+      
+      if (result.success) {
+        toast({
+          title: "Meal Added",
+          description: `${selectedRecipe.name} added to your meal plan for ${format(planDate, 'PPP')} (${planMealType}).`,
+        });
+        setShowAddToPlanDialog(false);
+        setSelectedRecipe(null);
+      } else {
+        toast({ 
+          title: "Error", 
+          description: result.error || "Failed to add meal to plan.",
+          variant: "destructive"
+        });
+      }
+    } catch (error: any) {
+      console.error('Add to meal plan error:', error);
+      toast({ 
+        title: "Error", 
+        description: "Failed to add meal to plan.",
+        variant: "destructive"
       });
-      setShowAddToPlanDialog(false);
-      setSelectedRecipe(null);
-    } else {
-      toast({ title: "Error", description: "Please fill all fields." });
     }
   };
 

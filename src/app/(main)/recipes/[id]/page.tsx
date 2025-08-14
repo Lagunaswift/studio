@@ -147,31 +147,52 @@ export default function RecipeDetailPage() {
   };
 
   const handleAddToMealPlan = async () => {
-    if (recipe && planDate && planMealType && planServings > 0) {
-        try {
-            const newMeal = {
-              id: `${Date.now()}`,
-              recipeId: recipe.id,
-              date: format(planDate, 'yyyy-MM-dd'),
-              mealType: planMealType,
-              servings: planServings,
-              status: 'planned'
-            };
-            // @ts-ignore
-            const updatedMealPlan = [...(userProfile.mealPlan || []), newMeal];
-            await updateProfile({ mealPlan: updatedMealPlan });
-            toast({
-                title: "Meal Added",
-                description: `${recipe.name} added to your meal plan for ${format(planDate, 'PPP')} (${planMealType}).`,
-            });
-            setShowAddToPlanDialog(false);
-        } catch (error: any) {
-             toast({
-                title: "Error adding meal",
-                description: error.message || "Could not add meal to plan.",
-                variant: 'destructive',
-            });
-        }
+    if (!recipe || !planDate || !planMealType || planServings <= 0 || !user) {
+      toast({ 
+        title: "Error", 
+        description: "Please fill all fields.",
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      const idToken = await user.getIdToken();
+      const dateStr = format(planDate, 'yyyy-MM-dd');
+      
+      const mealData = {
+        recipeId: recipe.id,
+        date: dateStr,
+        mealType: planMealType,
+        servings: planServings,
+        status: 'planned'
+      };
+
+      // Import addMealToDay dynamically to avoid circular imports
+      const { addMealToDay } = await import('@/app/(main)/profile/actions');
+      const result = await addMealToDay(idToken, dateStr, mealData);
+      
+      if (result.success) {
+        toast({
+          title: "Meal Added",
+          description: `${recipe.name} added to your meal plan for ${format(planDate, 'PPP')} (${planMealType}).`,
+        });
+        setShowAddToPlanDialog(false);
+      } else {
+        toast({ 
+          title: "Error", 
+          description: result.error || "Failed to add meal to plan.",
+          variant: "destructive"
+        });
+      }
+    } catch (error: any) {
+      console.error('Add to meal plan error:', error);
+      toast({
+        title: "Error adding meal",
+        description: "Failed to add meal to plan.",
+        variant: 'destructive',
+      });
+    }
     } else {
        toast({
         title: "Error",
