@@ -23,6 +23,7 @@ import { MiniUpgradeButton } from '@/components/subscription/CheckoutButton';
 import { safeLocalStorage } from '@/lib/safe-storage';
 import { addMealToDay } from '@/app/(main)/profile/actions';
 import { useOptimizedRecipes, useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
+import { LimitReachedError, GenerationError } from '@/components/ui/friendly-error';
 
 // Your actual recipe data structure (macros as individual properties)
 interface RecipeWithDirectMacros {
@@ -296,11 +297,8 @@ export default function AISuggestionsPage() {
     const limitCheck = checkSubscriptionLimit(user.uid, 'aiRequest', userProfile);
     
     if (!limitCheck.allowed) {
-      toast({
-        title: "Limit Reached",
-        description: limitCheck.reason || "You've reached your usage limit.",
-        variant: "destructive",
-      });
+      // Set a friendly error instead of harsh toast
+      setError(`limit:${limitCheck.reason || "You've reached your daily AI request limit. Upgrade to Premium for unlimited access!"}`);
       return false;
     }
 
@@ -725,11 +723,25 @@ export default function AISuggestionsPage() {
         )}
 
         {error && (
-          <Alert variant="destructive">
-            <Info className="h-4 w-4" />
-            <AlertTitle>Error Generating Plan</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <div>
+            {error.startsWith('limit:') ? (
+              <LimitReachedError 
+                description={error.replace('limit:', '')}
+                onRetry={() => {
+                  setError(null);
+                  handleGeneratePlan();
+                }}
+              />
+            ) : (
+              <GenerationError 
+                description={error}
+                onRetry={() => {
+                  setError(null);
+                  handleGeneratePlan();
+                }}
+              />
+            )}
+          </div>
         )}
 
         {suggestion && !isGeneratingPlan && (

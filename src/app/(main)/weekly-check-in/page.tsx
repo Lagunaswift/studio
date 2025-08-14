@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Wand2, CheckSquare, Info, AlertTriangle, TrendingUp, TrendingDown, Lock } from 'lucide-react';
 import { WeeklyAnalysisLoading } from '@/components/ui/enhanced-preppy-loading';
+import { InfoMessage } from '@/components/ui/friendly-error';
 import type { PreppyOutput } from '@/ai/flows/pro-coach-flow';
 import { MacroDisplay } from '@/components/shared/MacroDisplay';
 import { Separator } from '@/components/ui/separator';
@@ -92,13 +93,12 @@ export default function WeeklyCheckinPage() {
           </CardHeader>
           <CardContent>
              {isCheckinDisabled ? (
-                <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>More Data Needed</AlertTitle>
-                    <AlertDescription>
-                        The weekly check-in requires at least 14 days of logged weight and consumed meals to accurately calculate your TDEE. Keep logging your progress daily on the <Link href="/" className="underline">Dashboard</Link> and <Link href="/meal-plan" className="underline">Meal Plan</Link> pages!
-                    </AlertDescription>
-                </Alert>
+                <InfoMessage
+                    title="More Data Needed"
+                    description="The weekly check-in requires at least 14 days of logged weight and consumed meals to accurately calculate your TDEE. Keep logging your progress daily and come back!"
+                    actionText="Go to Dashboard"
+                    onAction={() => window.location.href = '/'}
+                />
             ) : (
                 <Button onClick={handleRunCheckin} disabled={isLoading} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
