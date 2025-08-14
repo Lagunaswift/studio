@@ -83,3 +83,75 @@ The codebase doesn't include explicit test frameworks. When adding tests:
 - Check existing patterns before choosing testing tools
 - Consider the dual storage architecture when testing data flows
 - Test both online and offline scenarios for PWA functionality
+
+## Meal Plan Architecture
+
+### Current Structure (Post-Cleanup)
+The app uses a **document-per-day** meal plan architecture:
+
+```
+profiles/{userId}/dailyMealPlans/{date}
+```
+
+Each document contains:
+```typescript
+{
+  date: "YYYY-MM-DD",
+  meals: [
+    {
+      id: string,
+      recipeId: number,
+      mealType: MealType,
+      servings: number,
+      status: "planned" | "eaten",
+      mealSlotId?: string
+    }
+  ]
+}
+```
+
+### Key Functions and Hooks
+- **Adding meals**: `addMealToDay(idToken, date, mealData)`
+- **Reading meal plans**: `useOptimizedDailyMealPlan(userId, date)`
+- **Profile data**: `useOptimizedProfile(userId)`
+- **Recipe data**: `useOptimizedRecipes(userId)`
+
+### Data Flow Pattern
+1. User selects a recipe and date
+2. Call `addMealToDay()` server action
+3. Server creates/updates `dailyMealPlans/{date}` document
+4. Hook `useOptimizedDailyMealPlan()` automatically syncs changes
+5. UI reflects updated meal plan
+
+### Migration System
+The app includes automatic migration from legacy `mealPlan` collection:
+- Migration triggered on dashboard load
+- Groups legacy meals by date
+- Creates new `dailyMealPlans` documents
+- Maintains all meal data and relationships
+
+### Important Changes (August 2025)
+- Complete architectural cleanup: removed ALL legacy `mealPlan` collection code
+- Single source of truth: ONLY `dailyMealPlans/{date}` structure is now supported
+- All meal plan operations now use the document-per-day pattern
+- Legacy functions completely removed to prevent confusion
+
+## Development Guidelines
+
+### Meal Plan Development
+- **NEVER** use the old `profiles/{userId}/mealPlan` collection pattern
+- **ALWAYS** use `profiles/{userId}/dailyMealPlans/{date}` for meal planning
+- Use `addMealToDay()` server action for adding meals
+- Use `useOptimizedDailyMealPlan()` hook for reading meal plans
+- Each date gets its own document with meals array
+
+### Code Patterns to Follow
+- Import optimized hooks: `useOptimizedProfile`, `useOptimizedRecipes`, `useOptimizedDailyMealPlan`
+- Use server actions for all data mutations
+- Follow the established error handling patterns with graceful fallbacks
+- Always handle both online and offline scenarios (PWA requirements)
+
+### Code Patterns to AVOID
+- Legacy meal plan functions (removed in August 2025 cleanup)
+- Direct Firestore operations (use optimized hooks instead)
+- Hardcoded collection paths (use the established patterns)

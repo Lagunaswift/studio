@@ -7,13 +7,27 @@ import { serverFirestore } from '@/utils/firestoreRecovery';
 import { debugGetUserIdFromToken } from '@/utils/authDebug';
 import type { UserProfileSettings, Sex, ActivityLevel } from '@/types';
 import { ACTIVITY_LEVEL_OPTIONS } from '@/types';
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb, adminAuth } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { mergeWithDefaults } from '@/utils/profileDefaults';
 import { migrateEnumValues, validateAndFallbackEnums } from '@/utils/enumMigration';
 import { parseIngredientString, normalizeIngredientName, normalizeUnit, roundQuantityForShopping, generateConsolidationKey, assignCategory } from '@/lib/data';
 
-// Old helper functions removed - now using optimized functions from data.ts
+// Helper function for token verification
+async function verifyTokenAndGetUserId(idToken: string): Promise<string> {
+  if (!idToken) {
+    throw new Error('No authentication token provided');
+  }
+
+  try {
+    const cleanToken = idToken.replace(/^Bearer\s+/i, '');
+    const decodedToken = await adminAuth.verifyIdToken(cleanToken, true);
+    return decodedToken.uid;
+  } catch (error: any) {
+    console.error('Token verification failed:', error);
+    throw new Error(`Authentication error: Could not verify user. ${error.message}`);
+  }
+}
 
 // --- Calculation Helpers ---
 const calculateLBM = (weightKg: number | null, bodyFatPercentage: number | null): number | null => {
@@ -142,8 +156,7 @@ export async function batchUpdateUserProfile(
 // DAILY MEAL PLAN FUNCTIONS (New Structure: One Document Per Day)
 export async function setDailyMealPlan(idToken: string, date: string, meals: any[]) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     
     const dailyMealPlanRef = adminDb.collection('profiles').doc(userId).collection('dailyMealPlans').doc(date);
     
@@ -167,8 +180,7 @@ export async function setDailyMealPlan(idToken: string, date: string, meals: any
 
 export async function addMealToDay(idToken: string, date: string, meal: any) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     
     const dailyMealPlanRef = adminDb.collection('profiles').doc(userId).collection('dailyMealPlans').doc(date);
     const doc = await dailyMealPlanRef.get();
@@ -205,8 +217,7 @@ export async function addMealToDay(idToken: string, date: string, meal: any) {
 
 export async function updateMealInDay(idToken: string, date: string, mealId: string, updates: any) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     
     const dailyMealPlanRef = adminDb.collection('profiles').doc(userId).collection('dailyMealPlans').doc(date);
     const doc = await dailyMealPlanRef.get();
@@ -240,8 +251,7 @@ export async function updateMealInDay(idToken: string, date: string, mealId: str
 
 export async function removeMealFromDay(idToken: string, date: string, mealId: string) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     
     const dailyMealPlanRef = adminDb.collection('profiles').doc(userId).collection('dailyMealPlans').doc(date);
     const doc = await dailyMealPlanRef.get();
@@ -273,8 +283,10 @@ export async function removeMealFromDay(idToken: string, date: string, mealId: s
 
 export async function clearDailyMealPlan(idToken: string, date: string) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    console.log('clearDailyMealPlan: Starting for date:', date);
+    
+    const userId = await verifyTokenAndGetUserId(idToken);
+    console.log('clearDailyMealPlan: Token verified for user:', userId);
     
     const dailyMealPlanRef = adminDb.collection('profiles').doc(userId).collection('dailyMealPlans').doc(date);
     
@@ -284,13 +296,16 @@ export async function clearDailyMealPlan(idToken: string, date: string) {
       updatedAt: FieldValue.serverTimestamp(),
     });
     
+    console.log('clearDailyMealPlan: Successfully cleared meal plan for date:', date);
     revalidatePath('/meal-plan');
     return { success: true };
   } catch (error: any) {
     console.error('clearDailyMealPlan error:', {
+      error: error.message,
       code: error.code,
-      message: error.message,
       stack: error.stack,
+      idTokenPresent: !!idToken,
+      date,
     });
     return { success: false, error: `Could not clear daily meal plan: ${error.message}` };
   }
@@ -302,8 +317,7 @@ export async function addOrUpdateMealPlan(idToken: string, mealData: any) {
   console.warn('⚠️ DEPRECATED: addOrUpdateMealPlan called, redirecting to new structure');
   
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     
     // Redirect to new daily meal plan structure
     if (!mealData.date) {
@@ -375,8 +389,7 @@ export async function addOrUpdateMealPlan(idToken: string, mealData: any) {
 // SHOPPING LIST FUNCTIONS
 export async function addOrUpdateShoppingListItem(idToken: string, itemData: any) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     
     const shoppingListRef = adminDb.collection('profiles').doc(userId).collection('shoppingList');
     
@@ -409,8 +422,7 @@ export async function addOrUpdateShoppingListItem(idToken: string, itemData: any
 
 export async function deleteShoppingListItem(idToken: string, itemId: string) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     await adminDb.collection('profiles').doc(userId).collection('shoppingList').doc(itemId).delete();
     revalidatePath('/shopping-list');
     return { success: true };
@@ -426,8 +438,7 @@ export async function deleteShoppingListItem(idToken: string, itemId: string) {
 
 export async function updateShoppingListItemStatus(idToken: string, itemId: string, purchased: boolean) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     
     await adminDb.collection('profiles').doc(userId).collection('shoppingList').doc(itemId).update({
       purchased,
@@ -448,8 +459,7 @@ export async function updateShoppingListItemStatus(idToken: string, itemId: stri
 
 export async function clearShoppingList(idToken: string) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     
     // Get all shopping list items
     const shoppingListRef = adminDb.collection('profiles').doc(userId).collection('shoppingList');
@@ -476,8 +486,7 @@ export async function clearShoppingList(idToken: string) {
 
 export async function generateShoppingListFromMealPlan(idToken: string) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     
     // Get current meal plan from daily meal plans
     const dailyMealPlansRef = adminDb.collection('profiles').doc(userId).collection('dailyMealPlans');
@@ -667,8 +676,7 @@ export async function generateShoppingListFromMealPlan(idToken: string) {
 // PANTRY FUNCTIONS
 export async function addOrUpdatePantryItem(idToken: string, itemData: any) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     
     const pantryRef = adminDb.collection('profiles').doc(userId).collection('pantry');
     
@@ -701,8 +709,7 @@ export async function addOrUpdatePantryItem(idToken: string, itemData: any) {
 
 export async function deletePantryItem(idToken: string, itemId: string) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     await adminDb.collection('profiles').doc(userId).collection('pantry').doc(itemId).delete();
     revalidatePath('/pantry');
     return { success: true };
@@ -719,8 +726,7 @@ export async function deletePantryItem(idToken: string, itemId: string) {
 // RECIPE FUNCTIONS
 export async function addRecipe(idToken: string, recipeData: any) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     
     const recipesRef = adminDb.collection('profiles').doc(userId).collection('recipes');
     
@@ -745,8 +751,7 @@ export async function addRecipe(idToken: string, recipeData: any) {
 // VITALS LOG FUNCTIONS
 export async function addOrUpdateVitalsLog(idToken: string, vitalsData: any) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     
     const vitalsRef = adminDb.collection('profiles').doc(userId).collection('vitalsLogs');
     
@@ -780,8 +785,7 @@ export async function addOrUpdateVitalsLog(idToken: string, vitalsData: any) {
 // WEIGHT LOG FUNCTIONS
 export async function addOrUpdateWeightLog(idToken: string, weightData: any) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     
     const weightRef = adminDb.collection('profiles').doc(userId).collection('weightLogs');
     
@@ -815,8 +819,7 @@ export async function addOrUpdateWeightLog(idToken: string, weightData: any) {
 // MANUAL MACROS LOG FUNCTIONS
 export async function addOrUpdateManualMacrosLog(idToken: string, macrosData: any) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     
     const macrosRef = adminDb.collection('profiles').doc(userId).collection('manualMacrosLogs');
     
@@ -850,8 +853,7 @@ export async function addOrUpdateManualMacrosLog(idToken: string, macrosData: an
 // Migration function to move legacy meal plan data to new daily structure
 export async function migrateLegacyMealPlanData(idToken: string) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     
     console.log(`🚀 Starting meal plan migration for user ${userId}`);
     
@@ -943,8 +945,7 @@ export async function migrateLegacyMealPlanData(idToken: string) {
 // Helper function to check if migration is needed
 export async function checkMigrationStatus(idToken: string) {
   try {
-    const decodedToken = await serverFirestore.verifyToken(idToken);
-    const userId = decodedToken.uid;
+    const userId = await verifyTokenAndGetUserId(idToken);
     
     // Check if there's any legacy data
     const legacyMealPlanRef = adminDb.collection('profiles').doc(userId).collection('mealPlan');
