@@ -3,6 +3,7 @@ import { optimizedFirestore } from '@/lib/firestore/OptimizedFirestore';
 import { where, orderBy } from 'firebase/firestore';
 import type { UserProfileSettings, Recipe } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import { format } from 'date-fns';
 
 // High-performance profile hook with aggressive caching
 export function useOptimizedProfile(userId: string | undefined) {
@@ -142,6 +143,81 @@ export function useOptimizedRecipes(userId: string | undefined) {
 }
 
 
+// Meal plan hook to load meals from subcollection
+export function useOptimizedMealPlan(userId: string | undefined) {
+  const [mealPlan, setMealPlan] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+
+  const loadMealPlan = useCallback(async () => {
+    if (!userId) {
+      setMealPlan([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const mealPlanResult = await optimizedFirestore.getCollection<any>(
+        `profiles/${userId}/mealPlan`,
+        [],
+        {
+          ttl: 5 * 60 * 1000, // 5 minutes cache for meal plan data
+          enablePagination: false,
+          cacheKey: `meal_plan:${userId}`
+        }
+      );
+      
+      setMealPlan(mealPlanResult.data);
+    } catch (err: any) {
+      console.error('❌ Meal plan load failed:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) {
+      setMealPlan([]);
+      setLoading(false);
+      return;
+    }
+
+    // Subscribe to real-time updates for meal plan
+    unsubscribeRef.current = optimizedFirestore.subscribeToCollection<any>(
+      `profiles/${userId}/mealPlan`,
+      [],
+      (data) => {
+        setMealPlan(data);
+        setLoading(false);
+      },
+      {
+        debounceMs: 1000, // Shorter debounce for meal plan updates
+        ttl: 5 * 60 * 1000
+      }
+    );
+
+    loadMealPlan();
+
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+    };
+  }, [userId, loadMealPlan]);
+
+  return {
+    mealPlan,
+    loading,
+    error,
+    refetch: loadMealPlan
+  };
+}
+
 // Performance monitoring hook
 export function useFirestorePerformance() {
   const [stats, setStats] = useState({
@@ -166,4 +242,78 @@ export function useFirestorePerformance() {
   }, []);
 
   return stats;
+}
+
+// Shopping List Hook
+export function useOptimizedShoppingList(userId: string | undefined) {
+  const [shoppingList, setShoppingList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userId) {
+      setShoppingList([]);
+      setLoading(false);
+      return;
+    }
+
+    const collectionPath = `profiles/${userId}/shoppingList`;
+    
+    const unsubscribe = optimizedFirestore.subscribeToCollection<any>(
+      collectionPath,
+      [], // No constraints needed for basic shopping list
+      (data) => {
+        setShoppingList(data);
+        setLoading(false);
+        setError(null);
+      },
+      {
+        debounceMs: 500,
+        ttl: 2 * 60 * 1000 // 2 minute cache
+      }
+    );
+
+    return unsubscribe;
+  }, [userId]);
+
+  return { shoppingList, loading, error };
+}
+
+// Daily Meal Plan Hook (New Structure: One Document Per Day)
+export function useOptimizedDailyMealPlan(userId: string | undefined, date?: string) {
+  const [dailyMealPlan, setDailyMealPlan] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userId) {
+      setDailyMealPlan(null);
+      setLoading(false);
+      return;
+    }
+
+    // If no date specified, use today
+    const targetDate = date || format(new Date(), 'yyyy-MM-dd');
+    const documentPath = `profiles/${userId}/dailyMealPlans/${targetDate}`;
+    
+    const unsubscribe = optimizedFirestore.subscribeToDocument<any>(
+      documentPath,
+      (data) => {
+        setDailyMealPlan(data);
+        setLoading(false);
+        setError(null);
+      },
+      {
+        debounceMs: 300,
+        ttl: 30 * 1000 // 30 second cache for real-time updates
+      }
+    );
+
+    return unsubscribe;
+  }, [userId, date]);
+
+  // Helper to get meals array
+  const meals = dailyMealPlan?.meals || [];
+
+  return { dailyMealPlan, meals, loading, error };
 }

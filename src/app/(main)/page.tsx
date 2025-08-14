@@ -50,7 +50,6 @@ import type { MacroTargets, Macros, Recipe, PlannedMeal } from '@/types';
 
 // Components
 import { RecipeCard } from '@/components/shared/RecipeCard';
-import { ProgressSummary } from '@/components/shared/ProgressSummary';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from '@/components/ui/badge';
 import { UsageDashboard } from '@/components/subscription/UsageDashboard';
@@ -130,17 +129,6 @@ export default function HomePage() {
     ? getMealsForDate(clientTodayDate) 
     : [];
 
-  // Calculate macro percentages for visual display
-  const macroPercentages = useMemo(() => {
-    if (!currentMacroTargets) return { calories: 0, protein: 0, carbs: 0, fat: 0 };
-    
-    return {
-      calories: currentMacroTargets.calories > 0 ? Math.min((consumedTodayMacros.calories / currentMacroTargets.calories) * 100, 100) : 0,
-      protein: currentMacroTargets.protein > 0 ? Math.min((consumedTodayMacros.protein / currentMacroTargets.protein) * 100, 100) : 0,
-      carbs: currentMacroTargets.carbs > 0 ? Math.min((consumedTodayMacros.carbs / currentMacroTargets.carbs) * 100, 100) : 0,
-      fat: currentMacroTargets.fat > 0 ? Math.min((consumedTodayMacros.fat / currentMacroTargets.fat) * 100, 100) : 0,
-    };
-  }, [consumedTodayMacros, currentMacroTargets]);
 
   // Prepare chart data (same as weekly planner)
   const caloriesChartData = useMemo(() => {
@@ -262,13 +250,6 @@ export default function HomePage() {
                       </div>
                     </div>
                   </div>
-                  
-                  {/* Progress Summary */}
-                  <ProgressSummary 
-                    consumedMacros={consumedTodayMacros}
-                    targetMacros={currentMacroTargets}
-                    className="mt-4"
-                  />
                 </div>
               ) : (
                 <div className="text-center py-8">

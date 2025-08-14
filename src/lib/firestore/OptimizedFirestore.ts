@@ -184,6 +184,49 @@ class OptimizedFirestore {
     };
   }
 
+  // Optimized real-time collection listener with debouncing
+  subscribeToCollection<T>(
+    collectionPath: string,
+    constraints: any[] = [],
+    callback: (data: T[]) => void,
+    options: {
+      debounceMs?: number;
+      ttl?: number;
+    } = {}
+  ): () => void {
+    const { debounceMs = 1000, ttl = this.DEFAULT_TTL } = options;
+    const cacheKey = `collection:${collectionPath}:${JSON.stringify(constraints)}`;
+    
+    // Cancel existing listener
+    this.unsubscribeListener(cacheKey);
+
+    let debounceTimer: NodeJS.Timeout;
+    
+    // Build query
+    const q = query(collection(db, collectionPath), ...constraints);
+    
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      clearTimeout(debounceTimer);
+      
+      debounceTimer = setTimeout(() => {
+        const data: T[] = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as T));
+        
+        this.setCachedData(cacheKey, data, ttl);
+        callback(data);
+      }, debounceMs);
+    });
+
+    this.listeners.set(cacheKey, unsubscribe);
+    
+    return () => {
+      clearTimeout(debounceTimer);
+      this.unsubscribeListener(cacheKey);
+    };
+  }
+
   // Batch write operations
   batchWrite(path: string, data: any, operation: 'set' | 'update' = 'update') {
     if (operation === 'set') {

@@ -4,8 +4,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { useOptimizedRecipes, useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
+import { useOptimizedRecipes, useOptimizedProfile, useOptimizedDailyMealPlan } from '@/hooks/useOptimizedFirestore';
 import { useAuth } from '@/context/AuthContext';
+import { addMealToDay, updateMealInDay, removeMealFromDay, clearDailyMealPlan } from '@/app/(main)/profile/actions';
 import type { PlannedMeal, MealType, Recipe, Macros, MealSlotConfig } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +43,7 @@ import {
   Minus,
   Edit,
   Target,
+  CalendarX,
   // Icons for MealPlanRecipeCard
   Clock,
   Users,
@@ -68,7 +70,7 @@ const MEAL_SLOT_CONFIG: Array<{ type: MealType; displayName: string }> = [
 ];
 
 const chartConfig = {
-  consumed: { label: "Consumed", color: "hsl(var(--chart-1))" },
+  planned: { label: "Planned", color: "hsl(var(--chart-1))" },
   target: { label: "Target", color: "hsl(var(--chart-2))" },
 } satisfies ChartConfig;
 
@@ -80,7 +82,11 @@ export default function MealPlanPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [editingMeal, setEditingMeal] = useState<PlannedMeal | null>(null);
   const [newServings, setNewServings] = useState<number>(1);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const { toast } = useToast();
+
+  const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+  const { meals: dailyMeals, loading: isMealPlanLoading } = useOptimizedDailyMealPlan(user?.uid, formattedDate);
 
   const [recipePickerIndices, setRecipePickerIndices] = useState<{[key: string]: number}>(
     (userProfile?.mealStructure || MEAL_SLOT_CONFIG).reduce((acc, slot, index) => {
@@ -93,10 +99,6 @@ export default function MealPlanPage() {
   
   const availableRecipesForPicker = allRecipesCache;
   const mealStructureToUse = userProfile?.mealStructure || MEAL_SLOT_CONFIG.map((s, i) => ({...s, id: `default-${i}`}));
-
-  const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-  // @ts-ignore
-  const dailyMeals = userProfile?.mealPlan?.filter(meal => meal.date === formattedDate) || [];
 
   // Mobile-optimized MealPlanRecipeCard Component
   interface MealPlanRecipeCardProps {
@@ -330,38 +332,71 @@ export default function MealPlanPage() {
     }
   };
 
-  const handleAddMeal = (recipeId: string, mealType: string, mealSlotId?: string) => {
-    if (!userProfile) return;
+  const handleAddMeal = async (recipeId: string, mealType: string, mealSlotId?: string) => {
+    if (!user) return;
 
-    const newMeal: PlannedMeal = {
-      id: Date.now().toString(),
-      recipeId: parseInt(recipeId),
-      date: formattedDate,
-      mealType,
-      servings: 1,
-      status: 'planned',
-      mealSlotId,
-    };
+    try {
+      const idToken = await user.getIdToken();
+      const mealData = {
+        recipeId: parseInt(recipeId),
+        date: formattedDate,
+        mealType,
+        servings: 1,
+        status: 'planned',
+        mealSlotId,
+      };
 
-    const updatedMealPlan = [...(userProfile.mealPlan || []), newMeal];
-    updateProfile({ mealPlan: updatedMealPlan });
-    
-    toast({
-      title: "Meal Added",
-      description: `Recipe added to ${mealType} for ${format(selectedDate, 'MMM do, yyyy')}.`,
-    });
+      const result = await addMealToDay(idToken, formattedDate, mealData);
+      
+      if (result.success) {
+        toast({
+          title: "Meal Added",
+          description: `Recipe added to ${mealType} for ${format(selectedDate, 'MMM do, yyyy')}.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to add meal",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Add meal error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add meal",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleRemoveMeal = (mealId: string) => {
-    if (!userProfile) return;
+  const handleRemoveMeal = async (mealId: string) => {
+    if (!user) return;
 
-    const updatedMealPlan = userProfile.mealPlan?.filter(meal => meal.id !== mealId) || [];
-    updateProfile({ mealPlan: updatedMealPlan });
-    
-    toast({
-      title: "Meal Removed",
-      description: "Meal removed from your plan.",
-    });
+    try {
+      const idToken = await user.getIdToken();
+      const result = await removeMealFromDay(idToken, formattedDate, mealId);
+      
+      if (result.success) {
+        toast({
+          title: "Meal Removed",
+          description: "Meal removed from your plan.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to remove meal",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Remove meal error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove meal",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleEditServings = (meal: PlannedMeal) => {
@@ -369,23 +404,79 @@ export default function MealPlanPage() {
     setNewServings(meal.servings);
   };
 
-  const saveServings = () => {
-    if (!userProfile || !editingMeal) return;
+  const saveServings = async () => {
+    if (!user || !editingMeal) return;
 
-    const updatedMealPlan = userProfile.mealPlan?.map(meal => 
-      meal.id === editingMeal.id ? { ...meal, servings: newServings } : meal
-    ) || [];
-    
-    updateProfile({ mealPlan: updatedMealPlan });
-    setEditingMeal(null);
-    
-    toast({
-      title: "Servings Updated",
-      description: `Servings updated to ${newServings}.`,
-    });
+    try {
+      const idToken = await user.getIdToken();
+      
+      if (!editingMeal?.id) {
+        throw new Error('Meal ID is required for updates');
+      }
+
+      const result = await updateMealInDay(idToken, formattedDate, editingMeal.id, {
+        servings: newServings
+      });
+      
+      if (result.success) {
+        setEditingMeal(null);
+        toast({
+          title: "Servings Updated",
+          description: `Servings updated to ${newServings}.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to update servings",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Update servings error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update servings",
+        variant: "destructive",
+      });
+    }
   };
 
-  // Calculate daily macros with safety checks
+  const handleClearDay = () => {
+    setShowClearConfirm(true);
+  };
+
+  const confirmClearDay = async () => {
+    if (!user) return;
+
+    try {
+      const idToken = await user.getIdToken();
+      const result = await clearDailyMealPlan(idToken, formattedDate);
+      
+      if (result.success) {
+        toast({
+          title: "Day Cleared",
+          description: `Cleared all meals from ${format(selectedDate, 'PPP')}.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to clear day",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Clear day error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear day",
+        variant: "destructive",
+      });
+    } finally {
+      setShowClearConfirm(false);
+    }
+  };
+
+  // Calculate daily PLANNED macros from all planned meals (regardless of eaten status)
   const dailyMacros = dailyMeals.reduce((acc, meal) => {
     if (!meal || typeof meal.recipeId === 'undefined' || typeof meal.servings !== 'number') {
       return acc;
@@ -398,8 +489,22 @@ export default function MealPlanPage() {
     if (servings <= 0) return acc;
 
     try {
+      // Handle both macro formats: individual properties and macrosPerServing object
+      let macros;
       if (recipe.macrosPerServing && typeof recipe.macrosPerServing === 'object') {
-        const macros = recipe.macrosPerServing;
+        // Nested macros format
+        macros = recipe.macrosPerServing;
+      } else if (typeof recipe.calories === 'number') {
+        // Individual properties format (more common)
+        macros = {
+          calories: recipe.calories,
+          protein: recipe.protein,
+          carbs: recipe.carbs,
+          fat: recipe.fat
+        };
+      }
+
+      if (macros) {
         acc.calories += (typeof macros.calories === 'number' ? macros.calories : 0) * servings;
         acc.protein += (typeof macros.protein === 'number' ? macros.protein : 0) * servings;
         acc.carbs += (typeof macros.carbs === 'number' ? macros.carbs : 0) * servings;
@@ -414,28 +519,31 @@ export default function MealPlanPage() {
 
   const currentMacroTargets = userProfile?.macroTargets;
   
-  const progressData = currentMacroTargets ? [
-    {
-      name: 'Calories',
-      consumed: Math.round(dailyMacros.calories),
-      target: currentMacroTargets.calories,
-    },
-    {
-      name: 'Protein',
-      consumed: Math.round(dailyMacros.protein),
-      target: currentMacroTargets.protein,
-    },
-    {
-      name: 'Carbs',
-      consumed: Math.round(dailyMacros.carbs),
-      target: currentMacroTargets.carbs,
-    },
-    {
-      name: 'Fat',
-      consumed: Math.round(dailyMacros.fat),
-      target: currentMacroTargets.fat,
-    },
-  ] : [];
+  // Prepare chart data - showing PLANNED meals for meal planning page
+  const caloriesChartData = currentMacroTargets ? [
+    { name: "Calories", planned: Math.round(dailyMacros.calories) || 0, target: currentMacroTargets.calories || 0, unit: 'kcal' },
+  ] : [{ name: "Calories", planned: Math.round(dailyMacros.calories) || 0, target: 0, unit: 'kcal' }];
+
+  const macrosChartData = currentMacroTargets ? [
+    { name: "Protein", planned: Math.round(dailyMacros.protein) || 0, target: currentMacroTargets.protein || 0, unit: 'g' },
+    { name: "Carbs", planned: Math.round(dailyMacros.carbs) || 0, target: currentMacroTargets.carbs || 0, unit: 'g' },
+    { name: "Fat", planned: Math.round(dailyMacros.fat) || 0, target: currentMacroTargets.fat || 0, unit: 'g' },
+  ] : [
+    { name: "Protein", planned: Math.round(dailyMacros.protein) || 0, target: 0, unit: 'g' },
+    { name: "Carbs", planned: Math.round(dailyMacros.carbs) || 0, target: 0, unit: 'g' },
+    { name: "Fat", planned: Math.round(dailyMacros.fat) || 0, target: 0, unit: 'g' },
+  ];
+
+  // Debug logging for chart issues
+  console.log('📊 Chart Debug Data:', {
+    dailyMealsCount: dailyMeals.length,
+    dailyMacros,
+    currentMacroTargets,
+    caloriesChartData,
+    macrosChartData,
+    hasTargets: !!currentMacroTargets,
+    selectedDate: formattedDate
+  });
 
   return (
     <PageWrapper title="Meal Plan" maxWidth="max-w-7xl">
@@ -492,67 +600,68 @@ export default function MealPlanPage() {
         {/* Mobile-optimized Daily Macros Summary */}
         <Card className="shadow-lg">
           <CardHeader className="px-3 sm:px-6">
-            <CardTitle className="font-headline text-primary text-lg sm:text-xl">Daily Totals</CardTitle>
-            <CardDescription className="text-sm">
-              {currentMacroTargets ? 
-                "Review your planned macronutrient intake against your targets." : 
-                "Review your planned macronutrient intake. Set targets in profile for comparison."
-              }
-            </CardDescription>
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div className="flex-1">
+                <CardTitle className="font-headline text-primary text-lg sm:text-xl">Daily Planned Totals</CardTitle>
+                <CardDescription className="text-sm">
+                  {currentMacroTargets ? 
+                    "Review your planned meals' macronutrient totals against your targets." : 
+                    "Review your planned meals' macronutrient totals. Set targets in profile for comparison."
+                  }
+                </CardDescription>
+              </div>
+              {dailyMeals.length > 0 && (
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearDay}
+                  className="text-destructive hover:text-destructive border-destructive/20 hover:border-destructive/50 h-8"
+                >
+                  <CalendarX className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="text-xs sm:text-sm">Clear Day</span>
+                </Button>
+              )}
+            </div>
           </CardHeader>
           
           <CardContent className="px-3 sm:px-6">
             {currentMacroTargets ? (
               <div className="space-y-4 sm:space-y-6">
-                {/* Mobile-responsive chart */}
-                <div className="h-48 sm:h-64 w-full">
-                  <ChartContainer config={chartConfig}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={progressData} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
-                        <XAxis 
-                          dataKey="name" 
-                          className="text-xs" 
-                          tick={{ fontSize: 12 }}
-                        />
-                        <YAxis className="text-xs" tick={{ fontSize: 10 }} />
-                        <ChartTooltip content={<ChartTooltipContent />} />
-                        <Bar dataKey="consumed" fill="var(--color-consumed)" />
-                        <Bar dataKey="target" fill="var(--color-target)" opacity={0.5} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </ChartContainer>
-                </div>
-
-                {/* Mobile-optimized percentage display */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-                  {[
-                    { key: 'calories', label: 'Calories', color: 'text-red-600' },
-                    { key: 'protein', label: 'Protein', color: 'text-blue-600' },
-                    { key: 'carbs', label: 'Carbs', color: 'text-green-600' },
-                    { key: 'fat', label: 'Fat', color: 'text-yellow-600' },
-                  ].map(({ key, label, color }) => {
-                    const consumed = dailyMacros[key as keyof typeof dailyMacros];
-                    const target = currentMacroTargets[key as keyof typeof currentMacroTargets];
-                    const percentage = target > 0 ? Math.round((consumed / target) * 100) : 0;
-                    return (
-                      <div key={key} className="text-center space-y-2">
-                        <div className={`font-semibold text-lg sm:text-xl ${color}`}>
-                          {percentage}%
-                        </div>
-                        <div className="text-muted-foreground text-xs sm:text-sm">{label}</div>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
-                          <div 
-                            className={`h-1.5 rounded-full transition-all duration-300 ${
-                              key === 'calories' ? 'bg-red-500' :
-                              key === 'protein' ? 'bg-blue-500' :
-                              key === 'carbs' ? 'bg-green-500' : 'bg-yellow-500'
-                            }`}
-                            style={{ width: `${Math.min(percentage, 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                {/* Chart Visualizations (same as dashboard) */}
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-md font-semibold mb-1">Calories (kcal)</h3>
+                    <div className="h-[200px]">
+                      <ChartContainer config={chartConfig} className="w-full h-full">
+                        <BarChart accessibilityLayer data={caloriesChartData} layout="vertical">
+                          <CartesianGrid horizontal={false} />
+                          <XAxis type="number" tickFormatter={(value) => `${value}`} />
+                          <YAxis dataKey="name" type="category" tickLine={false} tickMargin={10} axisLine={false} width={60} />
+                          <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                          <Bar dataKey="planned" fill="var(--color-planned)" radius={4} barSize={25} name="Planned" />
+                          {currentMacroTargets && <Bar dataKey="target" fill="var(--color-target)" radius={4} barSize={25} name="Target" />}
+                          <ChartLegend content={<ChartLegendContent />} />
+                        </BarChart>
+                      </ChartContainer>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-md font-semibold mb-1">Macronutrients (grams)</h3>
+                    <div className="h-[200px]">
+                      <ChartContainer config={chartConfig} className="w-full h-full">
+                        <BarChart accessibilityLayer data={macrosChartData} layout="vertical">
+                          <CartesianGrid horizontal={false} />
+                          <XAxis type="number" tickFormatter={(value) => `${value}g`} />
+                          <YAxis dataKey="name" type="category" tickLine={false} tickMargin={10} axisLine={false} width={60}/>
+                          <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                          <Bar dataKey="planned" fill="var(--color-planned)" radius={4} barSize={15} name="Planned" />
+                          {currentMacroTargets && <Bar dataKey="target" fill="var(--color-target)" radius={4} barSize={15} name="Target" />}
+                          <ChartLegend content={<ChartLegendContent />} />
+                        </BarChart>
+                      </ChartContainer>
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -582,10 +691,16 @@ export default function MealPlanPage() {
             const displayName = 'displayName' in mealSlot ? mealSlot.displayName : 
                               ('name' in mealSlot ? mealSlot.name : mealSlot.type);
 
-            const plannedMeal = dailyMeals.find(meal => 
+            const plannedMealFromSubcollection = dailyMeals.find(meal => 
               meal.mealSlotId === mealSlotId || 
               (meal.mealType === mealSlot.type && !meal.mealSlotId)
             );
+
+            // Add recipe details to the planned meal
+            const plannedMeal = plannedMealFromSubcollection ? {
+              ...plannedMealFromSubcollection,
+              recipeDetails: allRecipesCache.find(r => r.id === plannedMealFromSubcollection.recipeId)
+            } : null;
 
             const currentPickerIndex = recipePickerIndices[mealSlotKey] || 0;
             const recipesForThisSlot = availableRecipesForPicker || [];
@@ -779,6 +894,48 @@ export default function MealPlanPage() {
               className="flex-1 sm:flex-none bg-accent hover:bg-accent/90"
             >
               Save Changes
+            </Button>
+          </EditDialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clear Day Confirmation Dialog */}
+      <Dialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <DialogContent className="sm:max-w-[425px] mx-4">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg flex items-center">
+              <CalendarX className="h-5 w-5 mr-2 text-destructive" />
+              Clear Day
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              Are you sure you want to clear all meals for <strong>{format(selectedDate, 'PPP')}</strong>?
+              <br />
+              <span className="text-destructive">This action cannot be undone.</span>
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex items-center gap-2 p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+            <Info className="h-4 w-4 text-destructive shrink-0" />
+            <p className="text-sm text-destructive">
+              {dailyMeals.length} meal{dailyMeals.length !== 1 ? 's' : ''} will be permanently deleted.
+            </p>
+          </div>
+          
+          <EditDialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowClearConfirm(false)}
+              className="flex-1 sm:flex-none"
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={confirmClearDay}
+              className="flex-1 sm:flex-none"
+            >
+              <CalendarX className="h-4 w-4 mr-2" />
+              Clear Day
             </Button>
           </EditDialogFooter>
         </DialogContent>

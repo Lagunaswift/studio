@@ -3,12 +3,13 @@
 
 import { useState, useMemo } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { useOptimizedProfile, useOptimizedRecipes } from '@/hooks/useOptimizedFirestore';
+import { useOptimizedProfile, useOptimizedRecipes, useOptimizedShoppingList } from '@/hooks/useOptimizedFirestore';
 import { useAuth } from '@/context/AuthContext';
 import { ShoppingListItemComponent } from '@/components/shopping/ShoppingListItemComponent';
+import { updateShoppingListItemStatus, clearShoppingList, generateShoppingListFromMealPlan } from '@/app/(main)/profile/actions';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, ShoppingCart, Trash2, ListChecks, Utensils, X } from 'lucide-react';
+import { AlertCircle, ShoppingCart, Trash2, ListChecks, Utensils, X, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -48,35 +49,102 @@ interface RecipeShoppingGroup {
 
 export default function ShoppingListPage() {
   const { user } = useAuth();
-  const { profile: userProfile, updateProfile } = useOptimizedProfile(user?.uid);
+  const { profile: userProfile } = useOptimizedProfile(user?.uid);
   const { recipes: allRecipesCache } = useOptimizedRecipes(user?.uid);
+  const { shoppingList, loading: shoppingListLoading } = useOptimizedShoppingList(user?.uid);
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"aisle" | "recipe">("aisle");
 
-  const shoppingList = (userProfile?.shoppingList as ShoppingListItem[]) || [];
-  const mealPlan = (userProfile?.mealPlan as PlannedMeal[]) || [];
+  const isLoading = shoppingListLoading;
 
-  const handleClearList = () => {
-    updateProfile({ mealPlan: [] }); 
-    toast({
-      title: "Meal Plan Cleared",
-      description: "Your meal plan and shopping list have been cleared.",
-    });
+  const handleClearList = async () => {
+    if (!user) return;
+    
+    try {
+      const idToken = await user.getIdToken();
+      const result = await clearShoppingList(idToken);
+      
+      if (result.success) {
+        toast({
+          title: "Shopping List Cleared",
+          description: `Removed ${result.deletedCount} items from your shopping list.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to clear shopping list",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Clear shopping list error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear shopping list",
+        variant: "destructive",
+      });
+    }
   };
 
-  const toggleShoppingListItem = (itemId: string) => {
-    const updatedShoppingList = shoppingList.map(item => item.id === itemId ? { ...item, purchased: !item.purchased } : item);
-    updateProfile({ shoppingList: updatedShoppingList as any });
+  const toggleShoppingListItem = async (itemId: string) => {
+    if (!user) return;
+    
+    const item = shoppingList.find(item => item.id === itemId);
+    if (!item) return;
+    
+    try {
+      const idToken = await user.getIdToken();
+      const result = await updateShoppingListItemStatus(idToken, itemId, !item.purchased);
+      
+      if (!result.success) {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to update item",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Toggle shopping list item error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update item",
+        variant: "destructive",
+      });
+    }
   }
 
-  const removeMealFromPlan = (plannedMealId: string) => {
-    const updatedMealPlan = mealPlan.filter(pm => pm.id !== plannedMealId);
-    updateProfile({ mealPlan: updatedMealPlan as any });
-    toast({
-      title: "Meal Removed",
-      description: "The meal has been removed from your plan.",
-    });
-  }
+  const handleGenerateShoppingList = async () => {
+    if (!user) return;
+    
+    try {
+      const idToken = await user.getIdToken();
+      const result = await generateShoppingListFromMealPlan(idToken);
+      
+      if (result.success) {
+        toast({
+          title: "Shopping List Generated",
+          description: `Generated shopping list from ${result.mealsProcessed} planned meals with ${result.itemsGenerated} ingredient types.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to generate shopping list",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Generate shopping list error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate shopping list",
+        variant: "destructive",
+      });
+    }
+  };
+
+
+  // Note: Recipe view has been simplified for the new daily meal plan structure
+  // Users can now manage meals directly from the meal plan page
 
   const groupedListByAisle: { [category: string]: ShoppingListItem[] } = useMemo(() => {
     if (activeTab !== 'aisle') return {};
@@ -88,57 +156,27 @@ export default function ShoppingListPage() {
 
   const categoriesByAisle = useMemo(() => Object.keys(groupedListByAisle).sort(), [groupedListByAisle]);
 
-  const recipeShoppingGroups: RecipeShoppingGroup[] = useMemo(() => {
-    if (activeTab !== 'recipe') return [];
-
-    return mealPlan.map(pm => {
-      const recipeDetails = allRecipesCache.find(r => r.id === pm.recipeId);
-      const ingredientsForRecipeView: IngredientForRecipeView[] = [];
-
-      if (recipeDetails) {
-        recipeDetails.ingredients.forEach((ing, index) => {
-          const ingStr = typeof ing === 'string' ? ing : `${ing.quantity} ${ing.unit} ${ing.name}`;
-          const parsedOriginal = parseIngredientString(ingStr);
-          if (!parsedOriginal || parsedOriginal.name === 'non-item') return;
-          const quantityForThisMeal = (parsedOriginal.quantity / recipeDetails.servings) * pm.servings;
-          
-          let correspondingShoppingListItem = shoppingList.find(sli => 
-            sli.name.toLowerCase().trim() === parsedOriginal.name.toLowerCase().trim() &&
-            (sli.unit.toLowerCase() === (parsedOriginal.unit || '').toLowerCase() || sli.recipes.some(r => r.recipeId === pm.recipeId))
-          );
-          
-          if(!correspondingShoppingListItem){
-             correspondingShoppingListItem = shoppingList.find(sli => 
-                sli.name.toLowerCase().trim() === parsedOriginal.name.toLowerCase().trim() &&
-                sli.recipes.some(r => r.recipeId === pm.recipeId)
-            );
-          }
-
-          ingredientsForRecipeView.push({
-            id: `${pm.id}-${recipeDetails.id}-${index}`,
-            plannedMealId: pm.id,
-            recipeId: recipeDetails.id,
-            originalIngredientString: ingStr,
-            parsedName: parsedOriginal.name,
-            parsedQuantity: parseFloat(quantityForThisMeal.toFixed(2)),
-            parsedUnit: parsedOriginal.unit || 'items',
-            shoppingListItemId: correspondingShoppingListItem?.id,
-            purchased: correspondingShoppingListItem?.purchased || false,
-          });
-        });
-      }
-      return {
-        plannedMealId: pm.id,
-        recipeName: recipeDetails?.name || "Unknown Recipe",
-        recipeId: recipeDetails?.id || -1,
-        ingredients: ingredientsForRecipeView,
-      };
-    }).filter(group => group.ingredients.length > 0);
-  }, [mealPlan, shoppingList, allRecipesCache, activeTab]);
+  // Recipe view removed for simplicity with new daily meal plan structure
+  const recipeShoppingGroups: RecipeShoppingGroup[] = [];
 
 
   const purchasedCount = shoppingList.filter(item => item.purchased).length;
   const totalCount = shoppingList.length;
+
+  if (isLoading) {
+    return (
+      <PageWrapper title="Your Shopping List">
+        <Card className="shadow-xl">
+          <CardContent className="flex justify-center items-center py-20">
+            <div className="text-center">
+              <ShoppingCart className="h-12 w-12 animate-pulse text-primary/50 mx-auto mb-4" />
+              <p className="text-muted-foreground">Loading your shopping list...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </PageWrapper>
+    );
+  }
 
   return (
     <PageWrapper title="Your Shopping List">
@@ -150,22 +188,30 @@ export default function ShoppingListPage() {
               Grocery Items
             </CardTitle>
             <CardDescription>
-              {totalCount > 0 ? `You have ${totalCount - purchasedCount} item(s) left to buy.` : "Your shopping list is currently empty. Add meals to your plan to generate a list."}
+              {totalCount > 0 ? `You have ${totalCount - purchasedCount} item(s) left to buy.` : "Your shopping list is currently empty. Click 'Generate from Meal Plan' to create a list from your planned meals."}
             </CardDescription>
           </div>
-          <div className="flex flex-col sm:flex-row items-center gap-4 mt-4 sm:mt-0">
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 mt-4 sm:mt-0">
+            <Button 
+              onClick={handleGenerateShoppingList}
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" /> 
+              Generate from Meal Plan
+            </Button>
             {totalCount > 0 && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive">
-                    <Trash2 className="mr-2 h-4 w-4" /> Clear List &amp; Plan
+                  <Button variant="destructive" className="w-full sm:w-auto">
+                    <Trash2 className="mr-2 h-4 w-4" /> Clear Shopping List
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action will clear your entire meal plan. This cannot be undone.
+                      This action will clear your entire shopping list. This cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -180,16 +226,12 @@ export default function ShoppingListPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "aisle" | "recipe")} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="aisle" className="flex items-center gap-2">
-                <ListChecks className="w-4 h-4" /> By Aisle
-              </TabsTrigger>
-              <TabsTrigger value="recipe" className="flex items-center gap-2">
-                <Utensils className="w-4 h-4" /> By Recipe
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="aisle">
+          <div className="mb-6">
+            <div className="flex items-center gap-2 p-3 bg-secondary/30 rounded-md border">
+              <ListChecks className="w-4 h-4 text-primary" />
+              <span className="font-medium">Shopping List by Aisle</span>
+            </div>
+          </div>
               {totalCount === 0 ? (
                  <Card className="text-center py-10 shadow-none border-dashed">
                     <CardHeader>
@@ -198,7 +240,15 @@ export default function ShoppingListPage() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-muted-foreground">Add meals to your plan to auto-generate a shopping list.</p>
+                        <p className="text-muted-foreground mb-4">Add meals to your plan, then click "Generate from Meal Plan" to create your shopping list.</p>
+                        <Button 
+                          onClick={handleGenerateShoppingList}
+                          variant="default"
+                          className="w-full sm:w-auto"
+                        >
+                          <RefreshCw className="mr-2 h-4 w-4" /> 
+                          Generate from Meal Plan
+                        </Button>
                     </CardContent>
                  </Card>
               ) : categoriesByAisle.length === 0 && totalCount > 0 ? (
@@ -226,71 +276,6 @@ export default function ShoppingListPage() {
                   ))}
                 </div>
               )}
-            </TabsContent>
-            <TabsContent value="recipe">
-              {mealPlan.length === 0 || recipeShoppingGroups.length === 0 ? (
-                 <Card className="text-center py-10 shadow-none border-dashed">
-                    <CardHeader>
-                        <CardTitle className="text-xl font-semibold text-muted-foreground flex justify-center items-center">
-                            <ShoppingCart className="h-8 w-8 text-primary/50 mr-4"/> No Planned Meals
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-muted-foreground">Add some recipes to your meal plan first to see the ingredients here.</p>
-                    </CardContent>
-                 </Card>
-              ) : (
-                <div className="space-y-6">
-                  {recipeShoppingGroups.map((group) => (
-                    <div key={group.plannedMealId}>
-                      <div className="flex items-center justify-between mb-2 pb-1 border-b border-border">
-                        <h3 className="text-lg font-semibold text-primary capitalize">
-                          {group.recipeName}
-                        </h3>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => removeMealFromPlan(group.plannedMealId)}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="space-y-2 pl-4">
-                        {group.ingredients.map((ing) => (
-                          <div key={ing.id} className="flex items-center space-x-3 py-1">
-                            <Checkbox
-                              id={ing.id}
-                              checked={!!ing.purchased}
-                              onCheckedChange={() => {
-                                if (ing.shoppingListItemId) {
-                                  toggleShoppingListItem(ing.shoppingListItemId);
-                                } else {
-                                  toast({
-                                    title: "Item not on Shopping List",
-                                    description: `${ing.parsedName} might be fully covered by your pantry or is part of an aggregated item. Check 'By Aisle' view.`,
-                                    variant: "default"
-                                  })
-                                }
-                              }}
-                              disabled={!ing.shoppingListItemId}
-                              aria-label={`Mark ${ing.parsedName} as purchased`}
-                            />
-                            <label
-                              htmlFor={ing.id}
-                              className={`text-sm ${ing.purchased && ing.shoppingListItemId ? "line-through text-muted-foreground" : "text-foreground"}`}
-                            >
-                              {ing.parsedQuantity.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {ing.parsedUnit} {ing.parsedName}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
         </CardContent>
         {totalCount > 0 && (
           <CardFooter className="border-t pt-4">

@@ -44,8 +44,18 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('🚀 Calling Genkit suggestMealPlanFlow...');
+    console.log('🔧 Environment check:', {
+      hasGeminiKey: !!process.env.GEMINI_API_KEY,
+      keyLength: process.env.GEMINI_API_KEY?.length || 0,
+      nodeEnv: process.env.NODE_ENV
+    });
+    
     const result: SuggestMealPlanOutput = await suggestMealPlanFlow(body);
-    console.log('✅ Genkit flow completed successfully');
+    console.log('✅ Genkit flow completed successfully:', {
+      plannedMealsCount: result.plannedMeals?.length || 0,
+      hasJustification: !!result.aiJustification,
+      totalCalories: result.totalAchievedMacros?.calories || 0
+    });
     
     return NextResponse.json(result);
 

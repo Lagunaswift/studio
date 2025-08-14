@@ -20,6 +20,7 @@ import { ProFeature } from '@/components/shared/ProFeature';
 import { checkSubscriptionLimit, trackUsage } from '@/lib/subscriptionVerification';
 import { MiniUpgradeButton } from '@/components/subscription/CheckoutButton';
 import { safeLocalStorage } from '@/lib/safe-storage';
+import { addMealToDay } from '@/app/(main)/profile/actions';
 
 // Your actual recipe data structure (macros as individual properties)
 interface RecipeWithDirectMacros {
@@ -398,7 +399,14 @@ export default function AISuggestionsPage() {
         hasTargets: !!userSettingsToUse.macroTargets
       });
 
-      console.log('📡 Request body:', JSON.stringify(requestBody, null, 2));
+      console.log('📡 Request body summary:', {
+        macroTargets: requestBody.macroTargets,
+        mealStructureLength: requestBody.mealStructure.length,
+        recipeCount: requestBody.availableRecipes.length,
+        sampleRecipe: requestBody.availableRecipes[0],
+        dietaryPreferences: requestBody.dietaryPreferences,
+        allergens: requestBody.allergens
+      });
 
       const response = await fetch('/api/ai/suggest-meal-plan', {
         method: 'POST',
@@ -412,18 +420,26 @@ export default function AISuggestionsPage() {
 
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}: Failed to generate meal plan`;
+        let errorDetails = null;
         try {
           const responseText = await response.text();
+          console.error('❌ Error response text:', responseText);
           try {
             const errorData = JSON.parse(responseText);
+            console.error('❌ Parsed error data:', errorData);
             errorMessage = errorData.error || errorData.details || errorMessage;
+            errorDetails = errorData;
           } catch (jsonParseError) {
             // If it's not JSON, use the raw text
+            console.error('❌ Could not parse error as JSON:', jsonParseError);
             errorMessage = responseText || errorMessage;
           }
         } catch (textError) {
-          console.error('Could not read error response:', textError);
+          console.error('❌ Could not read error response:', textError);
         }
+        
+        console.error('❌ Final error message:', errorMessage);
+        console.error('❌ Full error details:', errorDetails);
         throw new Error(errorMessage);
       }
 
@@ -480,22 +496,70 @@ export default function AISuggestionsPage() {
     if (!suggestion || !suggestion.plannedMeals || !userSettingsToUse) return;
 
     try {
-      // Add each meal to the user's meal plan
-      const newMeals = suggestion.plannedMeals.map(meal => ({
-        id: `${Date.now()}-${meal.recipeId}-${Math.random()}`,
-        recipeId: meal.recipeId,
+      console.log('🍽️ Adding meals to calendar:', {
         date: format(date, 'yyyy-MM-dd'),
-        mealType: meal.mealSlotName, // Maps to the meal slot name from your structure
-        servings: meal.servings,
-        status: 'planned' as const
-      }));
+        plannedMeals: suggestion.plannedMeals,
+        allRecipesCount: allRecipesCache?.length || 0
+      });
 
-      // Add the new meals using the existing meal plan context
+      // Add each meal to the user's meal plan with proper structure
+      const newMeals = suggestion.plannedMeals.map(meal => {
+        // Find the matching meal slot from user's structure to get correct mealSlotId and mealType
+        const matchingSlot = userSettingsToUse.mealStructure.find(slot => 
+          slot.id === meal.mealSlotId || slot.name === meal.mealSlotName
+        );
+        
+        return {
+          id: `${Date.now()}-${meal.recipeId}-${Math.random()}`,
+          recipeId: meal.recipeId,
+          date: format(date, 'yyyy-MM-dd'),
+          mealType: matchingSlot ? matchingSlot.type : meal.mealSlotName, // Use the type from meal structure
+          mealSlotId: matchingSlot ? matchingSlot.id : meal.mealSlotId, // Use proper mealSlotId
+          servings: meal.servings,
+          status: 'planned' as const
+        };
+      });
+
+      console.log('🔄 Processing meals:', newMeals);
+
+      // Add the new meals using the server action directly to preserve mealSlotId
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      const idToken = await user.getIdToken();
+      
       for (const meal of newMeals) {
-        // Find the recipe for this meal
-        const recipe = allRecipesCache.find(r => r.id === meal.recipeId);
+        console.log(`🔍 Looking for recipe ID ${meal.recipeId} in ${allRecipesCache?.length || 0} recipes`);
+        
+        // Find the recipe for this meal (handle both string and number IDs)
+        const recipe = allRecipesCache.find(r => r.id == meal.recipeId || r.id === Number(meal.recipeId));
+        console.log('📝 Found recipe:', recipe ? `${recipe.name} (ID: ${recipe.id})` : 'NOT FOUND');
+        
         if (recipe) {
-          await addMealToPlan(recipe, meal.date, meal.mealType as any, meal.servings);
+          console.log(`➕ Adding meal: ${recipe.name} for ${meal.mealType} (slot: ${meal.mealSlotId}) on ${meal.date} (${meal.servings} servings)`);
+          try {
+            // Use server action directly to ensure mealSlotId is preserved
+            const result = await addMealToDay(idToken, meal.date, {
+              recipeId: meal.recipeId,
+              mealType: meal.mealType,
+              mealSlotId: meal.mealSlotId, // This is crucial for proper filtering on the meal plan page
+              servings: meal.servings,
+              status: meal.status
+            });
+
+            if (!result.success) {
+              throw new Error(result.error || 'Failed to add meal');
+            }
+            
+            console.log(`✅ Successfully added: ${recipe.name}`);
+          } catch (addError: any) {
+            console.error(`❌ Failed to add meal ${recipe.name}:`, addError);
+            throw addError; // Re-throw to trigger the main catch block
+          }
+        } else {
+          console.error(`❌ Recipe not found for ID: ${meal.recipeId}`);
+          throw new Error(`Recipe not found for ID: ${meal.recipeId}`);
         }
       }
 
@@ -717,14 +781,13 @@ export default function AISuggestionsPage() {
                             const target = userSettingsToUse.macroTargets![key] || 0;
                             const achieved = suggestion.totalAchievedMacros[key] || 0;
                             const diff = achieved - target;
-                            const diffPercentage = target > 0 ? (diff / target) * 100 : 0;
                             return (
                                 <div key={key} className="p-2 bg-muted/30 rounded">
                                     <p className="font-medium capitalize">{key}:</p>
                                     <p>Target: {target.toFixed(0)}</p>
                                     <p>Achieved: {achieved.toFixed(0)}</p>
                                     <p className={cn(diff === 0 ? "text-green-600" : diff > 0 ? "text-orange-600" : "text-blue-600")}>
-                                        Diff: {diff.toFixed(0)} ({diffPercentage > 0 ? '+' : ''}{diffPercentage.toFixed(1)}%)
+                                        Diff: {diff > 0 ? '+' : ''}{diff.toFixed(0)}
                                     </p>
                                 </div>
                             );

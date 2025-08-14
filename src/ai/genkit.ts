@@ -19,7 +19,7 @@ export const ai = genkit({
       apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY,
     }),
   ],
-  model: 'gemini-1.5-flash', // Set default model
+  model: 'googleai/gemini-1.5-flash', // Set default model with googleai/ prefix
   promptDir: './prompts', // Tell Genkit where to find .prompt files
 });
 
