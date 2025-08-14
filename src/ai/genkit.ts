@@ -23,6 +23,32 @@ export const ai = genkit({
   promptDir: './prompts', // Tell Genkit where to find .prompt files
 });
 
+// Ensure prompts are loaded by explicitly importing them
+// This helps with deployment environments where prompts might not be auto-discovered
+try {
+  console.log('🔧 Loading Genkit prompts...');
+  
+  // Test if the prompt can be accessed
+  const promptTest = ai.prompt('suggestMealPlan');
+  if (promptTest) {
+    console.log('✅ suggestMealPlan prompt loaded successfully');
+  } else {
+    console.error('❌ suggestMealPlan prompt is undefined');
+  }
+  
+} catch (error: any) {
+  console.error('⚠️ Error loading prompts:', {
+    message: error.message,
+    name: error.name,
+    stack: error.stack?.substring(0, 200)
+  });
+  
+  // In deployment, prompts might not be available immediately
+  // This is not necessarily fatal, but we should log it
+  console.log('📁 Current working directory:', process.cwd());
+  console.log('🗂️ Prompt directory should be:', './prompts');
+}
+
 //Enable logging
 import { logger } from 'genkit/logging';
 logger.setLogLevel('debug');

@@ -28,11 +28,31 @@ export const suggestMealPlanFlow = ai.defineFlow(
             currentDate: input.currentDate || new Date().toISOString().split('T')[0],
         };
 
-        // Correctly retrieve the prompt object first
-        const suggestMealPlanPrompt = ai.prompt('suggestMealPlan');
+        // Correctly retrieve the prompt object first with error handling
+        let suggestMealPlanPrompt;
+        try {
+            console.log('🔍 Attempting to retrieve suggestMealPlan prompt...');
+            suggestMealPlanPrompt = ai.prompt('suggestMealPlan');
+            
+            if (!suggestMealPlanPrompt) {
+                throw new Error('Prompt returned undefined');
+            }
+            
+            console.log('✅ suggestMealPlan prompt retrieved successfully');
+        } catch (promptError: any) {
+            console.error('❌ Failed to retrieve suggestMealPlan prompt:', {
+                error: promptError.message,
+                type: promptError.constructor.name,
+                availablePrompts: 'Cannot list - prompt enumeration not available'
+            });
+            
+            throw new Error(`Prompt retrieval failed: ${promptError.message}. This usually indicates the prompt file is not properly loaded in the deployment environment.`);
+        }
         
         // Invoke the executable prompt with the input
+        console.log('🚀 Invoking suggestMealPlan prompt with input...');
         const response = await suggestMealPlanPrompt(promptInput);
+        console.log('✅ Prompt execution completed');
 
         const output = response.output; // Access output as a property
 
