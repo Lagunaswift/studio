@@ -88,6 +88,7 @@
     "@types/request": "^2.48.13",
     "@types/tedious": "^4.0.14",
     "@types/tough-cookie": "^4.0.5",
+    "copy-webpack-plugin": "^13.0.1",
     "cross-env": "^10.0.0",
     "genkit-cli": "^0.0.2",
     "handlebars-loader": "^1.7.3",

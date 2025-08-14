@@ -54,7 +54,23 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  webpack(config, { isServer }) {
+  webpack(config, { isServer, dev }) {
+    // Copy prompts directory to build output for Genkit
+    if (isServer && !dev) {
+      const CopyWebpackPlugin = require('copy-webpack-plugin');
+      config.plugins.push(
+        new CopyWebpackPlugin({
+          patterns: [
+            {
+              from: 'prompts',
+              to: 'prompts',
+              noErrorOnMissing: false,
+            },
+          ],
+        })
+      );
+    }
+
     // Handle handlebars templates
     config.module.rules.push({
       test: /\.hbs$/,

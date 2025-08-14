@@ -2,6 +2,7 @@
 import { googleAI } from '@genkit-ai/googleai';
 import { enableFirebaseTelemetry } from '@genkit-ai/firebase';
 import { genkit } from 'genkit';
+import * as path from 'path';
 
 //enable Firebase telemetry only in production with proper Firebase config
 if (process.env.NODE_ENV === 'production' && process.env.FIREBASE_PROJECT_ID) {
@@ -12,6 +13,15 @@ if (process.env.NODE_ENV === 'production' && process.env.FIREBASE_PROJECT_ID) {
   }
 }
 
+// Define prompt directory based on environment
+const promptDir = process.env.NODE_ENV === 'production' 
+  ? path.join(process.cwd(), '.next/server/prompts')  // Use build output path in production
+  : './prompts'; // Use source path in development
+
+console.log('🗂️ Genkit prompt directory:', promptDir);
+console.log('📍 Current working directory:', process.cwd());
+console.log('⚙️ Environment:', process.env.NODE_ENV);
+
 // Configure the Genkit instance - THIS is what you need to export
 export const ai = genkit({
   plugins: [
@@ -20,7 +30,7 @@ export const ai = genkit({
     }),
   ],
   model: 'googleai/gemini-1.5-flash', // Set default model with googleai/ prefix
-  promptDir: './prompts', // Tell Genkit where to find .prompt files
+  promptDir: promptDir, // Use calculated prompt directory
 });
 
 // Ensure prompts are loaded by explicitly importing them
