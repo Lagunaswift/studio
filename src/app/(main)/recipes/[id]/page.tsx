@@ -193,13 +193,6 @@ export default function RecipeDetailPage() {
         variant: 'destructive',
       });
     }
-    } else {
-       toast({
-        title: "Error",
-        description: "Please fill all fields to add meal to plan.",
-        variant: 'destructive',
-      });
-    }
   };
   
   const handleFavoriteToggle = async (e: React.MouseEvent) => {
