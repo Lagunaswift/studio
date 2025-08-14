@@ -148,9 +148,9 @@ export function PreppyLoading({
 
   const texts = getContextualTexts();
   
-  // Text rotation effect
+  // Text rotation effect - slower cycling (minimum 3 seconds per text)
   useEffect(() => {
-    const changeInterval = Math.max(duration / texts.length, 800);
+    const changeInterval = Math.max(duration / texts.length, 3000); // Increased from 800ms to 3000ms
     
     const interval = setInterval(() => {
       setCurrentTextIndex((prev) => (prev + 1) % texts.length);
@@ -170,25 +170,25 @@ export function PreppyLoading({
     return () => clearInterval(progressInterval);
   }, [duration, showProgress]);
 
-  // Size configurations
+  // Size configurations - only increase icon size
   const sizeConfig = {
     sm: {
-      avatar: 'w-12 h-12',
-      bot: 'w-6 h-6',
+      avatar: 'w-16 h-16', // Same as md
+      bot: 'w-7 h-7', // Slightly larger icon
       spinner: 'w-4 h-4',
       text: 'text-sm',
       dot: 'w-1.5 h-1.5'
     },
     md: {
-      avatar: 'w-16 h-16',
-      bot: 'w-8 h-8',
+      avatar: 'w-16 h-16', // Keep same avatar size
+      bot: 'w-9 h-9', // Larger icon
       spinner: 'w-6 h-6',
       text: 'text-base',
       dot: 'w-2 h-2'
     },
     lg: {
-      avatar: 'w-20 h-20',
-      bot: 'w-10 h-10',
+      avatar: 'w-16 h-16', // Keep same avatar size
+      bot: 'w-11 h-11', // Larger icon
       spinner: 'w-8 h-8',
       text: 'text-lg',
       dot: 'w-3 h-3'

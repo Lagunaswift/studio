@@ -111,22 +111,14 @@ export function EnhancedPreppyLoading({
     setParticles(particleArray);
   }, [showParticles]);
 
-  // Rotate insights
+  // Show one random insight per AI call (no rotation)
   useEffect(() => {
     if (!showInsights) return;
     
     const typeInsights = insights[props.type] || insights.chat;
-    let index = 0;
-    
-    const rotateInsight = () => {
-      setCurrentInsight(typeInsights[index]);
-      index = (index + 1) % typeInsights.length;
-    };
-    
-    rotateInsight(); // Show first insight immediately
-    const interval = setInterval(rotateInsight, 4000);
-    
-    return () => clearInterval(interval);
+    // Pick one random insight and stick with it for this AI call
+    const randomInsight = typeInsights[Math.floor(Math.random() * typeInsights.length)];
+    setCurrentInsight(randomInsight);
   }, [props.type, showInsights]);
 
   // Get contextual icon based on loading type

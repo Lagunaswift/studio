@@ -239,10 +239,10 @@ export function ContextualPreppyLoading({
   // Determine personality icon
   const getPersonalityIcon = () => {
     switch (personality) {
-      case 'encouraging': return <Heart className="w-4 h-4 text-pink-500" />;
-      case 'analytical': return <Target className="w-4 h-4 text-blue-500" />;
-      case 'playful': return <Zap className="w-4 h-4 text-yellow-500" />;
-      default: return <Bot className="w-4 h-4 text-purple-500" />;
+      case 'encouraging': return <Heart className="w-4 h-4 text-primary" />;
+      case 'analytical': return <Target className="w-4 h-4 text-accent" />;
+      case 'playful': return <Zap className="w-4 h-4 text-accent" />;
+      default: return <Bot className="w-4 h-4 text-primary" />;
     }
   };
 
