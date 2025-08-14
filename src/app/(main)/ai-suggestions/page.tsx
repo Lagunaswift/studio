@@ -727,18 +727,11 @@ export default function AISuggestionsPage() {
             {error.startsWith('limit:') ? (
               <LimitReachedError 
                 description={error.replace('limit:', '')}
-                onRetry={() => {
-                  setError(null);
-                  handleGeneratePlan();
-                }}
+                showUpgradeButton={!isSubscribed}
               />
             ) : (
               <GenerationError 
                 description={error}
-                onRetry={() => {
-                  setError(null);
-                  handleGeneratePlan();
-                }}
               />
             )}
           </div>

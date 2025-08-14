@@ -145,11 +145,13 @@ export function LimitReachedError({
   title = "Daily Limit Reached", 
   description = "You've reached your daily limit for AI requests. Upgrade to Premium for unlimited access!",
   onRetry,
+  showUpgradeButton = true,
   className 
 }: { 
   title?: string; 
   description?: string; 
   onRetry?: () => void;
+  showUpgradeButton?: boolean;
   className?: string;
 }) {
   return (
@@ -158,7 +160,7 @@ export function LimitReachedError({
       title={title}
       description={description}
       className={className}
-      upgradeButton
+      upgradeButton={showUpgradeButton}
       retryButton={!!onRetry}
       onRetry={onRetry}
     />
@@ -169,11 +171,13 @@ export function GenerationError({
   title = "Something Went Wrong", 
   description = "Preppy encountered an issue while generating your meal plan. Don't worry, this happens sometimes!",
   onRetry,
+  showRetryButton = false,
   className 
 }: { 
   title?: string; 
   description?: string; 
   onRetry?: () => void;
+  showRetryButton?: boolean;
   className?: string;
 }) {
   return (
@@ -182,7 +186,7 @@ export function GenerationError({
       title={title}
       description={description}
       className={className}
-      retryButton={!!onRetry}
+      retryButton={showRetryButton && !!onRetry}
       onRetry={onRetry}
       actionButton={{
         text: "Contact Support",
