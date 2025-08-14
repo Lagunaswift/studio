@@ -20,12 +20,47 @@ async function verifyTokenAndGetUserId(idToken: string): Promise<string> {
   }
 
   try {
+    console.log('🔐 Starting token verification...');
+    
+    // Check if adminAuth is available
+    if (!adminAuth) {
+      console.error('❌ adminAuth is not available');
+      throw new Error('Firebase Admin Auth not initialized');
+    }
+
     const cleanToken = idToken.replace(/^Bearer\s+/i, '');
+    console.log('🎫 Token cleaned, length:', cleanToken.length);
+    
+    // Additional debugging for Firebase Admin state
+    const { getApps } = await import('firebase-admin/app');
+    console.log('🔧 Firebase Admin apps count:', getApps().length);
+    
     const decodedToken = await adminAuth.verifyIdToken(cleanToken, true);
+    console.log('✅ Token verified successfully for user:', decodedToken.uid);
+    
     return decodedToken.uid;
   } catch (error: any) {
-    console.error('Token verification failed:', error);
-    throw new Error(`Authentication error: Could not verify user. ${error.message}`);
+    console.error('❌ Token verification failed:', {
+      error: error.message,
+      code: error.code,
+      errorType: error.constructor.name,
+      stack: error.stack?.substring(0, 300)
+    });
+    
+    // Provide more specific error messages
+    let userFriendlyMessage = error.message;
+    if (error.message.includes('secretOrPrivateKey must be an asymmetric key')) {
+      userFriendlyMessage = 'Firebase Admin SDK private key configuration error';
+      console.error('🔑 Private key configuration issue detected');
+    } else if (error.message.includes('Invalid key format')) {
+      userFriendlyMessage = 'Firebase private key format is invalid';
+    } else if (error.code === 'auth/id-token-expired') {
+      userFriendlyMessage = 'Authentication token has expired';
+    } else if (error.code === 'auth/id-token-revoked') {
+      userFriendlyMessage = 'Authentication token has been revoked';
+    }
+    
+    throw new Error(`Authentication error: Could not verify user. ${userFriendlyMessage}`);
   }
 }
 
