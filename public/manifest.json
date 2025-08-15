@@ -1,104 +1,136 @@
 {
-  "name": "MealPreppyPro - Smart Nutrition & Meal Planning",
+  "name": "MealPreppyPro",
   "short_name": "MealPreppyPro",
-  "description": "AI-powered meal planning with nutrition tracking, recipe management, and smart shopping lists",
-  "start_url": "/",
+  "description": "Your complete meal planning and nutrition tracking app",
+  "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#7DD3FC",
-  "theme_color": "#2563eb",
+  "background_color": "#ffffff",
+  "theme_color": "#059669",
   "orientation": "portrait-primary",
   "scope": "/",
-  "lang": "en",
-  "categories": ["food", "health", "lifestyle", "productivity"],
+  "lang": "en-US",
+  "categories": ["food", "health", "lifestyle"],
   "icons": [
     {
-      "src": "/icons/icon-72x72.png",
+      "src": "/icon-72x72.png",
       "sizes": "72x72",
       "type": "image/png",
-      "purpose": "maskable any"
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-96x96.png",
+      "src": "/icon-96x96.png",
       "sizes": "96x96",
       "type": "image/png",
-      "purpose": "maskable any"
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-128x128.png",
+      "src": "/icon-128x128.png",
       "sizes": "128x128",
       "type": "image/png",
-      "purpose": "maskable any"
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-144x144.png",
+      "src": "/icon-144x144.png",
       "sizes": "144x144",
       "type": "image/png",
-      "purpose": "maskable any"
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-152x152.png",
+      "src": "/icon-152x152.png",
       "sizes": "152x152",
       "type": "image/png",
-      "purpose": "maskable any"
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-192x192.png",
+      "src": "/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "maskable any"
+      "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-384x384.png",
+      "src": "/icon-384x384.png",
       "sizes": "384x384",
       "type": "image/png",
-      "purpose": "maskable any"
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-512x512.png",
+      "src": "/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "maskable any"
+      "purpose": "any maskable"
     }
   ],
   "shortcuts": [
     {
-      "name": "Today's Meals",
-      "short_name": "Today",
-      "description": "View today's meal plan",
-      "url": "/daily-log",
+      "name": "Meal Plan",
+      "short_name": "Meal Plan",
+      "description": "View your meal plan",
+      "url": "/dashboard/meal-plan",
       "icons": [
         {
-          "src": "/icons/icon-192x192.png",
-          "sizes": "192x192",
-          "type": "image/png"
+          "src": "/icon-192x192.png",
+          "sizes": "192x192"
         }
       ]
     },
     {
-      "name": "Add Recipe",
-      "short_name": "Recipe",
-      "description": "Add a new recipe",
-      "url": "/recipes/add",
+      "name": "Recipes",
+      "short_name": "Recipes",
+      "description": "Browse recipes",
+      "url": "/dashboard/recipes",
       "icons": [
         {
-          "src": "/icons/icon-192x192.png",
-          "sizes": "192x192",
-          "type": "image/png"
+          "src": "/icon-192x192.png",
+          "sizes": "192x192"
         }
       ]
     },
     {
-      "name": "Shopping List",
-      "short_name": "Shopping",
-      "description": "View shopping list",
-      "url": "/shopping-list",
+      "name": "Pantry",
+      "short_name": "Pantry",
+      "description": "Manage pantry items",
+      "url": "/pantry",
       "icons": [
         {
-          "src": "/icons/icon-192x192.png",
-          "sizes": "192x192",
-          "type": "image/png"
+          "src": "/icon-192x192.png",
+          "sizes": "192x192"
         }
       ]
     }
-  ]
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile-1.png",
+      "sizes": "375x667",
+      "type": "image/png",
+      "platform": "narrow",
+      "label": "Dashboard view on mobile"
+    },
+    {
+      "src": "/screenshot-mobile-2.png",
+      "sizes": "375x667",
+      "type": "image/png",
+      "platform": "narrow",
+      "label": "Recipe browsing on mobile"
+    },
+    {
+      "src": "/screenshot-desktop-1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "platform": "wide",
+      "label": "Dashboard view on desktop"
+    }
+  ],
+  "features": [
+    "offline",
+    "background-sync",
+    "cross-platform"
+  ],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  }
 }
