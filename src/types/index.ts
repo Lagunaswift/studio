@@ -150,7 +150,8 @@ export interface ShoppingListItem {
   quantity: number;
   unit: string;
   category: UKSupermarketCategory;
-  completed: boolean;
+  purchased: boolean;
+  recipes?: Array<{ recipeId: number; recipeName: string }>;
 }
 
 export interface PantryItem {
