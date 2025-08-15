@@ -4,6 +4,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 import { Footer } from '@/components/layout/Footer';
 import { ThemeToggleButton } from '@/components/layout/ThemeToggleButton';
 import { TermsAcceptanceModal } from '@/components/legal/TermsAcceptanceModal';
@@ -87,8 +88,8 @@ const helpNavItems: NavItem[] = [
 const mainSections = [
   { label: 'Planner', icon: CalendarDays, items: planNavItems },
   { label: 'Recipe Book', icon: UtensilsCrossed, items: recipesNavItems },
-  { label: 'Progress', icon: TrendingUp, items: progressNavItems },
-  { label: 'Settings', icon: Settings, items: settingsNavItems },
+  { label: 'Check-ins', icon: TrendingUp, items: progressNavItems },
+  { label: 'Setup', icon: Settings, items: settingsNavItems },
   { label: 'Help', icon: HelpCircle, items: helpNavItems },
 ];
 
@@ -114,12 +115,10 @@ function LogoutButton() {
   return (
     <Tooltip>
         <TooltipTrigger asChild>
-            <SidebarMenuItem>
-              <SidebarMenuButton onClick={handleLogout} className="mt-2">
-                <LogOut />
-                <span className="group-data-[collapsible=icon]:hidden">Log Out</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            <SidebarMenuButton onClick={handleLogout} className="w-full justify-start">
+              <LogOut />
+              <span className="group-data-[collapsible=icon]:hidden">Log Out</span>
+            </SidebarMenuButton>
         </TooltipTrigger>
         <TooltipContent side="right" align="center" hidden={!isCollapsed}>Log Out</TooltipContent>
     </Tooltip>
@@ -281,8 +280,14 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     <div className="flex flex-1 w-full min-w-0">
       <Sidebar>
         <SidebarHeader className="p-4 border-b border-sidebar-border">
-          <Link href="/" className="flex items-center gap-2">
-            <UtensilsCrossed className="h-7 w-7 text-sidebar-primary" />
+          <Link href="/" className="flex items-center gap-0">
+            <Image 
+              src="/icons/icon-192x192.png" 
+              alt="MealPreppyPro Icon" 
+              width={80} 
+              height={80} 
+              className="shrink-0"
+            />
             <div className="group-data-[collapsible=icon]:hidden">
               {isMobile ? (
                  <SheetTitle className="text-xl font-bold font-headline text-sidebar-primary">
@@ -297,8 +302,9 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           </Link>
         </SidebarHeader>
         <SidebarContent className="flex flex-col justify-between">
-          <SidebarMenu>
-            <SidebarMenuItem className="px-2">
+          <div className="flex-1">
+            <SidebarMenu>
+            <SidebarMenuItem className="px-4 py-3">
                <SidebarSearch/>
             </SidebarMenuItem>
             
@@ -355,11 +361,13 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                 </AccordionItem>
               ))}
             </Accordion>
-            
-            <SidebarSeparator className="my-2" />
-            
+            </SidebarMenu>
+          </div>
+          
+          <div className="mt-auto p-2">
+            <SidebarSeparator className="mb-2" />
             {!isAuthLoading && user && <LogoutButton />}
-          </SidebarMenu>
+          </div>
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
