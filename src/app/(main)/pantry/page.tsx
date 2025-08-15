@@ -1,10 +1,8 @@
-
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { useOptimizedProfile } from '@/hooks/useOptimizedFirestore';
+import { usePantryItems } from '@/hooks/usePantryItems';
 import { useAuth } from '@/context/AuthContext';
 import type { PantryItem, UKSupermarketCategory } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -24,6 +22,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { format, addDays, isBefore, isSameDay, parseISO, isValid, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { UK_SUPERMARKET_CATEGORIES } from '@/types';
+import { addOrUpdatePantryItem, deletePantryItem } from '@/app/(main)/profile/actions';
+import { auth } from '@/lib/firebase-client';
 
 const COMMON_UNITS: string[] = [
   "item(s)", "g", "kg", "ml", "L", "tsp", "tbsp", "cup", "oz", "lb", "slice(s)", "can(s)", "egg"
@@ -41,14 +41,19 @@ type PantryItemFormValues = z.infer<typeof pantryItemSchema>;
 
 export default function PantryPage() {
   const { user } = useAuth();
-  const { profile: userProfile, updateProfile, loading: isAppDataLoading } = useOptimizedProfile(user?.uid);
+  const { pantryItems, loading: isAppDataLoading } = usePantryItems(user?.uid);
   const { toast } = useToast();
+  
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingQuantity, setEditingQuantity] = useState<number>(0);
   const [selectedExpiryDate, setSelectedExpiryDate] = useState<Date | undefined>(undefined);
 
-
-  const pantryItems = (userProfile?.pantryItems as PantryItem[]) || [];
+  // Helper function to call server actions with auth
+  const callWithAuth = useCallback(async (action: (idToken: string, ...args: any[]) => Promise<any>, ...args: any[]) => {
+    if (!user) throw new Error('User not authenticated');
+    const idToken = await user.getIdToken();
+    return await action(idToken, ...args);
+  }, [user]);
 
   const form = useForm<PantryItemFormValues>({
     resolver: zodResolver(pantryItemSchema),
@@ -92,27 +97,27 @@ export default function PantryPage() {
     };
   }, [pantryItems]);
 
-  const onSubmit: SubmitHandler<PantryItemFormValues> = (data) => {
+  const onSubmit: SubmitHandler<PantryItemFormValues> = useCallback(async (data) => {
     try {
       const category = data.category || 'Food Cupboard';
-      const newItem = {
-        id: `${Date.now()}`,
-        ...data,
-        category,
-      }
-      updateProfile({ pantryItems: [...pantryItems, newItem] as any });
+      // Create a completely clean object with no references to form data
+      const itemData = Object.freeze({
+        name: String(data.name),
+        quantity: Number(data.quantity),
+        unit: String(data.unit),
+        category: String(category),
+        expiryDate: data.expiryDate ? String(data.expiryDate) : undefined
+      });
+      
+      await callWithAuth(addOrUpdatePantryItem, itemData);
+      
       toast({
         title: "Item Added",
         description: `${data.quantity} ${data.unit} of ${data.name} added to your pantry.`,
       });
-      form.reset({
-        name: '',
-        quantity: 1,
-        unit: 'item(s)',
-        category: 'Food Cupboard',
-        expiryDate: undefined,
-      });
-      setSelectedExpiryDate(undefined); // Reset date picker display
+      
+      form.reset();
+      setSelectedExpiryDate(undefined);
     } catch (error: any) {
       toast({
         title: "Error Adding Item",
@@ -121,36 +126,63 @@ export default function PantryPage() {
       });
       console.error("Error adding item:", error);
     }
-  };
+  }, [callWithAuth, toast, form]);
 
-  const updatePantryItemQuantity = useCallback((itemId: string, newQuantity: number) => {
-    updateProfile((prevProfile: any) => ({
-      ...prevProfile,
-      pantryItems: prevProfile?.pantryItems?.map((item: any) => 
-        item.id === itemId ? { ...item, quantity: newQuantity } : item
-      ) || []
-    }));
-  }, [updateProfile]);
+  const updatePantryItemQuantity = useCallback(async (itemId: string, newQuantity: number) => {
+    try {
+      const item = pantryItems.find(p => p.id === itemId);
+      if (!item) return;
+      
+      // Create a completely clean object with no references to original Firestore data
+      const updatedItem = Object.freeze({
+        id: String(item.id),
+        name: String(item.name),
+        quantity: Number(newQuantity),
+        unit: String(item.unit),
+        category: String(item.category),
+        expiryDate: item.expiryDate ? String(item.expiryDate) : undefined
+      });
+      
+      await callWithAuth(addOrUpdatePantryItem, updatedItem);
+    } catch (error: any) {
+      toast({
+        title: "Error Updating Quantity",
+        description: error.message || "Could not update item quantity.",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  }, [pantryItems, callWithAuth, toast]);
 
-  const removePantryItem = useCallback((itemId: string) => {
-    updateProfile((prevProfile: any) => ({
-      ...prevProfile,
-      pantryItems: prevProfile?.pantryItems?.filter((item: any) => item.id !== itemId) || []
-    }));
-  }, [updateProfile]);
+  const removePantryItem = useCallback(async (itemId: string) => {
+    try {
+      await callWithAuth(deletePantryItem, itemId);
+    } catch (error: any) {
+      toast({
+        title: "Error Removing Item",
+        description: error.message || "Could not remove item from pantry.",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  }, [callWithAuth, toast]);
 
-  const handleQuantityChange = useCallback((itemId: string, delta: number) => {
+  const handleQuantityChange = useCallback(async (itemId: string, delta: number) => {
     const item = pantryItems.find(p => p.id === itemId);
     if (item) {
       const newQuantity = Math.max(0, item.quantity + delta);
-       if (newQuantity === 0) {
-        removePantryItem(itemId);
-         toast({ title: "Item Removed", description: `${item.name} removed from pantry as quantity reached zero.` });
-      } else {
-        updatePantryItemQuantity(itemId, newQuantity);
+      try {
+        if (newQuantity === 0) {
+          await removePantryItem(itemId);
+          toast({ title: "Item Removed", description: `${item.name} removed from pantry as quantity reached zero.` });
+        } else {
+          await updatePantryItemQuantity(itemId, newQuantity);
+        }
+      } catch (error: any) {
+        // Error already handled in the functions above
       }
     }
-  }, [removePantryItem, updatePantryItemQuantity, toast]);
+  }, [pantryItems, removePantryItem, updatePantryItemQuantity, toast]);
 
   const handleDirectQuantityUpdate = useCallback((itemId: string, newQuantityStr: string) => {
     const newQuantity = parseFloat(newQuantityStr);
@@ -159,25 +191,28 @@ export default function PantryPage() {
     }
   }, []);
 
-  const saveEditedQuantity = useCallback((itemId: string) => {
+  const saveEditedQuantity = useCallback(async (itemId: string) => {
     const item = pantryItems.find(p => p.id === itemId);
     if (item) {
-      if (editingQuantity <= 0) {
-        removePantryItem(itemId);
-        toast({ title: "Item Removed", description: `${item.name} removed as quantity set to zero or less.` });
-      } else {
-        updatePantryItemQuantity(itemId, editingQuantity);
-        toast({ title: "Quantity Updated", description: `Quantity for ${item.name} updated.` });
+      try {
+        if (editingQuantity <= 0) {
+          await removePantryItem(itemId);
+          toast({ title: "Item Removed", description: `${item.name} removed as quantity set to zero or less.` });
+        } else {
+          await updatePantryItemQuantity(itemId, editingQuantity);
+          toast({ title: "Quantity Updated", description: `Quantity for ${item.name} updated.` });
+        }
+      } catch (error: any) {
+        // Error already handled in the functions above
       }
     }
     setEditingItemId(null);
-  }, [editingQuantity, removePantryItem, updatePantryItemQuantity, toast]);
+  }, [editingQuantity, pantryItems, removePantryItem, updatePantryItemQuantity, toast]);
 
   const startEditing = useCallback((item: PantryItem) => {
     setEditingItemId(item.id);
     setEditingQuantity(item.quantity);
   }, []);
-
 
   const { groupedPantryItems, sortedCategories } = useMemo(() => {
     const grouped: { [category: string]: PantryItem[] } = pantryItems.reduce((acc, item) => {
@@ -346,8 +381,8 @@ export default function PantryPage() {
                                   !field.value && "text-muted-foreground"
                                 )}
                               >
-                                {selectedExpiryDate ? (
-                                  format(selectedExpiryDate, "dd MMMM yyyy")
+                                {field.value ? (
+                                  format(parseISO(field.value), "dd MMMM yyyy")
                                 ) : (
                                   <span>Pick a date</span>
                                 )}
@@ -358,9 +393,9 @@ export default function PantryPage() {
                           <PopoverContent className="w-auto p-0" align="start">
                             <Calendar
                               mode="single"
-                              selected={selectedExpiryDate}
+                              selected={field.value ? parseISO(field.value) : undefined}
                               onSelect={(date) => {
-                                setSelectedExpiryDate(date as Date);
+                                setSelectedExpiryDate(date);
                                 field.onChange(date ? format(date, "yyyy-MM-dd") : undefined);
                               }}
                               disabled={(date) => date < startOfDay(new Date()) }
@@ -451,13 +486,28 @@ export default function PantryPage() {
                               )}
                             </div>
                             <div className="flex items-center space-x-1">
-                              <Button variant="ghost" size="icon" onClick={() => handleQuantityChange(item.id, 1)} className="h-7 w-7">
+                              <Button variant="ghost" size="icon" onClick={async () => await handleQuantityChange(item.id, 1)} className="h-7 w-7">
                                 <PlusCircle className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleQuantityChange(item.id, -1)} className="h-7 w-7">
+                              <Button variant="ghost" size="icon" onClick={async () => await handleQuantityChange(item.id, -1)} className="h-7 w-7">
                                 <MinusCircle className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="icon" onClick={() => removePantryItem(item.id)} className="h-7 w-7 text-destructive hover:text-destructive/80">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={async () => {
+                                  try {
+                                    await removePantryItem(item.id);
+                                    toast({ 
+                                      title: "Item Removed", 
+                                      description: `${item.name} removed from your pantry.` 
+                                    });
+                                  } catch (error: any) {
+                                    // Error already handled in removePantryItem function
+                                  }
+                                }} 
+                                className="h-7 w-7 text-destructive hover:text-destructive/80"
+                              >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
