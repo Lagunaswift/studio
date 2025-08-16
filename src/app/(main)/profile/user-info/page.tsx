@@ -15,7 +15,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { UserProfileSettings, Sex, ActivityLevel, AthleteType, PrimaryGoal, TrainingExperienceLevel } from '@/types';
 import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS, TRAINING_EXPERIENCE_OPTIONS } from '@/types';
-import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale, Award } from 'lucide-react';
+import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale, Award, CreditCard, Trash2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from 'next/link';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { getDefaultUserProfile } from '@/utils/profileDefaults';
 
 
@@ -559,6 +560,201 @@ function UserInfoForm({ userProfile, updateProfile }: { userProfile: UserProfile
   )
 }
 
+function ManageSubscriptionCard({ userProfile }: { userProfile: UserProfileSettings }) {
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+
+  const handleManageSubscription = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/create-customer-portal-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (response.ok) {
+        const { url } = await response.json();
+        window.open(url, '_blank');
+      } else {
+        throw new Error('Failed to create portal session');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Unable to open subscription management. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Card className="border-blue-200 bg-blue-50/50">
+      <CardHeader>
+        <CardTitle className="flex items-center text-blue-700">
+          <CreditCard className="mr-2 h-5 w-5" />
+          Subscription Management
+        </CardTitle>
+        <CardDescription>
+          Manage your subscription, update payment methods, or view billing history.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground mb-4">
+          Current Status: <span className="font-medium">{userProfile?.subscription_status || 'Free'}</span>
+        </p>
+      </CardContent>
+      <CardFooter>
+        <Button 
+          onClick={handleManageSubscription}
+          disabled={isLoading}
+          className="bg-blue-600 hover:bg-blue-700"
+        >
+          <CreditCard className="mr-2 h-4 w-4" />
+          {isLoading ? 'Opening...' : 'Manage Subscription'}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
+function DeleteAccountCard() {
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirmationText, setConfirmationText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    
+    setIsDeleting(true);
+    try {
+      const idToken = await user.getIdToken();
+      
+      const response = await fetch('/api/account/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          password,
+          confirmationText,
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Account Deleted",
+          description: "Your account and all data have been permanently deleted.",
+        });
+        // Sign out and redirect
+        await signOut();
+        window.location.href = '/';
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete account');
+      }
+    } catch (error: any) {
+      toast({
+        title: "Delete Failed",
+        description: error.message || "Unable to delete account. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const canDelete = password.length > 0 && confirmationText === 'DELETE';
+
+  return (
+    <>
+      <Card className="border-red-200 bg-red-50/50">
+        <CardHeader>
+          <CardTitle className="flex items-center text-red-700">
+            <Trash2 className="mr-2 h-5 w-5" />
+            Delete Account
+          </CardTitle>
+          <CardDescription>
+            Permanently delete your account and all data. This action cannot be undone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="destructive">
+            <AlertTitle>⚠️ This action is permanent</AlertTitle>
+            <AlertDescription>
+              • All your recipes, meal plans, and data will be deleted<br/>
+              • Your subscription will be canceled<br/>
+              • This cannot be undone
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+        <CardFooter>
+          <Button 
+            variant="destructive"
+            onClick={() => setShowDeleteModal(true)}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete My Account
+          </Button>
+        </CardFooter>
+      </Card>
+
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Delete Account - Final Warning</DialogTitle>
+            <DialogDescription>
+              This will permanently delete ALL your data and cancel your subscription. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="password">Enter your password to confirm:</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Your password"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="confirmation">Type "DELETE" to confirm:</Label>
+              <Input
+                id="confirmation"
+                value={confirmationText}
+                onChange={(e) => setConfirmationText(e.target.value)}
+                placeholder="Type DELETE"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={!canDelete || isDeleting}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {isDeleting ? 'Deleting...' : 'Delete Forever'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 export default function UserInfoPage() {
   const { user } = useAuth();
   const { profile: userProfile, updateProfile, loading: isAppDataLoading } = useOptimizedProfile(user?.uid);
@@ -573,7 +769,14 @@ export default function UserInfoPage() {
       {isAppDataLoading ? (
         <UserInfoPageSkeleton />
       ) : (
-        <UserInfoForm userProfile={formProfile} updateProfile={updateProfile} />
+        <div className="space-y-8">
+          <UserInfoForm userProfile={formProfile} updateProfile={updateProfile} />
+          
+          <div className="grid gap-6">
+            <ManageSubscriptionCard userProfile={formProfile} />
+            <DeleteAccountCard />
+          </div>
+        </div>
       )}
     </PageWrapper>
   );
