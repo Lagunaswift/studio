@@ -15,7 +15,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import type { UserProfileSettings, Sex, ActivityLevel, AthleteType, PrimaryGoal, TrainingExperienceLevel } from '@/types';
 import { SEX_OPTIONS, ACTIVITY_LEVEL_OPTIONS, ATHLETE_TYPE_OPTIONS, PRIMARY_GOAL_OPTIONS, TRAINING_EXPERIENCE_OPTIONS } from '@/types';
-import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale, Award, CreditCard, Trash2 } from 'lucide-react';
+import { Save, Calculator, Activity, UserCircle, Target as TargetIcon, Dumbbell, Mail, User as UserIcon, Ruler, Scale, Award, Crown, Trash2, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from 'next/link';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -24,6 +24,7 @@ import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 import { getDefaultUserProfile } from '@/utils/profileDefaults';
 
 
@@ -589,29 +590,44 @@ function ManageSubscriptionCard({ userProfile }: { userProfile: UserProfileSetti
     }
   };
 
+  const getStatusBadge = (status: string) => {
+    const statusMap: Record<string, { variant: any, label: string }> = {
+      'active': { variant: 'default', label: 'Premium Active' },
+      'canceled': { variant: 'secondary', label: 'Canceled' },
+      'past_due': { variant: 'destructive', label: 'Past Due' },
+      'none': { variant: 'outline', label: 'Free Plan' }
+    };
+    return statusMap[status] || statusMap['none'];
+  };
+
+  const statusInfo = getStatusBadge(userProfile?.subscription_status || 'none');
+
   return (
-    <Card className="border-blue-200 bg-blue-50/50">
+    <Card className="border-accent/20 bg-accent/5">
       <CardHeader>
-        <CardTitle className="flex items-center text-blue-700">
-          <CreditCard className="mr-2 h-5 w-5" />
+        <CardTitle className="flex items-center text-accent">
+          <Crown className="mr-2 h-5 w-5" />
           Subscription Management
         </CardTitle>
         <CardDescription>
           Manage your subscription, update payment methods, or view billing history.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground mb-4">
-          Current Status: <span className="font-medium">{userProfile?.subscription_status || 'Free'}</span>
-        </p>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-muted-foreground">Current Status:</span>
+          <Badge variant={statusInfo.variant} className="font-medium">
+            {statusInfo.label}
+          </Badge>
+        </div>
       </CardContent>
       <CardFooter>
         <Button 
           onClick={handleManageSubscription}
           disabled={isLoading}
-          className="bg-blue-600 hover:bg-blue-700"
+          className="bg-accent hover:bg-accent/90 text-accent-foreground w-full"
         >
-          <CreditCard className="mr-2 h-4 w-4" />
+          <Crown className="mr-2 h-4 w-4" />
           {isLoading ? 'Opening...' : 'Manage Subscription'}
         </Button>
       </CardFooter>
@@ -673,33 +689,41 @@ function DeleteAccountCard() {
 
   return (
     <>
-      <Card className="border-red-200 bg-red-50/50">
+      <Card className="border-destructive/20 bg-background">
         <CardHeader>
-          <CardTitle className="flex items-center text-red-700">
-            <Trash2 className="mr-2 h-5 w-5" />
-            Delete Account
+          <CardTitle className="flex items-center text-foreground">
+            <Trash2 className="mr-2 h-5 w-5 text-muted-foreground" />
+            Account Deletion
           </CardTitle>
           <CardDescription>
-            Permanently delete your account and all data. This action cannot be undone.
+            Permanently remove your account and all associated data.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Alert variant="destructive">
-            <AlertTitle>⚠️ This action is permanent</AlertTitle>
-            <AlertDescription>
-              • All your recipes, meal plans, and data will be deleted<br/>
-              • Your subscription will be canceled<br/>
-              • This cannot be undone
-            </AlertDescription>
-          </Alert>
+        <CardContent className="space-y-4">
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+              </div>
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-destructive">This action is permanent</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• All recipes, meal plans, and personal data deleted</li>
+                  <li>• Active subscription automatically canceled</li>
+                  <li>• Account cannot be recovered</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </CardContent>
         <CardFooter>
           <Button 
-            variant="destructive"
+            variant="outline"
             onClick={() => setShowDeleteModal(true)}
+            className="border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive/50"
           >
             <Trash2 className="mr-2 h-4 w-4" />
-            Delete My Account
+            Delete Account
           </Button>
         </CardFooter>
       </Card>
@@ -707,43 +731,63 @@ function DeleteAccountCard() {
       <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-red-600">Delete Account - Final Warning</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="flex items-center text-destructive">
+              <AlertTriangle className="mr-2 h-5 w-5" />
+              Delete Account - Final Warning
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
               This will permanently delete ALL your data and cancel your subscription. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="password">Enter your password to confirm:</Label>
+            <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+              <p className="text-sm text-destructive font-medium">
+                ⚠️ You will lose access to all recipes, meal plans, and account data forever.
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium">
+                Enter your password to confirm:
+              </Label>
               <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Your password"
+                className="border-destructive/30 focus:border-destructive"
               />
             </div>
             
-            <div>
-              <Label htmlFor="confirmation">Type "DELETE" to confirm:</Label>
+            <div className="space-y-2">
+              <Label htmlFor="confirmation" className="text-sm font-medium">
+                Type "DELETE" to confirm:
+              </Label>
               <Input
                 id="confirmation"
                 value={confirmationText}
                 onChange={(e) => setConfirmationText(e.target.value)}
                 placeholder="Type DELETE"
+                className="border-destructive/30 focus:border-destructive"
               />
             </div>
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowDeleteModal(false)}
+              className="flex-1"
+            >
               Cancel
             </Button>
             <Button 
               variant="destructive"
               onClick={handleDeleteAccount}
               disabled={!canDelete || isDeleting}
+              className="flex-1"
             >
               <Trash2 className="mr-2 h-4 w-4" />
               {isDeleting ? 'Deleting...' : 'Delete Forever'}
