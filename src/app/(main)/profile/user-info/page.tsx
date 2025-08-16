@@ -562,27 +562,53 @@ function UserInfoForm({ userProfile, updateProfile }: { userProfile: UserProfile
 }
 
 function ManageSubscriptionCard({ userProfile }: { userProfile: UserProfileSettings }) {
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   const handleManageSubscription = async () => {
+    if (!user) return;
+    
     setIsLoading(true);
     try {
+      const idToken = await user.getIdToken();
+      
       const response = await fetch('/api/create-customer-portal-session', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ userId: user.uid })
       });
 
+      const responseData = await response.json();
+      
       if (response.ok) {
-        const { url } = await response.json();
-        window.open(url, '_blank');
+        if (responseData.isManualSubscription) {
+          toast({
+            title: "Manual Subscription",
+            description: "Your subscription was set up manually. Contact support for changes.",
+            variant: "default",
+          });
+        } else {
+          window.open(responseData.url, '_blank');
+        }
       } else {
-        throw new Error('Failed to create portal session');
+        if (responseData.error?.includes('No Stripe customer')) {
+          toast({
+            title: "No Stripe Customer",
+            description: "Please upgrade to a paid plan to access subscription management.",
+            variant: "default",
+          });
+        } else {
+          throw new Error(responseData.error || 'Failed to create portal session');
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Unable to open subscription management. Please try again.",
+        description: error.message || "Unable to open subscription management. Please try again.",
         variant: "destructive",
       });
     } finally {

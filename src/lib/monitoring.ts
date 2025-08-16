@@ -32,7 +32,7 @@ class ErrorMonitoring {
         component: context?.component || 'unknown'
       }
     });
-  }
+  }/
 
   captureMessage(message: string, level: 'info' | 'warning' | 'error' = 'info') {
     Sentry.captureMessage(message, level as any);

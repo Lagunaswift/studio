@@ -16,10 +16,8 @@ export function ProFeature({ featureName, description, hideWrapper = false }: Pr
   const router = useRouter();
 
   const handleUpgrade = () => {
-    // In a real app, this would link to your pricing/subscription page
-    // For now, it will just show an alert.
     alert("Upgrade to Pro to unlock this feature!");
-    // router.push('/pricing'); // Example of a future routing
+    router.push('/upgrade'); 
   };
   
   const content = (
