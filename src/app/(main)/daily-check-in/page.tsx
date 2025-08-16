@@ -133,10 +133,39 @@ function DailyVitalsCheckin() {
           </CardTitle>
           <CardDescription>You're all checked in for today. Great job!</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p><strong>Sleep:</strong> {todayLog.sleepQuality}/10</p>
-            <p><strong>Energy:</strong> <span className="capitalize">{todayLog.energyLevel}</span></p>
-            <p><strong>Recovery:</strong> <span className="capitalize">{todayLog.muscleSoreness}</span></p>
+        <CardContent>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="space-y-2">
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Sleep Quality:</span>
+                        <span className="font-medium">{todayLog.sleepQuality}/10</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Energy Level:</span>
+                        <span className="font-medium capitalize">{todayLog.energyLevel}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Cravings:</span>
+                        <span className="font-medium">{todayLog.cravingsLevel}/10</span>
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Recovery:</span>
+                        <span className="font-medium capitalize">{todayLog.muscleSoreness}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Yesterday's Activity:</span>
+                        <span className="font-medium capitalize">{todayLog.activityYesterday}</span>
+                    </div>
+                    {todayLog.notes && (
+                        <div className="col-span-2 pt-2 border-t">
+                            <span className="text-muted-foreground">Notes:</span>
+                            <p className="text-xs mt-1">{todayLog.notes}</p>
+                        </div>
+                    )}
+                </div>
+            </div>
         </CardContent>
         <CardFooter>
            <Button variant="outline" onClick={() => setIsOpen(true)}>Edit Today's Vitals</Button>
@@ -383,9 +412,9 @@ function DailyWeightLog() {
         });
     };
     
-    const recentWeightEntries = useMemo(() => {
-      return (userProfile?.dailyWeightLog as DailyWeightLog[])?.slice(0, 7) || [];
-    }, [userProfile?.dailyWeightLog]);
+    const todayWeightEntry = useMemo(() => {
+      return (userProfile?.dailyWeightLog as DailyWeightLog[])?.find(log => log.date === clientTodayDate);
+    }, [userProfile?.dailyWeightLog, clientTodayDate]);
 
     return (
         <Card className="shadow-md">
@@ -417,21 +446,17 @@ function DailyWeightLog() {
                         </Button>
                     </form>
                 </Form>
-                <div className="mt-6">
-                    <h4 className="font-semibold mb-2 text-muted-foreground">Recent Entries:</h4>
-                    {recentWeightEntries.length > 0 ? (
-                        <ul className="space-y-2 text-sm">
-                            {recentWeightEntries.map(log => (
-                                <li key={log.date} className="flex justify-between p-2 bg-muted/30 rounded-md">
-                                    <span>{format(parseISO(log.date), 'dd MMMM, yyyy')}</span>
-                                    <span className="font-semibold">{log.weightKg} kg</span>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <p className="text-xs text-muted-foreground text-center py-2">No weight entries yet.</p>
-                    )}
-                </div>
+                {todayWeightEntry && (
+                    <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                <span className="text-sm font-medium text-green-800 dark:text-green-200">Today's Weight Logged</span>
+                            </div>
+                            <span className="font-semibold text-green-800 dark:text-green-200">{todayWeightEntry.weightKg} kg</span>
+                        </div>
+                    </div>
+                )}
             </CardContent>
         </Card>
     );
@@ -542,9 +567,29 @@ function ManualMacroLog() {
                     </form>
                 </Form>
                  {todayLog && (
-                    <div className="mt-4 text-center p-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-md text-sm">
-                        <CheckCircle2 className="inline-block h-4 w-4 mr-2" />
-                        You have already logged macros manually for today. Submitting again will overwrite the previous entry.
+                    <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+                        <div className="flex items-center gap-2 mb-2">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            <span className="text-sm font-medium text-green-800 dark:text-green-200">Today's Macros Logged</span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2 text-xs">
+                            <div className="text-center">
+                                <div className="font-medium">{todayLog.calories}</div>
+                                <div className="text-muted-foreground">kcal</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="font-medium">{todayLog.protein}g</div>
+                                <div className="text-muted-foreground">protein</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="font-medium">{todayLog.carbs}g</div>
+                                <div className="text-muted-foreground">carbs</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="font-medium">{todayLog.fat}g</div>
+                                <div className="text-muted-foreground">fat</div>
+                            </div>
+                        </div>
                     </div>
                  )}
             </CardContent>

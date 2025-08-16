@@ -568,19 +568,7 @@ export default function DietaryTargetsPage() {
         </div>
 
         <div className="space-y-8">
-            <Alert>
-                <Info className="h-4 w-4" />
-                <AlertTitle>How to Use This Page</AlertTitle>
-                <AlertDescription className="text-sm">
-                <ul className="list-disc pl-4 space-y-1 mt-2">
-                    <li>Set your daily macro targets using the form on the left.</li>
-                    <li>Use the **Protein Calculator** to get a science-based protein target.</li>
-                    <li>Use the **Suggest Fat** button to get a balanced fat target.</li>
-                    <li>Use the **Calorie Target Helpers** to set calories based on fat loss or muscle gain goals. This will adjust your 'Carbohydrates' to meet the target.</li>
-                    <li>For **muscle gain**, use the 'Muscle Gain' tab. For **fat loss**, use the 'Fat Loss' tab.</li>
-                </ul>
-                </AlertDescription>
-            </Alert>
+            {/* Right column content can be added here if needed */}
         </div>
        </div>
     </PageWrapper>

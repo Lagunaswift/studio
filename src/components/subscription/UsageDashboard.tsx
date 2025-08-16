@@ -112,7 +112,7 @@ export function UsageDashboard({ userId, userProfile, onUpgradeClick, defaultCol
             </div>
             
             {tier === 'free' && !isCollapsed && (
-              <Button onClick={onUpgradeClick} size="sm" className="bg-gradient-to-r from-purple-600 to-blue-600">
+              <Button onClick={() => window.location.href = '/upgrade'} size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground">
                 <Crown className="w-4 h-4 mr-2" />
                 Upgrade
               </Button>
@@ -280,11 +280,11 @@ export function UsageDashboard({ userId, userProfile, onUpgradeClick, defaultCol
                   </div>
                 </div>
                 <Button 
-                  onClick={onUpgradeClick} 
-                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                  onClick={() => window.location.href = '/upgrade'} 
+                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
                 >
                   <Crown className="w-4 h-4 mr-2" />
-                  Upgrade to Premium - $9.99/month
+                  Upgrade to Premium - £12.99/month
                 </Button>
               </CardContent>
             </Card>

@@ -125,7 +125,7 @@ export function UpgradePage({ showCancelledMessage = false, highlightPlan = 'yea
           <CardHeader className="text-center space-y-2">
             <CardTitle className="text-xl">Free Plan</CardTitle>
             <div className="space-y-2">
-              <div className="text-3xl font-bold">$0</div>
+              <div className="text-3xl font-bold">£0</div>
               <CardDescription>Perfect for getting started</CardDescription>
             </div>
             {currentTier === 'free' && (

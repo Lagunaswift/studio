@@ -60,9 +60,32 @@ export default function UpdatesPage() {
             <CardTitle>What's New</CardTitle>
             <CardDescription>Latest updates and features added to MealPreppyPro.</CardDescription>
           </CardHeader>
-          <CardContent>
-            {/* You can map over a list of updates here */}
-            <p>Stay tuned for exciting new features!</p>
+          <CardContent className="space-y-4">
+            <div className="border-l-4 border-accent pl-4">
+              <h3 className="font-semibold text-accent">Version 0.1.0 - Production Launch</h3>
+              <p className="text-sm text-muted-foreground mb-2">Current Release - August 2025</p>
+              <div className="space-y-2 text-sm">
+                <p><strong>🎉 App Status:</strong> Production Ready & Live</p>
+                <p><strong>🏗️ Core Features:</strong></p>
+                <ul className="list-disc list-inside pl-4 space-y-1">
+                  <li>Complete meal planning system with 500+ built-in recipes</li>
+                  <li>AI-powered Preppy Plan Generator (15 requests/day for premium)</li>
+                  <li>AI Pantry Chef for ingredient-based recipe suggestions</li>
+                  <li>Shopping list generator and pantry management</li>
+                  <li>Daily check-in tracking (weight, vitals, macros)</li>
+                  <li>Macro targets with science-based calculators</li>
+                  <li>Progressive Web App (PWA) with offline capability</li>
+                </ul>
+                <p><strong>🔒 Security & Compliance:</strong></p>
+                <ul className="list-disc list-inside pl-4 space-y-1">
+                  <li>Enterprise-grade security with DoS protection</li>
+                  <li>GDPR-compliant account deletion and data export</li>
+                  <li>Behavioral anomaly detection and monitoring</li>
+                  <li>Token revocation and session management</li>
+                </ul>
+                <p><strong>💳 Subscription:</strong> Free tier with premium upgrade (£12.99/month, £129.99/year)</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
