@@ -1,12 +1,22 @@
 // src/app/api/ai/suggest-meal-plan/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { suggestMealPlanFlow, type SuggestMealPlanInput, type SuggestMealPlanOutput } from '@/ai/flows/suggest-meal-plan';
+import { authenticateRequest, createAuthenticatedResponse } from '@/lib/auth-helpers';
+import { trackAPIUsage } from '@/lib/api-monitoring';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   console.log('🔥 AI Suggest Meal Plan API called');
+  const startTime = Date.now();
+  
+  // Authenticate request
+  const authResult = await authenticateRequest(request);
+  const authError = createAuthenticatedResponse(authResult);
+  if (authError) return authError;
+  
+  const userId = authResult.user?.uid;
   
   try {
     const body: SuggestMealPlanInput = await request.json();
@@ -57,6 +67,9 @@ export async function POST(request: NextRequest) {
       totalCalories: result.totalAchievedMacros?.calories || 0
     });
     
+    // Track successful API usage
+    await trackAPIUsage('/api/ai/suggest-meal-plan', userId, Date.now() - startTime, 200);
+    
     return NextResponse.json(result);
 
   } catch (error: any) {
@@ -66,6 +79,9 @@ export async function POST(request: NextRequest) {
       name: error.name,
       cause: error.cause
     });
+    
+    // Track failed API usage
+    await trackAPIUsage('/api/ai/suggest-meal-plan', userId, Date.now() - startTime, 500);
     
     return NextResponse.json(
       { 

@@ -1,6 +1,8 @@
 import { proCoachFlow } from '@/ai/flows/pro-coach-flow';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { authenticateRequest, createAuthenticatedResponse } from '@/lib/auth-helpers';
+import { trackAPIUsage } from '@/lib/api-monitoring';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -17,6 +19,15 @@ const ProCoachInputSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+  
+  // Authenticate request
+  const authResult = await authenticateRequest(req);
+  const authError = createAuthenticatedResponse(authResult);
+  if (authError) return authError;
+  
+  const userId = authResult.user?.uid;
+  
   try {
     // Validate request body exists and is JSON
     let body;
@@ -102,10 +113,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Track successful API usage
+    await trackAPIUsage('/api/genkit', userId, Date.now() - startTime, 200);
+    
     // Return successful result
     return NextResponse.json(result, { status: 200 });
 
   } catch (error) {
+    // Track failed API usage
+    await trackAPIUsage('/api/genkit', userId, Date.now() - startTime, 500);
+    
     // Catch-all error handler for unexpected issues
     console.error('Unexpected error in pro-coach API route:', error);
     return NextResponse.json(

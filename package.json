@@ -91,6 +91,7 @@
     "copy-webpack-plugin": "^13.0.1",
     "cross-env": "^10.0.0",
     "cypress": "^14.5.4",
+    "eslint": "^9.33.0",
     "genkit-cli": "^0.0.2",
     "handlebars-loader": "^1.7.3",
     "lighthouse-ci": "^1.10.0",

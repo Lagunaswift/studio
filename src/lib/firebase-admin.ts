@@ -44,6 +44,18 @@ function initializeFirebaseAdmin() {
     }
   }
 
+  // Handle placeholder/invalid private keys during build
+  if (privateKey.includes('YOUR_PRIVATE_KEY_HERE') || privateKey.includes('your_private_key')) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Invalid Firebase private key in production - contains placeholder text');
+    } else {
+      console.warn('Firebase admin using placeholder key for build, using minimal app');
+      return initializeApp({ 
+        projectId: projectId || 'build-placeholder'
+      });
+    }
+  }
+
   try {
     // Apply Vercel-specific fixes first (includes all necessary transformations)
     const formattedPrivateKey = fixVercelPrivateKey(privateKey);

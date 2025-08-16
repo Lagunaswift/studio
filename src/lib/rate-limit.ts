@@ -62,8 +62,7 @@ class InMemoryRateLimiter {
 
   private getDefaultKey(request: NextRequest): string {
     // Use IP address or user ID for rate limiting
-    const ip = request.ip || 
-                request.headers.get('x-forwarded-for')?.split(',')[0] || 
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 
                 request.headers.get('x-real-ip') || 
                 'anonymous';
     
@@ -86,7 +85,7 @@ export const rateLimiters = {
     maxRequests: 10,
     keyGenerator: (request) => {
       const userId = request.headers.get('x-user-id');
-      return userId ? `ai:user:${userId}` : `ai:ip:${request.ip || 'anonymous'}`;
+      return userId ? `ai:user:${userId}` : `ai:ip:${request.headers.get('x-forwarded-for')?.split(',')[0] || 'anonymous'}`;
     }
   }),
 
@@ -96,7 +95,7 @@ export const rateLimiters = {
     maxRequests: 5,
     keyGenerator: (request) => {
       const userId = request.headers.get('x-user-id');
-      return userId ? `ai-strict:user:${userId}` : `ai-strict:ip:${request.ip || 'anonymous'}`;
+      return userId ? `ai-strict:user:${userId}` : `ai-strict:ip:${request.headers.get('x-forwarded-for')?.split(',')[0] || 'anonymous'}`;
     }
   }),
 

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyIdToken } from '@/lib/firebase-admin';
 import { applyRateLimit, addRateLimitHeaders } from '@/lib/rate-limit';
 
 export async function middleware(request: NextRequest) {
@@ -62,7 +61,7 @@ export async function middleware(request: NextRequest) {
     addRateLimitHeaders(response, rateLimitResult);
   }
 
-  // Protected API routes requiring authentication
+  // Protected API routes requiring authentication - handled at route level
   const protectedAPIRoutes = [
     '/api/ai/',
     '/api/profile/',
@@ -81,23 +80,12 @@ export async function middleware(request: NextRequest) {
       );
     }
 
+    // Token verification will be handled in individual API routes
+    // since Firebase Admin SDK requires Node.js runtime
     const token = authHeader.substring(7);
     
-    try {
-      const decodedToken = await verifyIdToken(token);
-      
-      // Add user context to request headers for downstream use
-      response.headers.set('x-user-id', decodedToken.uid);
-      response.headers.set('x-user-email', decodedToken.email || '');
-      
-      return response;
-    } catch (error) {
-      console.error('Token verification failed:', error);
-      return NextResponse.json(
-        { error: 'Unauthorized - Invalid token' },
-        { status: 401 }
-      );
-    }
+    // Add token to headers for route-level verification
+    response.headers.set('x-auth-token', token);
   }
 
   // Public webhooks (have their own authentication)

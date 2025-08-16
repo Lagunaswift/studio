@@ -2,13 +2,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { suggestRecipesByIngredients, type SuggestRecipesByIngredientsInput, type SuggestRecipesByIngredientsOutput } from '@/ai/flows/suggest-recipes-by-ingredients-flow';
 import { trackAPIUsage } from '@/lib/api-monitoring';
+import { authenticateRequest, createAuthenticatedResponse } from '@/lib/auth-helpers';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  const userId = request.headers.get('x-user-id');
+  
+  // Authenticate request
+  const authResult = await authenticateRequest(request);
+  const authError = createAuthenticatedResponse(authResult);
+  if (authError) return authError;
+  
+  const userId = authResult.user?.uid;
   
   try {
     const body: SuggestRecipesByIngredientsInput = await request.json();
