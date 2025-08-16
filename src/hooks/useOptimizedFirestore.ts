@@ -98,7 +98,7 @@ export function useOptimizedRecipes(userId: string | undefined) {
     try {
       const builtInResult = await optimizedFirestore.getCollection<Recipe>(
         "recipes",
-        [],
+        [orderBy('id', 'asc')],
         {
           ttl: 60 * 60 * 1000,
           enablePagination: false,
