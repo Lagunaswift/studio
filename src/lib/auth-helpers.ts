@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { verifyIdToken } from '@/lib/firebase-admin';
+import { tokenBlacklist } from '@/lib/token-blacklist';
 
 export interface AuthenticatedRequest extends NextRequest {
   user?: {
@@ -25,7 +26,25 @@ export async function authenticateRequest(request: NextRequest): Promise<{
       };
     }
 
+    // Check token blacklist first
+    const isBlacklisted = await tokenBlacklist.isTokenBlacklisted(token);
+    if (isBlacklisted) {
+      return {
+        success: false,
+        error: 'Token has been revoked'
+      };
+    }
+
     const decodedToken = await verifyIdToken(token);
+    
+    // Check if user has global token revocation
+    const isUserRevoked = await tokenBlacklist.isUserGloballyRevoked(decodedToken.uid);
+    if (isUserRevoked) {
+      return {
+        success: false,
+        error: 'All user tokens have been revoked'
+      };
+    }
     
     return {
       success: true,

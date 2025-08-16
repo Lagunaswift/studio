@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { suggestMealPlanFlow, type SuggestMealPlanInput, type SuggestMealPlanOutput } from '@/ai/flows/suggest-meal-plan';
 import { authenticateRequest, createAuthenticatedResponse } from '@/lib/auth-helpers';
 import { trackAPIUsage } from '@/lib/api-monitoring';
+import { trackUserBehavior } from '@/lib/anomaly-detection';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -17,6 +18,25 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
   
   const userId = authResult.user?.uid;
+  
+  // Track behavior for anomaly detection
+  const anomalyScore = await trackUserBehavior(
+    request, 
+    userId!, 
+    'ai_meal_plan_request', 
+    '/api/ai/suggest-meal-plan'
+  );
+  
+  // Block if critical anomaly detected
+  if (anomalyScore.riskLevel === 'critical') {
+    return NextResponse.json(
+      { 
+        error: 'Access temporarily restricted due to security concerns',
+        code: 'SECURITY_BLOCK'
+      },
+      { status: 403 }
+    );
+  }
   
   try {
     const body: SuggestMealPlanInput = await request.json();
