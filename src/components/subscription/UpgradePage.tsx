@@ -195,23 +195,23 @@ export function UpgradePage({ showCancelledMessage = false, highlightPlan = 'yea
               </li>
               <li className="flex items-start gap-2">
                 <Zap className="h-5 w-5 text-accent mt-0.5 flex-shrink-0" />
-                <span className="text-sm">Unlimited AI meal plan generations</span>
+                <span className="text-sm">15 AI requests per day (300/month)</span>
               </li>
               <li className="flex items-start gap-2">
                 <Sparkles className="h-5 w-5 text-accent mt-0.5 flex-shrink-0" />
-                <span className="text-sm">Advanced AI nutrition coaching</span>
+                <span className="text-sm">AI pantry chef & meal planning</span>
               </li>
               <li className="flex items-start gap-2">
                 <BarChart3 className="h-5 w-5 text-accent mt-0.5 flex-shrink-0" />
-                <span className="text-sm">Advanced analytics & insights</span>
+                <span className="text-sm">Unlimited recipes & meal plans</span>
               </li>
               <li className="flex items-start gap-2">
                 <Download className="h-5 w-5 text-accent mt-0.5 flex-shrink-0" />
-                <span className="text-sm">Export your data (CSV, PDF)</span>
+                <span className="text-sm">Shopping list generator</span>
               </li>
               <li className="flex items-start gap-2">
                 <Palette className="h-5 w-5 text-accent mt-0.5 flex-shrink-0" />
-                <span className="text-sm">Custom meal plan templates</span>
+                <span className="text-sm">Pantry management system</span>
               </li>
               <li className="flex items-start gap-2">
                 <MessageCircle className="h-5 w-5 text-accent mt-0.5 flex-shrink-0" />
@@ -252,7 +252,7 @@ export function UpgradePage({ showCancelledMessage = false, highlightPlan = 'yea
               <tr>
                 <td className="border border-gray-200 px-4 py-3">Daily AI Requests</td>
                 <td className="border border-gray-200 px-4 py-3 text-center">{freeLimits.aiRequestsPerDay}</td>
-                <td className="border border-gray-200 px-4 py-3 text-center text-accent font-semibold">Unlimited</td>
+                <td className="border border-gray-200 px-4 py-3 text-center text-accent font-semibold">{premiumLimits.aiRequestsPerDay}/day</td>
               </tr>
               <tr className="bg-gray-50">
                 <td className="border border-gray-200 px-4 py-3">Saved Recipes</td>
@@ -260,12 +260,12 @@ export function UpgradePage({ showCancelledMessage = false, highlightPlan = 'yea
                 <td className="border border-gray-200 px-4 py-3 text-center text-accent font-semibold">Unlimited</td>
               </tr>
               <tr>
-                <td className="border border-gray-200 px-4 py-3">Advanced AI Features</td>
+                <td className="border border-gray-200 px-4 py-3">AI Pantry Chef</td>
                 <td className="border border-gray-200 px-4 py-3 text-center">❌</td>
                 <td className="border border-gray-200 px-4 py-3 text-center">✅</td>
               </tr>
               <tr className="bg-gray-50">
-                <td className="border border-gray-200 px-4 py-3">Export Data</td>
+                <td className="border border-gray-200 px-4 py-3">Shopping Lists</td>
                 <td className="border border-gray-200 px-4 py-3 text-center">❌</td>
                 <td className="border border-gray-200 px-4 py-3 text-center">✅</td>
               </tr>
