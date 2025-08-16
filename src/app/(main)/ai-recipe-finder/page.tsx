@@ -82,8 +82,20 @@ export default function AIRecipeFinderPage() {
       );
 
       if (result.success) {
-        setSuggestion(result.data as any);
-        if (result.data?.recipes.length === 0) {
+        // Transform the response to match expected structure
+        const transformedData = {
+          suggestedRecipes: result.data?.recipes?.map((recipe: any) => ({
+            recipeId: recipe.id || Math.random(),
+            recipeName: recipe.name,
+            utilizationScore: 0.8,
+            matchedIngredients: recipe.ingredients?.slice(0, 3) || [],
+            missingKeyIngredients: [],
+            notes: recipe.description
+          })) || [],
+          aiGeneralNotes: "AI-generated recipe suggestions based on your ingredients"
+        };
+        setSuggestion(transformedData);
+        if (result.data?.recipes?.length === 0) {
             toast({
                 title: "No Matching Recipes Found",
                 description: "I couldn't find any recipes that closely match your ingredients and profile settings."
@@ -92,7 +104,18 @@ export default function AIRecipeFinderPage() {
       } else {
           setError(result.error || 'Failed to get suggestions');
           if(result.fallback) {
-            setSuggestion({ suggestedRecipes: result.fallback.recipes as any, aiGeneralNotes: "Could not connect to the AI, here is a fallback suggestion."});
+            const fallbackData = {
+              suggestedRecipes: result.fallback.recipes?.map((recipe: any) => ({
+                recipeId: recipe.id || Math.random(),
+                recipeName: recipe.name,
+                utilizationScore: 0.8,
+                matchedIngredients: recipe.ingredients?.slice(0, 3) || [],
+                missingKeyIngredients: [],
+                notes: recipe.description
+              })) || [],
+              aiGeneralNotes: "Could not connect to the AI, here is a fallback suggestion."
+            };
+            setSuggestion(fallbackData);
           }
       }
     } catch (err: any) {

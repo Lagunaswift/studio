@@ -173,7 +173,7 @@ export function useDailyInsights(userId?: string): DailyInsightsState {
         color: 'text-teal-600',
         priority: 'low',
         actionText: 'Plan Today\'s Meals',
-        actionHref: '/ai-suggestions'
+        actionHref: '/preppy-plan-generator'
       };
     }
 

@@ -45,7 +45,7 @@ export function SimpleHelpWidget() {
       title: 'AI Meal Plan',
       description: 'Let Preppy create a personalized meal plan',
       icon: Wand2,
-      href: '/ai-suggestions',
+      href: '/preppy-plan-generator',
       color: 'text-yellow-600',
       bgColor: 'bg-yellow-50 hover:bg-yellow-100',
       popular: true

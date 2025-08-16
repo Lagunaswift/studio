@@ -916,7 +916,7 @@ export default function MealPlanPage() {
               Weekly View
             </Button>
           </Link>
-          <Link href="/ai-suggestions" className="flex-1">
+          <Link href="/preppy-plan-generator" className="flex-1">
             <Button variant="outline" className="w-full h-10 text-sm">
               <Target className="w-4 h-4 mr-2" />
               AI Meal Planner

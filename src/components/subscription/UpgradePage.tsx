@@ -183,14 +183,14 @@ export function UpgradePage({ showCancelledMessage = false, highlightPlan = 'yea
             </CardTitle>
             <div className="space-y-2">
               <div className="text-3xl font-bold text-accent">
-                ${billingCycle === 'yearly' ? yearlyPlan.price : monthlyPlan.price}
+                {formatPrice(billingCycle === 'yearly' ? yearlyPlan.price : monthlyPlan.price)}
               </div>
               <CardDescription>
                 {billingCycle === 'yearly' ? 'per year' : 'per month'} • Billed {billingCycle}
               </CardDescription>
               {billingCycle === 'yearly' && (
                 <div className="text-sm text-green-600 font-medium">
-                  Save ${savings.amount} compared to monthly billing
+                  Save {formatPrice(savings.amount)} compared to monthly billing
                 </div>
               )}
             </div>

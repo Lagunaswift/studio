@@ -54,7 +54,7 @@ interface NavItem {
 const dashboardNavItem: NavItem = { href: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true };
 
 const planNavItems: NavItem[] = [
-    { href: '/ai-suggestions', label: 'Preppy: Plan Generator', icon: Sparkles },
+    { href: '/preppy-plan-generator', label: 'Preppy: Plan Generator', icon: Sparkles },
     { href: '/meal-plan', label: 'Daily/Weekly View', icon: CalendarDays },
     { href: '/shopping-list', label: 'Shopping List', icon: ShoppingBag },
     { href: '/pantry', label: 'Pantry', icon: Archive },
@@ -254,7 +254,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   };
 
   const getCurrentPageTitle = () => {
-    if (pathname === '/ai-suggestions') return 'Preppy: Plan Generator';
+    if (pathname === '/preppy-plan-generator') return 'Preppy: Plan Generator';
     if (pathname === '/ai-recipe-finder') return 'Preppy: Pantry Chef';
     if (pathname === '/weekly-check-in') return 'Preppy: Weekly Check-in';
     

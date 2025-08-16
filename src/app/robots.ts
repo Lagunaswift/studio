@@ -12,7 +12,7 @@ export default function robots(): MetadataRoute.Robots {
           '/meal-plan',
           '/recipes',
           '/ai-recipe-finder',
-          '/ai-suggestions',
+          '/preppy-plan-generator',
           '/shopping-list',
           '/pantry',
           '/guide',
