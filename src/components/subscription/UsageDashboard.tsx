@@ -21,6 +21,7 @@ import { SUBSCRIPTION_LIMITS, SubscriptionTier } from '@/config/subscriptionLimi
 import { usageTracker } from '@/utils/usageTracker';
 import { getUserTier, getUsagePercentage } from '@/utils/subscriptionHelpers';
 import { UserProfileSettings } from '@/types';
+import { formatPrice, SUBSCRIPTION_PLANS } from '@/lib/stripe';
 
 interface UsageDashboardProps {
   userId: string;
@@ -196,7 +197,7 @@ export function UsageDashboard({ userId, userProfile, onUpgradeClick, defaultCol
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-purple-500" />
+                <Clock className="w-5 h-5 text-amber-500" />
                 <CardTitle className="text-base">Saved Recipes</CardTitle>
               </div>
               <div className={`flex items-center gap-1 text-sm ${getStatusColor(usageStats.recipes)}`}>
@@ -248,15 +249,15 @@ export function UsageDashboard({ userId, userProfile, onUpgradeClick, defaultCol
 
           {/* Premium Benefits */}
           {tier === 'free' && (
-            <Card className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20">
+            <Card className="bg-gradient-to-r from-primary/10 to-accent/10 dark:from-primary/5 dark:to-accent/5">
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <Crown className="w-5 h-5 text-purple-600" />
-                  <CardTitle className="text-purple-900 dark:text-purple-100">
+                  <Crown className="w-5 h-5 text-accent" />
+                  <CardTitle className="text-accent">
                     Unlock Premium Benefits
                   </CardTitle>
                 </div>
-                <CardDescription className="text-purple-700 dark:text-purple-300">
+                <CardDescription className="text-accent/80">
                   Upgrade to get unlimited access and advanced features
                 </CardDescription>
               </CardHeader>
@@ -284,7 +285,7 @@ export function UsageDashboard({ userId, userProfile, onUpgradeClick, defaultCol
                   className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
                 >
                   <Crown className="w-4 h-4 mr-2" />
-                  Upgrade to Premium - £12.99/month
+                  Upgrade to Premium - {formatPrice(SUBSCRIPTION_PLANS.premium_monthly.price)}/month
                 </Button>
               </CardContent>
             </Card>

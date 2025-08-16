@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Crown, Zap, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { redirectToCheckout, SUBSCRIPTION_PLANS, StripePriceId, formatPrice } from '@/lib/stripe';
+import { redirectToCheckout, SUBSCRIPTION_PLANS, StripePriceId, formatPrice, isStripeConfigured } from '@/lib/stripe';
 
 interface CheckoutButtonProps {
   priceId: StripePriceId;
@@ -50,6 +50,16 @@ export function CheckoutButton({
       return;
     }
 
+    // Check if Stripe is configured
+    if (!isStripeConfigured()) {
+      toast({
+        title: 'Payment System Unavailable',
+        description: 'Payment processing is currently being configured. Please try again later.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -77,7 +87,7 @@ export function CheckoutButton({
     }
   };
 
-  const isDisabled = disabled || isLoading || isAuthLoading || !user;
+  const isDisabled = disabled || isLoading || isAuthLoading || !user || !isStripeConfigured();
 
   return (
     <div className="space-y-2">

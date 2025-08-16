@@ -6,7 +6,19 @@ let stripePromise: Promise<Stripe | null>;
 
 export const getStripe = () => {
   if (!stripePromise) {
-    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+    const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    
+    if (!publishableKey) {
+      console.error('Stripe publishable key is missing. Please configure NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.');
+      stripePromise = Promise.resolve(null);
+      return stripePromise;
+    }
+    
+    // Load Stripe with better error handling
+    stripePromise = loadStripe(publishableKey).catch((error) => {
+      console.error('Failed to load Stripe.js:', error);
+      return null;
+    });
   }
   return stripePromise;
 };
@@ -18,6 +30,12 @@ export const STRIPE_PRICE_IDS = {
 } as const;
 
 export type StripePriceId = keyof typeof STRIPE_PRICE_IDS;
+
+// Utility function to check if Stripe is properly configured
+export function isStripeConfigured(): boolean {
+  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  return !!(publishableKey && !publishableKey.includes('placeholder') && !publishableKey.includes('your_stripe'));
+}
 
 // Subscription product information
 export const SUBSCRIPTION_PLANS = {
@@ -106,12 +124,18 @@ export async function redirectToCheckout({
   userEmail: string;
 }) {
   try {
+    // Check if Stripe is available
     const stripe = await getStripe();
     
     if (!stripe) {
-      throw new Error('Stripe failed to load');
+      const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+      if (!publishableKey || publishableKey.includes('placeholder') || publishableKey.includes('your_stripe')) {
+        throw new Error('Stripe is not configured. Payment processing is currently unavailable.');
+      }
+      throw new Error('Failed to load Stripe.js. Please check your internet connection and try again.');
     }
 
+    // Create checkout session
     const sessionId = await createCheckoutSession({
       priceId,
       successUrl: `${window.location.origin}/upgrade/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -120,16 +144,24 @@ export async function redirectToCheckout({
       userEmail,
     });
 
+    // Redirect to checkout
     const { error } = await stripe.redirectToCheckout({
       sessionId,
     });
 
     if (error) {
-      throw error;
+      console.error('Stripe checkout error:', error);
+      throw new Error(error.message || 'Failed to redirect to checkout');
     }
   } catch (error) {
     console.error('Error redirecting to checkout:', error);
-    throw error;
+    
+    // Re-throw with more user-friendly message if needed
+    if (error instanceof Error) {
+      throw error;
+    }
+    
+    throw new Error('An unexpected error occurred during checkout. Please try again.');
   }
 }
 
