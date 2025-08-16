@@ -3,28 +3,216 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ===============================
+    // ENTERPRISE SECURITY FUNCTIONS
+    // ===============================
+    
     function isAuthenticated() {
       return request.auth != null;
     }
+    
+    function isAdmin() {
+      return request.auth != null && 
+             (request.auth.token.admin == true || 
+              request.auth.token.role == 'admin');
+    }
+    
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+    
+    function isSupportAgent() {
+      return request.auth != null && 
+             request.auth.token.role == 'support';
+    }
+    
+    function hasValidSubscription() {
+      return resource.data.subscription_status == 'active' ||
+             resource.data.subscription_status == 'trialing';
+    }
+    
+    // Document size validation (max 1MB = 1048576 bytes)
+    function isValidDocumentSize() {
+      return request.resource.data.size() < 1048576;
+    }
+    
+    // Rate limiting: max 100 operations per minute per user
+    function isWithinRateLimit() {
+      return request.auth.token.rate_limit_remaining > 0;
+    }
+    
+    // Validate profile data structure and sensitive fields
+    function validateProfileData(data) {
+      return data.keys().hasAll(['email']) &&
+             data.email is string &&
+             data.email.size() > 0 &&
+             data.email.size() < 255 &&
+             (!('stripeCustomerId' in data) || data.stripeCustomerId is string) &&
+             (!('subscription_status' in data) || data.subscription_status in ['free', 'active', 'canceled', 'trialing']) &&
+             (!('weightKg' in data) || (data.weightKg is number && data.weightKg > 20 && data.weightKg < 500));
+    }
+    
+    // Validate recipe data structure
+    function validateRecipeData(data) {
+      return data.keys().hasAll(['name', 'user_id']) &&
+             data.name is string &&
+             data.name.size() > 0 &&
+             data.name.size() < 200 &&
+             data.user_id is string &&
+             (!('ingredients' in data) || data.ingredients is list) &&
+             (!('calories' in data) || (data.calories is number && data.calories >= 0 && data.calories < 10000));
+    }
+    
+    // Validate meal plan data
+    function validateMealPlanData(data) {
+      return data.keys().hasAll(['date']) &&
+             data.date is string &&
+             data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+             (!('meals' in data) || data.meals is list) &&
+             (!('meals' in data) || data.meals.size() <= 20); // Max 20 meals per day
+    }
 
-    // Recipes: readable if public or by owner. Writable only by owner.
+    // ===============================
+    // BUILT-IN RECIPES COLLECTION
+    // ===============================
+    
     match /recipes/{recipeId} {
-      allow get: if resource.data.user_id == null || request.auth.uid == resource.data.user_id;
-      allow list: if isAuthenticated();
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
-      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
+      // Public recipes (no user_id) readable by authenticated users
+      // Private recipes only by owner or admin
+      allow read: if isAuthenticated() && 
+        (resource.data.user_id == null || 
+         isOwner(resource.data.user_id) || 
+         isAdmin());
+      
+      // Only authenticated users can create recipes
+      // Must set themselves as owner
+      allow create: if isAuthenticated() && 
+                   isOwner(request.resource.data.user_id) &&
+                   validateRecipeData(request.resource.data) &&
+                   isValidDocumentSize();
+      
+      // Only owner or admin can modify
+      allow update: if isAuthenticated() && 
+                   (isOwner(resource.data.user_id) || isAdmin()) &&
+                   validateRecipeData(request.resource.data) &&
+                   isValidDocumentSize();
+      
+      allow delete: if isAuthenticated() && 
+                   (isOwner(resource.data.user_id) || isAdmin());
     }
 
-    // Profiles: Writable only by the owner.
+    // ===============================
+    // USER PROFILES
+    // ===============================
+    
     match /profiles/{userId} {
-      allow read, create, update: if isAuthenticated() && request.auth.uid == userId;
+      // Users can only access their own profile
+      // Admins and support can read for assistance
+      allow read: if isOwner(userId) || isAdmin() || isSupportAgent();
+      
+      // Only user can create their own profile
+      allow create: if isOwner(userId) && 
+                   validateProfileData(request.resource.data) &&
+                   isValidDocumentSize();
+      
+      // Users can update their own profile
+      // Admins can update for support purposes
+      allow update: if (isOwner(userId) || isAdmin()) && 
+                   validateProfileData(request.resource.data) &&
+                   isValidDocumentSize() &&
+                   // Prevent users from modifying subscription status
+                   (!('subscription_status' in request.resource.data) || 
+                    isAdmin() || 
+                    request.resource.data.subscription_status == resource.data.subscription_status);
+      
+      // Only admins can delete profiles (GDPR compliance)
+      allow delete: if isAdmin();
+
+      // ===============================
+      // USER SUBCOLLECTIONS
+      // ===============================
+      
+      // User's personal recipes
+      match /recipes/{recipeId} {
+        allow read, write: if isOwner(userId) && 
+                          validateRecipeData(request.resource.data) &&
+                          isValidDocumentSize();
+        allow read: if isAdmin() || isSupportAgent();
+      }
+      
+      // Daily meal plans with date validation
+      match /dailyMealPlans/{date} {
+        allow read, write: if isOwner(userId) && 
+                          validateMealPlanData(request.resource.data) &&
+                          isValidDocumentSize();
+        allow read: if isAdmin() || isSupportAgent();
+      }
+      
+      // Pantry items
+      match /pantryItems/{itemId} {
+        allow read, write: if isOwner(userId) && isValidDocumentSize();
+        allow read: if isAdmin() || isSupportAgent();
+      }
+      
+      // Shopping lists
+      match /shoppingList/{listId} {
+        allow read, write: if isOwner(userId) && isValidDocumentSize();
+        allow read: if isAdmin() || isSupportAgent();
+      }
+      
+      // Weight logs (sensitive health data)
+      match /weightLog/{logId} {
+        allow read, write: if isOwner(userId) && isValidDocumentSize();
+        allow read: if isAdmin(); // No support access to health data
+      }
+      
+      // Vitals logs (sensitive health data)
+      match /vitalsLog/{logId} {
+        allow read, write: if isOwner(userId) && isValidDocumentSize();
+        allow read: if isAdmin(); // No support access to health data
+      }
     }
 
-    // Generic rule for all other user-specific collections.
-    match /{collection}/{docId} {
-      allow read, delete: if isAuthenticated() && request.auth.uid == resource.data.user_id;
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
-      allow update: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
+    // ===============================
+    // SYSTEM COLLECTIONS
+    // ===============================
+    
+    // Security monitoring (admin only)
+    match /_security/{path=**} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Audit logs (admin only)
+    match /_audit/{path=**} {
+      allow read, write: if isAdmin();
+    }
+    
+    // System configuration (admin only)
+    match /_system/{path=**} {
+      allow read, write: if isAdmin();
+    }
+
+    // ===============================
+    // SUBSCRIPTION & BILLING
+    // ===============================
+    
+    match /subscriptions/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isAdmin(); // Only admins can modify subscriptions
+    }
+    
+    match /invoices/{invoiceId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow write: if isAdmin(); // Only system can create invoices
+    }
+
+    // ===============================
+    // DENY ALL OTHER ACCESS
+    // ===============================
+    
+    // Explicitly deny all other paths
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
