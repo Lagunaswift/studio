@@ -85,15 +85,9 @@ const generateFallbackMealPlan = (
   mealStructure: MealSlotConfigLocal[],
   macroTargets?: { calories: number; protein: number; carbs: number; fat: number }
 ): SuggestMealPlanOutput => {
-  console.log('generateFallbackMealPlan called with:', {
-    recipeCount: availableRecipes?.length || 0,
-    mealSlotCount: mealStructure?.length || 0,
-    hasTargets: !!macroTargets
-  });
 
   // Validate inputs - this prevents the original error
   if (!availableRecipes || !Array.isArray(availableRecipes) || availableRecipes.length === 0) {
-    console.warn('No recipes available for fallback meal plan');
     return {
       plannedMeals: [],
       totalAchievedMacros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
@@ -103,7 +97,6 @@ const generateFallbackMealPlan = (
   }
 
   if (!mealStructure || !Array.isArray(mealStructure) || mealStructure.length === 0) {
-    console.warn('No meal structure available for fallback meal plan');
     return {
       plannedMeals: [],
       totalAchievedMacros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
@@ -117,12 +110,10 @@ const generateFallbackMealPlan = (
   const validRecipes = availableRecipes.filter((recipe, index) => {
     // Check if recipe exists and has required properties
     if (!recipe) {
-      console.warn(`Recipe at index ${index} is null/undefined`);
-      return false;
+        return false;
     }
 
     if (!recipe.id || !recipe.name) {
-      console.warn(`Recipe at index ${index} missing id or name:`, recipe);
       return false;
     }
 
@@ -137,17 +128,14 @@ const generateFallbackMealPlan = (
       isNaN(recipe.carbs) ||
       isNaN(recipe.fat)
     ) {
-      console.warn(`Recipe "${recipe.name}" has invalid macro data - calories: ${recipe.calories}, protein: ${recipe.protein}, carbs: ${recipe.carbs}, fat: ${recipe.fat}`);
       return false;
     }
 
     return true;
   });
 
-  console.log(`Filtered ${availableRecipes.length} recipes down to ${validRecipes.length} valid recipes`);
 
   if (validRecipes.length === 0) {
-    console.error('No valid recipes found after filtering - this indicates a data quality issue');
     return {
       plannedMeals: [],
       totalAchievedMacros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
@@ -167,7 +155,6 @@ const generateFallbackMealPlan = (
     
     // Double-check even after filtering (defensive programming)
     if (!selectedRecipe) {
-      console.warn(`Skipping meal slot ${slot.displayName || slot.name || `slot-${index}`} - recipe issue`);
       return;
     }
 
@@ -217,7 +204,6 @@ const generateDemoMealPlan = (
   userProfile: any, 
   mealStructure: MealSlotForAI[]
 ): SuggestMealPlanOutput => {
-  console.log('⚠️ Generating demo meal plan (no recipes available)...');
 
   const plannedMeals: PlannedRecipeItem[] = [];
   const targetCalories = userProfile?.macroTargets?.calories || 2000;
@@ -319,7 +305,6 @@ export default function AISuggestionsPage() {
 
   // FIXED: handleGeneratePlan to use real AI API
   const handleGeneratePlan = async () => {
-    console.log('🎬 Starting handleGeneratePlan with real AI...');
 
     // Check subscription limits before proceeding
     if (!checkLimitsBeforeGeneration()) {
@@ -391,20 +376,7 @@ export default function AISuggestionsPage() {
     };
 
     try {
-      console.log('🚀 Calling Preppy API with:', { 
-        recipeCount: validRecipes.length, 
-        mealSlots: userSettingsToUse.mealStructure.length,
-        hasTargets: !!userSettingsToUse.macroTargets
-      });
 
-      console.log('📡 Request body summary:', {
-        macroTargets: requestBody.macroTargets,
-        mealStructureLength: requestBody.mealStructure.length,
-        recipeCount: requestBody.availableRecipes.length,
-        sampleRecipe: requestBody.availableRecipes[0],
-        dietaryPreferences: requestBody.dietaryPreferences,
-        allergens: requestBody.allergens
-      });
 
       // Get authentication token
       const idToken = await user.getIdToken();
@@ -418,30 +390,23 @@ export default function AISuggestionsPage() {
         body: JSON.stringify(requestBody)
       });
 
-      console.log('📥 Response status:', response.status, response.statusText);
 
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}: Failed to generate meal plan`;
         let errorDetails = null;
         try {
           const responseText = await response.text();
-          console.error('❌ Error response text:', responseText);
           try {
             const errorData = JSON.parse(responseText);
-            console.error('❌ Parsed error data:', errorData);
             errorMessage = errorData.error || errorData.details || errorMessage;
             errorDetails = errorData;
           } catch (jsonParseError) {
             // If it's not JSON, use the raw text
-            console.error('❌ Could not parse error as JSON:', jsonParseError);
             errorMessage = responseText || errorMessage;
           }
         } catch (textError) {
-          console.error('❌ Could not read error response:', textError);
         }
         
-        console.error('❌ Final error message:', errorMessage);
-        console.error('❌ Full error details:', errorDetails);
         throw new Error(errorMessage);
       }
 
@@ -464,7 +429,6 @@ export default function AISuggestionsPage() {
       
       // Try fallback meal plan generation only as last resort
       try {
-        console.log('⚠️ AI failed, trying fallback...');
         
         const mealStructureLocal: MealSlotConfigLocal[] = userSettingsToUse.mealStructure.map((ms: any) => ({
           id: ms.id,
@@ -486,7 +450,6 @@ export default function AISuggestionsPage() {
         
         setError(`Preppy temporarily unavailable: ${err.message}. Showing a simple fallback plan instead.`);
       } catch (fallbackError: any) {
-        console.error('Even fallback failed:', fallbackError);
         setError(`Failed to generate meal plan: ${err.message}`);
       }
     } finally {
@@ -532,14 +495,11 @@ export default function AISuggestionsPage() {
       const idToken = await user.getIdToken();
       
       for (const meal of newMeals) {
-        console.log(`🔍 Looking for recipe ID ${meal.recipeId} in ${allRecipesCache?.length || 0} recipes`);
         
         // Find the recipe for this meal (handle both string and number IDs)
         const recipe = allRecipesCache.find(r => r.id == meal.recipeId || r.id === Number(meal.recipeId));
-        console.log('📝 Found recipe:', recipe ? `${recipe.name} (ID: ${recipe.id})` : 'NOT FOUND');
         
         if (recipe) {
-          console.log(`➕ Adding meal: ${recipe.name} for ${meal.mealType} (slot: ${meal.mealSlotId}) on ${meal.date} (${meal.servings} servings)`);
           try {
             // Use server action directly to ensure mealSlotId is preserved
             const result = await addMealToDay(idToken, meal.date, {
@@ -554,13 +514,10 @@ export default function AISuggestionsPage() {
               throw new Error(result.error || 'Failed to add meal');
             }
             
-            console.log(`✅ Successfully added: ${recipe.name}`);
           } catch (addError: any) {
-            console.error(`❌ Failed to add meal ${recipe.name}:`, addError);
             throw addError; // Re-throw to trigger the main catch block
           }
         } else {
-          console.error(`❌ Recipe not found for ID: ${meal.recipeId}`);
           throw new Error(`Recipe not found for ID: ${meal.recipeId}`);
         }
       }
@@ -574,7 +531,6 @@ export default function AISuggestionsPage() {
       setSuggestion(null);
       
     } catch (error: any) {
-      console.error('Failed to add meal plan:', error);
       toast({
         title: "Error Adding Plan",
         description: "Failed to save your meal plan. Please try again.",
@@ -583,48 +539,7 @@ export default function AISuggestionsPage() {
     }
   };
 
-  // Debug function to inspect recipe data (can be removed in production)
-  const debugRecipeData = () => {
-    console.log('=== RECIPE DATA ANALYSIS ===');
-    console.log('Total recipes:', allRecipesCache?.length || 0);
-    
-    if (allRecipesCache) {
-      allRecipesCache.forEach((recipe: any, index: number) => {
-        if (!recipe) {
-          console.log(`Recipe ${index}: NULL/UNDEFINED`);
-          return;
-        }
-        
-        // Check for individual macro properties (your data structure)
-        if (typeof recipe.calories !== 'number') {
-          console.log(`Recipe ${index} "${recipe.name}": Invalid/missing calories:`, recipe.calories);
-        }
-        if (typeof recipe.protein !== 'number') {
-          console.log(`Recipe ${index} "${recipe.name}": Invalid/missing protein:`, recipe.protein);
-        }
-        if (typeof recipe.carbs !== 'number') {
-          console.log(`Recipe ${index} "${recipe.name}": Invalid/missing carbs:`, recipe.carbs);
-        }
-        if (typeof recipe.fat !== 'number') {
-          console.log(`Recipe ${index} "${recipe.name}": Invalid/missing fat:`, recipe.fat);
-        }
-        
-        // Log successful recipes
-        if (typeof recipe.calories === 'number' && typeof recipe.protein === 'number' && 
-            typeof recipe.carbs === 'number' && typeof recipe.fat === 'number') {
-          console.log(`Recipe ${index} "${recipe.name}": ✅ Valid macros - Cal: ${recipe.calories}, P: ${recipe.protein}, C: ${recipe.carbs}, F: ${recipe.fat}`);
-        }
-      });
-    }
-    console.log('=== END ANALYSIS ===');
-  };
 
-  // Call debug function when recipes load (can be removed in production)
-  useEffect(() => {
-    if (allRecipesCache && allRecipesCache.length > 0) {
-      debugRecipeData();
-    }
-  }, [allRecipesCache]);
   
   if (!isSubscribed) {
     return (
