@@ -1,7 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
+import { isAdminIPAllowed } from '@/lib/admin-security';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Admin IP restriction for security
+  if (!isAdminIPAllowed(request)) {
+    return NextResponse.json(
+      { error: 'Access denied - Admin IP restriction' },
+      { status: 403 }
+    );
+  }
   const checks = {
     timestamp: new Date().toISOString(),
     status: 'healthy',

@@ -33,6 +33,31 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(`https://${request.headers.get('host')}${pathname}`, 301);
   }
 
+  // Request body size limits for DoS protection
+  if (request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH') {
+    const contentLength = request.headers.get('content-length');
+    const maxSizes = {
+      '/api/ai/': 1024 * 1024, // 1MB for AI endpoints
+      '/api/webhooks/': 10 * 1024 * 1024, // 10MB for webhooks
+      default: 100 * 1024 // 100KB for other endpoints
+    };
+    
+    let maxSize = maxSizes.default;
+    for (const [route, size] of Object.entries(maxSizes)) {
+      if (route !== 'default' && pathname.startsWith(route)) {
+        maxSize = size;
+        break;
+      }
+    }
+    
+    if (contentLength && parseInt(contentLength) > maxSize) {
+      return NextResponse.json(
+        { error: 'Request body too large', maxSize: `${maxSize} bytes` },
+        { status: 413 }
+      );
+    }
+  }
+
   // Apply rate limiting based on route type
   let rateLimitResult;
   if (pathname.startsWith('/api/ai/')) {
