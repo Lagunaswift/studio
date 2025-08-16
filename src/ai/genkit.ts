@@ -39,11 +39,11 @@ try {
   console.log('🔧 Loading Genkit prompts...');
   
   // Test if the prompt can be accessed
-  const promptTest = ai.prompt('suggestMealPlan');
-  if (promptTest) {
+  try {
+    const promptTest = ai.prompt('suggestMealPlan');
     console.log('✅ suggestMealPlan prompt loaded successfully');
-  } else {
-    console.error('❌ suggestMealPlan prompt is undefined');
+  } catch (error) {
+    console.error('❌ suggestMealPlan prompt failed to load:', error);
   }
   
 } catch (error: any) {

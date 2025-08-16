@@ -46,6 +46,38 @@ export const MENOPAUSE_STATUS_OPTIONS = ['notSpecified', 'pre', 'post'] as const
 export type MenopauseStatus = typeof MENOPAUSE_STATUS_OPTIONS[number];
 
 
+// Export types needed by AI flows
+export type PlannedRecipeItem = {
+  mealSlotId: string;
+  mealSlotName: string;
+  recipeId: number;
+  recipeName: string;
+  servings: number;
+  calculatedMacros: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+};
+
+export type RecipeForAI = {
+  id: number;
+  name: string;
+  macrosPerServing: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+  tags?: string[];
+};
+
+// Energy and vitals types for daily check-in
+export type EnergyLevelV2 = 'low' | 'moderate' | 'high' | 'vibrant';
+export type SorenessLevel = 'none' | 'mild' | 'moderate' | 'severe';
+export type ActivityYesterdayLevel = 'none' | 'light' | 'moderate' | 'intense';
+
 export interface Macros {
   calories: number;
   protein: number;
@@ -109,6 +141,13 @@ export const UserProfileSettingsSchema = z.object({
     showQuickRecipes: z.boolean(),
   }),
   favorite_recipe_ids: z.array(z.number()),
+  dailyWeightLog: z.array(z.any()).optional(),
+  dailyVitalsLog: z.array(z.any()).optional(),
+  dailyManualMacrosLog: z.array(z.any()).optional(),
+  neck_circumference_cm: z.number().nullable().optional(),
+  abdomen_circumference_cm: z.number().nullable().optional(),
+  waist_circumference_cm: z.number().nullable().optional(),
+  hip_circumference_cm: z.number().nullable().optional(),
 });
 
 
@@ -180,6 +219,13 @@ export interface Recipe {
     protein: number;
     carbs: number;
     fat: number;
+    // ✅ Added macrosPerServing for AI compatibility
+    macrosPerServing: {
+      calories: number;
+      protein: number;
+      carbs: number;
+      fat: number;
+    };
     imageUrl?: string; // ✅ Made optional
     tags: string[];
     isCustom?: boolean; // ✅ Added to match your data
@@ -206,7 +252,12 @@ export interface DailyVitalsLog {
   date: string; // YYYY-MM-DD
   sleepHours: number;
   stressLevel: number; // 1-10
-  energyLevel: number; // 1-10
+  energyLevel: EnergyLevelV2;
+  sleepQuality: number;
+  cravingsLevel: number;
+  muscleSoreness: SorenessLevel;
+  activityYesterday: ActivityYesterdayLevel;
+  notes?: string;
 }
 
 export interface DailyManualMacrosLog {

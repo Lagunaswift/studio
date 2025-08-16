@@ -1,0 +1,188 @@
+name: Vercel CI/CD Pipeline
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    name: Security Scan
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run secret detection
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  lint-and-type-check:
+    runs-on: ubuntu-latest
+    name: Lint and Type Check
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Type check
+        run: npm run typecheck
+      
+      - name: Lint check
+        run: npm run lint --silent
+        continue-on-error: true
+
+  build-test:
+    runs-on: ubuntu-latest
+    name: Build Test
+    needs: [security-scan, lint-and-type-check]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build application
+        run: npm run build
+        env:
+          # Use placeholder values for build
+          NEXT_PUBLIC_FIREBASE_API_KEY: "build-placeholder"
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: "build-placeholder"
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "build-placeholder.firebaseapp.com"
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "build-placeholder.firebasestorage.app"
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "123456789"
+          NEXT_PUBLIC_FIREBASE_APP_ID: "1:123456789:web:abcdef"
+          FIREBASE_PROJECT_ID: "build-placeholder"
+          FIREBASE_CLIENT_EMAIL: "build@placeholder.iam.gserviceaccount.com"
+          FIREBASE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\nBUILD_PLACEHOLDER\n-----END PRIVATE KEY-----"
+          GEMINI_API_KEY: "build-placeholder"
+      
+      - name: Check build size
+        run: |
+          if [ -d ".next" ]; then
+            echo "Build successful - .next directory created"
+            du -sh .next/ || echo "Could not measure build size"
+          else
+            echo "Build failed - .next directory not found"
+            exit 1
+          fi
+
+  deploy-preview:
+    runs-on: ubuntu-latest
+    name: Deploy Preview
+    needs: [security-scan, lint-and-type-check, build-test]
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+      
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+      
+      - name: Build Project Artifacts
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+      
+      - name: Deploy Preview to Vercel
+        id: deploy-preview
+        run: |
+          url=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          echo "PREVIEW_URL=$url" >> $GITHUB_OUTPUT
+          echo "Preview deployed to: $url"
+      
+      - name: Test Preview Deployment
+        run: |
+          # Wait for deployment to be ready
+          sleep 30
+          
+          # Test health endpoint
+          curl -f "${{ steps.deploy-preview.outputs.PREVIEW_URL }}/api/health" || exit 1
+          
+          # Test that protected endpoints require auth
+          response=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.deploy-preview.outputs.PREVIEW_URL }}/api/ai/suggest-recipes")
+          if [ "$response" != "401" ]; then
+            echo "❌ AI endpoint should return 401 without auth, got $response"
+            exit 1
+          fi
+          echo "✅ Security test passed - AI endpoints require authentication"
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    name: Deploy Production
+    needs: [security-scan, lint-and-type-check, build-test]
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+      
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      
+      - name: Build Project Artifacts
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      
+      - name: Deploy Production to Vercel
+        id: deploy-production
+        run: |
+          url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "PRODUCTION_URL=$url" >> $GITHUB_OUTPUT
+          echo "Production deployed to: $url"
+      
+      - name: Post-Deploy Health Check
+        run: |
+          # Wait for deployment to be ready
+          sleep 60
+          
+          # Test health endpoint
+          health_response=$(curl -s "${{ steps.deploy-production.outputs.PRODUCTION_URL }}/api/health")
+          echo "Health check response: $health_response"
+          
+          # Verify health status
+          if echo "$health_response" | grep -q '"status":"healthy"'; then
+            echo "✅ Production health check passed"
+          else
+            echo "❌ Production health check failed"
+            exit 1
+          fi
+      
+      - name: Run Lighthouse on Production
+        run: |
+          npm install -g @lhci/cli
+          lhci autorun --upload.target=temporary-public-storage
+        env:
+          LHCI_BUILD_CONTEXT__CURRENT_HASH: ${{ github.sha }}
+          LHCI_BUILD_CONTEXT__COMMIT_TIME: ${{ github.event.head_commit.timestamp }}
+          LHCI_BUILD_CONTEXT__CURRENT_BRANCH: ${{ github.ref_name }}
+          LHCI_BUILD_CONTEXT__COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+      
+      - name: Notify Success
+        run: |
+          echo "🚀 Production deployment successful!"
+          echo "URL: ${{ steps.deploy-production.outputs.PRODUCTION_URL }}"
+          echo "Health: ${{ steps.deploy-production.outputs.PRODUCTION_URL }}/api/health"
+          echo "Metrics: ${{ steps.deploy-production.outputs.PRODUCTION_URL }}/api/metrics"

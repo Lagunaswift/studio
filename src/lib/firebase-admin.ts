@@ -113,3 +113,18 @@ export const adminDb = getFirestore(adminApp);
 export function getAdminFirestore() {
     return adminDb;
 }
+
+// Token verification function for middleware
+export async function verifyIdToken(token: string) {
+  if (!token) {
+    throw new Error('No token provided');
+  }
+  
+  try {
+    const decodedToken = await adminAuth.verifyIdToken(token);
+    return decodedToken;
+  } catch (error: any) {
+    console.error('Token verification failed:', error.message);
+    throw new Error('Invalid or expired token');
+  }
+}

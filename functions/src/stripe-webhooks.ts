@@ -4,7 +4,7 @@ import Stripe from 'stripe';
 import { admin } from './admin';
 
 const stripe = new Stripe(functions.config().stripe.secret_key, {
-  apiVersion: '2024-06-20',
+  apiVersion: '2025-07-30.basil',
 });
 
 const webhookSecret = functions.config().stripe.webhook_secret;
@@ -196,7 +196,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   console.log('Invoice payment succeeded:', invoice.id);
   
-  const subscriptionId = invoice.subscription as string;
+  const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id;
   
   if (!subscriptionId) return;
 
@@ -243,7 +243,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   console.log('Invoice payment failed:', invoice.id);
   
-  const subscriptionId = invoice.subscription as string;
+  const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id;
   
   if (!subscriptionId) return;
 
@@ -333,7 +333,7 @@ function getSubscriptionStatus(stripeStatus: string): string {
 // Additional function to sync user data with Stripe customer
 export const syncStripeCustomer = functions.https.onCall(async (data, context) => {
   // Ensure user is authenticated
-  if (!context.auth) {
+  if (!context?.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
 

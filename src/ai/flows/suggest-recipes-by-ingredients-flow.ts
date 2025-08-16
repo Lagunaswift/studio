@@ -6,9 +6,7 @@ import { SuggestRecipesByIngredientsInputSchema, SuggestRecipesByIngredientsOutp
 export async function suggestRecipesByIngredients(input: z.infer<typeof SuggestRecipesByIngredientsInputSchema>) {
   const prompt = ai.prompt('suggestRecipesByIngredients');
   
-  const result = await prompt.generate({
-    input,
-  });
+  const result = await prompt(input);
 
   return result.output;
 }

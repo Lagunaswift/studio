@@ -33,5 +33,5 @@
     "scripts/**/*.ts", 
     "supabase/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "functions/**/*", ".next", "out"]
 }
