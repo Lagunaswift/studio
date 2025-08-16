@@ -406,10 +406,14 @@ export default function AISuggestionsPage() {
         allergens: requestBody.allergens
       });
 
+      // Get authentication token
+      const idToken = await user.getIdToken();
+
       const response = await fetch('/api/ai/suggest-meal-plan', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
         },
         body: JSON.stringify(requestBody)
       });
