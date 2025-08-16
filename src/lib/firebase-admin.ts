@@ -45,8 +45,8 @@ function initializeFirebaseAdmin() {
   }
 
   // Handle placeholder/invalid private keys during build
-  if (privateKey.includes('YOUR_PRIVATE_KEY_HERE') || privateKey.includes('your_private_key')) {
-    if (process.env.NODE_ENV === 'production') {
+  if (privateKey.includes('YOUR_PRIVATE_KEY_HERE') || privateKey.includes('your_private_key') || privateKey.length < 100) {
+    if (process.env.NODE_ENV === 'production' && process.env.VERCEL !== '1') {
       throw new Error('Invalid Firebase private key in production - contains placeholder text');
     } else {
       console.warn('Firebase admin using placeholder key for build, using minimal app');
