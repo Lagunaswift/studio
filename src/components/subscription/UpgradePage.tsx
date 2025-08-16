@@ -148,6 +148,14 @@ export function UpgradePage({ showCancelledMessage = false, highlightPlan = 'yea
               </li>
               <li className="flex items-start gap-2">
                 <Check className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <span className="text-sm">Shopping list generator</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <span className="text-sm">Pantry management system</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
                 <span className="text-sm">Community support</span>
               </li>
             </ul>
@@ -207,11 +215,11 @@ export function UpgradePage({ showCancelledMessage = false, highlightPlan = 'yea
               </li>
               <li className="flex items-start gap-2">
                 <Download className="h-5 w-5 text-accent mt-0.5 flex-shrink-0" />
-                <span className="text-sm">Shopping list generator</span>
+                <span className="text-sm">AI weekly check-in coaching</span>
               </li>
               <li className="flex items-start gap-2">
                 <Palette className="h-5 w-5 text-accent mt-0.5 flex-shrink-0" />
-                <span className="text-sm">Pantry management system</span>
+                <span className="text-sm">Advanced AI nutrition widgets</span>
               </li>
               <li className="flex items-start gap-2">
                 <MessageCircle className="h-5 w-5 text-accent mt-0.5 flex-shrink-0" />
@@ -266,10 +274,15 @@ export function UpgradePage({ showCancelledMessage = false, highlightPlan = 'yea
               </tr>
               <tr className="bg-gray-50">
                 <td className="border border-gray-200 px-4 py-3">Shopping Lists</td>
-                <td className="border border-gray-200 px-4 py-3 text-center">❌</td>
+                <td className="border border-gray-200 px-4 py-3 text-center">✅</td>
                 <td className="border border-gray-200 px-4 py-3 text-center">✅</td>
               </tr>
               <tr>
+                <td className="border border-gray-200 px-4 py-3">AI Weekly Check-in</td>
+                <td className="border border-gray-200 px-4 py-3 text-center">❌</td>
+                <td className="border border-gray-200 px-4 py-3 text-center">✅</td>
+              </tr>
+              <tr className="bg-gray-50">
                 <td className="border border-gray-200 px-4 py-3">Priority Support</td>
                 <td className="border border-gray-200 px-4 py-3 text-center">❌</td>
                 <td className="border border-gray-200 px-4 py-3 text-center">✅</td>
@@ -283,8 +296,7 @@ export function UpgradePage({ showCancelledMessage = false, highlightPlan = 'yea
       <div className="text-center space-y-4">
         <h2 className="text-2xl font-bold">Questions?</h2>
         <p className="text-gray-600">
-          Contact us at support@mealplannerapp.com or check out our{' '}
-          <a href="/help" className="text-accent hover:underline">Help Center</a>
+          Contact us at mealpreppypro@gmail.com for any questions or support.
         </p>
       </div>
     </div>

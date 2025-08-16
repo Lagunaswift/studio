@@ -30,9 +30,9 @@ export const SUBSCRIPTION_PLANS = {
     features: [
       '15 AI requests per day (300/month)',
       'AI pantry chef & meal planning', 
+      'AI weekly check-in coaching',
+      'Advanced AI nutrition widgets',
       'Unlimited recipes & meal plans',
-      'Shopping list generator',
-      'Pantry management system',
       'Priority customer support',
     ],
     savings: null,
@@ -45,7 +45,7 @@ export const SUBSCRIPTION_PLANS = {
     interval: 'year',
     features: [
       'Everything in Premium Monthly',
-      'Save £26 annually',
+      'Save £26.89 annually',
       'Priority feature requests',
       'Early access to new features',
     ],
@@ -158,8 +158,8 @@ export async function redirectToCustomerPortal(userId: string) {
 }
 
 // Utility functions for subscription management
-export function formatPrice(amount: number, currency: string = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
+export function formatPrice(amount: number, currency: string = 'GBP'): string {
+  return new Intl.NumberFormat('en-GB', {
     style: 'currency',
     currency,
   }).format(amount);
