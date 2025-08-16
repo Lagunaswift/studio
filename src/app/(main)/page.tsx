@@ -252,18 +252,87 @@ export default function HomePage() {
     ];
   }, [consumedTodayMacros, currentMacroTargets]);
 
-  // Featured recipe effect
+  // Cleanup old cached recipes (keep only last 7 days)
   useEffect(() => {
-    if (allRecipesCache && allRecipesCache.length > 0) {
-      const randomIndex = Math.floor(Math.random() * allRecipesCache.length);
-      setFeaturedRecipe(allRecipesCache[randomIndex]);
-      
-      const differentIndex = randomIndex === 0 ? 1 : randomIndex - 1;
-      if (allRecipesCache[differentIndex]) {
-        setQuickRecipe(allRecipesCache[differentIndex]);
+    if (isClient && clientTodayDate) {
+      try {
+        const keys = Object.keys(localStorage);
+        const recipeKeys = keys.filter(key => key.startsWith('featuredRecipe_') || key.startsWith('quickRecipe_'));
+        
+        recipeKeys.forEach(key => {
+          const dateStr = key.split('_')[1];
+          if (dateStr) {
+            const keyDate = new Date(dateStr);
+            const today = new Date(clientTodayDate);
+            const daysDiff = Math.floor((today.getTime() - keyDate.getTime()) / (1000 * 60 * 60 * 24));
+            
+            // Remove entries older than 7 days
+            if (daysDiff > 7) {
+              localStorage.removeItem(key);
+            }
+          }
+        });
+      } catch (error) {
+        console.warn('Failed to cleanup old cached recipes:', error);
       }
     }
-  }, [allRecipesCache]);
+  }, [isClient, clientTodayDate]);
+
+  // Featured recipe effect with daily caching
+  useEffect(() => {
+    if (allRecipesCache && allRecipesCache.length > 0 && clientTodayDate && isClient) {
+      const todayKey = `featuredRecipe_${clientTodayDate}`;
+      const quickRecipeKey = `quickRecipe_${clientTodayDate}`;
+      
+      try {
+        // Check if we already have cached recipes for today
+        const cachedFeaturedId = localStorage.getItem(todayKey);
+        const cachedQuickId = localStorage.getItem(quickRecipeKey);
+        
+        let featuredRecipeToSet = null;
+        let quickRecipeToSet = null;
+        
+        // Try to find cached featured recipe
+        if (cachedFeaturedId) {
+          const parsedId = parseInt(cachedFeaturedId, 10);
+          featuredRecipeToSet = allRecipesCache.find(recipe => recipe.id === parsedId);
+        }
+        
+        // Try to find cached quick recipe
+        if (cachedQuickId) {
+          const parsedId = parseInt(cachedQuickId, 10);
+          quickRecipeToSet = allRecipesCache.find(recipe => recipe.id === parsedId);
+        }
+        
+        // If we don't have valid cached recipes or they're not found, generate new ones
+        if (!featuredRecipeToSet || !quickRecipeToSet) {
+          const randomIndex = Math.floor(Math.random() * allRecipesCache.length);
+          const differentIndex = randomIndex === 0 ? 1 : randomIndex - 1;
+          
+          featuredRecipeToSet = allRecipesCache[randomIndex];
+          quickRecipeToSet = allRecipesCache[differentIndex] || allRecipesCache[0];
+          
+          // Cache the new selections for today
+          localStorage.setItem(todayKey, featuredRecipeToSet.id.toString());
+          localStorage.setItem(quickRecipeKey, quickRecipeToSet.id.toString());
+        }
+        
+        setFeaturedRecipe(featuredRecipeToSet);
+        setQuickRecipe(quickRecipeToSet);
+        
+      } catch (error) {
+        // Fallback to random selection if localStorage fails
+        console.warn('Failed to use localStorage for featured recipe caching:', error);
+        const randomIndex = Math.floor(Math.random() * allRecipesCache.length);
+        setFeaturedRecipe(allRecipesCache[randomIndex]);
+        
+        const differentIndex = randomIndex === 0 ? 1 : randomIndex - 1;
+        if (allRecipesCache[differentIndex]) {
+          setQuickRecipe(allRecipesCache[differentIndex]);
+        }
+      }
+    }
+  }, [allRecipesCache, clientTodayDate, isClient]);
 
   // Loading state
   if (isAuthLoading || isProfileLoading || isAppRecipeCacheLoading) {
